@@ -22,6 +22,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [isClaimingAll, setIsClaimingAll] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
@@ -68,6 +69,22 @@ export default function UnderwritingPositions({ displayCurrency }) {
       console.error("Failed to claim rewards", err);
     } finally {
       setIsClaiming(false);
+    }
+  };
+
+  const handleClaimAllRewards = async () => {
+    if (underwritingPositions.length === 0) return;
+    setIsClaimingAll(true);
+    try {
+      const cp = await getCoverPoolWithSigner();
+      const ids = underwritingPositions.map((p) => p.poolId);
+      await (
+        await cp.claimRewardsFromMultiplePools(ids, true, true)
+      ).wait();
+    } catch (err) {
+      console.error("Failed to claim all rewards", err);
+    } finally {
+      setIsClaimingAll(false);
     }
   };
 
@@ -283,7 +300,16 @@ export default function UnderwritingPositions({ displayCurrency }) {
               </tbody>
             </table>
           </div>
-        </div>
+      </div>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={handleClaimAllRewards}
+          disabled={isClaimingAll}
+          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
+        >
+          {isClaimingAll ? "Claiming..." : "Claim All Rewards"}
+        </button>
       </div>
 
       {/* Manage Position Modal */}
