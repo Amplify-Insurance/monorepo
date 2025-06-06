@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { Info, Plus, Minus } from "lucide-react"
+import { getCoverPoolWithSigner } from "../lib/coverPool"
 import Modal from "./Modal"
 
 export default function ManageCoverageModal({
@@ -15,12 +16,15 @@ export default function ManageCoverageModal({
   premium,
   yield: underwriterYield,
   capacity = 0,
+  policyId,
+  shares,
 }) {
   const [action, setAction] = useState("increase") // increase or decrease
   const [adjustAmount, setAdjustAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
   const tokenPrice = 1
   const maxAmount = type === "coverage" ? capacity : amount
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Calculate USD value when amount changes
   const handleAmountChange = (e) => {
@@ -42,6 +46,30 @@ export default function ManageCoverageModal({
     }
     setAdjustAmount(maxTokens)
     setUsdValue((Number.parseFloat(maxTokens) * tokenPrice).toFixed(2))
+  }
+
+  const handleSubmit = async () => {
+    if (!adjustAmount || Number.parseFloat(adjustAmount) <= 0) return
+    setIsSubmitting(true)
+    try {
+      const cp = await getCoverPoolWithSigner()
+      let tx
+      if (type === "coverage") {
+        if (!policyId) throw new Error("policyId required")
+        tx = await cp.settlePremium(policyId)
+      } else if (action === "decrease") {
+        if (!shares) throw new Error("share info missing")
+        tx = await cp.requestWithdrawal(shares)
+      } else {
+        return
+      }
+      await tx.wait()
+      onClose()
+    } catch (err) {
+      console.error("Failed to submit", err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -175,14 +203,17 @@ export default function ManageCoverageModal({
 
         {/* Action button */}
         <button
+          onClick={handleSubmit}
           className={`w-full py-3 rounded-lg font-medium text-white ${
-            adjustAmount && Number.parseFloat(adjustAmount) > 0
+            adjustAmount && Number.parseFloat(adjustAmount) > 0 && !isSubmitting
               ? "bg-blue-600 hover:bg-blue-700"
               : "bg-gray-400 cursor-not-allowed"
           }`}
-          disabled={!adjustAmount || Number.parseFloat(adjustAmount) <= 0}
+          disabled={!adjustAmount || Number.parseFloat(adjustAmount) <= 0 || isSubmitting}
         >
-          {adjustAmount && Number.parseFloat(adjustAmount) > 0
+          {isSubmitting
+            ? "Submitting..."
+            : adjustAmount && Number.parseFloat(adjustAmount) > 0
             ? `${action === "increase" ? "Increase" : "Decrease"} ${type === "coverage" ? "Coverage" : "Position"}`
             : "Enter an amount"}
         </button>

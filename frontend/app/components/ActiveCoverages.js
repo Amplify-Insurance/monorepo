@@ -178,6 +178,7 @@ export default function ActiveCoverages({ displayCurrency }) {
           amount={selectedCoverage.coverageAmount}
           premium={selectedCoverage.premium}
           capacity={selectedCoverage.capacity}
+          policyId={selectedCoverage.id}
         />
       )}
     </div>
