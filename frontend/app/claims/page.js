@@ -4,49 +4,48 @@ import { useState } from "react"
 import { useAccount } from "wagmi"
 import { AlertTriangle, Info, Search } from "lucide-react"
 import Image from "next/image"
-import ConnectWallet from "../components/ConnectWallet"
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatCurrency } from "../utils/formatting"
+import useUserPolicies from "../hooks/useUserPolicies"
+import usePools from "../hooks/usePools"
+import { ethers } from "ethers"
 
-// Mock data for active coverages that can be claimed
-const activeCoverages = [
-  {
-    id: 1,
-    protocol: "Aave",
-    pool: "ETH",
-    coverageAmount: 25000,
-    premium: 2.5,
-    status: "active",
-    startDate: "2024-01-15",
-    endDate: "2025-01-15",
-  },
-  {
-    id: 2,
-    protocol: "Compound",
-    pool: "USDC",
-    coverageAmount: 50000,
-    premium: 1.5,
-    status: "active",
-    startDate: "2024-02-20",
-    endDate: "2025-02-20",
-  },
-  {
-    id: 3,
-    protocol: "Morpho",
-    pool: "ETH",
-    coverageAmount: 15000,
-    premium: 2.7,
-    status: "active",
-    startDate: "2024-03-10",
-    endDate: "2025-03-10",
-  },
-]
+const PROTOCOL_NAMES = {
+  1: "Protocol A",
+  2: "Protocol B",
+  3: "Protocol C",
+  4: "Lido stETH",
+  5: "Rocket rETH",
+}
 
 export default function ClaimsPage() {
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
+  const { policies } = useUserPolicies(address)
+  const { pools } = usePools()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCoverage, setSelectedCoverage] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
+
+  const activeCoverages = policies
+    .map((p) => {
+      const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
+      if (!pool) return null
+      const coverageAmount = Number(
+        ethers.formatUnits(p.coverage, pool.underlyingAssetDecimals),
+      )
+      return {
+        id: p.id,
+        protocol: PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`,
+        pool: pool.protocolTokenToCover,
+        coverageAmount,
+        premium: Number(pool.premiumRateBps || 0) / 100,
+        status: "active",
+        startDate: new Date(Number(p.activation || p.start) * 1000).toISOString(),
+        endDate: new Date(Number(p.lastPaidUntil) * 1000).toISOString(),
+      }
+    })
+    .filter(Boolean)
 
   // Filter coverages based on search term
   const filteredCoverages = activeCoverages.filter(
@@ -55,23 +54,30 @@ export default function ClaimsPage() {
       coverage.pool.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const handleSubmitClaim = (e) => {
+  const handleSubmitClaim = async (e) => {
     e.preventDefault()
+    if (!selectedCoverage) return
     setIsSubmitting(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      await fetch("/api/coverpool/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ policyId: selectedCoverage.id, proof: [] }),
+      })
       setShowConfirmation(true)
       setSelectedCoverage(null)
-    }, 1500)
+    } catch (err) {
+      console.error("Failed to submit claim", err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <h1 className="text-2xl font-bold mb-6">Connect your wallet to make a claim</h1>
-        <ConnectWallet />
+        <ConnectButton />
       </div>
     )
   }
