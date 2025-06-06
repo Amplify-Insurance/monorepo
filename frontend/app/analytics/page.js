@@ -4,9 +4,18 @@ import { useState } from "react"
 import { ArrowDown, ArrowUp, Check, ExternalLink, Info, Search, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { ethers } from "ethers"
+import useClaims from "../hooks/useClaims"
+import usePools from "../hooks/usePools"
 
-// Mock data for claims history
-const claimsHistory = [
+const PROTOCOL_NAMES = {
+  1: "Protocol A",
+  2: "Protocol B",
+  3: "Protocol C",
+  4: "Lido stETH",
+  5: "Rocket rETH",
+}
+
   {
     id: 25,
     coverId: 1369,
@@ -159,52 +168,65 @@ const claimsHistory = [
   },
 ]
 
-// Mock data for claims statistics
-const claimsStats = {
-  total: 18265303,
-  byToken: {
-    DAI: 12977372,
-    ETH: 5281040,
-    USDC: 6891,
-    cbBTC: 0,
-  },
-  byProduct: [
-    { name: "FTX", amount: 4500000, denied: 1200000 },
-    { name: "Mango Markets", amount: 4200000, denied: 0 },
-    { name: "Euler", amount: 2300000, denied: 0 },
-    { name: "Cream Finance", amount: 2200000, denied: 0 },
-    { name: "Sherlock", amount: 1200000, denied: 0 },
-    { name: "Compound", amount: 1100000, denied: 0 },
-    { name: "Aave", amount: 800000, denied: 0 },
-    { name: "Curve", amount: 700000, denied: 0 },
-    { name: "bZx v1", amount: 400000, denied: 0 },
-  ],
-  byMonth: [
-    { month: "Jan 2021", amount: 0 },
-    { month: "Apr 2021", amount: 0 },
-    { month: "Jul 2021", amount: 0 },
-    { month: "Oct 2021", amount: 0 },
-    { month: "Jan 2022", amount: 0 },
-    { month: "Apr 2022", amount: 0 },
-    { month: "Jul 2022", amount: 0 },
-    { month: "Oct 2022", amount: 2000000 },
-    { month: "Jan 2023", amount: 3000000 },
-    { month: "Apr 2023", amount: 3500000 },
-    { month: "Jul 2023", amount: 4000000 },
-    { month: "Oct 2023", amount: 5000000 },
-    { month: "Jan 2024", amount: 15000000 },
-    { month: "Apr 2024", amount: 18000000 },
-  ],
-}
 
 export default function AnalyticsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const { claims } = useClaims()
+  const { pools } = usePools()
+
+  const mappedClaims = claims
+    .map((c, idx) => {
+      const pool = pools.find((p) => Number(p.id) === c.poolId)
+      if (!pool) return null
+      const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+      const token = pool.protocolTokenToCover
+      const amount = Number(
+        ethers.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
+      )
+      const value = Number(
+        ethers.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)
+      )
+      return {
+        id: idx + 1,
+        coverId: c.policyId,
+        verdict: "PAID",
+        url: `https://etherscan.io/tx/${c.transactionHash}`,
+        productName: protocol,
+        productType: "Protocol",
+        stakingPool: c.poolId,
+        coverAsset: token,
+        coverAmount: amount,
+        coverAmountUSD: value,
+        claimAmount: value,
+        claimAmountUSD: value,
+        date: new Date(c.timestamp * 1000).toISOString().slice(0, 10),
+      }
+    })
+    .filter(Boolean)
+
+  const stats = (() => {
+    const byToken = {}
+    const byProduct = {}
+    const byMonth = {}
+    for (const c of mappedClaims) {
+      byToken[c.coverAsset] = (byToken[c.coverAsset] || 0) + c.claimAmountUSD
+      byProduct[c.productName] = (byProduct[c.productName] || 0) + c.claimAmountUSD
+      const month = new Date(c.date).toLocaleString("en-US", { month: "short", year: "numeric" })
+      byMonth[month] = (byMonth[month] || 0) + c.claimAmountUSD
+    }
+    return {
+      total: mappedClaims.reduce((sum, c) => sum + c.claimAmountUSD, 0),
+      byToken,
+      byProduct: Object.entries(byProduct).map(([name, amount]) => ({ name, amount, denied: 0 })),
+      byMonth: Object.entries(byMonth).map(([month, amount]) => ({ month, amount })),
+    }
+  })()
 
   // Filter claims based on search term
-  const filteredClaims = claimsHistory.filter(
+  const filteredClaims = mappedClaims.filter(
     (claim) =>
       claim.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       claim.productType.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -259,7 +281,7 @@ export default function AnalyticsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
             <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-              {claimsStats.total.toLocaleString()}
+              {stats.total.toLocaleString()}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total</div>
           </div>
@@ -268,7 +290,7 @@ export default function AnalyticsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
             <div className="text-2xl sm:text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-              {claimsStats.byToken.DAI.toLocaleString()}
+              {(stats.byToken.DAI || 0).toLocaleString()}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">DAI share</div>
           </div>
@@ -277,7 +299,7 @@ export default function AnalyticsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
             <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {claimsStats.byToken.ETH.toLocaleString()}
+              {(stats.byToken.ETH || 0).toLocaleString()}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">ETH share</div>
           </div>
@@ -286,7 +308,7 @@ export default function AnalyticsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
             <div className="text-2xl sm:text-3xl font-bold text-blue-500 dark:text-blue-300">
-              {claimsStats.byToken.USDC.toLocaleString()}
+              {(stats.byToken.USDC || 0).toLocaleString()}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USDC share</div>
           </div>
@@ -297,7 +319,7 @@ export default function AnalyticsPage() {
       <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <h2 className="text-xl font-semibold mb-4">Claims Paid Over Time</h2>
         <div className="h-80">
-          <ClaimsOverTimeChart data={claimsStats.byMonth} />
+          <ClaimsOverTimeChart data={stats.byMonth} />
         </div>
       </div>
 
@@ -305,7 +327,7 @@ export default function AnalyticsPage() {
       <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <h2 className="text-xl font-semibold mb-4">Claims Paid per Product Name</h2>
         <div className="h-80">
-          <ClaimsByProductChart data={claimsStats.byProduct} />
+          <ClaimsByProductChart data={stats.byProduct} />
         </div>
       </div>
 

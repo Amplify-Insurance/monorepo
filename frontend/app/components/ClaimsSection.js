@@ -4,43 +4,50 @@ import { useState } from "react"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 import Image from "next/image"
 import { formatCurrency } from "../utils/formatting"
+import { ethers } from "ethers"
+import { useAccount } from "wagmi"
+import useClaims from "../../hooks/useClaims"
+import usePools from "../../hooks/usePools"
 
-// Mock data for claims
-const claimsData = [
-  {
-    id: 1,
-    protocol: "LayerBank",
-    token: "ETH",
-    amount: 2.5,
-    value: 8750,
-    claimDate: "2024-04-15",
-    status: "pending",
-    txHash: "0x1234...5678",
-  },
-  {
-    id: 2,
-    protocol: "Compound",
-    token: "USDC",
-    amount: 15000,
-    value: 15000,
-    claimDate: "2024-04-02",
-    status: "approved",
-    txHash: "0x8765...4321",
-  },
-  {
-    id: 3,
-    protocol: "Aave",
-    token: "ETH",
-    amount: 1.2,
-    value: 4200,
-    claimDate: "2024-03-28",
-    status: "denied",
-    txHash: "0x9876...1234",
-  },
-]
+const PROTOCOL_NAMES = {
+  1: "Protocol A",
+  2: "Protocol B",
+  3: "Protocol C",
+  4: "Lido stETH",
+  5: "Rocket rETH",
+}
 
 export default function ClaimsSection({ displayCurrency }) {
   const [activeTab, setActiveTab] = useState("affected") // 'affected' or 'history'
+  const { address } = useAccount()
+  const { claims } = useClaims()
+  const { pools } = usePools()
+
+  const claimsData = claims
+    .filter((c) => !address || c.claimant.toLowerCase() === address.toLowerCase())
+    .map((c) => {
+      const pool = pools.find((p) => Number(p.id) === c.poolId)
+      if (!pool) return null
+      const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+      const token = pool.protocolTokenToCover
+      const amount = Number(
+        ethers.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
+      )
+      const value = Number(
+        ethers.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)
+      )
+      return {
+        id: c.policyId,
+        protocol,
+        token,
+        amount,
+        value,
+        claimDate: new Date(c.timestamp * 1000).toISOString(),
+        status: "processed",
+        txHash: c.transactionHash,
+      }
+    })
+    .filter(Boolean)
 
   if (claimsData.length === 0) {
     return (
