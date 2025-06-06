@@ -367,6 +367,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
           token={selectedToken?.symbol || ''}
           premium={0} // Not relevant for providing coverage
           yield={totalYield}
+          poolIds={selectedMarkets}
           selectedMarkets={selectedMarkets.map((id) => {
             const market = markets.find((m) => m.id === id)
             const pool = market?.pools.find((p) => p.token === selectedToken?.symbol)

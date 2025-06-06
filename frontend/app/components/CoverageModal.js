@@ -3,7 +3,11 @@
 import { useState } from "react"
 import Image from "next/image"
 import { Info } from "lucide-react"
+import { ethers } from "ethers"
+import CoverPool from "../abi/CoverPool.json"
 import Modal from "./Modal"
+
+const COVER_POOL_ADDRESS = process.env.NEXT_PUBLIC_COVER_POOL_ADDRESS
 
 // Add the selectedMarkets prop to the component parameters
 export default function CoverageModal({
@@ -14,6 +18,8 @@ export default function CoverageModal({
   token,
   premium,
   yield: underwriterYield,
+  poolId,
+  poolIds = [],
   selectedMarkets = [],
   capacity = 0,
 }) {
@@ -21,6 +27,7 @@ export default function CoverageModal({
   const [usdValue, setUsdValue] = useState("0")
   const maxAmount = capacity
   const tokenPrice = 1
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Calculate USD value when amount changes
   const handleAmountChange = (e) => {
@@ -37,6 +44,31 @@ export default function CoverageModal({
     const maxTokens = maxAmount.toFixed(6)
     setAmount(maxTokens)
     setUsdValue((maxAmount * tokenPrice).toFixed(2))
+  }
+
+  const handleSubmit = async () => {
+    if (!amount || Number.parseFloat(amount) <= 0) return
+    setIsSubmitting(true)
+    try {
+      if (!window.ethereum) throw new Error("Wallet not found")
+      const browserProvider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await browserProvider.getSigner()
+      const cp = new ethers.Contract(COVER_POOL_ADDRESS, CoverPool, signer)
+
+      let tx
+      if (type === "purchase") {
+        tx = await cp.purchaseCover(poolId, amount)
+      } else {
+        const ids = poolIds && poolIds.length > 0 ? poolIds : poolId ? [poolId] : []
+        tx = await cp.depositAndAllocate(amount, 1, ids)
+      }
+      await tx.wait()
+      onClose()
+    } catch (err) {
+      console.error("Failed to submit", err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // Calculate estimated cost/yield
@@ -166,6 +198,7 @@ export default function CoverageModal({
 
         {/* Action button */}
         <button
+          onClick={handleSubmit}
           className={`w-full py-3 rounded-lg font-medium text-white ${
             amount && Number.parseFloat(amount) > 0
               ? type === "purchase"
@@ -173,9 +206,11 @@ export default function CoverageModal({
                 : "bg-green-600 hover:bg-green-700"
               : "bg-gray-400 cursor-not-allowed"
           }`}
-          disabled={!amount || Number.parseFloat(amount) <= 0}
+          disabled={!amount || Number.parseFloat(amount) <= 0 || isSubmitting}
         >
-          {amount && Number.parseFloat(amount) > 0
+          {isSubmitting
+            ? "Submitting..."
+            : amount && Number.parseFloat(amount) > 0
             ? `${type === "purchase" ? "Purchase" : "Provide"} Coverage`
             : "Enter an amount"}
         </button>
