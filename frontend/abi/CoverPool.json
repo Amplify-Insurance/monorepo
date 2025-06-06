@@ -79,5 +79,57 @@
     "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_amount", "type": "uint256" },
+      { "internalType": "uint8", "name": "_yieldChoice", "type": "uint8" },
+      { "internalType": "uint256[]", "name": "_poolIdsToAllocate", "type": "uint256[]" }
+    ],
+    "name": "depositAndAllocate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "_sharesToBurn", "type": "uint256" } ],
+    "name": "requestWithdrawal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "executeWithdrawal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_poolId", "type": "uint256" },
+      { "internalType": "uint256", "name": "_coverageAmount", "type": "uint256" }
+    ],
+    "name": "purchaseCover",
+    "outputs": [ { "internalType": "uint256", "name": "policyId", "type": "uint256" } ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "_policyId", "type": "uint256" } ],
+    "name": "settlePremium",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_policyId", "type": "uint256" },
+      { "internalType": "bytes", "name": "_proofOfLossDataArg", "type": "bytes" }
+    ],
+    "name": "processClaim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ]
