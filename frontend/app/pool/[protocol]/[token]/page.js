@@ -102,6 +102,7 @@ export default function PoolDetailsPage() {
         token={token}
         premium={premium}
         yield={yieldRate}
+        poolId={pool.id}
       />
       <CoverageModal
         isOpen={provideModalOpen}
@@ -111,6 +112,7 @@ export default function PoolDetailsPage() {
         token={token}
         premium={premium}
         yield={yieldRate}
+        poolId={pool.id}
       />
     </div>
   )

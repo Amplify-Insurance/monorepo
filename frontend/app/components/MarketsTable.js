@@ -281,6 +281,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
           premium={selectedPool.pool.premium}
           yield={selectedPool.pool.underwriterYield}
           capacity={selectedPool.pool.capacity}
+          poolId={selectedPool.market.id}
         />
       )}
     </div>
