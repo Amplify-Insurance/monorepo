@@ -30,6 +30,8 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     const name = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
     const underlyingDec = Number(pool.underlyingAssetDecimals)
     const protoDec = Number(pool.protocolTokenDecimals)
+    const premium = Number(pool.premiumRateBps || 0) / 100
+    const uwYield = Number(pool.underwriterYieldBps || 0) / 100
     return {
       id: pool.id,
       name,
@@ -38,8 +40,8 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
       pools: [
         {
           token: pool.protocolTokenToCover,
-          premium: 0,
-          underwriterYield: 0,
+          premium,
+          underwriterYield: uwYield,
           tvl: Number(ethers.formatUnits(pool.totalCoverageSold, protoDec)),
           price: 1,
         },

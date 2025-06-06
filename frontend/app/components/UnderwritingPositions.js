@@ -37,7 +37,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
       pool: pool.protocolTokenToCover,
       amount,
       nativeValue: amount,
-      yield: 0,
+      yield: Number(pool.underwriterYieldBps || 0) / 100,
       status: "active",
     }
   }).filter(Boolean)

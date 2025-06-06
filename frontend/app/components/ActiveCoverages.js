@@ -36,7 +36,7 @@ export default function ActiveCoverages({ displayCurrency }) {
       protocol,
       pool: pool.protocolTokenToCover,
       coverageAmount,
-      premium: 0,
+      premium: Number(pool.premiumRateBps || 0) / 100,
       status: "active",
     }
   }).filter(Boolean)

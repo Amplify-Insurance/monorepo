@@ -60,8 +60,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
       }
       acc[id].pools.push({
         token: pool.protocolTokenToCover,
-        premium: 0,
-        underwriterYield: 0,
+        premium: Number(pool.premiumRateBps || 0) / 100,
+        underwriterYield: Number(pool.underwriterYieldBps || 0) / 100,
         tvl: Number(
           ethers.formatUnits(pool.totalCoverageSold, pool.protocolTokenDecimals)
         ),
