@@ -1,6 +1,6 @@
 // app/config.js
 import { http } from 'wagmi';
-import { mainnet, sepolia } from 'wagmi/chains';
+import { base } from 'wagmi/chains';
 // 1. Import getDefaultConfig
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 
@@ -18,11 +18,10 @@ if (!projectId) {
 export const config = getDefaultConfig({
   appName: 'DeFi Insurance Platform', // Your app name
   projectId: projectId || 'DEFAULT_PROJECT_ID_IF_MISSING', // REQUIRED! Add your WalletConnect Project ID or a fallback
-  chains: [mainnet, sepolia],
+  chains: [base],
   // Optional: Add transports here if you want to use specific RPCs instead of defaults
   // transports: {
-  //   [mainnet.id]: http('https://your-mainnet-rpc.com'),
-  //   [sepolia.id]: http('https://your-sepolia-rpc.com'),
+  //   [base.id]: http('https://base.blockpi.network/v1/rpc/public'),
   // },
   ssr: true, // Recommended for Next.js Required for App Router
 });

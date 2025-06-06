@@ -8,161 +8,44 @@ import Image from "next/image"
 import { useAccount } from "wagmi"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
+import usePools from "../../hooks/usePools"
+import { ethers } from "ethers"
 
-// Mock data for markets (same as before, but we'll modify how we use it)
-const markets = [
-  {
-    id: "aave",
-    name: "Aave",
-    description: "Decentralized lending protocol",
-    tvl: 5200000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.5,
-        underwriterYield: 4.2,
-        tvl: 1200000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 1.8,
-        underwriterYield: 3.5,
-        tvl: 980000000,
-        price: 1,
-      },
-      {
-        token: "BTC",
-        premium: 2.2,
-        underwriterYield: 3.8,
-        tvl: 850000000,
-        price: 62000,
-      },
-      {
-        token: "AVAX",
-        premium: 2.6,
-        underwriterYield: 4.4,
-        tvl: 450000000,
-        price: 21.52,
-      },
-    ],
-  },
-  {
-    id: "compound",
-    name: "Compound",
-    description: "Algorithmic money market protocol",
-    tvl: 3800000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.3,
-        underwriterYield: 3.9,
-        tvl: 950000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 1.5,
-        underwriterYield: 3.2,
-        tvl: 1100000000,
-        price: 1,
-      },
-      {
-        token: "AVAX",
-        premium: 2.4,
-        underwriterYield: 4.1,
-        tvl: 320000000,
-        price: 21.52,
-      },
-    ],
-  },
-  {
-    id: "morpho",
-    name: "Morpho",
-    description: "Peer-to-peer lending protocol",
-    tvl: 2100000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.7,
-        underwriterYield: 4.5,
-        tvl: 680000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 1.9,
-        underwriterYield: 3.7,
-        tvl: 520000000,
-        price: 1,
-      },
-      {
-        token: "BTC",
-        premium: 2.3,
-        underwriterYield: 4.0,
-        tvl: 380000000,
-        price: 62000,
-      },
-    ],
-  },
-  {
-    id: "yearn",
-    name: "Yearn Finance",
-    description: "Yield aggregator protocol",
-    tvl: 1500000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.4,
-        underwriterYield: 4.0,
-        tvl: 420000000,
-        price: 3500,
-      },
-      {
-        token: "BTC",
-        premium: 2.1,
-        underwriterYield: 3.6,
-        tvl: 380000000,
-        price: 62000,
-      },
-    ],
-  },
-  {
-    id: "layerbank",
-    name: "LayerBank",
-    description: "Cross-layer lending protocol",
-    tvl: 980000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.8,
-        underwriterYield: 4.7,
-        tvl: 320000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 2.0,
-        underwriterYield: 3.9,
-        tvl: 290000000,
-        price: 1,
-      },
-      {
-        token: "AVAX",
-        premium: 2.5,
-        underwriterYield: 4.3,
-        tvl: 180000000,
-        price: 21.52,
-      },
-    ],
-  },
-]
+const PROTOCOL_NAMES = {
+  1: "Protocol A",
+  2: "Protocol B",
+  3: "Protocol C",
+  4: "Lido stETH",
+  5: "Rocket rETH",
+}
 
 export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const { isConnected } = useAccount()
   const [expandedMarkets, setExpandedMarkets] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPool, setSelectedPool] = useState(null)
+  const { pools, loading } = usePools()
+
+  const markets = pools.map((pool) => {
+    const name = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+    const underlyingDec = Number(pool.underlyingAssetDecimals)
+    const protoDec = Number(pool.protocolTokenDecimals)
+    return {
+      id: pool.id,
+      name,
+      description: `Risk pool for ${pool.protocolTokenToCover}`,
+      tvl: Number(ethers.formatUnits(pool.totalCapitalPledgedToPool, underlyingDec)),
+      pools: [
+        {
+          token: pool.protocolTokenToCover,
+          premium: 0,
+          underwriterYield: 0,
+          tvl: Number(ethers.formatUnits(pool.totalCoverageSold, protoDec)),
+          price: 1,
+        },
+      ],
+    }
+  })
 
   const toggleMarket = (marketId) => {
     setExpandedMarkets((prev) => (prev.includes(marketId) ? prev.filter((id) => id !== marketId) : [...prev, marketId]))
@@ -197,6 +80,10 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     }
 
     return `${formatPercentage(minYield)} - ${formatPercentage(maxYield)} APY`
+  }
+
+  if (loading) {
+    return <p>Loading markets...</p>
   }
 
   return (
