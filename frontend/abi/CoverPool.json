@@ -123,6 +123,31 @@
     "type": "function"
   },
   {
+    "inputs": [ { "internalType": "uint256", "name": "_poolId", "type": "uint256" } ],
+    "name": "claimPremiumRewards",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "_poolId", "type": "uint256" } ],
+    "name": "claimDistressedAssetRewards",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256[]", "name": "_poolIds", "type": "uint256[]" },
+      { "internalType": "bool", "name": "_claimPremiums", "type": "bool" },
+      { "internalType": "bool", "name": "_claimDistressedAssets", "type": "bool" }
+    ],
+    "name": "claimRewardsFromMultiplePools",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       { "internalType": "uint256", "name": "_policyId", "type": "uint256" },
       { "internalType": "bytes", "name": "_proofOfLossDataArg", "type": "bytes" }

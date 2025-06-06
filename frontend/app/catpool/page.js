@@ -10,6 +10,7 @@ export default function CatPoolPage() {
   const { isConnected } = useAccount()
   const [depositAmount, setDepositAmount] = useState("")
   const [withdrawShares, setWithdrawShares] = useState("")
+  const [claimTokens, setClaimTokens] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleDeposit = async () => {
@@ -37,6 +38,22 @@ export default function CatPoolPage() {
       setWithdrawShares("")
     } catch (err) {
       console.error("Withdraw failed", err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleClaim = async () => {
+    if (!claimTokens) return
+    setIsSubmitting(true)
+    try {
+      const cp = await getCatPoolWithSigner()
+      const tokens = claimTokens.split(',').map((t) => t.trim()).filter(Boolean)
+      const tx = await cp.claimProtocolAssetRewards(tokens)
+      await tx.wait()
+      setClaimTokens("")
+    } catch (err) {
+      console.error("Claim failed", err)
     } finally {
       setIsSubmitting(false)
     }
@@ -88,6 +105,24 @@ export default function CatPoolPage() {
           className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50"
         >
           Withdraw
+        </button>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+        <h2 className="text-xl font-semibold">Claim Protocol Asset Rewards</h2>
+        <input
+          type="text"
+          placeholder="Token addresses (comma separated)"
+          value={claimTokens}
+          onChange={(e) => setClaimTokens(e.target.value)}
+          className="w-full p-2 border rounded mb-3 text-gray-900 dark:text-gray-100 dark:bg-gray-700"
+        />
+        <button
+          onClick={handleClaim}
+          disabled={isSubmitting || !claimTokens}
+          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
+        >
+          Claim
         </button>
       </div>
     </div>
