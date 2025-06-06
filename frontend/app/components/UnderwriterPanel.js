@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Info, ChevronDown, Filter } from "lucide-react"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from "next/image"
@@ -9,15 +9,8 @@ import { useAccount } from "wagmi"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
+import useTokenList from "../../hooks/useTokenList"
 import { ethers } from "ethers"
-
-// Available tokens for providing coverage
-const availableTokens = [
-  { symbol: "ETH", name: "Ethereum" },
-  { symbol: "USDC", name: "USD Coin" },
-  { symbol: "BTC", name: "Bitcoin" },
-  { symbol: "AVAX", name: "Avalanche" },
-]
 
 // Protocol categories
 const protocolCategories = [
@@ -39,12 +32,19 @@ const PROTOCOL_NAMES = {
 export default function UnderwriterPanel({ displayCurrency }) {
   const { isConnected } = useAccount()
   const { pools, loading } = usePools()
-  const [selectedToken, setSelectedToken] = useState(availableTokens[0])
+  const tokens = useTokenList(pools)
+  const [selectedToken, setSelectedToken] = useState(null)
   const [tokenDropdownOpen, setTokenDropdownOpen] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
+
+  useEffect(() => {
+    if (!selectedToken && tokens && tokens.length > 0) {
+      setSelectedToken(tokens[0])
+    }
+  }, [tokens, selectedToken])
 
   const markets = Object.values(
     pools.reduce((acc, pool) => {
@@ -76,19 +76,22 @@ export default function UnderwriterPanel({ displayCurrency }) {
   }
 
   // Filter markets that support the selected token and category
-  const filteredMarkets = markets.filter(
-    (market) =>
-      market.pools.some((pool) => pool.token === selectedToken.symbol) &&
-      (selectedCategory === "all" || market.category === selectedCategory),
-  )
+  const filteredMarkets = selectedToken
+    ? markets.filter(
+        (market) =>
+      market.pools.some((pool) => pool.token === selectedToken?.symbol) &&
+          (selectedCategory === "all" || market.category === selectedCategory),
+      )
+    : []
 
   // Calculate total yield based on selected markets
   const calculateTotalYield = () => {
     // Return the sum of yields (not weighted average)
+    if (!selectedToken) return 0
     return selectedMarkets.reduce((sum, marketId) => {
       const market = markets.find((m) => m.id === marketId)
       if (!market) return sum
-      const pool = market.pools.find((p) => p.token === selectedToken.symbol)
+      const pool = market.pools.find((p) => p.token === selectedToken?.symbol)
       return pool ? sum + pool.underwriterYield : sum
     }, 0)
   }
@@ -155,20 +158,22 @@ export default function UnderwriterPanel({ displayCurrency }) {
             className="relative w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             onClick={() => setTokenDropdownOpen(!tokenDropdownOpen)}
           >
-            <div className="flex items-center">
-              <div className="flex-shrink-0 h-6 w-6 mr-2">
+            {selectedToken && (
+              <div className="flex items-center">
+                <div className="flex-shrink-0 h-6 w-6 mr-2">
                 <Image
-                  src={`/images/tokens/${selectedToken.symbol.toLowerCase()}.png`}
-                  alt={selectedToken.name}
-                  width={24}
-                  height={24}
-                  className="rounded-full"
-                />
+                  src={`/images/tokens/${selectedToken?.symbol?.toLowerCase()}.png`}
+                  alt={selectedToken?.name || ''}
+                    width={24}
+                    height={24}
+                    className="rounded-full"
+                  />
+                </div>
+                <span className="block truncate">
+                {selectedToken?.symbol} - {selectedToken?.name}
+                </span>
               </div>
-              <span className="block truncate">
-                {selectedToken.symbol} - {selectedToken.name}
-              </span>
-            </div>
+            )}
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
             </span>
@@ -176,11 +181,11 @@ export default function UnderwriterPanel({ displayCurrency }) {
 
           {tokenDropdownOpen && (
             <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
-              {availableTokens.map((token) => (
+              {tokens.map((token) => (
                 <button
                   key={token.symbol}
                   className={`${
-                    token.symbol === selectedToken.symbol
+                    token.symbol === selectedToken?.symbol
                       ? "text-white bg-blue-600"
                       : "text-gray-900 dark:text-gray-200"
                   } cursor-default select-none relative py-2 pl-3 pr-9 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
@@ -202,7 +207,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     </div>
                     <span
                       className={`block truncate ${
-                        token.symbol === selectedToken.symbol ? "font-medium" : "font-normal"
+                         token.symbol === selectedToken?.symbol ? "font-medium" : "font-normal"
                       }`}
                     >
                       {token.symbol} - {token.name}
@@ -219,7 +224,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
       <div className="mb-6">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Available protocols for {selectedToken.symbol}
+            Available protocols for {selectedToken?.symbol || ''}
           </h3>
 
           <div className="relative">
@@ -263,7 +268,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
       <div className="mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredMarkets.map((market) => {
-            const pool = market.pools.find((p) => p.token === selectedToken.symbol)
+            const pool = market.pools.find((p) => p.token === selectedToken?.symbol)
             if (!pool) return null
 
             const isSelected = selectedMarkets.includes(market.id)
@@ -359,12 +364,12 @@ export default function UnderwriterPanel({ displayCurrency }) {
           protocol={
             selectedMarkets.length > 1 ? "Multiple Protocols" : markets.find((m) => m.id === selectedMarkets[0])?.name
           }
-          token={selectedToken.symbol}
+          token={selectedToken?.symbol || ''}
           premium={0} // Not relevant for providing coverage
           yield={totalYield}
           selectedMarkets={selectedMarkets.map((id) => {
             const market = markets.find((m) => m.id === id)
-            const pool = market?.pools.find((p) => p.token === selectedToken.symbol)
+            const pool = market?.pools.find((p) => p.token === selectedToken?.symbol)
             return {
               name: market?.name || "",
               yield: pool?.underwriterYield || 0,

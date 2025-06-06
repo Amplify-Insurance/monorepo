@@ -1,7 +1,6 @@
-import { ethers } from 'ethers';
-import CoverPool from '../abi/CoverPool.json';
-
-const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+import { ethers } from 'ethers'
+import CoverPool from '../abi/CoverPool.json'
+import { provider } from './provider'
 
 export const coverPool = new ethers.Contract(
   process.env.COVER_POOL_ADDRESS as string,
