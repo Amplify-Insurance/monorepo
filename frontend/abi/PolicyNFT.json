@@ -1,0 +1,22 @@
+[
+  {
+    "inputs": [ { "internalType": "uint256", "name": "id", "type": "uint256" } ],
+    "name": "getPolicy",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "uint256", "name": "coverage", "type": "uint256" },
+          { "internalType": "uint256", "name": "poolId", "type": "uint256" },
+          { "internalType": "uint256", "name": "start", "type": "uint256" },
+          { "internalType": "uint256", "name": "activation", "type": "uint256" },
+          { "internalType": "uint256", "name": "lastPaidUntil", "type": "uint256" }
+        ],
+        "internalType": "struct PolicyNFT.Policy",
+        "name": "p",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

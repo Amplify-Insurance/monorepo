@@ -1,0 +1,10 @@
+import { ethers } from 'ethers';
+import CatPool from '../abi/CatInsurancePool.json';
+
+const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+
+export const catPool = new ethers.Contract(
+  process.env.CAT_POOL_ADDRESS as string,
+  CatPool,
+  provider
+);
