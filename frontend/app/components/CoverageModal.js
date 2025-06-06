@@ -15,11 +15,12 @@ export default function CoverageModal({
   premium,
   yield: underwriterYield,
   selectedMarkets = [],
+  capacity = 0,
 }) {
   const [amount, setAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
-  const maxAmount = type === "purchase" ? 100000 : 50000 // Mock max amounts
-  const tokenPrice = token === "ETH" ? 3500 : token === "BTC" ? 62000 : token === "AVAX" ? 21.52 : 1 // Mock prices
+  const maxAmount = capacity
+  const tokenPrice = 1
 
   // Calculate USD value when amount changes
   const handleAmountChange = (e) => {
@@ -33,9 +34,9 @@ export default function CoverageModal({
 
   // Set max amount
   const handleSetMax = () => {
-    const maxTokens = (maxAmount / tokenPrice).toFixed(6)
+    const maxTokens = maxAmount.toFixed(6)
     setAmount(maxTokens)
-    setUsdValue(maxAmount.toFixed(2))
+    setUsdValue((maxAmount * tokenPrice).toFixed(2))
   }
 
   // Calculate estimated cost/yield
@@ -89,7 +90,7 @@ export default function CoverageModal({
               <span className="text-sm text-gray-500 dark:text-gray-400 mb-1 sm:mb-0">${usdValue}</span>
               <div className="flex items-center justify-between sm:justify-end sm:space-x-2">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Available: {((maxAmount / tokenPrice) * 0.8).toFixed(6)}
+                  Available: {maxAmount.toFixed(6)}
                 </span>
                 <button
                   onClick={handleSetMax}

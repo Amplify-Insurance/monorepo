@@ -31,6 +31,12 @@ export default function ActiveCoverages({ displayCurrency }) {
     const coverageAmount = Number(
       ethers.formatUnits(p.coverage, pool.underlyingAssetDecimals)
     )
+    const capacity = Number(
+      ethers.formatUnits(
+        BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold),
+        pool.underlyingAssetDecimals
+      )
+    )
     return {
       id: p.id,
       protocol,
@@ -38,6 +44,7 @@ export default function ActiveCoverages({ displayCurrency }) {
       coverageAmount,
       premium: Number(pool.premiumRateBps || 0) / 100,
       status: "active",
+      capacity,
     }
   }).filter(Boolean)
 
@@ -170,6 +177,7 @@ export default function ActiveCoverages({ displayCurrency }) {
           token={selectedCoverage.pool}
           amount={selectedCoverage.coverageAmount}
           premium={selectedCoverage.premium}
+          capacity={selectedCoverage.capacity}
         />
       )}
     </div>

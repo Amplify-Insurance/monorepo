@@ -14,12 +14,13 @@ export default function ManageCoverageModal({
   amount,
   premium,
   yield: underwriterYield,
+  capacity = 0,
 }) {
   const [action, setAction] = useState("increase") // increase or decrease
   const [adjustAmount, setAdjustAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
-  const tokenPrice = token === "ETH" ? 3500 : token === "BTC" ? 62000 : token === "AVAX" ? 21.52 : 1 // Mock prices
-  const maxAmount = type === "coverage" ? 100000 : 50000 // Mock max amounts
+  const tokenPrice = 1
+  const maxAmount = type === "coverage" ? capacity : amount
 
   // Calculate USD value when amount changes
   const handleAmountChange = (e) => {
@@ -35,7 +36,7 @@ export default function ManageCoverageModal({
   const handleSetMax = () => {
     let maxTokens
     if (action === "increase") {
-      maxTokens = ((maxAmount / tokenPrice) * 0.5).toFixed(6)
+      maxTokens = maxAmount.toFixed(6)
     } else {
       maxTokens = amount
     }
@@ -138,7 +139,7 @@ export default function ManageCoverageModal({
               <div className="flex items-center justify-between sm:justify-end sm:space-x-2">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   {action === "increase" ? "Available" : "Current"}:{" "}
-                  {action === "increase" ? ((maxAmount / tokenPrice) * 0.5).toFixed(6) : amount}
+                  {action === "increase" ? maxAmount.toFixed(6) : amount}
                 </span>
                 <button
                   onClick={handleSetMax}
