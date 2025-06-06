@@ -4,30 +4,42 @@ import { Shield } from "lucide-react"
 import Image from "next/image"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import ManageCoverageModal from "./ManageCoverageModal"
+import { useAccount } from "wagmi"
+import useUserPolicies from "../../hooks/useUserPolicies"
+import usePools from "../../hooks/usePools"
+import { ethers } from "ethers"
 
-// Mock data for active coverages
-const activeCoverages = [
-  {
-    id: 1,
-    protocol: "Aave",
-    pool: "ETH",
-    coverageAmount: 25000,
-    premium: 2.5,
-    status: "active",
-  },
-  {
-    id: 2,
-    protocol: "Compound",
-    pool: "USDC",
-    coverageAmount: 50000,
-    premium: 1.5,
-    status: "active",
-  },
-]
+const PROTOCOL_NAMES = {
+  1: "Protocol A",
+  2: "Protocol B",
+  3: "Protocol C",
+  4: "Lido stETH",
+  5: "Rocket rETH",
+}
 
 export default function ActiveCoverages({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCoverage, setSelectedCoverage] = useState(null)
+  const { address } = useAccount()
+  const { policies } = useUserPolicies(address)
+  const { pools } = usePools()
+
+  const activeCoverages = policies.map((p) => {
+    const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
+    if (!pool) return null
+    const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+    const coverageAmount = Number(
+      ethers.formatUnits(p.coverage, pool.underlyingAssetDecimals)
+    )
+    return {
+      id: p.id,
+      protocol,
+      pool: pool.protocolTokenToCover,
+      coverageAmount,
+      premium: 0,
+      status: "active",
+    }
+  }).filter(Boolean)
 
   const handleOpenModal = (coverage) => {
     setSelectedCoverage(coverage)
@@ -156,16 +168,7 @@ export default function ActiveCoverages({ displayCurrency }) {
           type="coverage"
           protocol={selectedCoverage.protocol}
           token={selectedCoverage.pool}
-          amount={
-            selectedCoverage.coverageAmount /
-            (selectedCoverage.pool === "ETH"
-              ? 3500
-              : selectedCoverage.pool === "BTC"
-                ? 62000
-                : selectedCoverage.pool === "AVAX"
-                  ? 21.52
-                  : 1)
-          }
+          amount={selectedCoverage.coverageAmount}
           premium={selectedCoverage.premium}
         />
       )}

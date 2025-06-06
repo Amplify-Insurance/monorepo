@@ -4,41 +4,43 @@ import { TrendingUp } from "lucide-react"
 import Image from "next/image"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import ManageCoverageModal from "./ManageCoverageModal"
+import { useAccount } from "wagmi"
+import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
+import usePools from "../../hooks/usePools"
+import { ethers } from "ethers"
 
-// Mock data for underwriting positions
-const underwritingPositions = [
-  {
-    id: 1,
-    protocol: "Aave",
-    pool: "ETH",
-    amount: 10,
-    nativeValue: 35000,
-    yield: 4.2,
-    status: "active",
-  },
-  {
-    id: 2,
-    protocol: "Compound",
-    pool: "USDC",
-    amount: 25000,
-    nativeValue: 25000,
-    yield: 3.2,
-    status: "active",
-  },
-  {
-    id: 3,
-    protocol: "Morpho",
-    pool: "ETH",
-    amount: 5,
-    nativeValue: 17500,
-    yield: 4.5,
-    status: "active",
-  },
-]
+const PROTOCOL_NAMES = {
+  1: "Protocol A",
+  2: "Protocol B",
+  3: "Protocol C",
+  4: "Lido stETH",
+  5: "Rocket rETH",
+}
 
 export default function UnderwritingPositions({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState(null)
+  const { address } = useAccount()
+  const { details } = useUnderwriterDetails(address)
+  const { pools } = usePools()
+
+  const underwritingPositions = (details?.allocatedPoolIds || []).map((pid, i) => {
+    const pool = pools.find((pl) => Number(pl.id) === Number(pid))
+    if (!pool) return null
+    const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+    const amount = Number(
+      ethers.formatUnits(details.totalDepositedAssetPrincipal, pool.underlyingAssetDecimals)
+    )
+    return {
+      id: i,
+      protocol,
+      pool: pool.protocolTokenToCover,
+      amount,
+      nativeValue: amount,
+      yield: 0,
+      status: "active",
+    }
+  }).filter(Boolean)
 
   const handleOpenModal = (position) => {
     setSelectedPosition(position)
