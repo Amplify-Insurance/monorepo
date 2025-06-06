@@ -8,6 +8,8 @@ import Image from "next/image"
 import { useAccount } from "wagmi"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
+import usePools from "../../hooks/usePools"
+import { ethers } from "ethers"
 
 // Available tokens for providing coverage
 const availableTokens = [
@@ -26,214 +28,52 @@ const protocolCategories = [
   { id: "stablecoin", name: "Stablecoins" },
 ]
 
-// Reusing the markets data from MarketsTable
-const markets = [
-  {
-    id: "aave",
-    name: "Aave",
-    description: "Decentralized lending protocol",
-    category: "lending",
-    tvl: 5200000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.5,
-        underwriterYield: 4.2,
-        tvl: 1200000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 1.8,
-        underwriterYield: 3.5,
-        tvl: 980000000,
-        price: 1,
-      },
-      {
-        token: "BTC",
-        premium: 2.2,
-        underwriterYield: 3.8,
-        tvl: 850000000,
-        price: 62000,
-      },
-      {
-        token: "AVAX",
-        premium: 2.6,
-        underwriterYield: 4.4,
-        tvl: 450000000,
-        price: 21.52,
-      },
-    ],
-  },
-  {
-    id: "compound",
-    name: "Compound",
-    description: "Algorithmic money market protocol",
-    category: "lending",
-    tvl: 3800000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.3,
-        underwriterYield: 3.9,
-        tvl: 950000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 1.5,
-        underwriterYield: 3.2,
-        tvl: 1100000000,
-        price: 1,
-      },
-      {
-        token: "AVAX",
-        premium: 2.4,
-        underwriterYield: 4.1,
-        tvl: 320000000,
-        price: 21.52,
-      },
-    ],
-  },
-  {
-    id: "morpho",
-    name: "Morpho",
-    description: "Peer-to-peer lending protocol",
-    category: "lending",
-    tvl: 2100000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.7,
-        underwriterYield: 4.5,
-        tvl: 680000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 1.9,
-        underwriterYield: 3.7,
-        tvl: 520000000,
-        price: 1,
-      },
-      {
-        token: "BTC",
-        premium: 2.3,
-        underwriterYield: 4.0,
-        tvl: 380000000,
-        price: 62000,
-      },
-    ],
-  },
-  {
-    id: "yearn",
-    name: "Yearn Finance",
-    description: "Yield aggregator protocol",
-    category: "derivatives",
-    tvl: 1500000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.4,
-        underwriterYield: 4.0,
-        tvl: 420000000,
-        price: 3500,
-      },
-      {
-        token: "BTC",
-        premium: 2.1,
-        underwriterYield: 3.6,
-        tvl: 380000000,
-        price: 62000,
-      },
-    ],
-  },
-  {
-    id: "layerbank",
-    name: "LayerBank",
-    description: "Cross-layer lending protocol",
-    category: "lending",
-    tvl: 980000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.8,
-        underwriterYield: 4.7,
-        tvl: 320000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 2.0,
-        underwriterYield: 3.9,
-        tvl: 290000000,
-        price: 1,
-      },
-      {
-        token: "AVAX",
-        premium: 2.5,
-        underwriterYield: 4.3,
-        tvl: 180000000,
-        price: 21.52,
-      },
-    ],
-  },
-  {
-    id: "uniswap",
-    name: "Uniswap",
-    description: "Decentralized exchange protocol",
-    category: "exchange",
-    tvl: 4200000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.6,
-        underwriterYield: 4.3,
-        tvl: 1500000000,
-        price: 3500,
-      },
-      {
-        token: "USDC",
-        premium: 1.7,
-        underwriterYield: 3.4,
-        tvl: 1200000000,
-        price: 1,
-      },
-    ],
-  },
-  {
-    id: "maker",
-    name: "MakerDAO",
-    description: "Decentralized stablecoin protocol",
-    category: "stablecoin",
-    tvl: 3800000000,
-    pools: [
-      {
-        token: "ETH",
-        premium: 2.2,
-        underwriterYield: 3.8,
-        tvl: 1800000000,
-        price: 3500,
-      },
-      {
-        token: "BTC",
-        premium: 2.0,
-        underwriterYield: 3.5,
-        tvl: 950000000,
-        price: 62000,
-      },
-    ],
-  },
-]
+const PROTOCOL_NAMES = {
+  1: "Protocol A",
+  2: "Protocol B",
+  3: "Protocol C",
+  4: "Lido stETH",
+  5: "Rocket rETH",
+}
 
 export default function UnderwriterPanel({ displayCurrency }) {
   const { isConnected } = useAccount()
+  const { pools, loading } = usePools()
   const [selectedToken, setSelectedToken] = useState(availableTokens[0])
   const [tokenDropdownOpen, setTokenDropdownOpen] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
+
+  const markets = Object.values(
+    pools.reduce((acc, pool) => {
+      const id = String(pool.protocolCovered)
+      if (!acc[id]) {
+        acc[id] = {
+          id,
+          name: PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`,
+          description: `Risk pool for ${pool.protocolTokenToCover}`,
+          category: "lending",
+          pools: [],
+        }
+      }
+      acc[id].pools.push({
+        token: pool.protocolTokenToCover,
+        premium: 0,
+        underwriterYield: 0,
+        tvl: Number(
+          ethers.formatUnits(pool.totalCoverageSold, pool.protocolTokenDecimals)
+        ),
+        price: 1,
+      })
+      return acc
+    }, {})
+  )
+
+  if (loading) {
+    return <p>Loading markets...</p>
+  }
 
   // Filter markets that support the selected token and category
   const filteredMarkets = markets.filter(
