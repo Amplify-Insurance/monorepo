@@ -1,131 +1,127 @@
 const { expect } = require("chai");
-const { ethers: hardhatEthers } = require("hardhat");
+const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { MaxUint256, ZeroAddress, parseUnits } = require("ethers");
+const { MaxUint256, parseUnits } = require("ethers");
 
-const toWei = (num, decimals = 18) => parseUnits(num.toString(), decimals);
+const toWei = (val, decimals = 6) => parseUnits(val.toString(), decimals);
 
-async function deployAdapterFixture() {
-  const [owner, depositor, other] = await hardhatEthers.getSigners();
-  const MockERC20Factory = await hardhatEthers.getContractFactory("MockERC20");
-  const token = await MockERC20Factory.deploy("Mock Token", "MTK", 6);
+async function deployAaveFixture() {
+  const [owner, user, other] = await ethers.getSigners();
+  const ERC20 = await ethers.getContractFactory("MockERC20");
+  const token = await ERC20.deploy("Mock Token", "MTK", 6);
+  const aToken = await ERC20.deploy("Mock AToken", "aMTK", 6);
 
-  const MockYieldAdapterFactory = await hardhatEthers.getContractFactory("MockYieldAdapter");
-  const adapter = await MockYieldAdapterFactory.deploy(token.target, depositor.address, owner.address);
+  const Pool = await ethers.getContractFactory("MockAaveV3Pool");
+  const pool = await Pool.deploy(token.target, aToken.target);
+  await aToken.transferOwnership(pool.target);
 
-  const initialBalance = toWei(1000, 6);
-  await token.connect(owner).mint(depositor.address, initialBalance);
-  await token.connect(owner).mint(owner.address, initialBalance);
+  const Adapter = await ethers.getContractFactory("AaveV3Adapter");
+  const adapter = await Adapter.deploy(token.target, pool.target, aToken.target, owner.address);
 
-  await token.connect(depositor).approve(adapter.target, MaxUint256);
-  await token.connect(owner).approve(adapter.target, MaxUint256);
+  const initial = toWei(1000);
+  for (const acc of [owner, user]) {
+    await token.mint(acc.address, initial);
+    await token.connect(acc).approve(adapter.target, MaxUint256);
+  }
 
-  return { adapter, token, owner, depositor, other, initialBalance };
+  return { owner, user, other, token, aToken, pool, adapter };
 }
 
-describe("MockYieldAdapter", function () {
-  describe("Deployment", function () {
-    it("sets underlying token, depositor and owner", async function () {
-      const { adapter, token, owner, depositor } = await loadFixture(deployAdapterFixture);
-      expect(await adapter.underlyingToken()).to.equal(token.target);
-      expect(await adapter.asset()).to.equal(token.target);
-      expect(await adapter.depositorContract()).to.equal(depositor.address);
-      expect(await adapter.owner()).to.equal(owner.address);
-    });
+async function deployCompoundFixture() {
+  const [owner, user, other] = await ethers.getSigners();
+  const ERC20 = await ethers.getContractFactory("MockERC20");
+  const token = await ERC20.deploy("Mock Token", "MTK", 6);
+
+  const Comet = await ethers.getContractFactory("MockComet");
+  const comet = await Comet.deploy(token.target);
+
+  const Adapter = await ethers.getContractFactory("CompoundV3Adapter");
+  const adapter = await Adapter.deploy(comet.target, owner.address);
+
+  const initial = toWei(1000);
+  for (const acc of [owner, user]) {
+    await token.mint(acc.address, initial);
+    await token.connect(acc).approve(adapter.target, MaxUint256);
+  }
+
+  return { owner, user, other, token, comet, adapter };
+}
+
+describe("AaveV3Adapter", function () {
+  it("deploys with correct parameters", async function () {
+    const { adapter, token, pool, aToken, owner } = await loadFixture(deployAaveFixture);
+    expect(await adapter.asset()).to.equal(token.target);
+    expect(await adapter.aavePool()).to.equal(pool.target);
+    expect(await adapter.aToken()).to.equal(aToken.target);
+    expect(await adapter.owner()).to.equal(owner.address);
   });
 
-  describe("Deposits and withdrawals", function () {
-    it("allows depositor to deposit and withdraw", async function () {
-      const { adapter, token, depositor } = await loadFixture(deployAdapterFixture);
-      const amount = toWei(100, 6);
+  it("allows deposits and withdrawals", async function () {
+    const { adapter, token, aToken, pool, owner, user } = await loadFixture(deployAaveFixture);
+    const amount = toWei(100);
+    await adapter.connect(user).deposit(amount);
 
-      await expect(adapter.connect(depositor).deposit(amount))
-        .to.emit(adapter, "Deposited")
-        .withArgs(depositor.address, amount);
+    expect(await aToken.balanceOf(adapter.target)).to.equal(amount);
+    expect(await token.balanceOf(pool.target)).to.equal(amount);
+    expect(await token.balanceOf(adapter.target)).to.equal(0);
 
-      expect(await adapter.totalValueHeld()).to.equal(amount);
-      expect(await token.balanceOf(adapter.target)).to.equal(amount);
-
-      const withdrawAmount = toWei(60, 6);
-      const beforeWithdrawBalance = await token.balanceOf(depositor.address);
-
-      await expect(adapter.connect(depositor).withdraw(withdrawAmount, depositor.address))
-        .to.emit(adapter, "Withdrawn")
-        .withArgs(depositor.address, depositor.address, withdrawAmount, withdrawAmount);
-
-      expect(await adapter.totalValueHeld()).to.equal(amount - withdrawAmount);
-      expect(await token.balanceOf(depositor.address)).to.equal(beforeWithdrawBalance + withdrawAmount);
-    });
-
-    it("caps withdrawal by totalValueHeld and balance", async function () {
-      const { adapter, token, depositor, owner } = await loadFixture(deployAdapterFixture);
-      const amount = toWei(100, 6);
-      await adapter.connect(depositor).deposit(amount);
-
-      await adapter.connect(owner).simulateYieldOrLoss(toWei(50, 6)); // tvh = 150, balance = 100
-
-      const withdrawn = await adapter.connect(depositor).withdraw(toWei(150, 6), depositor.address);
-      const receipt = await withdrawn.wait();
-      const event = receipt.logs.map(log => {
-        try { return adapter.interface.parseLog(log); } catch (e) { return null; }
-      }).find(e => e && e.name === "Withdrawn");
-
-      expect(event.args.amountTransferred).to.equal(amount);
-      expect(await adapter.totalValueHeld()).to.equal(toWei(50, 6));
-      expect(await token.balanceOf(adapter.target)).to.equal(0);
-    });
-
-    it("getCurrentValueHeld reverts when flag set", async function () {
-      const { adapter, owner, depositor } = await loadFixture(deployAdapterFixture);
-      await adapter.connect(owner).setRevertOnNextGetCurrentValueHeld(true);
-
-      await expect(adapter.connect(depositor).getCurrentValueHeld()).to.be.revertedWith(
-        "MockAdapter: getCurrentValueHeld deliberately reverted for test"
-      );
-    });
+    const before = await token.balanceOf(user.address);
+    await expect(adapter.connect(owner).withdraw(amount / 2n, user.address))
+      .to.emit(adapter, "FundsWithdrawn")
+      .withArgs(user.address, amount / 2n, amount / 2n);
+    expect(await aToken.balanceOf(adapter.target)).to.equal(amount / 2n);
+    expect(await token.balanceOf(user.address)).to.equal(before + amount / 2n);
   });
 
-  describe("Yield adjustment functions", function () {
-    it("simulateYieldOrLoss adjusts total value", async function () {
-      const { adapter, owner, depositor } = await loadFixture(deployAdapterFixture);
-      await adapter.connect(depositor).deposit(toWei(100, 6));
-
-      await adapter.connect(owner).simulateYieldOrLoss(toWei(50, 6));
-      expect(await adapter.totalValueHeld()).to.equal(toWei(150, 6));
-
-      await adapter.connect(owner).simulateYieldOrLoss(-toWei(20, 6));
-      expect(await adapter.totalValueHeld()).to.equal(toWei(130, 6));
-
-      await adapter.connect(owner).simulateYieldOrLoss(-toWei(200, 6));
-      expect(await adapter.totalValueHeld()).to.equal(0);
-    });
-
-    it("setTotalValueHeld overrides value", async function () {
-      const { adapter, owner } = await loadFixture(deployAdapterFixture);
-      await adapter.connect(owner).setTotalValueHeld(toWei(123, 6));
-      expect(await adapter.totalValueHeld()).to.equal(toWei(123, 6));
-    });
+  it("only owner can withdraw", async function () {
+    const { adapter, user } = await loadFixture(deployAaveFixture);
+    await expect(adapter.connect(user).withdraw(1, user.address))
+      .to.be.revertedWithCustomError(adapter, "OwnableUnauthorizedAccount")
+      .withArgs(user.address);
   });
 
-  describe("Access control and admin functions", function () {
-    it("only owner can set depositor", async function () {
-      const { adapter, owner, depositor, other } = await loadFixture(deployAdapterFixture);
-      await expect(adapter.connect(other).setDepositor(other.address))
-        .to.be.revertedWithCustomError(adapter, "OwnableUnauthorizedAccount")
-        .withArgs(other.address);
-
-      await expect(adapter.connect(depositor).setDepositor(other.address))
-        .to.be.revertedWithCustomError(adapter, "OwnableUnauthorizedAccount")
-        .withArgs(depositor.address);
-
-      await expect(adapter.connect(owner).setDepositor(ZeroAddress))
-        .to.be.revertedWith("MockAdapter: New depositor cannot be zero address");
-
-      await expect(adapter.connect(owner).setDepositor(other.address))
-        .to.emit(adapter, "DepositorSet")
-        .withArgs(other.address);
-      expect(await adapter.depositorContract()).to.equal(other.address);
-    });
+  it("getCurrentValueHeld totals token and aToken", async function () {
+    const { adapter, user } = await loadFixture(deployAaveFixture);
+    const amount = toWei(50);
+    await adapter.connect(user).deposit(amount);
+    expect(await adapter.getCurrentValueHeld()).to.equal(amount);
   });
 });
 
+describe("CompoundV3Adapter", function () {
+  it("deploys with correct parameters", async function () {
+    const { adapter, token, comet, owner } = await loadFixture(deployCompoundFixture);
+    expect(await adapter.asset()).to.equal(token.target);
+    expect(await adapter.comet()).to.equal(comet.target);
+    expect(await adapter.owner()).to.equal(owner.address);
+  });
+
+  it("handles deposit and withdrawal", async function () {
+    const { adapter, token, comet, owner, user } = await loadFixture(deployCompoundFixture);
+    const amount = toWei(80);
+    await adapter.connect(user).deposit(amount);
+    expect(await comet.balanceOf(adapter.target)).to.equal(amount);
+    expect(await token.balanceOf(adapter.target)).to.equal(0);
+
+    const before = await token.balanceOf(user.address);
+    await expect(adapter.connect(owner).withdraw(amount, user.address))
+      .to.emit(adapter, "FundsWithdrawn")
+      .withArgs(user.address, amount, amount);
+    expect(await token.balanceOf(user.address)).to.equal(before + amount);
+    expect(await comet.balanceOf(adapter.target)).to.equal(0);
+  });
+
+  it("only owner can withdraw", async function () {
+    const { adapter, user } = await loadFixture(deployCompoundFixture);
+    await expect(adapter.connect(user).withdraw(1, user.address))
+      .to.be.revertedWithCustomError(adapter, "OwnableUnauthorizedAccount")
+      .withArgs(user.address);
+  });
+
+  it("getCurrentValueHeld sums balances", async function () {
+    const { adapter, user } = await loadFixture(deployCompoundFixture);
+    const amount = toWei(40);
+    await adapter.connect(user).deposit(amount);
+    expect(await adapter.getCurrentValueHeld()).to.equal(amount);
+  });
+});
