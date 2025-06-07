@@ -114,10 +114,11 @@ describe("CatInsurancePool", function () {
     await catPool.connect(user1).depositLiquidity(dep);
     await catPool.connect(owner).flushToAdapter(dep);
     const draw = toWei(700, 6);
+    const before = await usdc.balanceOf(coverPoolAcc.address);
     await expect(catPool.connect(coverPoolAcc).drawFund(draw))
       .to.emit(catPool, "DrawFromFund")
       .withArgs(draw, draw);
-    expect(await usdc.balanceOf(coverPoolAcc.address)).to.equal(draw);
+    expect(await usdc.balanceOf(coverPoolAcc.address)).to.equal(before + draw);
     expect(await adapter.totalValueHeld()).to.equal(dep - draw);
   });
 
