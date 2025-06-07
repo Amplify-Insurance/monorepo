@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2019"],
+    "types": ["@graphprotocol/graph-ts"],
+    "experimentalDecorators": true
+  },
+  "include": ["src"],
+  "files": ["./node_modules/@graphprotocol/graph-ts/global/global.d.ts"]
+}

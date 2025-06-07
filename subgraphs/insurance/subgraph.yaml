@@ -1,0 +1,120 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+description: Insurance protocol subgraph
+
+dataSources:
+  - kind: ethereum/contract
+    name: CoverPool
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      abi: CoverPool
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: CoverPool
+          file: ./abis/CoverPool.json
+      eventHandlers:
+        - event: PoolAdded(uint256,address,address,uint8)
+          handler: handlePoolAdded
+        - event: UnderwriterDeposit(address,uint256,uint256,uint8,uint256[])
+          handler: handleUnderwriterDeposit
+        - event: WithdrawalRequested(address,uint256,uint256)
+          handler: handleWithdrawalRequested
+        - event: WithdrawalExecuted(address,uint256,uint256,uint256)
+          handler: handleWithdrawalExecuted
+        - event: PremiumPaid(uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaid
+        - event: ClaimProcessed(uint256,uint256,address,uint256,uint256,uint256)
+          handler: handleClaimProcessed
+        - event: UnderwriterLoss(address,uint256,uint256)
+          handler: handleUnderwriterLoss
+        - event: CapitalPledgedToPoolChanged(uint256,int256)
+          handler: handleCapitalPledgedToPoolChanged
+        - event: PolicyCreated(address,uint256,uint256,uint256,uint256)
+          handler: handlePolicyCreated
+        - event: IncidentReported(uint256,bool)
+          handler: handleIncidentReported
+        - event: PolicyLapsed(uint256)
+          handler: handlePolicyLapsed
+        - event: CatPremiumBpsUpdated(uint256)
+          handler: handleCatPremiumBpsUpdated
+        - event: BaseYieldAdapterSet(uint8,address)
+          handler: handleBaseYieldAdapterSet
+        - event: CommitteeUpdated(address)
+          handler: handleCommitteeUpdated
+        - event: SystemValueSynced(uint256,uint256,uint256)
+          handler: handleSystemValueSynced
+        - event: AdapterCallFailed(address,string,string)
+          handler: handleAdapterCallFailed
+        - event: PremiumRewardsClaimed(address,uint256,uint256)
+          handler: handlePremiumRewardsClaimed
+        - event: DistressedAssetRewardsClaimed(address,uint256,address,uint256)
+          handler: handleDistressedAssetRewardsClaimed
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: CatInsurancePool
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      abi: CatInsurancePool
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: CatInsurancePool
+          file: ./abis/CatInsurancePool.json
+      eventHandlers:
+        - event: AdapterChanged(address)
+          handler: handleAdapterChanged
+        - event: CatLiquidityDeposited(address,uint256,uint256)
+          handler: handleCatLiquidityDeposited
+        - event: CatLiquidityWithdrawn(address,uint256,uint256)
+          handler: handleCatLiquidityWithdrawn
+        - event: CoverPoolAddressSet(address)
+          handler: handleCoverPoolAddressSet
+        - event: DepositToAdapter(uint256)
+          handler: handleDepositToAdapter
+        - event: DrawFromFund(uint256,uint256)
+          handler: handleDrawFromFund
+        - event: ProtocolAssetReceivedForDistribution(address,uint256)
+          handler: handleProtocolAssetReceivedForDistribution
+        - event: ProtocolAssetRewardsClaimed(address,address,uint256)
+          handler: handleProtocolAssetRewardsClaimed
+        - event: UsdcPremiumReceived(uint256)
+          handler: handleUsdcPremiumReceived
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: PolicyNFT
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      abi: PolicyNFT
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: PolicyNFT
+          file: ./abis/PolicyNFT.json
+      eventHandlers:
+        - event: PolicyLastPaidUpdated(uint256,uint256,address)
+          handler: handlePolicyLastPaidUpdated
+        - event: Transfer(address,address,uint256)
+          handler: handleTransfer
+      file: ./src/mapping.ts
