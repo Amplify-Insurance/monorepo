@@ -6,7 +6,8 @@ require("dotenv").config();
 
 module.exports = {
     solidity: {
-        version: "0.8.20", // Or your contract's pragma
+        // Use 0.8.26 which ships with Hardhat to avoid network downloads
+        version: "0.8.26",
         settings: {
             optimizer: {
                 enabled: true,
