@@ -8,7 +8,7 @@ import { useAccount } from "wagmi";
 import useUnderwriterDetails from "../../hooks/useUnderwriterDetails";
 import usePools from "../../hooks/usePools";
 import { ethers } from "ethers";
-import { getCoverPoolWithSigner } from "../lib/coverPool";
+import { getCoverPoolWithSigner } from "../../lib/coverPool";
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",

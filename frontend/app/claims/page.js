@@ -9,7 +9,7 @@ import { formatCurrency } from "../utils/formatting"
 import useUserPolicies from "../hooks/useUserPolicies"
 import usePools from "../hooks/usePools"
 import { ethers } from "ethers"
-import { getCoverPoolWithSigner } from "../lib/coverPool"
+import { getCoverPoolWithSigner } from "../../lib/coverPool"
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",

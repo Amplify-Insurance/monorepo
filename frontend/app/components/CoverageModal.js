@@ -4,7 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import { Info } from "lucide-react"
 import { ethers } from "ethers"
-import CoverPool from "../abi/CoverPool.json"
+import CoverPool from "../../abi/CoverPool.json"
 import Modal from "./Modal"
 
 const COVER_POOL_ADDRESS = process.env.NEXT_PUBLIC_COVER_POOL_ADDRESS
@@ -199,20 +199,19 @@ export default function CoverageModal({
         {/* Action button */}
         <button
           onClick={handleSubmit}
-          className={`w-full py-3 rounded-lg font-medium text-white ${
-            amount && Number.parseFloat(amount) > 0
+          className={`w-full py-3 rounded-lg font-medium text-white ${amount && Number.parseFloat(amount) > 0
               ? type === "purchase"
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-green-600 hover:bg-green-700"
               : "bg-gray-400 cursor-not-allowed"
-          }`}
+            }`}
           disabled={!amount || Number.parseFloat(amount) <= 0 || isSubmitting}
         >
           {isSubmitting
             ? "Submitting..."
             : amount && Number.parseFloat(amount) > 0
-            ? `${type === "purchase" ? "Purchase" : "Provide"} Coverage`
-            : "Enter an amount"}
+              ? `${type === "purchase" ? "Purchase" : "Provide"} Coverage`
+              : "Enter an amount"}
         </button>
       </div>
     </Modal>

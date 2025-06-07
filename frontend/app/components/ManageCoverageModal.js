@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Info, Plus, Minus } from "lucide-react";
-import { getCoverPoolWithSigner } from "../lib/coverPool";
+import { getCoverPoolWithSigner } from "../../lib/coverPool";
 import Modal from "./Modal";
 
 export default function ManageCoverageModal({
@@ -80,9 +80,8 @@ export default function ManageCoverageModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Manage ${
-        type === "coverage" ? "Coverage" : "Position"
-      } - ${protocol} ${token}`}
+      title={`Manage ${type === "coverage" ? "Coverage" : "Position"
+        } - ${protocol} ${token}`}
     >
       <div className="space-y-6">
         {/* Current position */}
@@ -122,21 +121,19 @@ export default function ManageCoverageModal({
           </label>
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <button
-              className={`py-2 rounded-lg font-medium ${
-                action === "increase"
+              className={`py-2 rounded-lg font-medium ${action === "increase"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-              }`}
+                }`}
               onClick={() => setAction("increase")}
             >
               <Plus className="h-4 w-4 inline mr-1" /> Increase
             </button>
             <button
-              className={`py-2 rounded-lg font-medium ${
-                action === "decrease"
+              className={`py-2 rounded-lg font-medium ${action === "decrease"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-              }`}
+                }`}
               onClick={() => setAction("decrease")}
             >
               <Minus className="h-4 w-4 inline mr-1" /> Decrease
@@ -210,12 +207,12 @@ export default function ManageCoverageModal({
             <span className="text-base font-medium text-gray-900 dark:text-white">
               {action === "increase"
                 ? Number.parseFloat(amount) +
-                  Number.parseFloat(adjustAmount || 0)
+                Number.parseFloat(adjustAmount || 0)
                 : Math.max(
-                    0,
-                    Number.parseFloat(amount) -
-                      Number.parseFloat(adjustAmount || 0)
-                  )}{" "}
+                  0,
+                  Number.parseFloat(amount) -
+                  Number.parseFloat(adjustAmount || 0)
+                )}{" "}
               {token}
             </span>
             <span className="text-sm text-gray-600 dark:text-gray-300">
@@ -223,12 +220,12 @@ export default function ManageCoverageModal({
               {(
                 (action === "increase"
                   ? Number.parseFloat(amount) +
-                    Number.parseFloat(adjustAmount || 0)
+                  Number.parseFloat(adjustAmount || 0)
                   : Math.max(
-                      0,
-                      Number.parseFloat(amount) -
-                        Number.parseFloat(adjustAmount || 0)
-                    )) * tokenPrice
+                    0,
+                    Number.parseFloat(amount) -
+                    Number.parseFloat(adjustAmount || 0)
+                  )) * tokenPrice
               ).toFixed(2)}
             </span>
           </div>
@@ -237,11 +234,10 @@ export default function ManageCoverageModal({
         {/* Action button */}
         <button
           onClick={handleSubmit}
-          className={`w-full py-3 rounded-lg font-medium text-white ${
-            adjustAmount && Number.parseFloat(adjustAmount) > 0 && !isSubmitting
+          className={`w-full py-3 rounded-lg font-medium text-white ${adjustAmount && Number.parseFloat(adjustAmount) > 0 && !isSubmitting
               ? "bg-blue-600 hover:bg-blue-700"
               : "bg-gray-400 cursor-not-allowed"
-          }`}
+            }`}
           disabled={
             !adjustAmount ||
             Number.parseFloat(adjustAmount) <= 0 ||
@@ -251,10 +247,9 @@ export default function ManageCoverageModal({
           {isSubmitting
             ? "Submitting..."
             : adjustAmount && Number.parseFloat(adjustAmount) > 0
-            ? `${action === "increase" ? "Increase" : "Decrease"} ${
-                type === "coverage" ? "Coverage" : "Position"
+              ? `${action === "increase" ? "Increase" : "Decrease"} ${type === "coverage" ? "Coverage" : "Position"
               }`
-            : "Enter an amount"}
+              : "Enter an amount"}
         </button>
       </div>
     </Modal>
