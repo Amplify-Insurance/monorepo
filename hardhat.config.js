@@ -6,15 +6,20 @@ require("dotenv").config();
 
 module.exports = {
     solidity: {
-        version: "0.8.20", // Or your contract's pragma
-        settings: {
-            optimizer: {
-                enabled: true,
-                runs: 1000, // <--- INCREASE THIS SIGNIFICANTLY (e.g., 1000, 2000, 5000)
+        // Use local solc-js to avoid network downloads
+        compilers: [
+            {
+                version: "0.8.20",
+                path: require.resolve("solc/solc.js"),
+                settings: {
+                    optimizer: {
+                        enabled: true,
+                        runs: 1000, // <--- INCREASE THIS SIGNIFICANTLY (e.g., 1000, 2000, 5000)
+                    },
+                    viaIR: true,    // <--- ENSURE THIS IS TRUE
+                },
             },
-            viaIR: true,    // <--- ENSURE THIS IS TRUE
-        },
-
+        ],
     },
     networks: {
         hardhat: {
