@@ -47,12 +47,14 @@ describe("MockYieldAdapter", function () {
       expect(await token.balanceOf(adapter.target)).to.equal(amount);
 
       const withdrawAmount = toWei(60, 6);
+      const beforeWithdrawBalance = await token.balanceOf(depositor.address);
+
       await expect(adapter.connect(depositor).withdraw(withdrawAmount, depositor.address))
         .to.emit(adapter, "Withdrawn")
         .withArgs(depositor.address, depositor.address, withdrawAmount, withdrawAmount);
 
       expect(await adapter.totalValueHeld()).to.equal(amount - withdrawAmount);
-      expect(await token.balanceOf(depositor.address)).to.equal(withdrawAmount);
+      expect(await token.balanceOf(depositor.address)).to.equal(beforeWithdrawBalance + withdrawAmount);
     });
 
     it("caps withdrawal by totalValueHeld and balance", async function () {

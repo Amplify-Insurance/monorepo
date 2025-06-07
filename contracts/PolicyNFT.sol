@@ -20,6 +20,7 @@ contract PolicyNFT is ERC721URIStorage, Ownable { // Inherit Ownable
     event PolicyLastPaidUpdated(uint256 indexed id, uint256 newLastPaidUntil, address caller);
 
     modifier onlyCoverPool() {
+        require(coverPoolContract != address(0), "PolicyNFT: CoverPool address not set");
         require(msg.sender == coverPoolContract, "PolicyNFT: Caller is not the authorized CoverPool contract");
         _;
     }
