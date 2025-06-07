@@ -25,7 +25,7 @@ module.exports = {
             // }
         },
         baseTenderly: {
-            url: "https://virtual.base.rpc.tenderly.co/73b21e81-f0cb-44f6-b934-11fdfc02dcd8",
+            url: "https://virtual.base.rpc.tenderly.co/b8bd0aaa-d917-4ed7-986d-a489973fb537",
             accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         },
         // localhost: { // Example: For a local node like Ganache

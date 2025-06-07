@@ -1,6 +1,10 @@
 import { ethers } from 'ethers'
 import CoverPool from '../abi/CoverPool.json'
 import { provider } from './provider'
+import 'server-only';
+
+const rpc = process.env.NEXT_PUBLIC_RPC_URL;
+console.log('RPC URL:', rpc);
 
 export const coverPool = new ethers.Contract(
   process.env.NEXT_PUBLIC_COVER_POOL_ADDRESS as string,

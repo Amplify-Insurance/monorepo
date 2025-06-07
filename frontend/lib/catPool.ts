@@ -1,8 +1,20 @@
 import { ethers } from 'ethers';
 import CatPool from '../abi/CatInsurancePool.json';
+// lib/provider.ts (or wherever you construct it)
+import 'server-only';
 
-const provider = new ethers.providers.JsonRpcProvider(
-  process.env.NEXT_PUBLIC_RPC_URL || process.env.RPC_URL,
+
+const RPC_URL =
+  process.env.NEXT_PUBLIC_RPC_URL ??
+  process.env.RPC_URL ??
+  'https://rpc.tenderly.co/v1/testnet/<your-vnet-uuid>';
+
+export const provider = new ethers.providers.StaticJsonRpcProvider(
+  RPC_URL,
+  {
+    name: 'tenderly-vnet',   // label is just cosmetic
+    chainId: 8450,           // your custom Tenderly chain-id
+  },
 );
 
 export const catPool = new ethers.Contract(
@@ -31,5 +43,6 @@ export async function getCatPoolWithSigner() {
     signer
   );
 }
+
 
 

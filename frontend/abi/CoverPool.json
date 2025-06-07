@@ -1,160 +1,1447 @@
 [
-  {
-    "inputs": [],
-    "name": "getActiveYieldAdapterAddresses",
-    "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "uint256", "name": "_poolId", "type": "uint256" }],
-    "name": "getPoolInfo",
-    "outputs": [
-      {
-        "components": [
-          { "internalType": "address", "name": "underlyingAsset", "type": "address" },
-          { "internalType": "address", "name": "protocolTokenToCover", "type": "address" },
-          {
-            "components": [
-              { "internalType": "uint256", "name": "base", "type": "uint256" },
-              { "internalType": "uint256", "name": "slope1", "type": "uint256" },
-              { "internalType": "uint256", "name": "slope2", "type": "uint256" },
-              { "internalType": "uint256", "name": "kink", "type": "uint256" }
-            ],
-            "internalType": "struct CoverPool.RateModel",
-            "name": "rateModel",
-            "type": "tuple"
-          },
-          { "internalType": "uint256", "name": "totalCapitalPledgedToPool", "type": "uint256" },
-          { "internalType": "uint256", "name": "totalCoverageSold", "type": "uint256" },
-          { "internalType": "uint8", "name": "underlyingAssetDecimals", "type": "uint8" },
-          { "internalType": "uint8", "name": "protocolTokenDecimals", "type": "uint8" },
-          { "internalType": "uint256", "name": "scaleToProtocolToken", "type": "uint256" },
-          { "internalType": "uint8", "name": "protocolCovered", "type": "uint8" },
-          { "internalType": "bool", "name": "isPaused", "type": "bool" }
-        ],
-        "internalType": "struct CoverPool.PoolData",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getNumberOfPools",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "address", "name": "_underwriter", "type": "address" }],
-    "name": "getUnderwriterAccountDetails",
-    "outputs": [
-      { "internalType": "uint256", "name": "totalDepositedAssetPrincipal", "type": "uint256" },
-      { "internalType": "uint8", "name": "yieldChoice", "type": "uint8" },
-      { "internalType": "address", "name": "yieldAdapter", "type": "address" },
-      { "internalType": "uint256[]", "name": "allocatedPoolIds", "type": "uint256[]" },
-      { "internalType": "uint256", "name": "masterShares", "type": "uint256" },
-      { "internalType": "uint256", "name": "withdrawalRequestTimestamp", "type": "uint256" },
-      { "internalType": "uint256", "name": "withdrawalRequestShares", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "_underwriter", "type": "address" },
-      { "internalType": "uint256", "name": "_poolId", "type": "uint256" }
-    ],
-    "name": "getIsUnderwriterAllocatedToPool",
-    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "uint256", "name": "_poolId", "type": "uint256" }],
-    "name": "getPoolUnderwriters",
-    "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_amount", "type": "uint256" },
-      { "internalType": "uint8", "name": "_yieldChoice", "type": "uint8" },
-      { "internalType": "uint256[]", "name": "_poolIdsToAllocate", "type": "uint256[]" }
-    ],
-    "name": "depositAndAllocate",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [ { "internalType": "uint256", "name": "_sharesToBurn", "type": "uint256" } ],
-    "name": "requestWithdrawal",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "executeWithdrawal",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_poolId", "type": "uint256" },
-      { "internalType": "uint256", "name": "_coverageAmount", "type": "uint256" }
-    ],
-    "name": "purchaseCover",
-    "outputs": [ { "internalType": "uint256", "name": "policyId", "type": "uint256" } ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [ { "internalType": "uint256", "name": "_policyId", "type": "uint256" } ],
-    "name": "settlePremium",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [ { "internalType": "uint256", "name": "_poolId", "type": "uint256" } ],
-    "name": "claimPremiumRewards",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [ { "internalType": "uint256", "name": "_poolId", "type": "uint256" } ],
-    "name": "claimDistressedAssetRewards",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256[]", "name": "_poolIds", "type": "uint256[]" },
-      { "internalType": "bool", "name": "_claimPremiums", "type": "bool" },
-      { "internalType": "bool", "name": "_claimDistressedAssets", "type": "bool" }
-    ],
-    "name": "claimRewardsFromMultiplePools",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_policyId", "type": "uint256" },
-      { "internalType": "bytes", "name": "_proofOfLossDataArg", "type": "bytes" }
-    ],
-    "name": "processClaim",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_policyNFTAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_catPoolAddress",
+				"type": "address"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "target",
+				"type": "address"
+			}
+		],
+		"name": "AddressEmptyCode",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "AddressInsufficientBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FailedInnerCall",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "OwnableInvalidOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "OwnableUnauthorizedAccount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ReentrancyGuardReentrantCall",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			}
+		],
+		"name": "SafeERC20FailedOperation",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "adapterAddress",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "functionCalled",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "reason",
+				"type": "string"
+			}
+		],
+		"name": "AdapterCallFailed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "enum CoverPool.YieldPlatform",
+				"name": "platform",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "adapterAddress",
+				"type": "address"
+			}
+		],
+		"name": "BaseYieldAdapterSet",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "int256",
+				"name": "amountChangePrincipal",
+				"type": "int256"
+			}
+		],
+		"name": "CapitalPledgedToPoolChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newBps",
+				"type": "uint256"
+			}
+		],
+		"name": "CatPremiumBpsUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "policyId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "claimant",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "netPayoutToClaimant",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "claimFee",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "protocolTokenAmountReceived",
+				"type": "uint256"
+			}
+		],
+		"name": "ClaimProcessed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "newCommittee",
+				"type": "address"
+			}
+		],
+		"name": "CommitteeUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "underwriter",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "DistressedAssetRewardsClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "paused",
+				"type": "bool"
+			}
+		],
+		"name": "IncidentReported",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "policyId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "coverageAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "premiumPaid",
+				"type": "uint256"
+			}
+		],
+		"name": "PolicyCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "policyId",
+				"type": "uint256"
+			}
+		],
+		"name": "PolicyLapsed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "underlyingAsset",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "protocolToken",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum CoverPool.ProtocolRiskIdentifier",
+				"name": "protocolCovered",
+				"type": "uint8"
+			}
+		],
+		"name": "PoolAdded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "policyId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amountPaid",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "catAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "poolIncome",
+				"type": "uint256"
+			}
+		],
+		"name": "PremiumPaid",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "underwriter",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "PremiumRewardsClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newTotalSystemValue",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldTotalSystemValue",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "SystemValueSynced",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amountDeposited",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "masterSharesMinted",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum CoverPool.YieldPlatform",
+				"name": "yieldChoice",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256[]",
+				"name": "poolIdsAllocated",
+				"type": "uint256[]"
+			}
+		],
+		"name": "UnderwriterDeposit",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "underwriter",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "lossAmountPrincipal",
+				"type": "uint256"
+			}
+		],
+		"name": "UnderwriterLoss",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "assetsReceived",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "sharesBurned",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "principalReduced",
+				"type": "uint256"
+			}
+		],
+		"name": "WithdrawalExecuted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "sharesToBurn",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "WithdrawalRequested",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "BPS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "CLAIM_FEE_BPS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "COVER_COOLDOWN_PERIOD",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_ALLOCATIONS_PER_UNDERWRITER",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "SECS_YEAR",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "UNDERWRITER_NOTICE_PERIOD",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "activeYieldAdapterAddresses",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_underlyingAsset",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_protocolTokenToCover",
+				"type": "address"
+			},
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "base",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "slope1",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "slope2",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "kink",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct CoverPool.RateModel",
+				"name": "_rateModel",
+				"type": "tuple"
+			},
+			{
+				"internalType": "enum CoverPool.ProtocolRiskIdentifier",
+				"name": "_protocolCovered",
+				"type": "uint8"
+			}
+		],
+		"name": "addProtocolRiskPool",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "poolId",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum CoverPool.YieldPlatform",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"name": "baseYieldAdapters",
+		"outputs": [
+			{
+				"internalType": "contract IYieldAdapter",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "catPool",
+		"outputs": [
+			{
+				"internalType": "contract CatInsurancePool",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "catPremiumBps",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			}
+		],
+		"name": "claimDistressedAssetRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			}
+		],
+		"name": "claimPremiumRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "_poolIds",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "bool",
+				"name": "_claimPremiums",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "_claimDistressedAssets",
+				"type": "bool"
+			}
+		],
+		"name": "claimRewardsFromMultiplePools",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "committee",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum CoverPool.YieldPlatform",
+				"name": "_yieldChoice",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "_poolIdsToAllocate",
+				"type": "uint256[]"
+			}
+		],
+		"name": "depositAndAllocate",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "executeWithdrawal",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getActiveYieldAdapterAddresses",
+		"outputs": [
+			{
+				"internalType": "address[]",
+				"name": "",
+				"type": "address[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_underwriter",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			}
+		],
+		"name": "getIsUnderwriterAllocatedToPool",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getNumberOfPools",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			}
+		],
+		"name": "getPoolInfo",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "contract IERC20",
+						"name": "underlyingAsset",
+						"type": "address"
+					},
+					{
+						"internalType": "contract IERC20",
+						"name": "protocolTokenToCover",
+						"type": "address"
+					},
+					{
+						"components": [
+							{
+								"internalType": "uint256",
+								"name": "base",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "slope1",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "slope2",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "kink",
+								"type": "uint256"
+							}
+						],
+						"internalType": "struct CoverPool.RateModel",
+						"name": "rateModel",
+						"type": "tuple"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalCapitalPledgedToPool",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalCoverageSold",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint8",
+						"name": "underlyingAssetDecimals",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint8",
+						"name": "protocolTokenDecimals",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint256",
+						"name": "scaleToProtocolToken",
+						"type": "uint256"
+					},
+					{
+						"internalType": "enum CoverPool.ProtocolRiskIdentifier",
+						"name": "protocolCovered",
+						"type": "uint8"
+					},
+					{
+						"internalType": "bool",
+						"name": "isPaused",
+						"type": "bool"
+					}
+				],
+				"internalType": "struct CoverPool.PoolData",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			}
+		],
+		"name": "getPoolUnderwriters",
+		"outputs": [
+			{
+				"internalType": "address[]",
+				"name": "",
+				"type": "address[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_underwriter",
+				"type": "address"
+			}
+		],
+		"name": "getUnderwriterAccountDetails",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "totalDepositedAssetPrincipal",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum CoverPool.YieldPlatform",
+				"name": "yieldChoice",
+				"type": "uint8"
+			},
+			{
+				"internalType": "contract IYieldAdapter",
+				"name": "yieldAdapter",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "allocatedPoolIds",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "masterShares",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "withdrawalRequestTimestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "withdrawalRequestShares",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "isAdapterActive",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "policyNFT",
+		"outputs": [
+			{
+				"internalType": "contract PolicyNFT",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "poolSpecificUnderwriters",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			}
+		],
+		"name": "premiumOwed",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "owed",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "",
+				"type": "bytes"
+			}
+		],
+		"name": "processClaim",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_coverageAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "purchaseCover",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "policyId",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			}
+		],
+		"name": "reportIncident",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_sharesToBurn",
+				"type": "uint256"
+			}
+		],
+		"name": "requestWithdrawal",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			}
+		],
+		"name": "resolveIncident",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "enum CoverPool.YieldPlatform",
+				"name": "_platform",
+				"type": "uint8"
+			},
+			{
+				"internalType": "address",
+				"name": "_adapterAddress",
+				"type": "address"
+			}
+		],
+		"name": "setBaseYieldAdapter",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_newBps",
+				"type": "uint256"
+			}
+		],
+		"name": "setCatPremiumShareBps",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_newCommittee",
+				"type": "address"
+			}
+		],
+		"name": "setCommittee",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			}
+		],
+		"name": "settlePremium",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "syncYieldAndAdjustSystemValue",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalMasterSharesSystem",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalSystemValue",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "underwriterAccounts",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "totalDepositedAssetPrincipal",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum CoverPool.YieldPlatform",
+				"name": "yieldChoice",
+				"type": "uint8"
+			},
+			{
+				"internalType": "contract IYieldAdapter",
+				"name": "yieldAdapter",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "masterShares",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "withdrawalRequestTimestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "withdrawalRequestShares",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "underwriterIndexInPoolArray",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "underwriterPoolRewards",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "pendingPremiums",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pendingDistressedAssets",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
 ]
