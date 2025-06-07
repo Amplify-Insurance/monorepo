@@ -6,3 +6,25 @@ type GenericEvent @entity {
   eventName: String!
   data: String!
 }
+
+# New entities with minimal fields for the demo
+type Pool @entity {
+  id: ID!
+  underlyingAsset: Bytes!
+  protocolToken: Bytes!
+  protocolCovered: Int!
+}
+
+type Underwriter @entity {
+  id: ID!
+  totalDeposited: BigInt!
+  masterShares: BigInt!
+}
+
+type Policy @entity {
+  id: ID!
+  owner: Bytes!
+  pool: Pool!
+  coverageAmount: BigInt!
+  premiumPaid: BigInt!
+}
