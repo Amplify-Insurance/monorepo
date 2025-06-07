@@ -32,6 +32,12 @@ Install dependencies with:
 npm install
 ```
 
+Install Slither (optional for static analysis) with:
+
+```bash
+pip install slither-analyzer
+```
+
 ## Usage
 
 Compile contracts with:
@@ -44,6 +50,12 @@ Run the test suite with:
 
 ```bash
 npx hardhat test
+```
+
+Run Slither static analysis with:
+
+```bash
+npm run slither
 ```
 
 The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.ts` to add or customise networks.
