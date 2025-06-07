@@ -17,45 +17,48 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
       abis:
         - name: CoverPool
           file: ./abis/CoverPool.json
       eventHandlers:
-        - event: PoolAdded(uint256,address,address,uint8)
+        - event: PoolAdded(indexed uint256,indexed address,indexed address,uint8)
           handler: handlePoolAdded
-        - event: UnderwriterDeposit(address,uint256,uint256,uint8,uint256[])
+        - event: UnderwriterDeposit(indexed address,uint256,uint256,uint8,uint256[])
           handler: handleUnderwriterDeposit
-        - event: WithdrawalRequested(address,uint256,uint256)
+        - event: WithdrawalRequested(indexed address,uint256,uint256)
           handler: handleWithdrawalRequested
-        - event: WithdrawalExecuted(address,uint256,uint256,uint256)
+        - event: WithdrawalExecuted(indexed address,uint256,uint256,uint256)
           handler: handleWithdrawalExecuted
-        - event: PremiumPaid(uint256,uint256,uint256,uint256,uint256)
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
           handler: handlePremiumPaid
-        - event: ClaimProcessed(uint256,uint256,address,uint256,uint256,uint256)
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
           handler: handleClaimProcessed
-        - event: UnderwriterLoss(address,uint256,uint256)
+        - event: UnderwriterLoss(indexed address,indexed uint256,uint256)
           handler: handleUnderwriterLoss
-        - event: CapitalPledgedToPoolChanged(uint256,int256)
+        - event: CapitalPledgedToPoolChanged(indexed uint256,int256)
           handler: handleCapitalPledgedToPoolChanged
-        - event: PolicyCreated(address,uint256,uint256,uint256,uint256)
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
           handler: handlePolicyCreated
-        - event: IncidentReported(uint256,bool)
+        - event: IncidentReported(indexed uint256,bool)
           handler: handleIncidentReported
-        - event: PolicyLapsed(uint256)
+        - event: PolicyLapsed(indexed uint256)
           handler: handlePolicyLapsed
         - event: CatPremiumBpsUpdated(uint256)
           handler: handleCatPremiumBpsUpdated
-        - event: BaseYieldAdapterSet(uint8,address)
+        - event: BaseYieldAdapterSet(indexed uint8,address)
           handler: handleBaseYieldAdapterSet
         - event: CommitteeUpdated(address)
           handler: handleCommitteeUpdated
         - event: SystemValueSynced(uint256,uint256,uint256)
           handler: handleSystemValueSynced
-        - event: AdapterCallFailed(address,string,string)
+        - event: AdapterCallFailed(indexed address,string,string)
           handler: handleAdapterCallFailed
-        - event: PremiumRewardsClaimed(address,uint256,uint256)
+        - event: PremiumRewardsClaimed(indexed address,indexed uint256,uint256)
           handler: handlePremiumRewardsClaimed
-        - event: DistressedAssetRewardsClaimed(address,uint256,address,uint256)
+        - event: DistressedAssetRewardsClaimed(indexed address,indexed uint256,indexed address,uint256)
           handler: handleDistressedAssetRewardsClaimed
       file: ./src/mapping.ts
 
@@ -72,25 +75,28 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
       abis:
         - name: CatInsurancePool
           file: ./abis/CatInsurancePool.json
       eventHandlers:
-        - event: AdapterChanged(address)
+        - event: AdapterChanged(indexed address)
           handler: handleAdapterChanged
-        - event: CatLiquidityDeposited(address,uint256,uint256)
+        - event: CatLiquidityDeposited(indexed address,uint256,uint256)
           handler: handleCatLiquidityDeposited
-        - event: CatLiquidityWithdrawn(address,uint256,uint256)
+        - event: CatLiquidityWithdrawn(indexed address,uint256,uint256)
           handler: handleCatLiquidityWithdrawn
-        - event: CoverPoolAddressSet(address)
+        - event: CoverPoolAddressSet(indexed address)
           handler: handleCoverPoolAddressSet
         - event: DepositToAdapter(uint256)
           handler: handleDepositToAdapter
         - event: DrawFromFund(uint256,uint256)
           handler: handleDrawFromFund
-        - event: ProtocolAssetReceivedForDistribution(address,uint256)
+        - event: ProtocolAssetReceivedForDistribution(indexed address,uint256)
           handler: handleProtocolAssetReceivedForDistribution
-        - event: ProtocolAssetRewardsClaimed(address,address,uint256)
+        - event: ProtocolAssetRewardsClaimed(indexed address,indexed address,uint256)
           handler: handleProtocolAssetRewardsClaimed
         - event: UsdcPremiumReceived(uint256)
           handler: handleUsdcPremiumReceived
@@ -109,12 +115,15 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
       abis:
         - name: PolicyNFT
           file: ./abis/PolicyNFT.json
       eventHandlers:
-        - event: PolicyLastPaidUpdated(uint256,uint256,address)
+        - event: PolicyLastPaidUpdated(indexed uint256,uint256,address)
           handler: handlePolicyLastPaidUpdated
-        - event: Transfer(address,address,uint256)
+        - event: Transfer(indexed address,indexed address,indexed uint256)
           handler: handleTransfer
       file: ./src/mapping.ts

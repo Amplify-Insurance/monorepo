@@ -1,5 +1,5 @@
-import { ethereum } from "@graphprotocol/graph-ts";
-import { GenericEvent } from "../generated/schema";
+import { ethereum, BigInt } from "@graphprotocol/graph-ts";
+import { GenericEvent, Pool, Underwriter, Policy } from "../generated/schema";
 import {
   AdapterCallFailed,
   BaseYieldAdapterSet,
@@ -53,15 +53,48 @@ function saveGeneric(event: ethereum.Event, name: string): void {
 }
 
 // CoverPool events
-export function handlePoolAdded(event: PoolAdded): void { saveGeneric(event, "PoolAdded"); }
-export function handleUnderwriterDeposit(event: UnderwriterDeposit): void { saveGeneric(event, "UnderwriterDeposit"); }
+export function handlePoolAdded(event: PoolAdded): void {
+  saveGeneric(event, "PoolAdded");
+
+  let poolId = event.params.poolId.toString();
+  let pool = new Pool(poolId);
+  pool.underlyingAsset = event.params.underlyingAsset;
+  pool.protocolToken = event.params.protocolToken;
+  pool.protocolCovered = event.params.protocolCovered;
+  pool.save();
+}
+
+export function handleUnderwriterDeposit(event: UnderwriterDeposit): void {
+  saveGeneric(event, "UnderwriterDeposit");
+
+  let id = event.params.user.toHex();
+  let u = Underwriter.load(id);
+  if (u == null) {
+    u = new Underwriter(id);
+    u.totalDeposited = BigInt.fromI32(0);
+    u.masterShares = BigInt.fromI32(0);
+  }
+  u.totalDeposited = u.totalDeposited.plus(event.params.amountDeposited);
+  u.masterShares = u.masterShares.plus(event.params.masterSharesMinted);
+  u.save();
+}
 export function handleWithdrawalRequested(event: WithdrawalRequested): void { saveGeneric(event, "WithdrawalRequested"); }
 export function handleWithdrawalExecuted(event: WithdrawalExecuted): void { saveGeneric(event, "WithdrawalExecuted"); }
 export function handlePremiumPaid(event: PremiumPaid): void { saveGeneric(event, "PremiumPaid"); }
 export function handleClaimProcessed(event: ClaimProcessed): void { saveGeneric(event, "ClaimProcessed"); }
 export function handleUnderwriterLoss(event: UnderwriterLoss): void { saveGeneric(event, "UnderwriterLoss"); }
 export function handleCapitalPledgedToPoolChanged(event: CapitalPledgedToPoolChanged): void { saveGeneric(event, "CapitalPledgedToPoolChanged"); }
-export function handlePolicyCreated(event: PolicyCreated): void { saveGeneric(event, "PolicyCreated"); }
+export function handlePolicyCreated(event: PolicyCreated): void {
+  saveGeneric(event, "PolicyCreated");
+
+  let policyId = event.params.policyId.toString();
+  let policy = new Policy(policyId);
+  policy.owner = event.params.user;
+  policy.pool = event.params.poolId.toString();
+  policy.coverageAmount = event.params.coverageAmount;
+  policy.premiumPaid = event.params.premiumPaid;
+  policy.save();
+}
 export function handleIncidentReported(event: IncidentReported): void { saveGeneric(event, "IncidentReported"); }
 export function handlePolicyLapsed(event: PolicyLapsed): void { saveGeneric(event, "PolicyLapsed"); }
 export function handleCatPremiumBpsUpdated(event: CatPremiumBpsUpdated): void { saveGeneric(event, "CatPremiumBpsUpdated"); }
@@ -85,4 +118,12 @@ export function handleUsdcPremiumReceived(event: UsdcPremiumReceived): void { sa
 
 // PolicyNFT events
 export function handlePolicyLastPaidUpdated(event: PolicyLastPaidUpdated): void { saveGeneric(event, "PolicyLastPaidUpdated"); }
-export function handleTransfer(event: Transfer): void { saveGeneric(event, "Transfer"); }
+export function handleTransfer(event: Transfer): void {
+  saveGeneric(event, "Transfer");
+
+  let policy = Policy.load(event.params.tokenId.toString());
+  if (policy != null) {
+    policy.owner = event.params.to;
+    policy.save();
+  }
+}
