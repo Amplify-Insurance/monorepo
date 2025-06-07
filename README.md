@@ -95,3 +95,15 @@ include:
 - `GET /api/catpool/liquidusdc` – CatInsurancePool liquid USDC value
 - `GET /api/catpool/rewards/[address]/[token]` – claimable distressed asset rewards
 - `GET /api/policies/[id]` – fetch details for a Policy NFT
+
+## Deployment
+
+Deploy all contracts to the configured network with:
+
+```bash
+npm run deploy
+```
+
+The script in `scripts/deploy.js` deploys mock tokens, `PolicyNFT`,
+`CatInsurancePool` and `CoverPool` and registers mock yield adapters. Adjust
+`hardhat.config.js` to target a specific network or provide private keys.
