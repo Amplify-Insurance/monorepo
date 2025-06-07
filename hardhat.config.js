@@ -22,6 +22,10 @@ module.exports = {
       //   blockNumber: LATEST_BLOCK_NUMBER // Optional: pin to a block
       // }
     },
+    baseTenderly: {
+      url: "https://virtual.base.rpc.tenderly.co/cf8f88d7-1bdc-45f4-9260-f7d32fff3ba6",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
     // localhost: { // Example: For a local node like Ganache
     //   url: "http://127.0.0.1:8545",
     // },
