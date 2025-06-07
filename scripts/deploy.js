@@ -3,6 +3,7 @@ const { ethers } = require("hardhat");
 // Base mainnet addresses
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC
 const AAVE_POOL_ADDRESS = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"; // Aave v3 Pool
+const AAVE_AUSDC_ADDRESS = "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB"; // aUSDC on Base
 const COMPOUND_COMET_ADDRESS = "0xb125E6687d4313864e53df431d5425969c15Eb2F"; // Compound v3 USDC
 
 async function main() {
@@ -24,13 +25,35 @@ async function main() {
   await policyNFT.setCoverPoolAddress(coverPool.target);
   await catPool.setCoverPoolAddress(coverPool.target);
 
-  // Configure known yield adapters (placeholders for now)
-  await coverPool.setBaseYieldAdapter(1, AAVE_POOL_ADDRESS); // YieldPlatform.AAVE
-  await coverPool.setBaseYieldAdapter(2, COMPOUND_COMET_ADDRESS); // YieldPlatform.COMPOUND
+  // Deploy yield adapters
+  const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
+  const aaveAdapter = await AaveAdapter.deploy(USDC_ADDRESS, AAVE_POOL_ADDRESS, AAVE_AUSDC_ADDRESS, deployer.address);
+  await aaveAdapter.waitForDeployment();
+
+  const CompoundAdapter = await ethers.getContractFactory("CompoundV3Adapter");
+  const compoundAdapter = await CompoundAdapter.deploy(COMPOUND_COMET_ADDRESS, deployer.address);
+  await compoundAdapter.waitForDeployment();
+
+  // Configure adapters in CoverPool
+  await coverPool.setBaseYieldAdapter(1, aaveAdapter.target); // YieldPlatform.AAVE
+  await coverPool.setBaseYieldAdapter(2, compoundAdapter.target); // YieldPlatform.COMPOUND
+
+  // Add protocol risk pools for Aave and Compound using generic identifiers
+  const defaultRateModel = {
+    base: 200,
+    slope1: 1000,
+    slope2: 5000,
+    kink: 7000,
+  };
+
+  await coverPool.addProtocolRiskPool(USDC_ADDRESS, AAVE_AUSDC_ADDRESS, defaultRateModel, 1); // PROTOCOL_A -> Aave
+  await coverPool.addProtocolRiskPool(USDC_ADDRESS, USDC_ADDRESS, defaultRateModel, 2); // PROTOCOL_B -> Compound
 
   console.log("PolicyNFT:", policyNFT.target);
   console.log("CatInsurancePool:", catPool.target);
   console.log("CoverPool:", coverPool.target);
+  console.log("Aave Adapter:", aaveAdapter.target);
+  console.log("Compound Adapter:", compoundAdapter.target);
 }
 
 main().catch((err) => {
