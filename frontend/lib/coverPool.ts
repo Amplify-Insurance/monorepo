@@ -10,14 +10,17 @@ export const coverPool = new ethers.Contract(
 
 export async function getCoverPoolWithSigner() {
   if (typeof window === 'undefined' || !window.ethereum)
-    throw new Error('Wallet not found')
-  const browserProvider = new ethers.BrowserProvider(window.ethereum)
-  const signer = await browserProvider.getSigner()
+    throw new Error('Wallet not found');
+
+  // In ethers v5, use Web3Provider instead of BrowserProvider
+  const browserProvider = new ethers.providers.Web3Provider(window.ethereum);
+  const signer = await browserProvider.getSigner();
+
   return new ethers.Contract(
     process.env.NEXT_PUBLIC_COVER_POOL_ADDRESS as string,
     CoverPool,
-    signer,
-  )
+    signer
+  );
 }
 
 export function getCoverPoolWriter() {

@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import CatPool from '../abi/CatInsurancePool.json';
 
-const provider = new ethers.JsonRpcProvider(
+const provider = new ethers.providers.JsonRpcProvider(
   process.env.NEXT_PUBLIC_RPC_URL || process.env.RPC_URL,
 );
 
@@ -21,11 +21,15 @@ export function getCatPoolWriter() {
 export async function getCatPoolWithSigner() {
   if (typeof window === 'undefined' || !window.ethereum)
     throw new Error('Wallet not found');
-  const browserProvider = new ethers.BrowserProvider(window.ethereum);
+
+  const browserProvider = new ethers.providers.Web3Provider(window.ethereum);
   const signer = await browserProvider.getSigner();
+
   return new ethers.Contract(
     process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string,
     CatPool,
-    signer,
+    signer
   );
 }
+
+

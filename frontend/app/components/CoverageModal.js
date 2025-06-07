@@ -51,7 +51,7 @@ export default function CoverageModal({
     setIsSubmitting(true)
     try {
       if (!window.ethereum) throw new Error("Wallet not found")
-      const browserProvider = new ethers.BrowserProvider(window.ethereum)
+      const browserProvider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = await browserProvider.getSigner()
       const cp = new ethers.Contract(COVER_POOL_ADDRESS, CoverPool, signer)
 
@@ -200,10 +200,10 @@ export default function CoverageModal({
         <button
           onClick={handleSubmit}
           className={`w-full py-3 rounded-lg font-medium text-white ${amount && Number.parseFloat(amount) > 0
-              ? type === "purchase"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-green-600 hover:bg-green-700"
-              : "bg-gray-400 cursor-not-allowed"
+            ? type === "purchase"
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-green-600 hover:bg-green-700"
+            : "bg-gray-400 cursor-not-allowed"
             }`}
           disabled={!amount || Number.parseFloat(amount) <= 0 || isSubmitting}
         >

@@ -33,7 +33,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     const premium = Number(pool.premiumRateBps || 0) / 100
     const uwYield = Number(pool.underwriterYieldBps || 0) / 100
     const capacity = Number(
-      ethers.formatUnits(
+      ethers.utils.formatUnits(
         BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold),
         underlyingDec
       )
@@ -42,13 +42,13 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
       id: pool.id,
       name,
       description: `Risk pool for ${pool.protocolTokenToCover}`,
-      tvl: Number(ethers.formatUnits(pool.totalCapitalPledgedToPool, underlyingDec)),
+      tvl: Number(ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, underlyingDec)),
       pools: [
         {
           token: pool.protocolTokenToCover,
           premium,
           underwriterYield: uwYield,
-          tvl: Number(ethers.formatUnits(pool.totalCoverageSold, protoDec)),
+          tvl: Number(ethers.utils.formatUnits(pool.totalCoverageSold, protoDec)),
           price: 1,
           capacity,
         },

@@ -63,7 +63,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
         premium: Number(pool.premiumRateBps || 0) / 100,
         underwriterYield: Number(pool.underwriterYieldBps || 0) / 100,
         tvl: Number(
-          ethers.formatUnits(pool.totalCoverageSold, pool.protocolTokenDecimals)
+          ethers.utils.formatUnits(pool.totalCoverageSold, pool.protocolTokenDecimals)
         ),
         price: 1,
       })
@@ -78,10 +78,10 @@ export default function UnderwriterPanel({ displayCurrency }) {
   // Filter markets that support the selected token and category
   const filteredMarkets = selectedToken
     ? markets.filter(
-        (market) =>
-      market.pools.some((pool) => pool.token === selectedToken?.symbol) &&
-          (selectedCategory === "all" || market.category === selectedCategory),
-      )
+      (market) =>
+        market.pools.some((pool) => pool.token === selectedToken?.symbol) &&
+        (selectedCategory === "all" || market.category === selectedCategory),
+    )
     : []
 
   // Calculate total yield based on selected markets
@@ -161,16 +161,16 @@ export default function UnderwriterPanel({ displayCurrency }) {
             {selectedToken && (
               <div className="flex items-center">
                 <div className="flex-shrink-0 h-6 w-6 mr-2">
-                <Image
-                  src={`/images/tokens/${selectedToken?.symbol?.toLowerCase()}.png`}
-                  alt={selectedToken?.name || ''}
+                  <Image
+                    src={`/images/tokens/${selectedToken?.symbol?.toLowerCase()}.png`}
+                    alt={selectedToken?.name || ''}
                     width={24}
                     height={24}
                     className="rounded-full"
                   />
                 </div>
                 <span className="block truncate">
-                {selectedToken?.symbol} - {selectedToken?.name}
+                  {selectedToken?.symbol} - {selectedToken?.name}
                 </span>
               </div>
             )}
@@ -184,11 +184,10 @@ export default function UnderwriterPanel({ displayCurrency }) {
               {tokens.map((token) => (
                 <button
                   key={token.symbol}
-                  className={`${
-                    token.symbol === selectedToken?.symbol
+                  className={`${token.symbol === selectedToken?.symbol
                       ? "text-white bg-blue-600"
                       : "text-gray-900 dark:text-gray-200"
-                  } cursor-default select-none relative py-2 pl-3 pr-9 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
+                    } cursor-default select-none relative py-2 pl-3 pr-9 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
                   onClick={() => {
                     setSelectedToken(token)
                     setTokenDropdownOpen(false)
@@ -206,9 +205,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
                       />
                     </div>
                     <span
-                      className={`block truncate ${
-                         token.symbol === selectedToken?.symbol ? "font-medium" : "font-normal"
-                      }`}
+                      className={`block truncate ${token.symbol === selectedToken?.symbol ? "font-medium" : "font-normal"
+                        }`}
                     >
                       {token.symbol} - {token.name}
                     </span>
@@ -244,11 +242,10 @@ export default function UnderwriterPanel({ displayCurrency }) {
                   {protocolCategories.map((category) => (
                     <button
                       key={category.id}
-                      className={`${
-                        category.id === selectedCategory
+                      className={`${category.id === selectedCategory
                           ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
                           : "text-gray-700 dark:text-gray-200"
-                      } block px-4 py-2 text-sm w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
+                        } block px-4 py-2 text-sm w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
                       onClick={() => {
                         setSelectedCategory(category.id)
                         setCategoryDropdownOpen(false)
@@ -276,9 +273,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
             return (
               <div
                 key={market.id}
-                className={`border rounded-lg overflow-hidden ${
-                  isSelected ? "border-blue-500 dark:border-blue-400" : "border-gray-200 dark:border-gray-700"
-                }`}
+                className={`border rounded-lg overflow-hidden ${isSelected ? "border-blue-500 dark:border-blue-400" : "border-gray-200 dark:border-gray-700"
+                  }`}
               >
                 <div className="p-4 bg-white dark:bg-gray-800">
                   <div className="flex items-center justify-between mb-4">

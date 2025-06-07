@@ -41,7 +41,7 @@ export default function PoolDetailsPage() {
 
   const name = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
   const tvl = Number(
-    ethers.formatUnits(pool.totalCapitalPledgedToPool, pool.underlyingAssetDecimals),
+    ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, pool.underlyingAssetDecimals),
   )
   const premium = Number(pool.premiumRateBps || 0) / 100
   const yieldRate = Number(pool.underwriterYieldBps || 0) / 100

@@ -33,7 +33,7 @@ export default function ClaimsPage() {
       const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
       if (!pool) return null
       const coverageAmount = Number(
-        ethers.formatUnits(p.coverage, pool.underlyingAssetDecimals),
+        ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals),
       )
       return {
         id: p.id,
@@ -140,11 +140,10 @@ export default function ClaimsPage() {
                   filteredCoverages.map((coverage) => (
                     <div
                       key={coverage.id}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedCoverage?.id === coverage.id
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedCoverage?.id === coverage.id
                           ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400"
                           : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"
-                      }`}
+                        }`}
                       onClick={() => setSelectedCoverage(coverage)}
                     >
                       <div className="flex items-center mb-2">
@@ -263,9 +262,8 @@ export default function ClaimsPage() {
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className={`px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white ${
-                          isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                        }`}
+                        className={`px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white ${isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                          }`}
                       >
                         {isSubmitting ? "Submitting..." : "Submit Claim"}
                       </button>

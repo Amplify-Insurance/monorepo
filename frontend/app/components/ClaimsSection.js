@@ -31,10 +31,10 @@ export default function ClaimsSection({ displayCurrency }) {
       const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
       const token = pool.protocolTokenToCover
       const amount = Number(
-        ethers.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
+        ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
       )
       const value = Number(
-        ethers.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)
+        ethers.utils.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)
       )
       return {
         id: c.policyId,
@@ -67,11 +67,10 @@ export default function ClaimsSection({ displayCurrency }) {
         <ul className="flex flex-wrap -mb-px">
           <li className="mr-2">
             <button
-              className={`inline-block p-4 border-b-2 rounded-t-lg ${
-                activeTab === "affected"
+              className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === "affected"
                   ? "text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400"
                   : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
-              }`}
+                }`}
               onClick={() => setActiveTab("affected")}
             >
               Affected Positions
@@ -79,11 +78,10 @@ export default function ClaimsSection({ displayCurrency }) {
           </li>
           <li className="mr-2">
             <button
-              className={`inline-block p-4 border-b-2 rounded-t-lg ${
-                activeTab === "history"
+              className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === "history"
                   ? "text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400"
                   : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
-              }`}
+                }`}
               onClick={() => setActiveTab("history")}
             >
               Claims History
@@ -208,13 +206,12 @@ export default function ClaimsSection({ displayCurrency }) {
                         </div>
                       ) : (
                         <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            claim.status === "approved"
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${claim.status === "approved"
                               ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                               : claim.status === "denied"
                                 ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
                                 : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                          }`}
+                            }`}
                         >
                           {claim.status.charAt(0).toUpperCase() + claim.status.slice(1)}
                         </span>

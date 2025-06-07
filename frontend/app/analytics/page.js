@@ -33,10 +33,10 @@ export default function AnalyticsPage() {
       const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
       const token = pool.protocolTokenToCover
       const amount = Number(
-        ethers.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
+        ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
       )
       const value = Number(
-        ethers.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)
+        ethers.utils.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)
       )
       return {
         id: idx + 1,
@@ -249,11 +249,10 @@ export default function AnalyticsPage() {
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{claim.coverId}</td>
                   <td className="px-3 py-4 whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        claim.verdict === "APPROVED"
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${claim.verdict === "APPROVED"
                           ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                           : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                      }`}
+                        }`}
                     >
                       {claim.verdict === "APPROVED" ? (
                         <Check className="mr-1 h-3 w-3" />
@@ -382,11 +381,10 @@ export default function AnalyticsPage() {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`relative inline-flex items-center px-4 py-2 border ${
-                        currentPage === pageNum
+                      className={`relative inline-flex items-center px-4 py-2 border ${currentPage === pageNum
                           ? "z-10 bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400"
                           : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600"
-                      } text-sm font-medium`}
+                        } text-sm font-medium`}
                     >
                       {pageNum}
                     </button>

@@ -35,7 +35,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
       const protocol =
         PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`;
       const amount = Number(
-        ethers.formatUnits(
+        ethers.utils.formatUnits(
           details.totalDepositedAssetPrincipal,
           pool.underlyingAssetDecimals
         )
@@ -300,7 +300,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
               </tbody>
             </table>
           </div>
-      </div>
+        </div>
       </div>
       <div className="mt-4 flex justify-end">
         <button

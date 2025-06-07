@@ -29,10 +29,10 @@ export default function ActiveCoverages({ displayCurrency }) {
     if (!pool) return null
     const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
     const coverageAmount = Number(
-      ethers.formatUnits(p.coverage, pool.underlyingAssetDecimals)
+      ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
     )
     const capacity = Number(
-      ethers.formatUnits(
+      ethers.utils.formatUnits(
         BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold),
         pool.underlyingAssetDecimals
       )
