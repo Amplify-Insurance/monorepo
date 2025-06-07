@@ -22,7 +22,7 @@ export const config = getDefaultConfig({
   transports: {
     [base.id]: http(
       process.env.NEXT_PUBLIC_RPC_URL ||
-        'https://virtual.base.rpc.tenderly.co/cf8f88d7-1bdc-45f4-9260-f7d32fff3ba6',
+      'https://virtual.base.rpc.tenderly.co/73b21e81-f0cb-44f6-b934-11fdfc02dcd8',
     ),
   },
   ssr: true,
