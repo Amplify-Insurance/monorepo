@@ -95,3 +95,7 @@ include:
 - `GET /api/catpool/liquidusdc` – CatInsurancePool liquid USDC value
 - `GET /api/catpool/rewards/[address]/[token]` – claimable distressed asset rewards
 - `GET /api/policies/[id]` – fetch details for a Policy NFT
+
+## License
+
+This project is licensed under the **Business Source License 1.1**. See [LICENSE](./LICENSE) for details.
