@@ -14,6 +14,9 @@ contracts/               Solidity sources
 ├─ MockERC20.sol         Simple ERC20 used in tests
 ├─ MockYieldAdapter.sol  Test adapter implementing IYieldAdapter
 ├─ SdaiAdapter.sol       Example adapter for depositing into sDAI
+├─ adapters/
+│  ├─ AaveV3Adapter.sol     IYieldAdapter wrapper for Aave V3
+│  └─ CompoundV3Adapter.sol IYieldAdapter wrapper for Compound V3
 └─ interfaces/           Minimal interfaces used by adapters
 
 hardhat.config.ts        Hardhat configuration
