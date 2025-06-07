@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interfaces/IYieldAdapter.sol"; // Assuming IYieldAdapter is in interfaces/
-import "./interfaces/ISdai.sol";       // Assuming ISdai is in interfaces/
+import "../interfaces/IYieldAdapter.sol"; // Assuming IYieldAdapter is in interfaces/
+import "../interfaces/ISdai.sol";       // Assuming ISdai is in interfaces/
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract SdaiAdapter is IYieldAdapter, Ownable {
