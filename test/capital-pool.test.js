@@ -124,14 +124,26 @@ describe("CapitalPool - setBaseYieldAdapter", function () {
 
         // Deploy a valid mock Yield Adapter
         const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-        const correctAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const correctAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
 
         // Deploy another valid mock Yield Adapter for update tests
-        const anotherCorrectAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const anotherCorrectAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
         
         // Deploy a mock token with a different address for mismatch tests
         const wrongAsset = await MockERC20Factory.deploy("Wrong Token", "W_TKN", 18);
-        const wrongAssetAdapter = await MockYieldAdapterFactory.deploy(wrongAsset.address);
+        const wrongAssetAdapter = await MockYieldAdapterFactory.deploy(
+            wrongAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
 
         return { capitalPool, owner, nonOwner, eoaAddress, correctAdapter, anotherCorrectAdapter, wrongAssetAdapter };
     }
@@ -255,7 +267,11 @@ describe("CapitalPool - deposit", function () {
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         const underlyingAsset = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-        const yieldAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const yieldAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
         const MockRiskManagerFactory = await ethers.getContractFactory("MockRiskManager");
         const mockRiskManager = await MockRiskManagerFactory.deploy();
 
@@ -266,6 +282,7 @@ describe("CapitalPool - deposit", function () {
         // Configure CapitalPool
         await capitalPool.connect(owner).setRiskManager(mockRiskManager.address);
         await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.AAVE, yieldAdapter.address);
+        await yieldAdapter.connect(owner).setDepositor(capitalPool.address);
 
         // Fund user and approve the CapitalPool to spend their tokens
         const depositAmount = ethers.utils.parseUnits("10000", 6); // 10,000 USDC
@@ -335,7 +352,8 @@ describe("CapitalPool - deposit", function () {
             
             // Simulate yield gain by just increasing the system value
             const yieldGain = ethers.utils.parseUnits("2000", 6); // 2,000 USDC of yield
-            await capitalPool.mock_setTotalSystemValue(depositAmount.add(yieldGain));
+            await yieldAdapter.connect(owner).setTotalValueHeld(depositAmount.add(yieldGain));
+            await capitalPool.connect(owner).syncYieldAndAdjustSystemValue();
 
             // Second depositor (otherUser) deposits the same amount
             const secondDepositAmount = depositAmount;
@@ -393,7 +411,11 @@ describe("CapitalPool - requestWithdrawal", function () {
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         const underlyingAsset = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-        const yieldAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const yieldAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
         const MockRiskManagerFactory = await ethers.getContractFactory("MockRiskManager");
         const mockRiskManager = await MockRiskManagerFactory.deploy();
         
@@ -402,6 +424,7 @@ describe("CapitalPool - requestWithdrawal", function () {
         const capitalPool = await CapitalPoolFactory.deploy(owner.address, underlyingAsset.address);
         await capitalPool.connect(owner).setRiskManager(mockRiskManager.address);
         await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.AAVE, yieldAdapter.address);
+        await yieldAdapter.connect(owner).setDepositor(capitalPool.address);
         
         // Fund user and make a deposit
         const depositAmount = ethers.utils.parseUnits("10000", 6);
@@ -412,7 +435,7 @@ describe("CapitalPool - requestWithdrawal", function () {
         // In the first deposit, shares minted = amount deposited
         const sharesOwned = depositAmount;
 
-        return { capitalPool, depositor, otherUser, mockRiskManager, sharesOwned };
+        return { capitalPool, depositor, otherUser, mockRiskManager, sharesOwned, owner, yieldAdapter };
     }
 
     describe("Validation and Revert Scenarios", function () {
@@ -488,7 +511,11 @@ describe("CapitalPool - executeWithdrawal", function () {
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         const underlyingAsset = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-        const yieldAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const yieldAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
         const MockRiskManagerFactory = await ethers.getContractFactory("MockRiskManager");
         const mockRiskManager = await MockRiskManagerFactory.deploy();
         
@@ -497,6 +524,7 @@ describe("CapitalPool - executeWithdrawal", function () {
         const capitalPool = await CapitalPoolFactory.deploy(owner.address, underlyingAsset.address);
         await capitalPool.connect(owner).setRiskManager(mockRiskManager.address);
         await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.AAVE, yieldAdapter.address);
+        await yieldAdapter.connect(owner).setDepositor(capitalPool.address);
         
         // Fund depositor, approve, and deposit
         const depositAmount = ethers.utils.parseUnits("10000", 6);
@@ -584,7 +612,8 @@ describe("CapitalPool - executeWithdrawal", function () {
 
             // Simulate a 10% yield gain on the total system value
             const yieldGain = depositAmount.div(10);
-            await capitalPool.mock_setTotalSystemValue(depositAmount.add(yieldGain));
+            await yieldAdapter.connect(owner).setTotalValueHeld(depositAmount.add(yieldGain));
+            await capitalPool.connect(owner).syncYieldAndAdjustSystemValue();
 
             await time.increase(NOTICE_PERIOD.add(1));
 
@@ -643,13 +672,18 @@ describe("CapitalPool - applyLosses", function () {
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         const underlyingAsset = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-        const yieldAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const yieldAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
         const CapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
         const capitalPool = await CapitalPoolFactory.deploy(owner.address, underlyingAsset.address);
 
         // Configure CapitalPool
         await capitalPool.connect(owner).setRiskManager(riskManager.address);
         await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.AAVE, yieldAdapter.address);
+        await yieldAdapter.connect(owner).setDepositor(capitalPool.address);
         
         // Fund and deposit for Underwriter 1
         const u1Deposit = ethers.utils.parseUnits("10000", 6);
@@ -793,8 +827,16 @@ describe("CapitalPool - syncYieldAndAdjustSystemValue", function () {
         const underlyingAsset = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         
         const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-        const aaveAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
-        const compoundAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const aaveAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
+        const compoundAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
         
         const CapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
         const capitalPool = await CapitalPoolFactory.deploy(owner.address, underlyingAsset.address);
@@ -803,6 +845,8 @@ describe("CapitalPool - syncYieldAndAdjustSystemValue", function () {
         await capitalPool.connect(owner).setRiskManager(ethers.constants.AddressZero); // Mock address
         await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.AAVE, aaveAdapter.address);
         await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.COMPOUND, compoundAdapter.address);
+        await aaveAdapter.connect(owner).setDepositor(capitalPool.address);
+        await compoundAdapter.connect(owner).setDepositor(capitalPool.address);
         
         // --- Simulate Deposits into both adapters ---
         // Deposit 1: 10k into AAVE
@@ -918,13 +962,18 @@ describe("CapitalPool - View Functions", function () {
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         const underlyingAsset = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-        const yieldAdapter = await MockYieldAdapterFactory.deploy(underlyingAsset.address);
+        const yieldAdapter = await MockYieldAdapterFactory.deploy(
+            underlyingAsset.address,
+            ethers.constants.AddressZero,
+            owner.address
+        );
         const CapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
         const capitalPool = await CapitalPoolFactory.deploy(owner.address, underlyingAsset.address);
 
         // Configure CapitalPool
         await capitalPool.connect(owner).setRiskManager(ethers.constants.AddressZero);
         await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.AAVE, yieldAdapter.address);
+        await yieldAdapter.connect(owner).setDepositor(capitalPool.address);
         
         // Fund and deposit for the depositor
         const depositAmount = ethers.utils.parseUnits("10000", 6); // 10,000 USDC
@@ -934,7 +983,7 @@ describe("CapitalPool - View Functions", function () {
         
         const sharesOwned = depositAmount; // 1:1 on first deposit
 
-        return { capitalPool, depositor, nonDepositor, depositAmount, sharesOwned };
+        return { capitalPool, depositor, nonDepositor, depositAmount, sharesOwned, owner, yieldAdapter };
     }
 
     describe("getUnderwriterAccount", function () {
@@ -995,11 +1044,12 @@ describe("CapitalPool - View Functions", function () {
         });
 
         it("should return a higher value for the same shares when NAV increases", async function() {
-            const { capitalPool, depositAmount } = await loadFixture(deployAndDepositFixture);
+            const { capitalPool, depositAmount, owner, yieldAdapter } = await loadFixture(deployAndDepositFixture);
             
             // Simulate a 25% yield gain
             const yieldGain = depositAmount.div(4); // 2,500
-            await capitalPool.mock_setTotalSystemValue(depositAmount.add(yieldGain));
+            await yieldAdapter.connect(owner).setTotalValueHeld(depositAmount.add(yieldGain));
+            await capitalPool.connect(owner).syncYieldAndAdjustSystemValue();
 
             const shares = ethers.utils.parseUnits("1000", 6);
             // Expected value = shares * totalValue / totalShares = 1000 * 12500 / 10000 = 1250
@@ -1026,11 +1076,12 @@ describe("CapitalPool - View Functions", function () {
         });
 
         it("should return fewer shares for the same value when NAV increases", async function() {
-            const { capitalPool, depositAmount } = await loadFixture(deployAndDepositFixture);
+            const { capitalPool, depositAmount, owner, yieldAdapter } = await loadFixture(deployAndDepositFixture);
             
             // Simulate a 25% yield gain
             const yieldGain = depositAmount.div(4); // 2,500
-            await capitalPool.mock_setTotalSystemValue(depositAmount.add(yieldGain));
+            await yieldAdapter.connect(owner).setTotalValueHeld(depositAmount.add(yieldGain));
+            await capitalPool.connect(owner).syncYieldAndAdjustSystemValue();
 
             const value = ethers.utils.parseUnits("1250", 6);
             // Expected shares = value * totalShares / totalValue = 1250 * 10000 / 12500 = 1000
