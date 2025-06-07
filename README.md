@@ -46,6 +46,12 @@ Run the test suite with:
 npx hardhat test
 ```
 
+Run Slither static analysis with:
+
+```bash
+npm run slither
+```
+
 The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.ts` to add or customise networks.
 
 ## Contracts Overview
