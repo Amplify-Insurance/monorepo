@@ -20,6 +20,7 @@ dataSources:
         - Pool
         - Underwriter
         - Policy
+        - ContractOwner
       abis:
         - name: CoverPool
           file: ./abis/CoverPool.json
@@ -60,6 +61,8 @@ dataSources:
           handler: handlePremiumRewardsClaimed
         - event: DistressedAssetRewardsClaimed(indexed address,indexed uint256,indexed address,uint256)
           handler: handleDistressedAssetRewardsClaimed
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleCoverPoolOwnershipTransferred
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -78,6 +81,7 @@ dataSources:
         - Pool
         - Underwriter
         - Policy
+        - ContractOwner
       abis:
         - name: CatInsurancePool
           file: ./abis/CatInsurancePool.json
@@ -100,6 +104,8 @@ dataSources:
           handler: handleProtocolAssetRewardsClaimed
         - event: UsdcPremiumReceived(uint256)
           handler: handleUsdcPremiumReceived
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleCatInsurancePoolOwnershipTransferred
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -118,6 +124,7 @@ dataSources:
         - Pool
         - Underwriter
         - Policy
+        - ContractOwner
       abis:
         - name: PolicyNFT
           file: ./abis/PolicyNFT.json
@@ -126,4 +133,6 @@ dataSources:
           handler: handlePolicyLastPaidUpdated
         - event: Transfer(indexed address,indexed address,indexed uint256)
           handler: handleTransfer
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handlePolicyNFTOwnershipTransferred
       file: ./src/mapping.ts

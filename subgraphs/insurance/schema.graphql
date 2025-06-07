@@ -28,3 +28,8 @@ type Policy @entity {
   coverageAmount: BigInt!
   premiumPaid: BigInt!
 }
+
+type ContractOwner @entity {
+  id: ID!
+  owner: Bytes!
+}

@@ -1,5 +1,5 @@
-import { ethereum, BigInt } from "@graphprotocol/graph-ts";
-import { GenericEvent, Pool, Underwriter, Policy } from "../generated/schema";
+import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts";
+import { GenericEvent, Pool, Underwriter, Policy, ContractOwner } from "../generated/schema";
 import {
   AdapterCallFailed,
   BaseYieldAdapterSet,
@@ -8,6 +8,7 @@ import {
   ClaimProcessed,
   CommitteeUpdated,
   DistressedAssetRewardsClaimed,
+  OwnershipTransferred as CoverPoolOwnershipTransferred,
   IncidentReported,
   PolicyCreated,
   PolicyLapsed,
@@ -27,13 +28,15 @@ import {
   CoverPoolAddressSet,
   DepositToAdapter,
   DrawFromFund,
+  OwnershipTransferred as CatInsurancePoolOwnershipTransferred,
   ProtocolAssetReceivedForDistribution,
   ProtocolAssetRewardsClaimed,
   UsdcPremiumReceived
 } from "../generated/CatInsurancePool/CatInsurancePool";
 import {
   PolicyLastPaidUpdated,
-  Transfer
+  Transfer,
+  OwnershipTransferred as PolicyNFTOwnershipTransferred
 } from "../generated/PolicyNFT/PolicyNFT";
 
 function saveGeneric(event: ethereum.Event, name: string): void {
@@ -50,6 +53,16 @@ function saveGeneric(event: ethereum.Event, name: string): void {
   }
   entity.data = params.join(",");
   entity.save();
+}
+
+function saveOwner(event: ethereum.Event, newOwner: Address): void {
+  let id = event.address.toHex();
+  let owner = ContractOwner.load(id);
+  if (owner == null) {
+    owner = new ContractOwner(id);
+  }
+  owner.owner = newOwner;
+  owner.save();
 }
 
 // CoverPool events
@@ -126,4 +139,25 @@ export function handleTransfer(event: Transfer): void {
     policy.owner = event.params.to;
     policy.save();
   }
+}
+
+export function handleCoverPoolOwnershipTransferred(
+  event: CoverPoolOwnershipTransferred
+): void {
+  saveGeneric(event, "OwnershipTransferred");
+  saveOwner(event, event.params.newOwner);
+}
+
+export function handleCatInsurancePoolOwnershipTransferred(
+  event: CatInsurancePoolOwnershipTransferred
+): void {
+  saveGeneric(event, "OwnershipTransferred");
+  saveOwner(event, event.params.newOwner);
+}
+
+export function handlePolicyNFTOwnershipTransferred(
+  event: PolicyNFTOwnershipTransferred
+): void {
+  saveGeneric(event, "OwnershipTransferred");
+  saveOwner(event, event.params.newOwner);
 }
