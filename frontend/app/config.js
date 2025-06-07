@@ -16,12 +16,14 @@ if (!projectId) {
 
 // 3. Use getDefaultConfig to create wagmi config
 export const config = getDefaultConfig({
-  appName: 'DeFi Insurance Platform', // Your app name
-  projectId: projectId || 'DEFAULT_PROJECT_ID_IF_MISSING', // REQUIRED! Add your WalletConnect Project ID or a fallback
+  appName: 'DeFi Insurance Platform',
+  projectId: projectId || 'DEFAULT_PROJECT_ID_IF_MISSING',
   chains: [base],
-  // Optional: Add transports here if you want to use specific RPCs instead of defaults
-  // transports: {
-  //   [base.id]: http('https://base.blockpi.network/v1/rpc/public'),
-  // },
-  ssr: true, // Recommended for Next.js Required for App Router
+  transports: {
+    [base.id]: http(
+      process.env.NEXT_PUBLIC_RPC_URL ||
+        'https://virtual.base.rpc.tenderly.co/cf8f88d7-1bdc-45f4-9260-f7d32fff3ba6',
+    ),
+  },
+  ssr: true,
 });
