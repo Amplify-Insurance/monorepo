@@ -564,4 +564,28 @@ contract RiskManager is ReentrancyGuard, Ownable {
     function _isPoolSolventForNewCover(PoolData storage _pool, uint256 _additionalCoverage) internal view returns (bool) {
         return (_pool.totalCoverageSold + _additionalCoverage) <= _pool.totalCapitalPledgedToPool;
     }
+
+    // ------------------------------------------------------------------
+    // Test helper functions
+    // ------------------------------------------------------------------
+
+    /// @notice Directly sets total coverage sold for a pool. Test only.
+    function mock_setTotalCoverageSold(uint256 _poolId, uint256 _value) external {
+        protocolRiskPools[_poolId].totalCoverageSold = _value;
+    }
+
+    /// @notice Directly sets total capital pledged for a pool. Test only.
+    function mock_setTotalCapitalPledged(uint256 _poolId, uint256 _value) external {
+        protocolRiskPools[_poolId].totalCapitalPledgedToPool = _value;
+    }
+
+    /// @notice Sets pending premium rewards for an underwriter. Test only.
+    function mock_setPendingPremiums(uint256 _poolId, address _underwriter, uint256 _amount) external {
+        underwriterPoolRewards[_poolId][_underwriter].pendingPremiums = _amount;
+    }
+
+    /// @notice Sets pending distressed asset rewards for an underwriter. Test only.
+    function mock_setPendingDistressedAssets(uint256 _poolId, address _underwriter, uint256 _amount) external {
+        underwriterPoolRewards[_poolId][_underwriter].pendingDistressedAssets = _amount;
+    }
 }

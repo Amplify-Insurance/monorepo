@@ -26,6 +26,7 @@ contract MockPolicyNFT is Ownable {
     uint256 public nextTokenId = 1;
     mapping(uint256 => Policy) public policies;
     mapping(uint256 => address) private _owners; // Internal mapping to mock ownerOf
+    address public coverPoolContract;
 
     // Variables to record the last call for testing convenience
     address public last_mint_to;
@@ -38,6 +39,47 @@ contract MockPolicyNFT is Ownable {
     event PolicyLastPaidUpdated(uint256 indexed id, uint256 newLastPaidUntil);
 
     constructor(address _initialOwner) Ownable(_initialOwner) {}
+
+    // ------------------------------------------------------------------
+    // Convenience setters used only in the tests. These functions allow the
+    // test suite to directly manipulate policy state without going through a
+    // full CoverPool workflow.
+    // ------------------------------------------------------------------
+
+    function setCoverPoolAddress(address _coverPool) external onlyOwner {
+        require(_coverPool != address(0), "MockPolicyNFT: CoverPool address cannot be zero");
+        coverPoolContract = _coverPool;
+    }
+
+    function mock_setPolicy(
+        uint256 id,
+        address owner,
+        uint256 pid,
+        uint256 coverage,
+        uint256 activation,
+        uint256 paidUntil
+    ) external {
+        policies[id] = Policy({
+            coverage: coverage,
+            poolId: pid,
+            start: block.timestamp,
+            activation: activation,
+            lastPaidUntil: paidUntil
+        });
+        _owners[id] = owner;
+    }
+
+    function mock_setLastPaid(uint256 id, uint256 ts) external {
+        policies[id].lastPaidUntil = ts;
+    }
+
+    function mock_setCoverage(uint256 id, uint256 coverage) external {
+        policies[id].coverage = coverage;
+    }
+
+    function mock_setActivation(uint256 id, uint256 activation) external {
+        policies[id].activation = activation;
+    }
 
 
     // --- Mocked Functions (Publicly callable for easy test setup) ---
