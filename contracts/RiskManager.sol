@@ -539,6 +539,11 @@ contract RiskManager is ReentrancyGuard, Ownable {
         return protocolRiskPools[_poolId];
     }
 
+    /// @notice Returns the number of protocol risk pools that have been created
+    function protocolRiskPoolsLength() external view returns (uint256) {
+        return protocolRiskPools.length;
+    }
+
     function premiumOwed(uint256 _policyId) public view returns (uint256) {
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
         if (pol.coverage == 0 || block.timestamp < pol.activation || block.timestamp <= pol.lastPaidUntil) {
