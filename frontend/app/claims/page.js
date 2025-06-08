@@ -9,7 +9,7 @@ import { formatCurrency } from "../utils/formatting"
 import useUserPolicies from "../hooks/useUserPolicies"
 import usePools from "../hooks/usePools"
 import { ethers } from "ethers"
-import { getCoverPoolWithSigner } from "../../lib/coverPool"
+import { getRiskManagerWithSigner } from "../../lib/riskManager"
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -60,8 +60,8 @@ export default function ClaimsPage() {
     if (!selectedCoverage) return
     setIsSubmitting(true)
     try {
-      const cp = await getCoverPoolWithSigner()
-      const tx = await cp.processClaim(selectedCoverage.id, "0x")
+      const rm = await getRiskManagerWithSigner()
+      const tx = await rm.processClaim(selectedCoverage.id, "0x")
       await tx.wait()
       setShowConfirmation(true)
       setSelectedCoverage(null)

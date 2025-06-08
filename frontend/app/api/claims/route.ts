@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { coverPool } from '../../../lib/coverPool'
+import { riskManager } from '../../../lib/riskManager'
 
 export async function GET() {
   try {
-    const events = await coverPool.queryFilter(
-      coverPool.filters.ClaimProcessed()
+    const events = await riskManager.queryFilter(
+      riskManager.filters.ClaimProcessed()
     )
     const claims = await Promise.all(
       events.map(async (ev) => {

@@ -1,6 +1,6 @@
 // app/api/pools/route.ts
 import { NextResponse } from 'next/server';
-import { coverPool } from '../../../../lib/coverPool';
+import { riskManager } from '../../../../lib/riskManager';
 
 const BPS = 10_000n;
 
@@ -36,12 +36,25 @@ function calcPremiumRateBps(pool: any): bigint {
 
 export async function GET() {
   try {
-    const count = await coverPool.getNumberOfPools();
+    let count = 0n;
+    try {
+      count = await (riskManager as any).protocolRiskPoolsLength();
+    } catch {
+      // fallback by iterating until failure
+      while (true) {
+        try {
+          await riskManager.getPoolInfo(count);
+          count++;
+        } catch {
+          break;
+        }
+      }
+    }
     // catPremiumBps may not be present in the minimal ABI
     let catPremiumBps: bigint = 2000n;
     try {
-      if (typeof (coverPool as any).catPremiumBps === 'function') {
-        catPremiumBps = await (coverPool as any).catPremiumBps();
+      if (typeof (riskManager as any).catPremiumBps === 'function') {
+        catPremiumBps = await (riskManager as any).catPremiumBps();
       }
     } catch { }
 
@@ -49,7 +62,7 @@ export async function GET() {
     for (let i = 0; i < Number(count); i++) {
       console.log(i,  'fetching pool info')
       try {
-        const info = await coverPool.getPoolInfo(0);
+        const info = await riskManager.getPoolInfo(i);
         const rate = calcPremiumRateBps(info);
         const uwYield = (rate * (BPS - catPremiumBps)) / BPS;
         pools.push({
