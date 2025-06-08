@@ -1518,6 +1518,10 @@ describe("RiskManager - claimDistressedAssets", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
+        // Configure the CapitalPool so that the RiskManager is authorized to
+        // apply losses. Without this setup, any claim processing in the fixture
+        // would revert when `applyLosses` is called.
+        await mockCapitalPool.connect(owner).setRiskManager(riskManager.target);
         await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
 
         // --- Setup Pool, Underwriter, and Policy ---
