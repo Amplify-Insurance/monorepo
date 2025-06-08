@@ -1,6 +1,5 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 const hre = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
 
@@ -371,7 +370,6 @@ describe("RiskManager - purchaseCover", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
-        await mockCapitalPool.setRiskManager(riskManager.target);
 
 
         // PolicyNFT requires a CoverPool address. Use RiskManager for testing.
@@ -487,7 +485,7 @@ describe("RiskManager - purchaseCover", function () {
             await expect(tx).to.emit(mockCatPool, "PremiumReceivedCalled").withArgs(catAmount); // Custom mock event
 
             // Check events from RiskManager
-            await expect(tx).to.emit(riskManager, "PolicyCreated").withArgs(policyHolder.address, 1, poolId, coverageAmount, weeklyPremium); // Assuming policyId is 1
+            await expect(tx).to.emit(riskManager, "PolicyCreated").withArgs(1, 1, poolId, coverageAmount, weeklyPremium); // Assuming policyId is 1
             await expect(tx).to.emit(riskManager, "PremiumPaid").withArgs(1, poolId, weeklyPremium, catAmount, poolIncome);
 
             // --- State Changes ---
@@ -739,8 +737,7 @@ describe("RiskManager - settlePremium", function () {
 
         // --- Fund PolicyHolder and Grant Allowance ---
         const premiumDue = await riskManager.premiumOwed(policyId);
-        // Mint a bit extra to avoid rounding issues between calls and tx execution
-        await usdc.mint(policyHolder.address, premiumDue * 2n);
+        await usdc.mint(policyHolder.address, premiumDue);
         await usdc.connect(policyHolder).approve(riskManager.target, ethers.MaxUint256);
 
         return {
@@ -792,9 +789,13 @@ describe("RiskManager - settlePremium", function () {
         it("should correctly transfer funds and distribute premium", async function() {
             const { riskManager, policyHolder, usdc, premiumDue, mockCatPool, otherPerson } = await loadFixture(deployAndCreatePolicyFixture);
             
+            const catPremiumBps = await riskManager.catPremiumBps();
+            const expectedCatAmount = (premiumDue * catPremiumBps) / 10000n;
+
             // Anyone can settle the premium and cat pool receives its share
             const tx = await riskManager.connect(otherPerson).settlePremium(1);
-            await expect(tx).to.emit(mockCatPool, "PremiumReceivedCalled").withArgs(anyValue);
+            await expect(tx).to.changeTokenBalance(usdc, policyHolder, -premiumDue);
+            await expect(tx).to.emit(mockCatPool, "PremiumReceivedCalled").withArgs(expectedCatAmount);
         });
         
         it("should update policy's lastPaidUntil and emit a PremiumPaid event", async function() {
@@ -803,7 +804,7 @@ describe("RiskManager - settlePremium", function () {
             const tx = await riskManager.connect(otherPerson).settlePremium(policyId);
             const blockTimestamp = (await ethers.provider.getBlock(tx.blockNumber)).timestamp;
 
-            await expect(tx).to.emit(riskManager, "PremiumPaid").withArgs(policyId, 0, anyValue, anyValue, anyValue);
+            await expect(tx).to.emit(riskManager, "PremiumPaid").withArgs(policyId, 0, premiumDue, ethers.BigNumber, ethers.BigNumber); // Check key args
             await expect(tx).to.emit(mockPolicyNFT, "PolicyLastPaidUpdated").withArgs(policyId, blockTimestamp);
         });
 
@@ -811,10 +812,13 @@ describe("RiskManager - settlePremium", function () {
             const { riskManager, underwriter, premiumDue, policyId } = await loadFixture(deployAndCreatePolicyFixture);
             const initialRewards = await riskManager.underwriterPoolRewards(0, underwriter.address);
             
+            const catPremiumBps = await riskManager.catPremiumBps();
+            const expectedPoolIncome = premiumDue - (premiumDue * catPremiumBps) / 10000n;
+            
             await riskManager.settlePremium(policyId);
-
+            
             const finalRewards = await riskManager.underwriterPoolRewards(0, underwriter.address);
-            expect(finalRewards.pendingPremiums).to.be.gt(initialRewards.pendingPremiums);
+            expect(finalRewards.pendingPremiums).to.equal(initialRewards.pendingPremiums + expectedPoolIncome);
         });
     });
 
@@ -1514,7 +1518,6 @@ describe("RiskManager - claimDistressedAssets", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
-        await mockCapitalPool.setRiskManager(riskManager.target);
         await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
 
         // --- Setup Pool, Underwriter, and Policy ---
