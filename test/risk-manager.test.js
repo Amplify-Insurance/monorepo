@@ -865,7 +865,7 @@ describe("RiskManager - processClaim", function () {
         const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         const protocolToken = await MockERC20Factory.deploy("Protocol Token", "pTKN", 18);
 
-        const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
+        const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
 
         const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
