@@ -48,6 +48,7 @@ async function deployRiskManagerFixture() {
         mockCatPool.target
     );
 
+
     return {
         riskManager,
         owner,
@@ -370,6 +371,10 @@ describe("RiskManager - purchaseCover", function () {
             await mockCatPool.getAddress()
         );
 
+
+        // PolicyNFT requires a CoverPool address. Use RiskManager for testing.
+        await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
+
         // --- Fund Underwriter and Pledge Capital ---
         const capitalAmount = ethers.parseUnits("100000", 6); // 100,000 USDC
         const cpAddress = await mockCapitalPool.getAddress();
@@ -494,7 +499,7 @@ describe("RiskManager - purchaseCover", function () {
             const { riskManager, policyHolder, underwriter } = await loadFixture(deployAndFundFixture);
 
             // Create a new pool (ID 1) but do NOT allocate any capital to it
-            await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_B);
+            await riskManager.addProtocolRiskPool(usdc.target, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_B);
 
             // Purchasing cover should fail due to insufficient capacity
             const coverageAmount = ethers.parseUnits("1000", 6);
@@ -535,7 +540,7 @@ describe("RiskManager - allocateCapital", function () {
         const MAX_ALLOCATIONS = await riskManager.MAX_ALLOCATIONS_PER_UNDERWRITER();
         for (let i = 0; i < Number(MAX_ALLOCATIONS) + 1; i++) { // Create 6 pools
             await riskManager.addProtocolRiskPool(
-                ethers.ZeroAddress, // Mock token
+                usdc.target, // Mock token
                 { base: 0, slope1: 0, slope2: 0, kink: 0 },
                 0 // NONE
             );
@@ -1020,6 +1025,8 @@ describe("RiskManager - premiumOwed", function () {
             await mockPolicyNFT.getAddress(),
             mockCatPool.target
         );
+
+        await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
         
         // --- Setup Pool with a dynamic rate model ---
         const rateModel = {
@@ -1028,7 +1035,7 @@ describe("RiskManager - premiumOwed", function () {
             slope2: 4000, // 40%
             kink: 8000    // 80% utilization
         };
-        await riskManager.addProtocolRiskPool(ethers.ZeroAddress, rateModel, 1); // Pool ID 0
+        await riskManager.addProtocolRiskPool(usdc.target, rateModel, 1); // Pool ID 0
 
         // --- Setup Underwriter and Capital ---
         const capitalAmount = ethers.parseUnits("100000", 6); // 100,000
@@ -1241,8 +1248,8 @@ describe("RiskManager - Capital Hooks", function () {
             owner.address
         );
         
-        await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base:0, slope1:0, slope2:0, kink:0 }, 1);
-        await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base:0, slope1:0, slope2:0, kink:0 }, 2);
+        await riskManager.addProtocolRiskPool(usdc.target, { base:0, slope1:0, slope2:0, kink:0 }, 1);
+        await riskManager.addProtocolRiskPool(usdc.target, { base:0, slope1:0, slope2:0, kink:0 }, 2);
 
         // Helper for impersonating the CapitalPool
         async function asCapitalPool(fn) {
@@ -1358,6 +1365,8 @@ describe("RiskManager - claimPremiumRewards", function () {
             await mockCatPool.getAddress()
         );
 
+        await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
+
         // Setup Pool and Underwriter
         const capitalAmount = ethers.parseUnits("100000", 6);
         const cpAddress3 = await mockCapitalPool.getAddress();
@@ -1395,7 +1404,7 @@ describe("RiskManager - claimPremiumRewards", function () {
             const { riskManager, underwriter } = await loadFixture(deployAndAccruePremiumsFixture);
             // Rewards were accrued in pool 0, so claiming from pool 1 should fail
             const nonExistentPoolId = 1;
-            await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base:0, slope1:0, slope2:0, kink:0 }, 1);
+            await riskManager.addProtocolRiskPool(usdc.target, { base:0, slope1:0, slope2:0, kink:0 }, 1);
             
             await expect(riskManager.connect(underwriter).claimPremiumRewards(nonExistentPoolId))
                 .to.be.revertedWithCustomError(riskManager, "NoRewardsToClaim");
@@ -1495,6 +1504,7 @@ describe("RiskManager - claimDistressedAssets", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
+        await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
 
         // --- Setup Pool, Underwriter, and Policy ---
         await riskManager.addProtocolRiskPool(distressedToken.target, { base:0, slope1:0, slope2:0, kink:0 }, 1); // Pool 0
