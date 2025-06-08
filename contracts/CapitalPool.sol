@@ -113,6 +113,11 @@ contract CapitalPool is ReentrancyGuard, Ownable {
      * @param _platform The enum identifier for the yield platform.
      * @param _adapterAddress The address of the adapter contract.
      */
+    /**
+     * @notice Configures or updates the address for a yield adapter contract.
+     * @param _platform The enum identifier for the yield platform.
+     * @param _adapterAddress The address of the adapter contract.
+     */
     function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external onlyOwner {
         if (_platform == YieldPlatform.NONE) revert("CP: Cannot set for NONE platform");
         if (_adapterAddress == address(0)) revert ZeroAddress();
@@ -122,7 +127,8 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         require(codeSize > 0, "CP: Adapter address is not a contract");
 
         // Ensure the adapter uses the correct underlying asset
-        require(IYieldAdapter(_adapterAddress).asset() == underlyingAsset, "CP: Adapter asset mismatch");
+        // FIXED: Explicitly cast interface types to address for comparison.
+        require(address(IYieldAdapter(_adapterAddress).asset()) == address(underlyingAsset), "CP: Adapter asset mismatch");
 
         baseYieldAdapters[_platform] = IYieldAdapter(_adapterAddress);
 

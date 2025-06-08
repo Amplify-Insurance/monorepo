@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./interfaces/IYieldAdapter.sol"; // Adjust path if your IYieldAdapter.sol is elsewhere
+import "../interfaces/IYieldAdapter.sol"; // Adjust path if your IYieldAdapter.sol is elsewhere
 
 /**
  * @title MockYieldAdapter

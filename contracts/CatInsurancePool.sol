@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol"; // For Math.min
-import "./CatShare.sol"; // Assuming CatShare.sol is in the same directory
+import "./tokenization/CatShare.sol"; // Assuming CatShare.sol is in the same directory
 import "./interfaces/IYieldAdapter.sol"; // Assuming IYieldAdapter.sol is in ./interfaces/
 
 contract CatInsurancePool is Ownable, ReentrancyGuard {
