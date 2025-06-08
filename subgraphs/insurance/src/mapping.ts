@@ -1,26 +1,29 @@
 import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts";
 import { GenericEvent, Pool, Underwriter, Policy, ContractOwner } from "../generated/schema";
 import {
-  AdapterCallFailed,
-  BaseYieldAdapterSet,
-  CapitalPledgedToPoolChanged,
-  CatPremiumBpsUpdated,
-  ClaimProcessed,
-  CommitteeUpdated,
-  DistressedAssetRewardsClaimed,
-  OwnershipTransferred as CoverPoolOwnershipTransferred,
-  IncidentReported,
-  PolicyCreated,
-  PolicyLapsed,
   PoolAdded,
+  IncidentReported,
+  CapitalAllocated,
+  CapitalDeallocated,
+  PolicyCreated,
   PremiumPaid,
+  PolicyLapsed,
+  ClaimProcessed,
   PremiumRewardsClaimed,
-  SystemValueSynced,
-  UnderwriterDeposit,
-  UnderwriterLoss,
+  DistressedAssetRewardsClaimed,
+  OwnershipTransferred as RiskManagerOwnershipTransferred
+} from "../generated/RiskManager/RiskManager";
+import {
+  RiskManagerSet,
+  BaseYieldAdapterSet,
+  Deposit,
+  WithdrawalRequested,
   WithdrawalExecuted,
-  WithdrawalRequested
-} from "../generated/CoverPool/CoverPool";
+  LossesApplied,
+  SystemValueSynced,
+  AdapterCallFailed,
+  OwnershipTransferred as CapitalPoolOwnershipTransferred
+} from "../generated/CapitalPool/CapitalPool";
 import {
   AdapterChanged,
   CatLiquidityDeposited,
@@ -65,7 +68,7 @@ function saveOwner(event: ethereum.Event, newOwner: Address): void {
   owner.save();
 }
 
-// CoverPool events
+// RiskManager events
 export function handlePoolAdded(event: PoolAdded): void {
   saveGeneric(event, "PoolAdded");
 
@@ -77,8 +80,8 @@ export function handlePoolAdded(event: PoolAdded): void {
   pool.save();
 }
 
-export function handleUnderwriterDeposit(event: UnderwriterDeposit): void {
-  saveGeneric(event, "UnderwriterDeposit");
+export function handleDeposit(event: Deposit): void {
+  saveGeneric(event, "Deposit");
 
   let id = event.params.user.toHex();
   let u = Underwriter.load(id);
@@ -95,8 +98,9 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void { sa
 export function handleWithdrawalExecuted(event: WithdrawalExecuted): void { saveGeneric(event, "WithdrawalExecuted"); }
 export function handlePremiumPaid(event: PremiumPaid): void { saveGeneric(event, "PremiumPaid"); }
 export function handleClaimProcessed(event: ClaimProcessed): void { saveGeneric(event, "ClaimProcessed"); }
-export function handleUnderwriterLoss(event: UnderwriterLoss): void { saveGeneric(event, "UnderwriterLoss"); }
-export function handleCapitalPledgedToPoolChanged(event: CapitalPledgedToPoolChanged): void { saveGeneric(event, "CapitalPledgedToPoolChanged"); }
+export function handleLossesApplied(event: LossesApplied): void { saveGeneric(event, "LossesApplied"); }
+export function handleCapitalAllocated(event: CapitalAllocated): void { saveGeneric(event, "CapitalAllocated"); }
+export function handleCapitalDeallocated(event: CapitalDeallocated): void { saveGeneric(event, "CapitalDeallocated"); }
 export function handlePolicyCreated(event: PolicyCreated): void {
   saveGeneric(event, "PolicyCreated");
 
@@ -110,11 +114,10 @@ export function handlePolicyCreated(event: PolicyCreated): void {
 }
 export function handleIncidentReported(event: IncidentReported): void { saveGeneric(event, "IncidentReported"); }
 export function handlePolicyLapsed(event: PolicyLapsed): void { saveGeneric(event, "PolicyLapsed"); }
-export function handleCatPremiumBpsUpdated(event: CatPremiumBpsUpdated): void { saveGeneric(event, "CatPremiumBpsUpdated"); }
 export function handleBaseYieldAdapterSet(event: BaseYieldAdapterSet): void { saveGeneric(event, "BaseYieldAdapterSet"); }
-export function handleCommitteeUpdated(event: CommitteeUpdated): void { saveGeneric(event, "CommitteeUpdated"); }
 export function handleSystemValueSynced(event: SystemValueSynced): void { saveGeneric(event, "SystemValueSynced"); }
 export function handleAdapterCallFailed(event: AdapterCallFailed): void { saveGeneric(event, "AdapterCallFailed"); }
+export function handleRiskManagerSet(event: RiskManagerSet): void { saveGeneric(event, "RiskManagerSet"); }
 export function handlePremiumRewardsClaimed(event: PremiumRewardsClaimed): void { saveGeneric(event, "PremiumRewardsClaimed"); }
 export function handleDistressedAssetRewardsClaimed(event: DistressedAssetRewardsClaimed): void { saveGeneric(event, "DistressedAssetRewardsClaimed"); }
 
@@ -141,8 +144,8 @@ export function handleTransfer(event: Transfer): void {
   }
 }
 
-export function handleCoverPoolOwnershipTransferred(
-  event: CoverPoolOwnershipTransferred
+export function handleRiskManagerOwnershipTransferred(
+  event: RiskManagerOwnershipTransferred
 ): void {
   saveGeneric(event, "OwnershipTransferred");
   saveOwner(event, event.params.newOwner);
@@ -150,6 +153,13 @@ export function handleCoverPoolOwnershipTransferred(
 
 export function handleCatInsurancePoolOwnershipTransferred(
   event: CatInsurancePoolOwnershipTransferred
+): void {
+  saveGeneric(event, "OwnershipTransferred");
+  saveOwner(event, event.params.newOwner);
+}
+
+export function handleCapitalPoolOwnershipTransferred(
+  event: CapitalPoolOwnershipTransferred
 ): void {
   saveGeneric(event, "OwnershipTransferred");
   saveOwner(event, event.params.newOwner);
