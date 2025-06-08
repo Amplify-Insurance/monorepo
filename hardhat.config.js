@@ -6,8 +6,8 @@ require("dotenv").config();
 
 module.exports = {
     solidity: {
-        // Use 0.8.26 which ships with Hardhat to avoid network downloads
-        version: "0.8.26",
+        // Use the locally installed solc to avoid network downloads
+        version: "0.8.30",
         settings: {
             optimizer: {
                 enabled: true,

@@ -358,7 +358,7 @@ describe("RiskManager - purchaseCover", function () {
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
 
         // For this test, we need a mock that returns values for getPolicy
-        const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
         const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
@@ -675,7 +675,7 @@ describe("RiskManager - allocateCapital", function () {
             await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [cpAddress] });
 
             // The attack will fail because of the nonReentrant guard
-            await expect(attacker.beginAttack([0, 1])).to.be.revertedWith("ReentrancyGuard: reentrant call");
+            await expect(attacker["beginAttack(uint256[])"]([0, 1])).to.be.revertedWith("ReentrancyGuard: reentrant call");
         });
     });
 });
@@ -694,7 +694,7 @@ describe("RiskManager - settlePremium", function () {
         const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
 
-        const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
         const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
@@ -868,7 +868,7 @@ describe("RiskManager - processClaim", function () {
         const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
 
-        const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
         const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
@@ -1019,7 +1019,7 @@ describe("RiskManager - premiumOwed", function () {
         const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, usdc.target);
 
-        const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
         const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
@@ -1360,7 +1360,7 @@ describe("RiskManager - claimPremiumRewards", function () {
         const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
-        const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
         const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
@@ -1410,7 +1410,7 @@ describe("RiskManager - claimPremiumRewards", function () {
         });
 
         it("should revert if an underwriter tries to claim from a pool they have no rewards in", async function () {
-            const { riskManager, underwriter } = await loadFixture(deployAndAccruePremiumsFixture);
+            const { riskManager, underwriter, usdc } = await loadFixture(deployAndAccruePremiumsFixture);
             // Rewards were accrued in pool 0, so claiming from pool 1 should fail
             const nonExistentPoolId = 1;
             await riskManager.addProtocolRiskPool(usdc.target, { base:0, slope1:0, slope2:0, kink:0 }, 1);
@@ -1484,7 +1484,10 @@ describe("RiskManager - claimPremiumRewards", function () {
             const cpS = await ethers.getSigner(cpA);
             await riskManager.connect(cpS).onCapitalDeposited(attacker.target, capitalAmount);
             await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [cpA] });
-            await riskManager.connect(attacker).allocateCapital([poolId]);
+            await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [attacker.target] });
+            const attackerSigner = await ethers.getSigner(attacker.target);
+            await riskManager.connect(attackerSigner).allocateCapital([poolId]);
+            await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [attacker.target] });
             await usdc.transfer(riskManager.target, ethers.parseUnits("100", 6)); // Ensure contract has funds
             await riskManager.mock_setPendingPremiums(poolId, attacker.target, ethers.parseUnits("10", 6));
             
@@ -1513,7 +1516,7 @@ describe("RiskManager - claimDistressedAssets", function () {
 
         const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
-        const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
         const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
