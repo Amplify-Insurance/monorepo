@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getCoverPoolWriter } from '../../../../lib/coverPool';
+import { getCapitalPoolWriter } from '../../../../lib/capitalPool';
 
 export async function POST() {
   try {
-    const cp = getCoverPoolWriter();
+    const cp = getCapitalPoolWriter();
     const tx = await cp.executeWithdrawal();
     await tx.wait();
     return NextResponse.json({ txHash: tx.hash });

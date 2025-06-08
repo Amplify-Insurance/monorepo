@@ -2,8 +2,7 @@
 
 import { NextResponse } from 'next/server';
 // import your provider and contract instances
-// import provider from '@/lib/provider'; 
-// import { riskManager } from '@/lib/contracts';
+import { riskManager } from '../../../../lib/riskManager';
 
 export async function GET(
   request: Request,
@@ -15,12 +14,8 @@ export async function GET(
         return NextResponse.json({ error: "Invalid pool ID" }, { status: 400 });
     }
 
-    // Now you can safely use the ID to call your contract
-    // const poolInfo = await riskManager.getPoolInfo(id);
-    // const underwriters = await riskManager.poolSpecificUnderwriters(id); // Example
-
-    // return NextResponse.json({ id, poolInfo, underwriters });
-    return NextResponse.json({ success: true, id: id }); // Placeholder response
+    const poolInfo = await riskManager.getPoolInfo(id);
+    return NextResponse.json({ id, poolInfo });
 
   } catch (error) {
     console.error(`Error fetching pool ${params.id}:`, error);

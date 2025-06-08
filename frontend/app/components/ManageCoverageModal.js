@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Info, Plus, Minus } from "lucide-react";
-import { getCoverPoolWithSigner } from "../../lib/coverPool";
+import { getRiskManagerWithSigner } from "../../lib/riskManager";
+import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
 import Modal from "./Modal";
 
 export default function ManageCoverageModal({
@@ -53,21 +54,28 @@ export default function ManageCoverageModal({
     if (!adjustAmount || Number.parseFloat(adjustAmount) <= 0) return;
     setIsSubmitting(true);
     try {
-      const cp = await getCoverPoolWithSigner();
       let tx;
       if (type === "coverage") {
         if (!policyId) throw new Error("policyId required");
-        tx = await cp.settlePremium(policyId);
+        const rm = await getRiskManagerWithSigner();
+        tx = await rm.settlePremium(policyId);
+        await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
+        const cp = await getCapitalPoolWithSigner();
         tx = await cp.requestWithdrawal(shares);
+        await tx.wait();
       } else if (action === "increase") {
         if (!poolId) throw new Error("poolId required");
-        tx = await cp.depositAndAllocate(adjustAmount, 1, [poolId]);
+        const cp = await getCapitalPoolWithSigner();
+        const rm = await getRiskManagerWithSigner();
+        tx = await cp.deposit(adjustAmount, 1);
+        await tx.wait();
+        const tx2 = await rm.allocateCapital([poolId]);
+        await tx2.wait();
       } else {
         return;
       }
-      await tx.wait();
       onClose();
     } catch (err) {
       console.error("Failed to submit", err);

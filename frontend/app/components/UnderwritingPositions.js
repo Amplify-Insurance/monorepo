@@ -8,7 +8,8 @@ import { useAccount } from "wagmi";
 import useUnderwriterDetails from "../../hooks/useUnderwriterDetails";
 import usePools from "../../hooks/usePools";
 import { ethers } from "ethers";
-import { getCoverPoolWithSigner } from "../../lib/coverPool";
+import { getRiskManagerWithSigner } from "../../lib/riskManager";
+import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -62,9 +63,9 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const handleClaimRewards = async (position) => {
     setIsClaiming(true);
     try {
-      const cp = await getCoverPoolWithSigner();
-      await (await cp.claimPremiumRewards(position.poolId)).wait();
-      await (await cp.claimDistressedAssetRewards(position.poolId)).wait();
+      const rm = await getRiskManagerWithSigner();
+      await (await rm.claimPremiumRewards(position.poolId)).wait();
+      await (await rm.claimDistressedAssets(position.poolId)).wait();
     } catch (err) {
       console.error("Failed to claim rewards", err);
     } finally {
@@ -76,11 +77,11 @@ export default function UnderwritingPositions({ displayCurrency }) {
     if (underwritingPositions.length === 0) return;
     setIsClaimingAll(true);
     try {
-      const cp = await getCoverPoolWithSigner();
-      const ids = underwritingPositions.map((p) => p.poolId);
-      await (
-        await cp.claimRewardsFromMultiplePools(ids, true, true)
-      ).wait();
+      const rm = await getRiskManagerWithSigner();
+      for (const id of underwritingPositions.map((p) => p.poolId)) {
+        await (await rm.claimPremiumRewards(id)).wait();
+        await (await rm.claimDistressedAssets(id)).wait();
+      }
     } catch (err) {
       console.error("Failed to claim all rewards", err);
     } finally {
@@ -91,7 +92,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const handleExecuteWithdrawal = async () => {
     setIsExecuting(true);
     try {
-      const cp = await getCoverPoolWithSigner();
+      const cp = await getCapitalPoolWithSigner();
       await (await cp.executeWithdrawal()).wait();
     } catch (err) {
       console.error("Failed to execute withdrawal", err);

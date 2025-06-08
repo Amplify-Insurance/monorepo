@@ -4,10 +4,9 @@ import { useState } from "react"
 import Image from "next/image"
 import { Info } from "lucide-react"
 import { ethers } from "ethers"
-import CoverPool from "../../abi/CoverPool.json"
+import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getCapitalPoolWithSigner } from "../../lib/capitalPool"
 import Modal from "./Modal"
-
-const COVER_POOL_ADDRESS = process.env.NEXT_PUBLIC_COVER_POOL_ADDRESS
 
 // Add the selectedMarkets prop to the component parameters
 export default function CoverageModal({
@@ -51,18 +50,22 @@ export default function CoverageModal({
     setIsSubmitting(true)
     try {
       if (!window.ethereum) throw new Error("Wallet not found")
-      const browserProvider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = await browserProvider.getSigner()
-      const cp = new ethers.Contract(COVER_POOL_ADDRESS, CoverPool, signer)
-
       let tx
       if (type === "purchase") {
-        tx = await cp.purchaseCover(poolId, amount)
+        const rm = await getRiskManagerWithSigner()
+        tx = await rm.purchaseCover(poolId, amount)
+        await tx.wait()
       } else {
+        const cp = await getCapitalPoolWithSigner()
+        const rm = await getRiskManagerWithSigner()
         const ids = poolIds && poolIds.length > 0 ? poolIds : poolId ? [poolId] : []
-        tx = await cp.depositAndAllocate(amount, 1, ids)
+        tx = await cp.deposit(amount, 1)
+        await tx.wait()
+        if (ids.length > 0) {
+          const tx2 = await rm.allocateCapital(ids)
+          await tx2.wait()
+        }
       }
-      await tx.wait()
       onClose()
     } catch (err) {
       console.error("Failed to submit", err)
