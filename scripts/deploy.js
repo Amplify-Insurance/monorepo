@@ -18,12 +18,17 @@ async function main() {
   const catPool = await CatInsurancePool.deploy(USDC_ADDRESS, ethers.ZeroAddress, deployer.address);
   await catPool.waitForDeployment();
 
-  const CoverPool = await ethers.getContractFactory("CoverPool");
-  const coverPool = await CoverPool.deploy(policyNFT.target, catPool.target);
-  await coverPool.waitForDeployment();
+  const CapitalPool = await ethers.getContractFactory("CapitalPool");
+  const capitalPool = await CapitalPool.deploy(deployer.address, USDC_ADDRESS);
+  await capitalPool.waitForDeployment();
 
-  await policyNFT.setCoverPoolAddress(coverPool.target);
-  await catPool.setCoverPoolAddress(coverPool.target);
+  const RiskManager = await ethers.getContractFactory("RiskManager");
+  const riskManager = await RiskManager.deploy(capitalPool.target, policyNFT.target, catPool.target);
+  await riskManager.waitForDeployment();
+
+  await policyNFT.setCoverPoolAddress(riskManager.target);
+  await catPool.setCoverPoolAddress(riskManager.target);
+  await capitalPool.setRiskManager(riskManager.target);
 
   // Deploy yield adapters
   const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
@@ -34,9 +39,9 @@ async function main() {
   const compoundAdapter = await CompoundAdapter.deploy(COMPOUND_COMET_ADDRESS, deployer.address);
   await compoundAdapter.waitForDeployment();
 
-  // Configure adapters in CoverPool
-  await coverPool.setBaseYieldAdapter(1, aaveAdapter.target); // YieldPlatform.AAVE
-  await coverPool.setBaseYieldAdapter(2, compoundAdapter.target); // YieldPlatform.COMPOUND
+  // Configure adapters in CapitalPool
+  await capitalPool.setBaseYieldAdapter(1, aaveAdapter.target); // YieldPlatform.AAVE
+  await capitalPool.setBaseYieldAdapter(2, compoundAdapter.target); // YieldPlatform.COMPOUND
 
   // Add protocol risk pools for Aave and Compound using generic identifiers
   const defaultRateModel = {
@@ -46,12 +51,13 @@ async function main() {
     kink: 7000,
   };
 
-  await coverPool.addProtocolRiskPool(USDC_ADDRESS, AAVE_AUSDC_ADDRESS, defaultRateModel, 1); // PROTOCOL_A -> Aave
-  await coverPool.addProtocolRiskPool(USDC_ADDRESS, USDC_ADDRESS, defaultRateModel, 2); // PROTOCOL_B -> Compound
+  await riskManager.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 1); // PROTOCOL_A -> Aave
+  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 2); // PROTOCOL_B -> Compound
 
   console.log("PolicyNFT:", policyNFT.target);
   console.log("CatInsurancePool:", catPool.target);
-  console.log("CoverPool:", coverPool.target);
+  console.log("CapitalPool:", capitalPool.target);
+  console.log("RiskManager:", riskManager.target);
   console.log("Aave Adapter:", aaveAdapter.target);
   console.log("Compound Adapter:", compoundAdapter.target);
 }
