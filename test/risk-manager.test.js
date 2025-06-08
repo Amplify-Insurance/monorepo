@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const hre = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
 // To make a direct comparison with the Solidity test, we map the enum values.
@@ -132,11 +133,15 @@ describe("RiskManager - addProtocolRiskPool", function () {
             const dai = await MockERC20Factory.deploy("DAI", "DAI", 18);
             const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
             const newCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, dai.target);
+            const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
+            const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
+            const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
+            const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
             const RiskManagerFactory = await ethers.getContractFactory("RiskManager", owner);
             const newRiskManager = await RiskManagerFactory.deploy(
                 newCapitalPool.target,
-                ethers.ZeroAddress, // Mocks don't need real addresses for this specific test
-                ethers.ZeroAddress
+                mockPolicyNFT.target,
+                mockCatPool.target
             );
 
             const rateModel = { base: 0, slope1: 0, slope2: 0, kink: 0 };
@@ -290,11 +295,15 @@ describe("RiskManager - addProtocolRiskPool", function () {
             const dai = await MockERC20Factory.deploy("DAI", "DAI", 18);
             const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
             const newCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, dai.target);
+            const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
+            const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
+            const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
+            const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
             const RiskManagerFactory = await ethers.getContractFactory("RiskManager", owner);
             const newRiskManager = await RiskManagerFactory.deploy(
                 newCapitalPool.target,
-                ethers.ZeroAddress,
-                ethers.ZeroAddress
+                mockPolicyNFT.target,
+                mockCatPool.target
             );
 
             const rateModel = { base: 0, slope1: 0, slope2: 0, kink: 0 };
@@ -351,7 +360,7 @@ describe("RiskManager - purchaseCover", function () {
         const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
-        const MockCatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
 
         const RiskManagerFactory = await getRiskManagerFactory(owner);
@@ -363,7 +372,10 @@ describe("RiskManager - purchaseCover", function () {
 
         // --- Fund Underwriter and Pledge Capital ---
         const capitalAmount = ethers.utils.parseUnits("100000", 6); // 100,000 USDC
-        await riskManager.connect(owner).onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
+        const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await mockCapitalPool.getAddress()] });
         await riskManager.addProtocolRiskPool(usdc.address, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_A); // Pool ID 0 with 10% annual premium
         await riskManager.connect(underwriter).allocateCapital([0]);
 
@@ -498,12 +510,23 @@ describe("RiskManager - allocateCapital", function () {
     async function deployAndDepositFixture() {
         const [owner, underwriter1, underwriter2, nonDepositor] = await ethers.getSigners();
 
+        const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+        const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
+
+        const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
+        const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, usdc.target);
+
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
+        const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
+
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
+        const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
+
         const RiskManagerFactory = await getRiskManagerFactory(owner);
-        // Deploy with mock addresses for dependencies not needed in this test
         const riskManager = await RiskManagerFactory.deploy(
-            ethers.constants.AddressZero,
-            ethers.constants.AddressZero,
-            ethers.constants.AddressZero
+            mockCapitalPool.target,
+            mockPolicyNFT.target,
+            mockCatPool.target
         );
 
         // Add several pools to test allocation limits and choices
@@ -518,8 +541,11 @@ describe("RiskManager - allocateCapital", function () {
 
         const depositAmount = ethers.utils.parseUnits("50000", 6); // 50,000 USDC
         // Simulate the onCapitalDeposited hook call from the CapitalPool
-        await riskManager.onCapitalDeposited(underwriter1.address, depositAmount);
-        await riskManager.onCapitalDeposited(underwriter2.address, depositAmount);
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
+        const cpSigner = await ethers.getSigner(mockCapitalPool.target);
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter1.address, depositAmount);
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter2.address, depositAmount);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [mockCapitalPool.target] });
 
         return { riskManager, owner, underwriter1, underwriter2, nonDepositor, depositAmount, MAX_ALLOCATIONS };
     }
@@ -657,7 +683,7 @@ describe("RiskManager - settlePremium", function () {
         const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
-        const MockCatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
         
         const RiskManagerFactory = await getRiskManagerFactory(owner);
@@ -669,7 +695,10 @@ describe("RiskManager - settlePremium", function () {
 
         // --- Setup Pool and Underwriter ---
         const capitalAmount = ethers.utils.parseUnits("100000", 6);
-        await riskManager.onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
+        const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await mockCapitalPool.getAddress()] });
         const rateModel = { base: 1000, slope1: 0, slope2: 0, kink: 0 }; // 10% annual premium
         await riskManager.addProtocolRiskPool(usdc.address, rateModel, 1 /* PROTOCOL_A */); // Pool ID 0
         await riskManager.connect(underwriter).allocateCapital([0]);
@@ -826,7 +855,7 @@ describe("RiskManager - processClaim", function () {
         const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
-        const MockCatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
         
         const RiskManagerFactory = await getRiskManagerFactory(owner);
@@ -843,8 +872,11 @@ describe("RiskManager - processClaim", function () {
         // --- Setup Underwriters: U1 deposits 10k, U2 deposits 30k (1:3 ratio) ---
         const u1Deposit = ethers.utils.parseUnits("10000", 6);
         const u2Deposit = ethers.utils.parseUnits("30000", 6);
-        await riskManager.onCapitalDeposited(underwriter1.address, u1Deposit);
-        await riskManager.onCapitalDeposited(underwriter2.address, u2Deposit);
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
+        const cpSigner = await ethers.getSigner(mockCapitalPool.target);
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter1.address, u1Deposit);
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter2.address, u2Deposit);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [mockCapitalPool.target] });
         await riskManager.connect(underwriter1).allocateCapital([0]);
         await riskManager.connect(underwriter2).allocateCapital([0]);
 
@@ -964,14 +996,23 @@ describe("RiskManager - premiumOwed", function () {
         const policyId = 1;
 
         // --- Deploy contracts ---
+        const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+        const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
+
+        const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
+        const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, usdc.target);
+
         const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
-        
+
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
+        const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
+
         const RiskManagerFactory = await getRiskManagerFactory(owner);
         const riskManager = await RiskManagerFactory.deploy(
-            ethers.constants.AddressZero, // Mock address
+            mockCapitalPool.target,
             await mockPolicyNFT.getAddress(),
-            ethers.constants.AddressZero  // Mock address
+            mockCatPool.target
         );
         
         // --- Setup Pool with a dynamic rate model ---
@@ -985,7 +1026,10 @@ describe("RiskManager - premiumOwed", function () {
 
         // --- Setup Underwriter and Capital ---
         const capitalAmount = ethers.utils.parseUnits("100000", 6); // 100,000
-        await riskManager.onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
+        const cpSigner = await ethers.getSigner(mockCapitalPool.target);
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [mockCapitalPool.target] });
         await riskManager.connect(underwriter).allocateCapital([0]);
 
         // --- Setup an active policy in the mock NFT contract ---
@@ -1124,9 +1168,9 @@ describe("RiskManager - Admin Functions", function () {
         const [owner, nonOwner, newCommittee] = await ethers.getSigners();
         const RiskManagerFactory = await getRiskManagerFactory(owner);
         const riskManager = await RiskManagerFactory.deploy(
-            ethers.constants.AddressZero,
-            ethers.constants.AddressZero,
-            ethers.constants.AddressZero
+            owner.address,
+            owner.address,
+            owner.address
         );
         return { riskManager, owner, nonOwner, newCommittee };
     }
@@ -1178,14 +1222,16 @@ describe("RiskManager - Capital Hooks", function () {
     // A fixture to set up pools and underwriters is needed here.
     async function deployAndAllocateFixture() {
         const [owner, underwriter1, underwriter2, nonCapitalPool] = await ethers.getSigners();
-        const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
-        const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, ethers.constants.AddressZero);
+        const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+        const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
+        const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
+        const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, usdc.target);
         
         const RiskManagerFactory = await getRiskManagerFactory(owner);
         const riskManager = await RiskManagerFactory.deploy(
             await mockCapitalPool.getAddress(),
-            ethers.constants.AddressZero,
-            ethers.constants.AddressZero
+            owner.address,
+            owner.address
         );
         
         await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, { base:0, slope1:0, slope2:0, kink:0 }, 1);
@@ -1295,7 +1341,7 @@ describe("RiskManager - claimPremiumRewards", function () {
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
         const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
-        const MockCatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
         const RiskManagerFactory = await getRiskManagerFactory(owner);
         const riskManager = await RiskManagerFactory.deploy(
@@ -1306,7 +1352,10 @@ describe("RiskManager - claimPremiumRewards", function () {
 
         // Setup Pool and Underwriter
         const capitalAmount = ethers.utils.parseUnits("100000", 6);
-        await riskManager.onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
+        const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await mockCapitalPool.getAddress()] });
         await riskManager.addProtocolRiskPool(usdc.address, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, 1);
         await riskManager.connect(underwriter).allocateCapital([poolId]);
 
@@ -1428,7 +1477,7 @@ describe("RiskManager - claimDistressedAssets", function () {
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
         const MockPolicyNFTFactory = await ethers.getContractFactory("PolicyNFT");
         const mockPolicyNFT = await MockPolicyNFTFactory.deploy(owner.address);
-        const MockCatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const mockCatPool = await MockCatPoolFactory.deploy(owner.address);
         const RiskManagerFactory = await getRiskManagerFactory(owner);
         const riskManager = await RiskManagerFactory.deploy(
