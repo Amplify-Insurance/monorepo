@@ -372,11 +372,13 @@ describe("RiskManager - purchaseCover", function () {
 
         // --- Fund Underwriter and Pledge Capital ---
         const capitalAmount = ethers.parseUnits("100000", 6); // 100,000 USDC
-        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
-        const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
+        const cpAddress = await mockCapitalPool.getAddress();
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [cpAddress] });
+        await hre.network.provider.send("hardhat_setBalance", [cpAddress, "0x1000000000000000000"]);
+        const cpSigner = await ethers.getSigner(cpAddress);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
-        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await mockCapitalPool.getAddress()] });
-        await riskManager.addProtocolRiskPool(usdc.address, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_A); // Pool ID 0 with 10% annual premium
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [cpAddress] });
+        await riskManager.addProtocolRiskPool(usdc.target, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_A); // Pool ID 0 with 10% annual premium
         await riskManager.connect(underwriter).allocateCapital([0]);
 
         // --- Fund PolicyHolder and Grant Allowance ---
@@ -384,7 +386,7 @@ describe("RiskManager - purchaseCover", function () {
         // This is a mock token, so we need a way to send tokens. Let's add a mint function to the mock.
         // Assuming MockERC20 has a `mint(address, amount)` function for testing.
         await usdc.mint(policyHolder.address, policyHolderBalance);
-        await usdc.connect(policyHolder).approve(riskManager.address, ethers.constants.MaxUint256);
+        await usdc.connect(policyHolder).approve(riskManager.target, ethers.MaxUint256);
 
         return {
             riskManager,
@@ -492,7 +494,7 @@ describe("RiskManager - purchaseCover", function () {
             const { riskManager, policyHolder, underwriter } = await loadFixture(deployAndFundFixture);
 
             // Create a new pool (ID 1) but do NOT allocate any capital to it
-            await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_B);
+            await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_B);
 
             // Purchasing cover should fail due to insufficient capacity
             const coverageAmount = ethers.parseUnits("1000", 6);
@@ -533,7 +535,7 @@ describe("RiskManager - allocateCapital", function () {
         const MAX_ALLOCATIONS = await riskManager.MAX_ALLOCATIONS_PER_UNDERWRITER();
         for (let i = 0; i < Number(MAX_ALLOCATIONS) + 1; i++) { // Create 6 pools
             await riskManager.addProtocolRiskPool(
-                ethers.constants.AddressZero, // Mock token
+                ethers.ZeroAddress, // Mock token
                 { base: 0, slope1: 0, slope2: 0, kink: 0 },
                 0 // NONE
             );
@@ -542,6 +544,7 @@ describe("RiskManager - allocateCapital", function () {
         const depositAmount = ethers.parseUnits("50000", 6); // 50,000 USDC
         // Simulate the onCapitalDeposited hook call from the CapitalPool
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
+        await hre.network.provider.send("hardhat_setBalance", [mockCapitalPool.target, "0x1000000000000000000"]);
         const cpSigner = await ethers.getSigner(mockCapitalPool.target);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter1.address, depositAmount);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter2.address, depositAmount);
@@ -654,11 +657,11 @@ describe("RiskManager - allocateCapital", function () {
         it("should prevent reentrancy attacks", async function() {
             const { riskManager, owner } = await loadFixture(deployAndDepositFixture);
             const ReentrancyAttackerFactory = await ethers.getContractFactory("ReentrancyAttacker");
-            const attacker = await ReentrancyAttackerFactory.deploy(riskManager.address);
+            const attacker = await ReentrancyAttackerFactory.deploy(riskManager.target);
 
             // Attacker needs capital to allocate
             const depositAmount = ethers.parseUnits("1000", 6);
-            await riskManager.onCapitalDeposited(attacker.address, depositAmount);
+            await riskManager.onCapitalDeposited(attacker.target, depositAmount);
 
             // The attack will fail because of the nonReentrant guard
             await expect(attacker.beginAttack([0, 1])).to.be.revertedWith("ReentrancyGuard: reentrant call");
@@ -695,12 +698,14 @@ describe("RiskManager - settlePremium", function () {
 
         // --- Setup Pool and Underwriter ---
         const capitalAmount = ethers.parseUnits("100000", 6);
-        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
-        const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
+        const cpAddress2 = await mockCapitalPool.getAddress();
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [cpAddress2] });
+        await hre.network.provider.send("hardhat_setBalance", [cpAddress2, "0x1000000000000000000"]);
+        const cpSigner = await ethers.getSigner(cpAddress2);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
-        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await mockCapitalPool.getAddress()] });
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [cpAddress2] });
         const rateModel = { base: 1000, slope1: 0, slope2: 0, kink: 0 }; // 10% annual premium
-        await riskManager.addProtocolRiskPool(usdc.address, rateModel, 1 /* PROTOCOL_A */); // Pool ID 0
+        await riskManager.addProtocolRiskPool(usdc.target, rateModel, 1 /* PROTOCOL_A */); // Pool ID 0
         await riskManager.connect(underwriter).allocateCapital([0]);
 
         // --- Setup Policy State in Mock ---
@@ -721,7 +726,7 @@ describe("RiskManager - settlePremium", function () {
         // --- Fund PolicyHolder and Grant Allowance ---
         const premiumDue = await riskManager.premiumOwed(policyId);
         await usdc.mint(policyHolder.address, premiumDue);
-        await usdc.connect(policyHolder).approve(riskManager.address, premiumDue);
+        await usdc.connect(policyHolder).approve(riskManager.target, premiumDue);
 
         return {
             riskManager,
@@ -810,7 +815,7 @@ describe("RiskManager - settlePremium", function () {
         it("should lapse the policy if policy owner has insufficient allowance", async function() {
             const { riskManager, usdc, policyHolder, policyId, coverageAmount, otherPerson } = await loadFixture(deployAndCreatePolicyFixture);
             // Revoke allowance to cause transferFrom to fail
-            await usdc.connect(policyHolder).approve(riskManager.address, 0);
+            await usdc.connect(policyHolder).approve(riskManager.target, 0);
             
             const initialPoolState = await riskManager.protocolRiskPools(0);
             
@@ -867,12 +872,13 @@ describe("RiskManager - processClaim", function () {
 
         // --- Setup Pool with Protocol Token ---
         const rateModel = { base: 1000, slope1: 0, slope2: 0, kink: 0 };
-        await riskManager.addProtocolRiskPool(protocolToken.address, rateModel, 1 /* PROTOCOL_A */); // Pool ID 0
+        await riskManager.addProtocolRiskPool(protocolToken.target, rateModel, 1 /* PROTOCOL_A */); // Pool ID 0
 
         // --- Setup Underwriters: U1 deposits 10k, U2 deposits 30k (1:3 ratio) ---
         const u1Deposit = ethers.parseUnits("10000", 6);
         const u2Deposit = ethers.parseUnits("30000", 6);
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
+        await hre.network.provider.send("hardhat_setBalance", [mockCapitalPool.target, "0x1000000000000000000"]);
         const cpSigner = await ethers.getSigner(mockCapitalPool.target);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter1.address, u1Deposit);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter2.address, u2Deposit);
@@ -893,9 +899,9 @@ describe("RiskManager - processClaim", function () {
         );
 
         // --- Fund PolicyHolder with underlying (for payout) and protocol token (for distressed asset transfer) ---
-        await usdc.mint(riskManager.address, ethers.parseUnits("100000", 6)); // Pre-fund RM for payouts
+        await usdc.mint(riskManager.target, ethers.parseUnits("100000", 6)); // Pre-fund RM for payouts
         await protocolToken.mint(policyHolder.address, ethers.parseUnits("20000", 18));
-        await protocolToken.connect(policyHolder).approve(riskManager.address, ethers.constants.MaxUint256);
+        await protocolToken.connect(policyHolder).approve(riskManager.target, ethers.MaxUint256);
         
         return {
             riskManager, owner, underwriter1, underwriter2, policyHolder, otherPerson,
@@ -937,8 +943,8 @@ describe("RiskManager - processClaim", function () {
             const tx = await riskManager.connect(policyHolder).processClaim(policyId, "0x");
 
             // Check for precise loss application events from our mock
-            await expect(tx).to.emit(mockCapitalPool, "LossesApplied").withArgs(ethers.constants.AddressZero, expectedU1Loss); // Underwriter 1
-            await expect(tx).to.emit(mockCapitalPool, "LossesApplied").withArgs(ethers.constants.AddressZero, expectedU2Loss); // Underwriter 2
+            await expect(tx).to.emit(mockCapitalPool, "LossesApplied").withArgs(ethers.ZeroAddress, expectedU1Loss); // Underwriter 1
+            await expect(tx).to.emit(mockCapitalPool, "LossesApplied").withArgs(ethers.ZeroAddress, expectedU2Loss); // Underwriter 2
         });
 
         it("should transfer assets, burn the NFT, update pool state, and emit event", async function() {
@@ -1022,11 +1028,12 @@ describe("RiskManager - premiumOwed", function () {
             slope2: 4000, // 40%
             kink: 8000    // 80% utilization
         };
-        await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, rateModel, 1); // Pool ID 0
+        await riskManager.addProtocolRiskPool(ethers.ZeroAddress, rateModel, 1); // Pool ID 0
 
         // --- Setup Underwriter and Capital ---
         const capitalAmount = ethers.parseUnits("100000", 6); // 100,000
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
+        await hre.network.provider.send("hardhat_setBalance", [mockCapitalPool.target, "0x1000000000000000000"]);
         const cpSigner = await ethers.getSigner(mockCapitalPool.target);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
         await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [mockCapitalPool.target] });
@@ -1149,7 +1156,7 @@ describe("RiskManager - premiumOwed", function () {
             // --- 2. Calculate expected premium in JavaScript ---
             const elapsed = BigInt((await time.latest()) - lastPaidUntilTimestamp);
             // Rate will be uint256.max
-            const annualRate = ethers.constants.MaxUint256;
+            const annualRate = ethers.MaxUint256;
             
             const expectedOwed = (BigInt(coverageAmount) * BigInt(annualRate) * elapsed) / (BigInt(SECS_YEAR) * BigInt(BPS));
 
@@ -1190,7 +1197,7 @@ describe("RiskManager - Admin Functions", function () {
 
         it("should revert if setting the committee to the zero address", async function () {
             const { riskManager, owner } = await loadFixture(deployFixture);
-            await expect(riskManager.connect(owner).setCommittee(ethers.constants.AddressZero))
+            await expect(riskManager.connect(owner).setCommittee(ethers.ZeroAddress))
                 .to.be.revertedWithCustomError(riskManager, "ZeroAddress");
         });
     });
@@ -1234,15 +1241,16 @@ describe("RiskManager - Capital Hooks", function () {
             owner.address
         );
         
-        await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, { base:0, slope1:0, slope2:0, kink:0 }, 1);
-        await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, { base:0, slope1:0, slope2:0, kink:0 }, 2);
+        await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base:0, slope1:0, slope2:0, kink:0 }, 1);
+        await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base:0, slope1:0, slope2:0, kink:0 }, 2);
 
         // Helper for impersonating the CapitalPool
         async function asCapitalPool(fn) {
-            await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.address] });
-            const signer = await ethers.getSigner(mockCapitalPool.address);
+            await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
+            await hre.network.provider.send("hardhat_setBalance", [mockCapitalPool.target, "0x1000000000000000000"]);
+            const signer = await ethers.getSigner(mockCapitalPool.target);
             const result = await fn(signer);
-            await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [mockCapitalPool.address] });
+            await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [mockCapitalPool.target] });
             return result;
         }
         
@@ -1352,18 +1360,20 @@ describe("RiskManager - claimPremiumRewards", function () {
 
         // Setup Pool and Underwriter
         const capitalAmount = ethers.parseUnits("100000", 6);
-        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
-        const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
+        const cpAddress3 = await mockCapitalPool.getAddress();
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [cpAddress3] });
+        await hre.network.provider.send("hardhat_setBalance", [cpAddress3, "0x1000000000000000000"]);
+        const cpSigner = await ethers.getSigner(cpAddress3);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
-        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [await mockCapitalPool.getAddress()] });
-        await riskManager.addProtocolRiskPool(usdc.address, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, 1);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [cpAddress3] });
+        await riskManager.addProtocolRiskPool(usdc.target, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, 1);
         await riskManager.connect(underwriter).allocateCapital([poolId]);
 
         // Purchase cover to generate premium income
         const coverageAmount = ethers.parseUnits("50000", 6);
         const weeklyPremium = ethers.parseUnits("95.89", 6); // Approx. 10% annual rate
         await usdc.mint(policyHolder.address, weeklyPremium);
-        await usdc.connect(policyHolder).approve(riskManager.address, weeklyPremium);
+        await usdc.connect(policyHolder).approve(riskManager.target, weeklyPremium);
         await riskManager.connect(policyHolder).purchaseCover(poolId, coverageAmount);
 
         // Calculate the accrued rewards
@@ -1385,7 +1395,7 @@ describe("RiskManager - claimPremiumRewards", function () {
             const { riskManager, underwriter } = await loadFixture(deployAndAccruePremiumsFixture);
             // Rewards were accrued in pool 0, so claiming from pool 1 should fail
             const nonExistentPoolId = 1;
-            await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, { base:0, slope1:0, slope2:0, kink:0 }, 1);
+            await riskManager.addProtocolRiskPool(ethers.ZeroAddress, { base:0, slope1:0, slope2:0, kink:0 }, 1);
             
             await expect(riskManager.connect(underwriter).claimPremiumRewards(nonExistentPoolId))
                 .to.be.revertedWithCustomError(riskManager, "NoRewardsToClaim");
@@ -1441,14 +1451,14 @@ describe("RiskManager - claimPremiumRewards", function () {
             const { riskManager, usdc, poolId } = await loadFixture(deployAndAccruePremiumsFixture);
             
             const AttackerFactory = await ethers.getContractFactory("ReentrancyAttacker");
-            const attacker = await AttackerFactory.deploy(riskManager.address);
+            const attacker = await AttackerFactory.deploy(riskManager.target);
 
             // Setup attacker to be an underwriter with rewards
             const capitalAmount = ethers.parseUnits("100000", 6);
-            await riskManager.onCapitalDeposited(attacker.address, capitalAmount);
+            await riskManager.onCapitalDeposited(attacker.target, capitalAmount);
             await riskManager.connect(attacker).allocateCapital([poolId]);
-            await usdc.transfer(riskManager.address, ethers.parseUnits("100", 6)); // Ensure contract has funds
-            await riskManager.mock_setPendingPremiums(poolId, attacker.address, ethers.parseUnits("10", 6));
+            await usdc.transfer(riskManager.target, ethers.parseUnits("100", 6)); // Ensure contract has funds
+            await riskManager.mock_setPendingPremiums(poolId, attacker.target, ethers.parseUnits("10", 6));
             
             // The attack should fail due to the nonReentrant guard
             await expect(attacker.beginAttack(poolId))
@@ -1487,18 +1497,18 @@ describe("RiskManager - claimDistressedAssets", function () {
         );
 
         // --- Setup Pool, Underwriter, and Policy ---
-        await riskManager.addProtocolRiskPool(distressedToken.address, { base:0, slope1:0, slope2:0, kink:0 }, 1); // Pool 0
+        await riskManager.addProtocolRiskPool(distressedToken.target, { base:0, slope1:0, slope2:0, kink:0 }, 1); // Pool 0
         const capitalAmount = ethers.parseUnits("100000", 6);
         await riskManager.onCapitalDeposited(underwriter.address, capitalAmount);
         await riskManager.connect(underwriter).allocateCapital([poolId]);
 
         const coverageAmount = ethers.parseUnits("50000", 6);
-        await mockPolicyNFT.mock_setPolicy(policyId, policyHolder.address, poolId, coverageAmount, 0, ethers.constants.MaxUint256);
+        await mockPolicyNFT.mock_setPolicy(policyId, policyHolder.address, poolId, coverageAmount, 0, ethers.MaxUint256);
 
         // --- Execute a Claim to Accrue Distressed Assets ---
-        await usdc.mint(riskManager.address, coverageAmount); // Pre-fund RM for payout
+        await usdc.mint(riskManager.target, coverageAmount); // Pre-fund RM for payout
         await distressedToken.mint(policyHolder.address, coverageAmount); // Fund policyholder with the asset they'll give up
-        await distressedToken.connect(policyHolder).approve(riskManager.address, ethers.constants.MaxUint256);
+        await distressedToken.connect(policyHolder).approve(riskManager.target, ethers.MaxUint256);
         
         await riskManager.connect(policyHolder).processClaim(policyId, "0x");
 
@@ -1546,7 +1556,7 @@ describe("RiskManager - claimDistressedAssets", function () {
             
             await expect(riskManager.connect(underwriter).claimDistressedAssets(poolId))
                 .to.emit(riskManager, "DistressedAssetRewardsClaimed")
-                .withArgs(underwriter.address, poolId, distressedToken.address, accruedAmount);
+                .withArgs(underwriter.address, poolId, distressedToken.target, accruedAmount);
         });
 
         it("should not affect other pending rewards (e.g., premiums)", async function () {
@@ -1575,13 +1585,13 @@ describe("RiskManager - claimDistressedAssets", function () {
             // NOTE: We would need a custom malicious ERC20 to trigger reentrancy on `safeTransfer`.
             // For this test, we assume a standard setup and test the guard's presence.
             // A more advanced test would use a bespoke ERC777-like token.
-            const attacker = await AttackerFactory.deploy(riskManager.address);
+            const attacker = await AttackerFactory.deploy(riskManager.target);
 
             // Setup attacker to be an underwriter with distressed asset rewards
-            await riskManager.onCapitalDeposited(attacker.address, ethers.parseUnits("1000", 6));
+            await riskManager.onCapitalDeposited(attacker.target, ethers.parseUnits("1000", 6));
             await riskManager.connect(attacker).allocateCapital([poolId]);
-            await distressedToken.transfer(riskManager.address, ethers.parseUnits("100", 18));
-            await riskManager.mock_setPendingDistressedAssets(poolId, attacker.address, ethers.parseUnits("10", 18));
+            await distressedToken.transfer(riskManager.target, ethers.parseUnits("100", 18));
+            await riskManager.mock_setPendingDistressedAssets(poolId, attacker.target, ethers.parseUnits("10", 18));
             
             // The attack should fail because of the nonReentrant guard
             await expect(attacker.beginDistressedAssetAttack(poolId))
@@ -1599,11 +1609,11 @@ describe("RiskManager - View Functions", function() {
         const protocolId = ProtocolRiskIdentifier.LIDO_STETH;
         const poolId = 0;
         
-        await riskManager.addProtocolRiskPool(stEth.address, rateModel, protocolId);
+        await riskManager.addProtocolRiskPool(stEth.target, rateModel, protocolId);
         
         const poolInfo = await riskManager.getPoolInfo(poolId);
 
-        expect(poolInfo.protocolTokenToCover).to.equal(stEth.address);
+        expect(poolInfo.protocolTokenToCover).to.equal(stEth.target);
         expect(poolInfo.rateModel.base).to.equal(rateModel.base);
         expect(poolInfo.rateModel.slope1).to.equal(rateModel.slope1);
         expect(poolInfo.rateModel.slope2).to.equal(rateModel.slope2);
