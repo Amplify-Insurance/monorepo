@@ -14,9 +14,8 @@ contract MockPolicyNFT is Ownable {
 
     // Mimic the Policy struct from the real contract
     struct Policy {
-        uint256 coverage;
         uint256 poolId;
-        uint256 start;
+        uint256 coverage;
         uint256 activation;
         uint256 lastPaidUntil;
     }
@@ -60,9 +59,8 @@ contract MockPolicyNFT is Ownable {
         uint256 paidUntil
     ) external {
         policies[id] = Policy({
-            coverage: coverage,
             poolId: pid,
-            start: block.timestamp,
+            coverage: coverage,
             activation: activation,
             lastPaidUntil: paidUntil
         });
@@ -97,9 +95,8 @@ contract MockPolicyNFT is Ownable {
         id = nextTokenId++;
         _owners[id] = to;
         policies[id] = Policy({
-            coverage: coverage,
             poolId: pid,
-            start: block.timestamp,
+            coverage: coverage,
             activation: activation,
             lastPaidUntil: paidUntil
         });
