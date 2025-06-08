@@ -354,7 +354,7 @@ describe("RiskManager - purchaseCover", function () {
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
 
-        const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
+        const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
 
         // For this test, we need a mock that returns values for getPolicy
@@ -370,7 +370,6 @@ describe("RiskManager - purchaseCover", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
-        await mockCapitalPool.setRiskManager(riskManager.target);
 
 
         // PolicyNFT requires a CoverPool address. Use RiskManager for testing.
@@ -483,7 +482,7 @@ describe("RiskManager - purchaseCover", function () {
                 .withArgs(1, policyHolder.address, poolId, coverageAmount);
 
             // Check CatPool.receiveUsdcPremium call
-            await expect(tx).to.emit(mockCatPool, "ReceivedPremium").withArgs(catAmount); // Custom mock event
+            await expect(tx).to.emit(mockCatPool, "PremiumReceivedCalled").withArgs(catAmount); // Custom mock event
 
             // Check events from RiskManager
             await expect(tx).to.emit(riskManager, "PolicyCreated").withArgs(1, 1, poolId, coverageAmount, weeklyPremium); // Assuming policyId is 1
@@ -693,7 +692,7 @@ describe("RiskManager - settlePremium", function () {
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
 
-        const MockCapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
+        const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
         const mockCapitalPool = await MockCapitalPoolFactory.deploy(owner.address, await usdc.getAddress());
 
         const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
@@ -739,7 +738,7 @@ describe("RiskManager - settlePremium", function () {
         // --- Fund PolicyHolder and Grant Allowance ---
         const premiumDue = await riskManager.premiumOwed(policyId);
         await usdc.mint(policyHolder.address, premiumDue);
-        await usdc.connect(policyHolder).approve(riskManager.target, premiumDue);
+        await usdc.connect(policyHolder).approve(riskManager.target, ethers.MaxUint256);
 
         return {
             riskManager,
@@ -766,7 +765,8 @@ describe("RiskManager - settlePremium", function () {
             const { riskManager, mockPolicyNFT, policyId } = await loadFixture(deployAndCreatePolicyFixture);
             const policy = await mockPolicyNFT.getPolicy(policyId);
             const futureActivation = (await time.latest()) + 86400;
-            await mockPolicyNFT.mock_setPolicy(policyId, policy.owner, policy.poolId, policy.coverage, futureActivation, policy.lastPaidUntil);
+            const owner = await mockPolicyNFT.ownerOf(policyId);
+            await mockPolicyNFT.mock_setPolicy(policyId, owner, policy.poolId, policy.coverage, futureActivation, policy.lastPaidUntil);
 
             await expect(riskManager.settlePremium(policyId)).to.be.revertedWith("RM: Policy not active");
         });
@@ -792,12 +792,10 @@ describe("RiskManager - settlePremium", function () {
             const catPremiumBps = await riskManager.catPremiumBps();
             const expectedCatAmount = (premiumDue * catPremiumBps) / 10000n;
 
-            // Anyone can settle the premium
-            await expect(() => riskManager.connect(otherPerson).settlePremium(1))
-                .to.changeTokenBalance(usdc, policyHolder, -premiumDue);
-
-            // Check that the cat pool received its share
-            await expect(riskManager.connect(otherPerson).settlePremium(1)).to.emit(mockCatPool, "ReceivedPremium").withArgs(expectedCatAmount);
+            // Anyone can settle the premium and cat pool receives its share
+            const tx = await riskManager.connect(otherPerson).settlePremium(1);
+            await expect(tx).to.changeTokenBalance(usdc, policyHolder, -premiumDue);
+            await expect(tx).to.emit(mockCatPool, "PremiumReceivedCalled").withArgs(expectedCatAmount);
         });
         
         it("should update policy's lastPaidUntil and emit a PremiumPaid event", async function() {
@@ -882,7 +880,6 @@ describe("RiskManager - processClaim", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
-        await mockCapitalPool.setRiskManager(riskManager.target);
 
         // --- Setup Pool with Protocol Token ---
         const rateModel = { base: 1000, slope1: 0, slope2: 0, kink: 0 };
@@ -957,8 +954,8 @@ describe("RiskManager - processClaim", function () {
             const tx = await riskManager.connect(policyHolder).processClaim(policyId, "0x");
 
             // Check for precise loss application events from our mock
-            await expect(tx).to.emit(mockCapitalPool, "LossesApplied").withArgs(ethers.ZeroAddress, expectedU1Loss); // Underwriter 1
-            await expect(tx).to.emit(mockCapitalPool, "LossesApplied").withArgs(ethers.ZeroAddress, expectedU2Loss); // Underwriter 2
+            await expect(tx).to.emit(mockCapitalPool, "LossesAppliedCalled").withArgs(ethers.ZeroAddress, expectedU1Loss); // Underwriter 1
+            await expect(tx).to.emit(mockCapitalPool, "LossesAppliedCalled").withArgs(ethers.ZeroAddress, expectedU2Loss); // Underwriter 2
         });
 
         it("should transfer assets, burn the NFT, update pool state, and emit event", async function() {
@@ -1364,7 +1361,6 @@ describe("RiskManager - claimPremiumRewards", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
-        await mockCapitalPool.setRiskManager(riskManager.target);
 
         await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
 
@@ -1488,7 +1484,7 @@ describe("RiskManager - claimPremiumRewards", function () {
             await riskManager.mock_setPendingPremiums(poolId, attacker.target, ethers.parseUnits("10", 6));
             
             // After the first call the attacker has no rewards left so the second call reverts
-            await expect(attacker.beginAttack(poolId))
+            await expect(attacker["beginAttack(uint256)"](poolId))
                 .to.be.revertedWithCustomError(riskManager, "NoRewardsToClaim");
         });
     });
@@ -1522,7 +1518,6 @@ describe("RiskManager - claimDistressedAssets", function () {
             await mockPolicyNFT.getAddress(),
             await mockCatPool.getAddress()
         );
-        await mockCapitalPool.setRiskManager(riskManager.target);
         await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
 
         // --- Setup Pool, Underwriter, and Policy ---
