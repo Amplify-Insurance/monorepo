@@ -15,11 +15,11 @@ if (!projectId) {
   // For RainbowKit defaults to work best, a projectId is needed.
 }
 
-// 3. Define your Tenderly Virtual Network (TVN) chain
-const tenderlyVNet = {
-  id: 8450, // 🔑 Your TVN chain ID
-  name: 'Tenderly Virtual Network',
-  network: 'tenderly-vnet',
+// 3. Define the Base mainnet chain
+const baseMainnet = {
+  id: 8453,
+  name: 'Base',
+  network: 'base-mainnet',
   nativeCurrency: {
     name: 'Ether',
     symbol: 'ETH',
@@ -28,31 +28,28 @@ const tenderlyVNet = {
   rpcUrls: {
     default: {
       http: [
-        // Use env variable in prod, fall back to hard‑coded fork URL in dev
-        process.env.NEXT_PUBLIC_RPC_URL ||
-        'https://virtual.base.rpc.tenderly.co/b8bd0aaa-d917-4ed7-986d-a489973fb537',
+        // Use env variable in prod, fall back to public RPC in dev
+        process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org',
       ],
     },
   },
   blockExplorers: {
     default: {
-      name: 'Tenderly Explorer',
-      url: 'https://dashboard.tenderly.co/explorer/vnet/73b21e81-f0cb-44f6-b934-11fdfc02dcd8',
+      name: 'BaseScan',
+      url: 'https://basescan.org',
     },
   },
-  testnet: true, // Mark as testnet so RainbowKit shows the ⚠️ pill by default
+  testnet: false,
 };
 
 // 4. Use getDefaultConfig to create wagmi/RainbowKit config
 export const config = getDefaultConfig({
   appName: 'DeFi Insurance Platform',
   projectId: projectId || 'DEFAULT_PROJECT_ID_IF_MISSING',
-  // 👇 Register your TVN as the only chain for now
-  chains: [tenderlyVNet],
+  chains: [baseMainnet],
   transports: {
-    [tenderlyVNet.id]: http(
-      process.env.NEXT_PUBLIC_RPC_URL ||
-      'https://virtual.base.rpc.tenderly.co/b8bd0aaa-d917-4ed7-986d-a489973fb537',
+    [baseMainnet.id]: http(
+      process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org',
     ),
   },
   ssr: true,

@@ -5,13 +5,13 @@ import 'server-only';
 const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ??
   process.env.RPC_URL ??
-  'https://rpc.tenderly.co/v1/testnet/<your-vnet-uuid>';
+  'https://mainnet.base.org';
 
 export const provider = new ethers.providers.StaticJsonRpcProvider(
   RPC_URL,
   {
-    name: 'tenderly-vnet',   // label is just cosmetic
-    chainId: 8450,           // your custom Tenderly chain-id
+    name: 'base',
+    chainId: 8453,
   },
 );
 
