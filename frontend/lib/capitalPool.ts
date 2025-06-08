@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import CapitalPool from '../abi/CapitalPool.json';
 import { provider } from './provider';
-import 'server-only';
 
 export const capitalPool = new ethers.Contract(
   process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS as string,

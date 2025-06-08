@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import RiskManager from '../abi/RiskManager.json';
 import { provider } from './provider';
-import 'server-only';
 
 export const riskManager = new ethers.Contract(
   process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS as string,

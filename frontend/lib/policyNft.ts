@@ -1,6 +1,5 @@
 import { ethers } from 'ethers';
 import PolicyNFT from '../abi/PolicyNFT.json';
-import 'server-only';
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ??

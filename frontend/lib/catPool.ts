@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import CatPool from '../abi/CatInsurancePool.json';
 // lib/provider.ts (or wherever you construct it)
-import 'server-only';
 
 
 const RPC_URL =

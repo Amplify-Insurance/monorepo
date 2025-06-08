@@ -1,7 +1,6 @@
 import { ethers } from 'ethers'
 import ERC20 from '../abi/ERC20.json'
 import { provider } from './provider'
-import 'server-only';
 
 const rpc = process.env.NEXT_PUBLIC_RPC_URL;
 console.log('RPC URL:', rpc);
