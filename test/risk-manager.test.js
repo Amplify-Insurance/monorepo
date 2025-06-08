@@ -371,7 +371,7 @@ describe("RiskManager - purchaseCover", function () {
         );
 
         // --- Fund Underwriter and Pledge Capital ---
-        const capitalAmount = ethers.utils.parseUnits("100000", 6); // 100,000 USDC
+        const capitalAmount = ethers.parseUnits("100000", 6); // 100,000 USDC
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
         const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
@@ -380,7 +380,7 @@ describe("RiskManager - purchaseCover", function () {
         await riskManager.connect(underwriter).allocateCapital([0]);
 
         // --- Fund PolicyHolder and Grant Allowance ---
-        const policyHolderBalance = ethers.utils.parseUnits("5000", 6); // 5,000 USDC
+        const policyHolderBalance = ethers.parseUnits("5000", 6); // 5,000 USDC
         // This is a mock token, so we need a way to send tokens. Let's add a mint function to the mock.
         // Assuming MockERC20 has a `mint(address, amount)` function for testing.
         await usdc.mint(policyHolder.address, policyHolderBalance);
@@ -400,7 +400,7 @@ describe("RiskManager - purchaseCover", function () {
     describe("Validation and Revert Scenarios", function () {
         it("should revert for an invalid pool ID", async function () {
             const { riskManager, policyHolder } = await loadFixture(deployAndFundFixture);
-            const coverageAmount = ethers.utils.parseUnits("1000", 6);
+            const coverageAmount = ethers.parseUnits("1000", 6);
 
             await expect(riskManager.connect(policyHolder).purchaseCover(99, coverageAmount))
                 .to.be.revertedWithCustomError(riskManager, "InvalidPoolId");
@@ -408,7 +408,7 @@ describe("RiskManager - purchaseCover", function () {
 
         it("should revert if the pool is paused", async function () {
             const { riskManager, owner, policyHolder } = await loadFixture(deployAndFundFixture);
-            const coverageAmount = ethers.utils.parseUnits("1000", 6);
+            const coverageAmount = ethers.parseUnits("1000", 6);
 
             // Assuming a function `togglePausePool(poolId)` exists for the owner
             // If not, this can't be tested without modifying the contract for testability.
@@ -424,8 +424,8 @@ describe("RiskManager - purchaseCover", function () {
 
         it("should revert if coverage exceeds pool capacity", async function () {
             const { riskManager, policyHolder } = await loadFixture(deployAndFundFixture);
-            const capitalAmount = ethers.utils.parseUnits("100000", 6);
-            const excessiveCoverage = capitalAmount.add(1); // More than total capital
+            const capitalAmount = ethers.parseUnits("100000", 6);
+            const excessiveCoverage = capitalAmount + 1n; // More than total capital
 
             await expect(riskManager.connect(policyHolder).purchaseCover(0, excessiveCoverage))
                 .to.be.revertedWithCustomError(riskManager, "InsufficientCapacity");
@@ -433,7 +433,7 @@ describe("RiskManager - purchaseCover", function () {
 
         it("should revert if the user has insufficient balance", async function () {
             const { riskManager, policyHolder, usdc } = await loadFixture(deployAndFundFixture);
-            const coverageAmount = ethers.utils.parseUnits("1000", 6);
+            const coverageAmount = ethers.parseUnits("1000", 6);
 
             // Burn the user's tokens to simulate insufficient balance
             await usdc.burn(policyHolder.address, await usdc.balanceOf(policyHolder.address));
@@ -448,7 +448,7 @@ describe("RiskManager - purchaseCover", function () {
             const { riskManager, policyHolder, underwriter, usdc, mockPolicyNFT, mockCatPool } = await loadFixture(deployAndFundFixture);
 
             const poolId = 0;
-            const coverageAmount = ethers.utils.parseUnits("50000", 6); // 50,000 USDC coverage
+            const coverageAmount = ethers.parseUnits("50000", 6); // 50,000 USDC coverage
             const initialUnderwriterRewards = await riskManager.underwriterPoolRewards(poolId, underwriter.address);
 
             // --- Calculations ---
@@ -485,7 +485,7 @@ describe("RiskManager - purchaseCover", function () {
             expect(pool.totalCoverageSold).to.equal(coverageAmount);
 
             const finalUnderwriterRewards = await riskManager.underwriterPoolRewards(poolId, underwriter.address);
-            expect(finalUnderwriterRewards.pendingPremiums).to.equal(initialUnderwriterRewards.pendingPremiums.add(poolIncome));
+            expect(finalUnderwriterRewards.pendingPremiums).to.equal(initialUnderwriterRewards.pendingPremiums + poolIncome);
         });
 
         it("should handle premium accrual correctly when a pool has zero capital", async function () {
@@ -495,7 +495,7 @@ describe("RiskManager - purchaseCover", function () {
             await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, { base: 1000, slope1: 0, slope2: 0, kink: 0 }, ProtocolRiskIdentifier.PROTOCOL_B);
 
             // Purchasing cover should fail due to insufficient capacity
-            const coverageAmount = ethers.utils.parseUnits("1000", 6);
+            const coverageAmount = ethers.parseUnits("1000", 6);
             await expect(riskManager.connect(policyHolder).purchaseCover(1, coverageAmount))
                 .to.be.revertedWithCustomError(riskManager, "InsufficientCapacity");
         });
@@ -531,7 +531,7 @@ describe("RiskManager - allocateCapital", function () {
 
         // Add several pools to test allocation limits and choices
         const MAX_ALLOCATIONS = await riskManager.MAX_ALLOCATIONS_PER_UNDERWRITER();
-        for (let i = 0; i < MAX_ALLOCATIONS + 1; i++) { // Create 6 pools
+        for (let i = 0; i < Number(MAX_ALLOCATIONS) + 1; i++) { // Create 6 pools
             await riskManager.addProtocolRiskPool(
                 ethers.constants.AddressZero, // Mock token
                 { base: 0, slope1: 0, slope2: 0, kink: 0 },
@@ -539,7 +539,7 @@ describe("RiskManager - allocateCapital", function () {
             );
         }
 
-        const depositAmount = ethers.utils.parseUnits("50000", 6); // 50,000 USDC
+        const depositAmount = ethers.parseUnits("50000", 6); // 50,000 USDC
         // Simulate the onCapitalDeposited hook call from the CapitalPool
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
         const cpSigner = await ethers.getSigner(mockCapitalPool.target);
@@ -565,7 +565,7 @@ describe("RiskManager - allocateCapital", function () {
 
         it("should revert if the poolIds array exceeds MAX_ALLOCATIONS_PER_UNDERWRITER", async function () {
             const { riskManager, underwriter1, MAX_ALLOCATIONS } = await loadFixture(deployAndDepositFixture);
-            const tooManyPools = Array.from(Array(MAX_ALLOCATIONS + 1).keys()); // [0, 1, 2, 3, 4, 5]
+            const tooManyPools = Array.from(Array(Number(MAX_ALLOCATIONS) + 1).keys()); // [0, 1, 2, 3, 4, 5]
 
             await expect(riskManager.connect(underwriter1).allocateCapital(tooManyPools))
                 .to.be.revertedWithCustomError(riskManager, "ExceedsMaxAllocations");
@@ -606,7 +606,7 @@ describe("RiskManager - allocateCapital", function () {
             const pool2_after = await riskManager.protocolRiskPools(2);
             
             // Check that each allocated pool's capital increased by the full deposit amount
-            expect(pool0_after.totalCapitalPledgedToPool).to.equal(pool0_before.totalCapitalPledgedToPool.add(depositAmount));
+            expect(pool0_after.totalCapitalPledgedToPool).to.equal(pool0_before.totalCapitalPledgedToPool + depositAmount);
             expect(pool2_after.totalCapitalPledgedToPool).to.equal(depositAmount);
             
             // Check that an unallocated pool remains unchanged
@@ -635,7 +635,7 @@ describe("RiskManager - allocateCapital", function () {
             
             // Check final pool state
             const pool1_final = await riskManager.protocolRiskPools(1);
-            expect(pool1_final.totalCapitalPledgedToPool).to.equal(depositAmount.mul(2));
+            expect(pool1_final.totalCapitalPledgedToPool).to.equal(depositAmount * 2n);
             // expect(await riskManager.getPoolSpecificUnderwriters(1)).to.deep.equal([underwriter1.address, underwriter2.address]);
         });
 
@@ -657,7 +657,7 @@ describe("RiskManager - allocateCapital", function () {
             const attacker = await ReentrancyAttackerFactory.deploy(riskManager.address);
 
             // Attacker needs capital to allocate
-            const depositAmount = ethers.utils.parseUnits("1000", 6);
+            const depositAmount = ethers.parseUnits("1000", 6);
             await riskManager.onCapitalDeposited(attacker.address, depositAmount);
 
             // The attack will fail because of the nonReentrant guard
@@ -694,7 +694,7 @@ describe("RiskManager - settlePremium", function () {
         );
 
         // --- Setup Pool and Underwriter ---
-        const capitalAmount = ethers.utils.parseUnits("100000", 6);
+        const capitalAmount = ethers.parseUnits("100000", 6);
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
         const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
@@ -704,7 +704,7 @@ describe("RiskManager - settlePremium", function () {
         await riskManager.connect(underwriter).allocateCapital([0]);
 
         // --- Setup Policy State in Mock ---
-        const coverageAmount = ethers.utils.parseUnits("20000", 6);
+        const coverageAmount = ethers.parseUnits("20000", 6);
         const now = await time.latest();
         const activationTimestamp = now - (10 * 86400); // Activated 10 days ago
         const lastPaidUntilTimestamp = now - (7 * 86400); // Paid up until 7 days ago
@@ -802,7 +802,7 @@ describe("RiskManager - settlePremium", function () {
             await riskManager.settlePremium(policyId);
             
             const finalRewards = await riskManager.underwriterPoolRewards(0, underwriter.address);
-            expect(finalRewards.pendingPremiums).to.equal(initialRewards.pendingPremiums.add(expectedPoolIncome));
+            expect(finalRewards.pendingPremiums).to.equal(initialRewards.pendingPremiums + expectedPoolIncome);
         });
     });
 
@@ -870,8 +870,8 @@ describe("RiskManager - processClaim", function () {
         await riskManager.addProtocolRiskPool(protocolToken.address, rateModel, 1 /* PROTOCOL_A */); // Pool ID 0
 
         // --- Setup Underwriters: U1 deposits 10k, U2 deposits 30k (1:3 ratio) ---
-        const u1Deposit = ethers.utils.parseUnits("10000", 6);
-        const u2Deposit = ethers.utils.parseUnits("30000", 6);
+        const u1Deposit = ethers.parseUnits("10000", 6);
+        const u2Deposit = ethers.parseUnits("30000", 6);
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
         const cpSigner = await ethers.getSigner(mockCapitalPool.target);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter1.address, u1Deposit);
@@ -881,7 +881,7 @@ describe("RiskManager - processClaim", function () {
         await riskManager.connect(underwriter2).allocateCapital([0]);
 
         // --- Setup Policy in MockNFT ---
-        const coverageAmount = ethers.utils.parseUnits("20000", 6); // 20k coverage
+        const coverageAmount = ethers.parseUnits("20000", 6); // 20k coverage
         const now = await time.latest();
         await mockPolicyNFT.mock_setPolicy(
             policyId,
@@ -893,8 +893,8 @@ describe("RiskManager - processClaim", function () {
         );
 
         // --- Fund PolicyHolder with underlying (for payout) and protocol token (for distressed asset transfer) ---
-        await usdc.mint(riskManager.address, ethers.utils.parseUnits("100000", 6)); // Pre-fund RM for payouts
-        await protocolToken.mint(policyHolder.address, ethers.utils.parseUnits("20000", 18));
+        await usdc.mint(riskManager.address, ethers.parseUnits("100000", 6)); // Pre-fund RM for payouts
+        await protocolToken.mint(policyHolder.address, ethers.parseUnits("20000", 18));
         await protocolToken.connect(policyHolder).approve(riskManager.address, ethers.constants.MaxUint256);
         
         return {
@@ -968,9 +968,9 @@ describe("RiskManager - processClaim", function () {
             const { riskManager, policyHolder, mockCatPool, coverageAmount, u1Deposit, u2Deposit, policyId } = await loadFixture(deployAndClaimFixture);
 
             // Create a new policy with coverage greater than the total pool capital
-            const largeCoverage = u1Deposit.add(u2Deposit).add(ethers.utils.parseUnits("10000", 6)); // 50k
+            const largeCoverage = u1Deposit.add(u2Deposit).add(ethers.parseUnits("10000", 6)); // 50k
             await mockPolicyNFT.mock_setCoverage(policyId, largeCoverage);
-            await protocolToken.mint(policyHolder.address, ethers.utils.parseUnits("30000", 18)); // Mint extra for transfer
+            await protocolToken.mint(policyHolder.address, ethers.parseUnits("30000", 18)); // Mint extra for transfer
             
             const netPayout = largeCoverage.mul(9500).div(10000);
             const totalCapital = u1Deposit.add(u2Deposit);
@@ -1025,7 +1025,7 @@ describe("RiskManager - premiumOwed", function () {
         await riskManager.addProtocolRiskPool(ethers.constants.AddressZero, rateModel, 1); // Pool ID 0
 
         // --- Setup Underwriter and Capital ---
-        const capitalAmount = ethers.utils.parseUnits("100000", 6); // 100,000
+        const capitalAmount = ethers.parseUnits("100000", 6); // 100,000
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [mockCapitalPool.target] });
         const cpSigner = await ethers.getSigner(mockCapitalPool.target);
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
@@ -1033,7 +1033,7 @@ describe("RiskManager - premiumOwed", function () {
         await riskManager.connect(underwriter).allocateCapital([0]);
 
         // --- Setup an active policy in the mock NFT contract ---
-        const coverageAmount = ethers.utils.parseUnits("50000", 6); // 50,000 (50% utilization)
+        const coverageAmount = ethers.parseUnits("50000", 6); // 50,000 (50% utilization)
         const now = await time.latest();
         const activationTimestamp = now - 86400 * 30; // Activated 30 days ago
         const lastPaidUntilTimestamp = now - 86400 * 15; // Paid up until 15 days ago
@@ -1117,7 +1117,7 @@ describe("RiskManager - premiumOwed", function () {
             const { riskManager, policyId, coverageAmount, capitalAmount, rateModel, lastPaidUntilTimestamp, SECS_YEAR, BPS } = await loadFixture(deployAndCreateActivePolicyFixture);
 
             // --- 1. Increase coverage to push utilization above the 80% kink ---
-            const highCoverage = ethers.utils.parseUnits("90000", 6); // 90% utilization
+            const highCoverage = ethers.parseUnits("90000", 6); // 90% utilization
             await riskManager.mock_setTotalCoverageSold(0, highCoverage);
             await mockPolicyNFT.mock_setCoverage(policyId, highCoverage);
 
@@ -1252,7 +1252,7 @@ describe("RiskManager - Capital Hooks", function () {
     describe("onCapitalDeposited", function() {
         it("should correctly increase an underwriter's total pledge", async function () {
             const { riskManager, underwriter1, asCapitalPool } = await loadFixture(deployAndAllocateFixture);
-            const depositAmount = ethers.utils.parseEther("100");
+            const depositAmount = ethers.parseEther("100");
             
             await asCapitalPool(signer => riskManager.connect(signer).onCapitalDeposited(underwriter1.address, depositAmount));
 
@@ -1269,8 +1269,8 @@ describe("RiskManager - Capital Hooks", function () {
     describe("onCapitalWithdrawn", function() {
         it("should handle a partial withdrawal correctly", async function() {
             const { riskManager, underwriter1, asCapitalPool } = await loadFixture(deployAndAllocateFixture);
-            const initialDeposit = ethers.utils.parseEther("1000");
-            const withdrawalAmount = ethers.utils.parseEther("400");
+            const initialDeposit = ethers.parseEther("1000");
+            const withdrawalAmount = ethers.parseEther("400");
             
             await asCapitalPool(signer => riskManager.connect(signer).onCapitalDeposited(underwriter1.address, initialDeposit));
             await riskManager.connect(underwriter1).allocateCapital([0, 1]); // Allocate to two pools
@@ -1292,8 +1292,8 @@ describe("RiskManager - Capital Hooks", function () {
 
         it("should handle a full withdrawal using 'swap and pop'", async function() {
             const { riskManager, underwriter1, underwriter2, asCapitalPool } = await loadFixture(deployAndAllocateFixture);
-            const u1Deposit = ethers.utils.parseEther("100");
-            const u2Deposit = ethers.utils.parseEther("500");
+            const u1Deposit = ethers.parseEther("100");
+            const u2Deposit = ethers.parseEther("500");
 
             // U1 and U2 deposit and both allocate to pool 0
             await asCapitalPool(signer => riskManager.connect(signer).onCapitalDeposited(underwriter1.address, u1Deposit));
@@ -1351,7 +1351,7 @@ describe("RiskManager - claimPremiumRewards", function () {
         );
 
         // Setup Pool and Underwriter
-        const capitalAmount = ethers.utils.parseUnits("100000", 6);
+        const capitalAmount = ethers.parseUnits("100000", 6);
         await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [await mockCapitalPool.getAddress()] });
         const cpSigner = await ethers.getSigner(await mockCapitalPool.getAddress());
         await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, capitalAmount);
@@ -1360,8 +1360,8 @@ describe("RiskManager - claimPremiumRewards", function () {
         await riskManager.connect(underwriter).allocateCapital([poolId]);
 
         // Purchase cover to generate premium income
-        const coverageAmount = ethers.utils.parseUnits("50000", 6);
-        const weeklyPremium = ethers.utils.parseUnits("95.89", 6); // Approx. 10% annual rate
+        const coverageAmount = ethers.parseUnits("50000", 6);
+        const weeklyPremium = ethers.parseUnits("95.89", 6); // Approx. 10% annual rate
         await usdc.mint(policyHolder.address, weeklyPremium);
         await usdc.connect(policyHolder).approve(riskManager.address, weeklyPremium);
         await riskManager.connect(policyHolder).purchaseCover(poolId, coverageAmount);
@@ -1422,7 +1422,7 @@ describe("RiskManager - claimPremiumRewards", function () {
             const { riskManager, underwriter, otherUnderwriter, poolId, accruedAmount } = await loadFixture(deployAndAccruePremiumsFixture);
             
             // Accrue some rewards for another underwriter in the same pool
-            await riskManager.onCapitalDeposited(otherUnderwriter.address, ethers.utils.parseUnits("100000", 6));
+            await riskManager.onCapitalDeposited(otherUnderwriter.address, ethers.parseUnits("100000", 6));
             await riskManager.connect(otherUnderwriter).allocateCapital([poolId]);
             // For simplicity, we manually credit rewards
             await riskManager.mock_setPendingPremiums(poolId, otherUnderwriter.address, 500);
@@ -1444,11 +1444,11 @@ describe("RiskManager - claimPremiumRewards", function () {
             const attacker = await AttackerFactory.deploy(riskManager.address);
 
             // Setup attacker to be an underwriter with rewards
-            const capitalAmount = ethers.utils.parseUnits("100000", 6);
+            const capitalAmount = ethers.parseUnits("100000", 6);
             await riskManager.onCapitalDeposited(attacker.address, capitalAmount);
             await riskManager.connect(attacker).allocateCapital([poolId]);
-            await usdc.transfer(riskManager.address, ethers.utils.parseUnits("100", 6)); // Ensure contract has funds
-            await riskManager.mock_setPendingPremiums(poolId, attacker.address, ethers.utils.parseUnits("10", 6));
+            await usdc.transfer(riskManager.address, ethers.parseUnits("100", 6)); // Ensure contract has funds
+            await riskManager.mock_setPendingPremiums(poolId, attacker.address, ethers.parseUnits("10", 6));
             
             // The attack should fail due to the nonReentrant guard
             await expect(attacker.beginAttack(poolId))
@@ -1488,11 +1488,11 @@ describe("RiskManager - claimDistressedAssets", function () {
 
         // --- Setup Pool, Underwriter, and Policy ---
         await riskManager.addProtocolRiskPool(distressedToken.address, { base:0, slope1:0, slope2:0, kink:0 }, 1); // Pool 0
-        const capitalAmount = ethers.utils.parseUnits("100000", 6);
+        const capitalAmount = ethers.parseUnits("100000", 6);
         await riskManager.onCapitalDeposited(underwriter.address, capitalAmount);
         await riskManager.connect(underwriter).allocateCapital([poolId]);
 
-        const coverageAmount = ethers.utils.parseUnits("50000", 6);
+        const coverageAmount = ethers.parseUnits("50000", 6);
         await mockPolicyNFT.mock_setPolicy(policyId, policyHolder.address, poolId, coverageAmount, 0, ethers.constants.MaxUint256);
 
         // --- Execute a Claim to Accrue Distressed Assets ---
@@ -1553,7 +1553,7 @@ describe("RiskManager - claimDistressedAssets", function () {
             const { riskManager, underwriter, poolId } = await loadFixture(deployAndAccrueDistressedAssetsFixture);
             
             // Manually credit some premium rewards for the test
-            const premiumRewardAmount = ethers.utils.parseUnits("100", 6);
+            const premiumRewardAmount = ethers.parseUnits("100", 6);
             await riskManager.mock_setPendingPremiums(poolId, underwriter.address, premiumRewardAmount);
             
             // Claim the distressed assets
@@ -1578,10 +1578,10 @@ describe("RiskManager - claimDistressedAssets", function () {
             const attacker = await AttackerFactory.deploy(riskManager.address);
 
             // Setup attacker to be an underwriter with distressed asset rewards
-            await riskManager.onCapitalDeposited(attacker.address, ethers.utils.parseUnits("1000", 6));
+            await riskManager.onCapitalDeposited(attacker.address, ethers.parseUnits("1000", 6));
             await riskManager.connect(attacker).allocateCapital([poolId]);
-            await distressedToken.transfer(riskManager.address, ethers.utils.parseUnits("100", 18));
-            await riskManager.mock_setPendingDistressedAssets(poolId, attacker.address, ethers.utils.parseUnits("10", 18));
+            await distressedToken.transfer(riskManager.address, ethers.parseUnits("100", 18));
+            await riskManager.mock_setPendingDistressedAssets(poolId, attacker.address, ethers.parseUnits("10", 18));
             
             // The attack should fail because of the nonReentrant guard
             await expect(attacker.beginDistressedAssetAttack(poolId))
