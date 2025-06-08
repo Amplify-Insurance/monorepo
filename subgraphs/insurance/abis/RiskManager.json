@@ -1,0 +1,123 @@
+[
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_capitalPoolAddress", "type": "address" },
+      { "internalType": "address", "name": "_policyNFTAddress", "type": "address" },
+      { "internalType": "address", "name": "_catPoolAddress", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_poolId", "type": "uint256" },
+      { "internalType": "uint256", "name": "_coverageAmount", "type": "uint256" }
+    ],
+    "name": "purchaseCover",
+    "outputs": [ { "internalType": "uint256", "name": "policyId", "type": "uint256" } ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "_policyId", "type": "uint256" } ],
+    "name": "settlePremium",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_policyId", "type": "uint256" },
+      { "internalType": "bytes", "name": "_proofOfLossData", "type": "bytes" }
+    ],
+    "name": "processClaim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256[]", "name": "_poolIds", "type": "uint256[]" } ],
+    "name": "allocateCapital",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "_poolId", "type": "uint256" } ],
+    "name": "claimPremiumRewards",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "_poolId", "type": "uint256" } ],
+    "name": "claimDistressedAssets",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "_poolId", "type": "uint256" } ],
+    "name": "getPoolInfo",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "address", "name": "protocolTokenToCover", "type": "address" },
+          {
+            "components": [
+              { "internalType": "uint256", "name": "base", "type": "uint256" },
+              { "internalType": "uint256", "name": "slope1", "type": "uint256" },
+              { "internalType": "uint256", "name": "slope2", "type": "uint256" },
+              { "internalType": "uint256", "name": "kink", "type": "uint256" }
+            ],
+            "internalType": "struct RiskManager.RateModel",
+            "name": "rateModel",
+            "type": "tuple"
+          },
+          { "internalType": "uint256", "name": "totalCapitalPledgedToPool", "type": "uint256" },
+          { "internalType": "uint256", "name": "totalCoverageSold", "type": "uint256" },
+          { "internalType": "uint8", "name": "protocolCovered", "type": "uint8" },
+          { "internalType": "uint8", "name": "protocolTokenDecimals", "type": "uint8" },
+          { "internalType": "uint256", "name": "scaleToProtocolToken", "type": "uint256" },
+          { "internalType": "bool", "name": "isPaused", "type": "bool" }
+        ],
+        "internalType": "struct RiskManager.PoolData",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "catPremiumBps",
+    "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "protocolRiskPoolsLength",
+    "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "address", "name": "", "type": "address" } ],
+    "name": "underwriterAllocations",
+    "outputs": [ { "internalType": "uint256[]", "name": "", "type": "uint256[]" } ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "", "type": "address" },
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "name": "isAllocatedToPool",
+    "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

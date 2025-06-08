@@ -1,10 +1,10 @@
 # Subgraphs
 
-This directory contains subgraph definitions for indexing the CoverPool
+This directory contains subgraph definitions for indexing the insurance
 protocol contracts using [The Graph](https://thegraph.com/).
 
-The `insurance` subgraph indexes events emitted by `CoverPool`,
-`CatInsurancePool` and `PolicyNFT`. Update the contract addresses in
+The `insurance` subgraph indexes events emitted by `RiskManager`,
+`CapitalPool`, `CatInsurancePool` and `PolicyNFT`. Update the contract addresses in
 `subgraph.yaml` before deployment.
 
 It stores a minimal set of entities for demonstration purposes, including a

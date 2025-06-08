@@ -5,11 +5,11 @@ description: Insurance protocol subgraph
 
 dataSources:
   - kind: ethereum/contract
-    name: CoverPool
+    name: RiskManager
     network: mainnet
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with deployed address
-      abi: CoverPool
+      abi: RiskManager
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -22,38 +22,32 @@ dataSources:
         - Policy
         - ContractOwner
       abis:
-        - name: CoverPool
-          file: ./abis/CoverPool.json
+        - name: RiskManager
+          file: ./abis/RiskManager.json
       eventHandlers:
-        - event: PoolAdded(indexed uint256,indexed address,indexed address,uint8)
+        - event: PoolAdded(indexed uint256,indexed address,uint8)
           handler: handlePoolAdded
-        - event: UnderwriterDeposit(indexed address,uint256,uint256,uint8,uint256[])
-          handler: handleUnderwriterDeposit
         - event: WithdrawalRequested(indexed address,uint256,uint256)
           handler: handleWithdrawalRequested
-        - event: WithdrawalExecuted(indexed address,uint256,uint256,uint256)
+        - event: WithdrawalExecuted(indexed address,uint256,uint256)
           handler: handleWithdrawalExecuted
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocated
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocated
         - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
           handler: handlePremiumPaid
-        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256)
           handler: handleClaimProcessed
-        - event: UnderwriterLoss(indexed address,indexed uint256,uint256)
-          handler: handleUnderwriterLoss
-        - event: CapitalPledgedToPoolChanged(indexed uint256,int256)
-          handler: handleCapitalPledgedToPoolChanged
         - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
           handler: handlePolicyCreated
         - event: IncidentReported(indexed uint256,bool)
           handler: handleIncidentReported
         - event: PolicyLapsed(indexed uint256)
           handler: handlePolicyLapsed
-        - event: CatPremiumBpsUpdated(uint256)
-          handler: handleCatPremiumBpsUpdated
         - event: BaseYieldAdapterSet(indexed uint8,address)
           handler: handleBaseYieldAdapterSet
-        - event: CommitteeUpdated(address)
-          handler: handleCommitteeUpdated
-        - event: SystemValueSynced(uint256,uint256,uint256)
+        - event: SystemValueSynced(uint256,uint256)
           handler: handleSystemValueSynced
         - event: AdapterCallFailed(indexed address,string,string)
           handler: handleAdapterCallFailed
@@ -62,7 +56,48 @@ dataSources:
         - event: DistressedAssetRewardsClaimed(indexed address,indexed uint256,indexed address,uint256)
           handler: handleDistressedAssetRewardsClaimed
         - event: OwnershipTransferred(indexed address,indexed address)
-          handler: handleCoverPoolOwnershipTransferred
+          handler: handleRiskManagerOwnershipTransferred
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: CapitalPool
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      abi: CapitalPool
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+      abis:
+        - name: CapitalPool
+          file: ./abis/CapitalPool.json
+      eventHandlers:
+        - event: Deposit(indexed address,uint256,uint256,uint8)
+          handler: handleDeposit
+        - event: WithdrawalRequested(indexed address,uint256,uint256)
+          handler: handleWithdrawalRequested
+        - event: WithdrawalExecuted(indexed address,uint256,uint256)
+          handler: handleWithdrawalExecuted
+        - event: LossesApplied(indexed address,uint256,bool)
+          handler: handleLossesApplied
+        - event: SystemValueSynced(uint256,uint256)
+          handler: handleSystemValueSynced
+        - event: AdapterCallFailed(indexed address,string,string)
+          handler: handleAdapterCallFailed
+        - event: RiskManagerSet(indexed address)
+          handler: handleRiskManagerSet
+        - event: BaseYieldAdapterSet(indexed uint8,address)
+          handler: handleBaseYieldAdapterSet
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleCapitalPoolOwnershipTransferred
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
