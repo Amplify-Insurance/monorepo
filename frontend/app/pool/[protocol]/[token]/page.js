@@ -10,14 +10,6 @@ import { ethers } from "ethers"
 import { formatCurrency, formatPercentage } from "../../../utils/formatting"
 import { getTokenName } from "../../config/tokenNameMap"
 
-const PROTOCOL_NAMES = {
-  1: "Protocol A",
-  2: "Protocol B",
-  3: "Protocol C",
-  4: "Lido stETH",
-  5: "Rocket rETH",
-}
-
 export default function PoolDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -43,7 +35,7 @@ export default function PoolDetailsPage() {
 
   if (!pool) return <p className="p-4">Pool not found.</p>
 
-  const name = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+  const name = getTokenName(pool.protocolTokenToCover)
   const tvl = Number(
     ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, pool.underlyingAssetDecimals),
   )

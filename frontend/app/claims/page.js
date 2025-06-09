@@ -12,14 +12,6 @@ import { getTokenName } from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
 
-const PROTOCOL_NAMES = {
-  1: "Protocol A",
-  2: "Protocol B",
-  3: "Protocol C",
-  4: "Lido stETH",
-  5: "Rocket rETH",
-}
-
 export default function ClaimsPage() {
   const { address, isConnected } = useAccount()
   const { policies } = useUserPolicies(address)
@@ -38,7 +30,7 @@ export default function ClaimsPage() {
       )
       return {
         id: p.id,
-        protocol: PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`,
+        protocol: getTokenName(pool.protocolTokenToCover),
         pool: pool.protocolTokenToCover,
         poolName: getTokenName(pool.protocolTokenToCover),
         coverageAmount,

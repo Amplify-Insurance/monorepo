@@ -21,13 +21,6 @@ const protocolCategories = [
   { id: "stablecoin", name: "Stablecoins" },
 ]
 
-const PROTOCOL_NAMES = {
-  1: "Protocol A",
-  2: "Protocol B",
-  3: "Protocol C",
-  4: "Lido stETH",
-  5: "Rocket rETH",
-}
 
 export default function UnderwriterPanel({ displayCurrency }) {
   const { isConnected } = useAccount()
@@ -52,7 +45,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
       if (!acc[id]) {
         acc[id] = {
           id,
-          name: PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`,
+          name: getTokenName(pool.protocolTokenToCover),
           description: `Risk pool for ${pool.protocolTokenToCover}`,
           category: "lending",
           pools: [],
