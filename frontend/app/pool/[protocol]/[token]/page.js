@@ -8,6 +8,7 @@ import CoverageModal from "../../../components/CoverageModal"
 import usePools from "../../../../hooks/usePools"
 import { ethers } from "ethers"
 import { formatCurrency, formatPercentage } from "../../../utils/formatting"
+import { getTokenName } from "../../config/tokenNameMap"
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -26,6 +27,7 @@ export default function PoolDetailsPage() {
 
   const protocol = params.protocol
   const token = params.token
+  const tokenName = getTokenName(token)
 
   if (loading) {
     return <p>Loading...</p>
@@ -65,7 +67,7 @@ export default function PoolDetailsPage() {
           className="rounded-full mr-3"
         />
         <h1 className="text-2xl font-bold">
-          {name} - {token}
+          {name} - {tokenName}
         </h1>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

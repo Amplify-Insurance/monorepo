@@ -11,6 +11,7 @@ import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
 import { utils as ethersUtils, BigNumber, ethers } from 'ethers';
 // import { formatUnits } from 'ethers';
+import { getTokenName } from "../config/tokenNameMap";
 
 
 const PROTOCOL_NAMES = {
@@ -57,6 +58,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
       pools: [
         {
           token: pool.protocolTokenToCover,
+          tokenName: getTokenName(pool.protocolTokenToCover),
           premium,
           underwriterYield: uwYield,
           tvl: Number(ethers.utils.formatUnits(pool.totalCoverageSold, protoDec)),
@@ -217,13 +219,13 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                       <div className="flex-shrink-0 h-6 w-6 mr-2">
                                         <Image
                                           src={`/images/tokens/${pool.token.toLowerCase()}.png`}
-                                          alt={pool.token}
+                                          alt={pool.tokenName}
                                           width={24}
                                           height={24}
                                           className="rounded-full"
                                         />
                                       </div>
-                                      <span className="font-medium">{pool.token}</span>
+                                      <span className="font-medium">{pool.tokenName}</span>
                                     </div>
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
                                       TVL: {formatCurrency(pool.tvl, "usd", displayCurrency)}

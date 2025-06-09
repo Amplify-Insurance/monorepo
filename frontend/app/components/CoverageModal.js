@@ -13,6 +13,7 @@ import {
   getUnderlyingAssetAddress,
 } from "../../lib/capitalPool"
 import { getERC20WithSigner } from "../../lib/erc20"
+import { getTokenName } from "../config/tokenNameMap"
 import Modal from "./Modal"
 
 export default function CoverageModal({
@@ -29,6 +30,7 @@ export default function CoverageModal({
   capacity = 0,
 }) {
   const { address } = useAccount()
+  const tokenName = getTokenName(token)
 
   /* ───── component state ───── */
   const [amount, setAmount] = useState("")
@@ -155,7 +157,7 @@ export default function CoverageModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`${type === "purchase" ? "Purchase Coverage" : "Provide Coverage"} - ${protocol} ${token}`}
+      title={`${type === "purchase" ? "Purchase Coverage" : "Provide Coverage"} - ${protocol} ${tokenName}`}
     >
       <div className="space-y-6">
         {/* Amount input */}
@@ -165,7 +167,7 @@ export default function CoverageModal({
             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
               <Info className="h-3 w-3 mr-1" />
               <span className="hidden sm:inline">
-                Enter the amount of {token} to {type === "purchase" ? "cover" : "provide"}
+                Enter the amount of {tokenName} to {type === "purchase" ? "cover" : "provide"}
               </span>
             </div>
           </div>
@@ -181,9 +183,9 @@ export default function CoverageModal({
               />
               <div className="flex items-center ml-2">
                 <div className="h-6 w-6 sm:h-8 sm:w-8 mr-2">
-                  <Image src={`/images/tokens/${token.toLowerCase()}.png`} alt={token} width={32} height={32} className="rounded-full" />
+                  <Image src={`/images/tokens/${token.toLowerCase()}.png`} alt={tokenName} width={32} height={32} className="rounded-full" />
                 </div>
-                <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">{token}</span>
+                <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">{tokenName}</span>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-3 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
