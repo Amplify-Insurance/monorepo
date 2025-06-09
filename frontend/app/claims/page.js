@@ -8,6 +8,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatCurrency } from "../utils/formatting"
 import useUserPolicies from "../hooks/useUserPolicies"
 import usePools from "../hooks/usePools"
+import { getTokenName } from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
 
@@ -39,6 +40,7 @@ export default function ClaimsPage() {
         id: p.id,
         protocol: PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`,
         pool: pool.protocolTokenToCover,
+        poolName: getTokenName(pool.protocolTokenToCover),
         coverageAmount,
         premium: Number(pool.premiumRateBps || 0) / 100,
         status: "active",
@@ -158,7 +160,7 @@ export default function ClaimsPage() {
                         </div>
                         <div>
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {coverage.protocol} {coverage.pool}
+                            {coverage.protocol} {coverage.poolName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             Expires: {new Date(coverage.endDate).toLocaleDateString()}
@@ -225,7 +227,7 @@ export default function ClaimsPage() {
                           </div>
                           <div>
                             <div className="text-lg font-medium text-gray-900 dark:text-white">
-                              {selectedCoverage.protocol} {selectedCoverage.pool}
+                              {selectedCoverage.protocol} {selectedCoverage.poolName}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               Coverage Period: {new Date(selectedCoverage.startDate).toLocaleDateString()} -{" "}

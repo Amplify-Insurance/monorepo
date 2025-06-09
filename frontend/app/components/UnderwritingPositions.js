@@ -10,6 +10,7 @@ import usePools from "../../hooks/usePools";
 import { ethers } from "ethers";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
+import { getTokenName } from "../config/tokenNameMap";
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -45,6 +46,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
         id: i,
         protocol,
         pool: pool.protocolTokenToCover,
+        poolName: getTokenName(pool.protocolTokenToCover),
         poolId: pid,
         amount,
         nativeValue: amount,
@@ -228,20 +230,20 @@ export default function UnderwritingPositions({ displayCurrency }) {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-6 w-6 mr-2">
                           <Image
-                            src={`/images/tokens/${position.pool.toLowerCase()}.png`}
-                            alt={position.pool}
+                          src={`/images/tokens/${position.pool.toLowerCase()}.png`}
+                          alt={position.poolName}
                             width={24}
                             height={24}
                             className="rounded-full"
                           />
                         </div>
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {position.pool}
+                          {position.poolName}
                         </div>
                       </div>
                       <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
                         {displayCurrency === "native"
-                          ? `${position.amount} ${position.pool}`
+                          ? `${position.amount} ${position.poolName}`
                           : formatCurrency(position.nativeValue, "USD", "usd")}
                       </div>
                       <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
@@ -251,7 +253,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="text-sm text-gray-900 dark:text-white">
                         {displayCurrency === "native"
-                          ? `${position.amount} ${position.pool}`
+                          ? `${position.amount} ${position.poolName}`
                           : formatCurrency(position.nativeValue, "USD", "usd")}
                       </div>
                     </td>

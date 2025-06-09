@@ -8,6 +8,7 @@ import { useAccount } from "wagmi"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
 import { ethers } from "ethers"
+import { getTokenName } from "../config/tokenNameMap"
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -41,6 +42,7 @@ export default function ActiveCoverages({ displayCurrency }) {
       id: p.id,
       protocol,
       pool: pool.protocolTokenToCover,
+      poolName: getTokenName(pool.protocolTokenToCover),
       coverageAmount,
       premium: Number(pool.premiumRateBps || 0) / 100,
       status: "active",
@@ -132,13 +134,13 @@ export default function ActiveCoverages({ displayCurrency }) {
                   <div className="flex-shrink-0 h-6 w-6 mr-2">
                     <Image
                       src={`/images/tokens/${coverage.pool.toLowerCase()}.png`}
-                      alt={coverage.pool}
+                      alt={coverage.poolName}
                       width={24}
                       height={24}
                       className="rounded-full"
                     />
                   </div>
-                  <div className="text-sm text-gray-900 dark:text-white">{coverage.pool}</div>
+                  <div className="text-sm text-gray-900 dark:text-white">{coverage.poolName}</div>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">

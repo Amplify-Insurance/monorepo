@@ -7,6 +7,7 @@ import Link from "next/link"
 import { ethers } from "ethers"
 import useClaims from "../hooks/useClaims"
 import usePools from "../hooks/usePools"
+import { getTokenName } from "../config/tokenNameMap"
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -32,6 +33,7 @@ export default function AnalyticsPage() {
       if (!pool) return null
       const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
       const token = pool.protocolTokenToCover
+      const tokenName = getTokenName(pool.protocolTokenToCover)
       const amount = Number(
         ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
       )
@@ -47,6 +49,7 @@ export default function AnalyticsPage() {
         productType: "Protocol",
         stakingPool: c.poolId,
         coverAsset: token,
+        coverAssetName: tokenName,
         coverAmount: amount,
         coverAmountUSD: value,
         claimAmount: value,
@@ -278,13 +281,13 @@ export default function AnalyticsPage() {
                       <div className="flex-shrink-0 h-5 w-5 mr-2">
                         <Image
                           src={`/images/tokens/${claim.coverAsset.toLowerCase()}.png`}
-                          alt={claim.coverAsset}
+                          alt={claim.coverAssetName}
                           width={20}
                           height={20}
                           className="rounded-full"
                         />
                       </div>
-                      {claim.coverAsset}
+                      {claim.coverAssetName}
                     </div>
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">

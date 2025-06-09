@@ -12,6 +12,7 @@ import {
 import { getERC20WithSigner } from "../../lib/erc20";
 import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
+import { getTokenName } from "../config/tokenNameMap";
 
 export default function ManageCoverageModal({
   isOpen,
@@ -28,6 +29,7 @@ export default function ManageCoverageModal({
   poolId,
 }) {
   const [action, setAction] = useState("increase"); // increase or decrease
+  const tokenName = getTokenName(token);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [usdValue, setUsdValue] = useState("0");
   const tokenPrice = 1;
@@ -131,7 +133,7 @@ export default function ManageCoverageModal({
       isOpen={isOpen}
       onClose={onClose}
       title={`Manage ${type === "coverage" ? "Coverage" : "Position"
-        } - ${protocol} ${token}`}
+        } - ${protocol} ${tokenName}`}
     >
       <div className="space-y-6">
         {/* Current position */}
@@ -144,14 +146,14 @@ export default function ManageCoverageModal({
               <div className="h-8 w-8 mr-2">
                 <Image
                   src={`/images/tokens/${token.toLowerCase()}.png`}
-                  alt={token}
+                  alt={tokenName}
                   width={32}
                   height={32}
                   className="rounded-full"
                 />
               </div>
               <span className="text-base font-medium text-gray-900 dark:text-white">
-                {amount} {token}
+                {amount} {tokenName}
               </span>
             </div>
             <span className="text-sm text-gray-600 dark:text-gray-300">
@@ -200,7 +202,7 @@ export default function ManageCoverageModal({
             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
               <Info className="h-3 w-3 mr-1" />
               <span className="hidden sm:inline">
-                Enter the amount of {token}
+                Enter the amount of {tokenName}
               </span>
             </div>
           </div>
@@ -217,14 +219,14 @@ export default function ManageCoverageModal({
                 <div className="h-6 w-6 sm:h-8 sm:w-8 mr-2">
                   <Image
                     src={`/images/tokens/${token.toLowerCase()}.png`}
-                    alt={token}
+                    alt={tokenName}
                     width={32}
                     height={32}
                     className="rounded-full"
                   />
                 </div>
                 <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">
-                  {token}
+                  {tokenName}
                 </span>
               </div>
             </div>
@@ -263,7 +265,7 @@ export default function ManageCoverageModal({
                   Number.parseFloat(amount) -
                   Number.parseFloat(adjustAmount || 0)
                 )}{" "}
-              {token}
+              {tokenName}
             </span>
             <span className="text-sm text-gray-600 dark:text-gray-300">
               $

@@ -8,6 +8,7 @@ import { ethers } from "ethers"
 import { useAccount } from "wagmi"
 import useClaims from "../../hooks/useClaims"
 import usePools from "../../hooks/usePools"
+import { getTokenName } from "../config/tokenNameMap"
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -30,6 +31,7 @@ export default function ClaimsSection({ displayCurrency }) {
       if (!pool) return null
       const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
       const token = pool.protocolTokenToCover
+      const tokenName = getTokenName(pool.protocolTokenToCover)
       const amount = Number(
         ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
       )
@@ -40,6 +42,7 @@ export default function ClaimsSection({ displayCurrency }) {
         id: c.policyId,
         protocol,
         token,
+        tokenName,
         amount,
         value,
         claimDate: new Date(c.timestamp * 1000).toISOString(),
@@ -173,24 +176,24 @@ export default function ClaimsSection({ displayCurrency }) {
                         <div className="flex-shrink-0 h-6 w-6 mr-2">
                           <Image
                             src={`/images/tokens/${claim.token.toLowerCase()}.png`}
-                            alt={claim.token}
+                            alt={claim.tokenName}
                             width={24}
                             height={24}
                             className="rounded-full"
                           />
                         </div>
-                        <div className="text-sm text-gray-900 dark:text-white">{claim.token}</div>
+                        <div className="text-sm text-gray-900 dark:text-white">{claim.tokenName}</div>
                       </div>
                       <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
                         {displayCurrency === "native"
-                          ? `${claim.amount} ${claim.token}`
+                          ? `${claim.amount} ${claim.tokenName}`
                           : formatCurrency(claim.value, "USD", "usd")}
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="text-sm text-gray-900 dark:text-white">
                         {displayCurrency === "native"
-                          ? `${claim.amount} ${claim.token}`
+                          ? `${claim.amount} ${claim.tokenName}`
                           : formatCurrency(claim.value, "USD", "usd")}
                       </div>
                     </td>
