@@ -43,5 +43,24 @@ export async function getCatPoolWithSigner() {
   );
 }
 
+export async function getUsdcAddress() {
+  const cp = new ethers.Contract(
+    process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string,
+    ['function usdc() view returns (address)'],
+    provider,
+  );
+  return await cp.usdc();
+}
+
+export async function getUsdcDecimals() {
+  const addr = await getUsdcAddress();
+  const token = new ethers.Contract(
+    addr,
+    ['function decimals() view returns (uint8)'],
+    provider,
+  );
+  return await token.decimals();
+}
+
 
 

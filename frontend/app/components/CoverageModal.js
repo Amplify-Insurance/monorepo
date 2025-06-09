@@ -85,8 +85,28 @@ export default function CoverageModal({
       let tx
 
       if (type === "purchase") {
-        // Purchase flow (still passes human-readable units because contract expects it)
         const rm = await getRiskManagerWithSigner()
+
+        // Estimate first premium for allowance check
+        const dec = underlyingDec || (await getUnderlyingAssetDecimals())
+        const assetAddr = await getUnderlyingAssetAddress()
+        const token = await getERC20WithSigner(assetAddr)
+        const addr = await token.signer.getAddress()
+        const weeklyPremium =
+          (Number(amount) * (Number(premium) / 100) * 7) / 365
+        const premBn = ethers.utils.parseUnits(weeklyPremium.toFixed(6), dec)
+        const allowance = await token.allowance(
+          addr,
+          process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+        )
+        if (allowance.lt(premBn)) {
+          const approveTx = await token.approve(
+            process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+            premBn,
+          )
+          await approveTx.wait()
+        }
+
         tx = await rm.purchaseCover(poolId, amount)
         await tx.wait()
       } else {
