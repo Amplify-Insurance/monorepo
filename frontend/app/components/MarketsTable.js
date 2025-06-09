@@ -13,15 +13,6 @@ import { utils as ethersUtils, BigNumber, ethers } from 'ethers';
 // import { formatUnits } from 'ethers';
 import { getTokenName } from "../config/tokenNameMap";
 
-
-const PROTOCOL_NAMES = {
-  1: "Protocol A",
-  2: "Protocol B",
-  3: "Protocol C",
-  4: "Lido stETH",
-  5: "Rocket rETH",
-}
-
 export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const { isConnected } = useAccount()
   const [expandedMarkets, setExpandedMarkets] = useState([])
@@ -32,7 +23,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   console.log(pools, "pools data")
 
   const markets = pools.map((pool) => {
-    const name = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+    const name = getTokenName(pool.protocolTokenToCover)
     // const underlyingDec = Number(pool.underlyingAssetDecimals)
     const protoDec = Number(pool.protocolTokenDecimals)
     const premium = Number(pool.premiumRateBps || 0) / 100

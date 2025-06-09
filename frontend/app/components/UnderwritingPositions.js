@@ -12,14 +12,6 @@ import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
 import { getTokenName } from "../config/tokenNameMap";
 
-const PROTOCOL_NAMES = {
-  1: "Protocol A",
-  2: "Protocol B",
-  3: "Protocol C",
-  4: "Lido stETH",
-  5: "Rocket rETH",
-};
-
 export default function UnderwritingPositions({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
@@ -34,8 +26,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
     .map((pid, i) => {
       const pool = pools.find((pl) => Number(pl.id) === Number(pid));
       if (!pool) return null;
-      const protocol =
-        PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`;
+      const protocol = getTokenName(pool.protocolTokenToCover);
       const amount = Number(
         ethers.utils.formatUnits(
           details.totalDepositedAssetPrincipal,

@@ -9,15 +9,6 @@ import useClaims from "../hooks/useClaims"
 import usePools from "../hooks/usePools"
 import { getTokenName } from "../config/tokenNameMap"
 
-const PROTOCOL_NAMES = {
-  1: "Protocol A",
-  2: "Protocol B",
-  3: "Protocol C",
-  4: "Lido stETH",
-  5: "Rocket rETH",
-
-}
-
 
 export default function AnalyticsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -31,7 +22,7 @@ export default function AnalyticsPage() {
     .map((c, idx) => {
       const pool = pools.find((p) => Number(p.id) === c.poolId)
       if (!pool) return null
-      const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+      const protocol = getTokenName(pool.protocolTokenToCover)
       const token = pool.protocolTokenToCover
       const tokenName = getTokenName(pool.protocolTokenToCover)
       const amount = Number(

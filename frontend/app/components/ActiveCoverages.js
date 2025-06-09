@@ -10,14 +10,6 @@ import usePools from "../../hooks/usePools"
 import { ethers } from "ethers"
 import { getTokenName } from "../config/tokenNameMap"
 
-const PROTOCOL_NAMES = {
-  1: "Protocol A",
-  2: "Protocol B",
-  3: "Protocol C",
-  4: "Lido stETH",
-  5: "Rocket rETH",
-}
-
 export default function ActiveCoverages({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCoverage, setSelectedCoverage] = useState(null)
@@ -28,7 +20,7 @@ export default function ActiveCoverages({ displayCurrency }) {
   const activeCoverages = policies.map((p) => {
     const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
     if (!pool) return null
-    const protocol = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
+    const protocol = getTokenName(pool.protocolTokenToCover)
     const coverageAmount = Number(
       ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
     )
