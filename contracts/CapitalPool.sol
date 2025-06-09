@@ -95,12 +95,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────── Admin Functions ────────────────── */
 
-    /**
-     * @notice Sets the address of the RiskManager contract.
-     * @dev Can only be called once to prevent unauthorized changes. The RiskManager has the critical
-     * permission to apply losses to underwriters' capital.
-     * @param _riskManager The address of the RiskManager contract.
-     */
     function setRiskManager(address _riskManager) external onlyOwner {
         require(riskManager == address(0), "CP: RiskManager already set");
         if (_riskManager == address(0)) revert ZeroAddress();
@@ -108,16 +102,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         emit RiskManagerSet(_riskManager);
     }
 
-    /**
-     * @notice Configures or updates the address for a yield adapter contract.
-     * @param _platform The enum identifier for the yield platform.
-     * @param _adapterAddress The address of the adapter contract.
-     */
-    /**
-     * @notice Configures or updates the address for a yield adapter contract.
-     * @param _platform The enum identifier for the yield platform.
-     * @param _adapterAddress The address of the adapter contract.
-     */
     function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external onlyOwner {
         if (_platform == YieldPlatform.NONE) revert("CP: Cannot set for NONE platform");
         if (_adapterAddress == address(0)) revert ZeroAddress();
@@ -126,8 +110,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         assembly { codeSize := extcodesize(_adapterAddress) }
         require(codeSize > 0, "CP: Adapter address is not a contract");
 
-        // Ensure the adapter uses the correct underlying asset
-        // FIXED: Explicitly cast interface types to address for comparison.
         require(address(IYieldAdapter(_adapterAddress).asset()) == address(underlyingAsset), "CP: Adapter asset mismatch");
 
         baseYieldAdapters[_platform] = IYieldAdapter(_adapterAddress);
@@ -143,8 +125,9 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     /* ───────────────── Underwriter Deposit & Withdrawal ────────────────── */
 
     /**
-     * @notice Allows an underwriter to deposit assets into the capital pool.
-     * @dev The RiskManager contract will be notified of the deposit to update its own state regarding capital pledges.
+     * @notice Allows an underwriter to deposit assets or add to an existing position.
+     * @dev An underwriter can only deposit into one yield platform at a time. To change platforms,
+     * they must first withdraw their entire position.
      * @param _amount The amount of the underlying asset to deposit.
      * @param _yieldChoice The chosen external yield platform for the deposited assets.
      */
@@ -156,7 +139,12 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
 
         if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
-        if (account.totalDepositedAssetPrincipal > 0) revert("CP: Must withdraw fully before new deposit");
+
+        // **MODIFIED LOGIC**
+        // If the user has an existing deposit, they can only add to their current yield platform.
+        if (account.totalDepositedAssetPrincipal > 0 && account.yieldChoice != _yieldChoice) {
+            revert("CP: Cannot change yield platform; withdraw first.");
+        }
 
         // --- Share Calculation (NAV-based) ---
         uint256 sharesToMint;
@@ -169,10 +157,16 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (sharesToMint == 0) revert NoSharesToMint();
 
         // --- Update Account ---
-        account.totalDepositedAssetPrincipal = _amount;
-        account.yieldChoice = _yieldChoice;
-        account.yieldAdapter = chosenAdapter;
-        account.masterShares = sharesToMint;
+        // If this is the user's first deposit, set their platform choice.
+        if (account.totalDepositedAssetPrincipal == 0) {
+            account.yieldChoice = _yieldChoice;
+            account.yieldAdapter = chosenAdapter;
+        }
+        
+        // **MODIFIED LOGIC**
+        // Add the new deposit amount and shares to the user's existing totals.
+        account.totalDepositedAssetPrincipal += _amount;
+        account.masterShares += sharesToMint;
 
         // --- Asset Transfers & System Update ---
         underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
@@ -183,27 +177,18 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         totalSystemValue += _amount;
 
         // --- Notify RiskManager of the new capital ---
-        // The RiskManager contract is responsible for checking if it is configured.
         (bool success,) = riskManager.call(abi.encodeWithSignature("onCapitalDeposited(address,uint256)", msg.sender, _amount));
         require(success, "CP: Failed to notify RiskManager of deposit");
 
         emit Deposit(msg.sender, _amount, sharesToMint, _yieldChoice);
     }
 
-    /**
-     * @notice Initiates the withdrawal process for an underwriter.
-     * @dev A notice period must pass before `executeWithdrawal` can be called. This allows the
-     * RiskManager to ensure the withdrawal will not leave any insurance pools insolvent.
-     * @param _sharesToBurn The number of shares the underwriter wishes to burn for assets.
-     */
     function requestWithdrawal(uint256 _sharesToBurn) external nonReentrant {
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
         if (_sharesToBurn == 0) revert InvalidAmount();
         if (_sharesToBurn > account.masterShares) revert InsufficientShares();
         if (account.withdrawalRequestShares > 0) revert WithdrawalRequestPending();
         
-        // --- Notify RiskManager to check solvency impact ---
-        // The RiskManager can revert this call if the withdrawal would cause insolvency.
         uint256 principalComponent = (account.totalDepositedAssetPrincipal * _sharesToBurn) / account.masterShares;
         (bool success,) = riskManager.call(abi.encodeWithSignature("onWithdrawalRequested(address,uint256)", msg.sender, principalComponent));
         require(success, "CP: RiskManager rejected withdrawal request");
@@ -214,9 +199,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         emit WithdrawalRequested(msg.sender, _sharesToBurn, block.timestamp);
     }
 
-    /**
-     * @notice Completes a pending withdrawal request after the notice period.
-     */
     function executeWithdrawal() external nonReentrant {
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
         uint256 sharesToBurn = account.withdrawalRequestShares;
@@ -225,19 +207,16 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (block.timestamp < account.withdrawalRequestTimestamp + UNDERWRITER_NOTICE_PERIOD) revert NoticePeriodActive();
         if (sharesToBurn > account.masterShares) revert InconsistentState(); // Share balance changed
 
-        // --- Calculate NAV-based amount to receive ---
         uint256 amountToReceiveBasedOnNAV = 0;
         if (totalSystemValue > 0) {
             amountToReceiveBasedOnNAV = (sharesToBurn * totalSystemValue) / totalMasterSharesSystem;
         }
 
-        // --- Withdraw assets from the yield adapter ---
         uint256 assetsActuallyWithdrawn = 0;
         if (amountToReceiveBasedOnNAV > 0) {
             assetsActuallyWithdrawn = account.yieldAdapter.withdraw(amountToReceiveBasedOnNAV, address(this));
         }
 
-        // --- Update Principal and Shares ---
         uint256 principalComponentRemoved = (account.totalDepositedAssetPrincipal * sharesToBurn) / account.masterShares;
         account.totalDepositedAssetPrincipal -= principalComponentRemoved;
         account.masterShares -= sharesToBurn;
@@ -247,19 +226,15 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         
         bool isFullWithdrawal = (account.masterShares == 0);
         if (isFullWithdrawal) {
-            // Reset account for future deposits
             delete underwriterAccounts[msg.sender];
         } else {
-             // Clear withdrawal request
             account.withdrawalRequestShares = 0;
             account.withdrawalRequestTimestamp = 0;
         }
 
-        // --- Notify RiskManager that capital has been removed ---
         (bool success,) = riskManager.call(abi.encodeWithSignature("onCapitalWithdrawn(address,uint256,bool)", msg.sender, principalComponentRemoved, isFullWithdrawal));
         require(success, "CP: Failed to notify RiskManager of withdrawal");
 
-        // --- Transfer assets to user ---
         if (assetsActuallyWithdrawn > 0) {
             underlyingAsset.safeTransfer(msg.sender, assetsActuallyWithdrawn);
         }
@@ -270,14 +245,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────── Trusted Functions (RiskManager Only) ────────────────── */
 
-    /**
-     * @notice Applies losses to an underwriter's principal as instructed by the RiskManager.
-     * @dev This is the most critical trusted function. It reduces an underwriter's principal,
-     * which also affects their share of the total system value. It can result in a "wipeout"
-     * where the underwriter loses their entire stake.
-     * @param _underwriter The address of the underwriter taking the loss.
-     * @param _principalLossAmount The amount of principal to deduct.
-     */
     function applyLosses(address _underwriter, uint256 _principalLossAmount) external nonReentrant onlyRiskManager {
         if (_principalLossAmount == 0) revert InvalidAmount();
 
@@ -287,13 +254,10 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         uint256 actualLoss = Math.min(_principalLossAmount, account.totalDepositedAssetPrincipal);
         
         account.totalDepositedAssetPrincipal -= actualLoss;
-        // Total system value is reduced by the same amount of principal lost.
-        // Yield that was notionally "backing" this principal is now socialized among remaining LPs.
         totalSystemValue = totalSystemValue > actualLoss ? totalSystemValue - actualLoss : 0;
 
         bool wipedOut = (account.totalDepositedAssetPrincipal == 0);
         if (wipedOut) {
-            // If principal is zero, their shares are now worthless and should be burned to clean up state.
             totalMasterSharesSystem -= account.masterShares;
             delete underwriterAccounts[_underwriter];
         }
@@ -304,15 +268,9 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ─────────────────── NAV Synchronization (Keeper Function) ─────────────────── */
 
-    /**
-     * @notice Recalculates the total system value (NAV) by querying all active yield adapters.
-     * @dev Should be called periodically by a keeper to account for earned yield.
-     * This updates the "price" of each share in the system.
-     */
     function syncYieldAndAdjustSystemValue() external nonReentrant {
         uint256 newCalculatedTotalSystemValue = 0;
 
-        // Sum values from all active yield adapters
         for (uint i = 0; i < activeYieldAdapterAddresses.length; i++) {
             address adapterAddress = activeYieldAdapterAddresses[i];
             try IYieldAdapter(adapterAddress).getCurrentValueHeld() returns (uint256 valueInAdapter) {
@@ -324,13 +282,11 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             }
         }
 
-        // Add any liquid underlying assets held directly by this contract
         newCalculatedTotalSystemValue += underlyingAsset.balanceOf(address(this));
 
         uint256 oldTotalSystemValue = totalSystemValue;
         totalSystemValue = newCalculatedTotalSystemValue;
 
-        // Safety check: if all shares are gone, value should be zero.
         if (totalMasterSharesSystem == 0) {
             totalSystemValue = 0;
         }
@@ -340,9 +296,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────────── View Functions ──────────────────────── */
 
-    /**
-     * @notice Returns the key details of an underwriter's account.
-     */
     function getUnderwriterAccount(address _underwriter)
         external
         view
@@ -364,11 +317,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         );
     }
 
-    /**
-     * @notice Calculates the current value of a certain number of shares.
-     * @param _shares The number of shares.
-     * @return The value of the shares in the underlying asset.
-     */
     function sharesToValue(uint256 _shares) external view returns (uint256) {
         if (totalMasterSharesSystem == 0 || _shares == 0) {
             return 0;
@@ -376,14 +324,8 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         return (_shares * totalSystemValue) / totalMasterSharesSystem;
     }
 
-    /**
-     * @notice Calculates the number of shares that would be minted for a given value.
-     * @param _value The value in the underlying asset.
-     * @return The number of shares that would be minted.
-     */
     function valueToShares(uint256 _value) external view returns (uint256) {
         if (totalSystemValue == 0 || _value == 0) {
-            // If there's no value in the system, 1 value = 1 share
             return _value;
         }
         return (_value * totalMasterSharesSystem) / totalSystemValue;

@@ -8,7 +8,7 @@ import CoverageModal from "../../../components/CoverageModal"
 import usePools from "../../../../hooks/usePools"
 import { ethers } from "ethers"
 import { formatCurrency, formatPercentage } from "../../../utils/formatting"
-import { getTokenName } from "../../config/tokenNameMap"
+import { getTokenName } from "../../../config/tokenNameMap"
 
 export default function PoolDetailsPage() {
   const params = useParams()

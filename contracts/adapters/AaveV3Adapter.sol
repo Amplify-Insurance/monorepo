@@ -39,7 +39,7 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
         underlyingToken.safeTransferFrom(msg.sender, address(this), _amountToDeposit);
         aavePool.supply(address(underlyingToken), _amountToDeposit, address(this), 0);
     }
-
+    
     function withdraw(uint256 _targetAmountOfUnderlyingToWithdraw, address _to)
         external
         override

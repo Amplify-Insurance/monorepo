@@ -108,3 +108,43 @@ include:
 ## License
 
 This project is licensed under the **Business Source License 1.1**. See [LICENSE](./LICENSE) for details.
+
+
+
+flowchart TD
+    %% ─────────────── Participants ───────────────
+    U[User / dApp]:::ext
+    RM[RiskManager]:::core
+    CP[CapitalPool]:::core
+    subgraph Pools
+        direction TB
+        P0[RiskPool 0 <br> (Protocol A)]
+        P1[RiskPool 1 <br> (Protocol B)]
+        Pn[…]
+    end
+    Token[Underlying<br>ERC-20]:::asset
+    CovNFT[Coverage Token<br>(ERC-721 / 1155)]:::asset
+    RateModel[(RateModel<br>struct)]:::lib
+
+    %% ─────────────── Relations ───────────────
+    %% purchase flow
+    U -- "purchaseCover(poolId, amount)" --> RM
+    RM -- "mints" --> CovNFT
+    RM -- "transfers premium" --> CP
+    %% provide flow
+    U -- "ERC-20 approve()" --> Token
+    U -- "deposit(amount)" --> CP
+    CP -- "allocateCapital(ids)" --> RM
+    %% capital allocation
+    RM -- "add/remove liquidity" --> Pools
+    Pools -- "protocol loss events\n call out to RM" --> RM
+    RM -- "pay claims\n (burn NFT, pay out)" --> CovNFT
+    RM -- "draw liquidity" --> CP
+    %% misc links
+    RM -- "uses" --> RateModel
+    CP -- "holds collateral" --> Token
+
+    %% ─────────────── Styles ───────────────
+    classDef core     fill:#d0e3ff,stroke:#4285f4,color:#000;
+    classDef asset    fill:#fff8dc,stroke:#d48b00,color:#000;
+    classDef ext      fill:#e8e8e8,stroke:#777,color:#000;
