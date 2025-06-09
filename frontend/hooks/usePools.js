@@ -6,8 +6,10 @@ export default function usePools() {
 
   useEffect(() => {
     async function load() {
+      console.log('usePools hook initialized')
       try {
         const res = await fetch('/api/pools/list')
+        console.log(res, "res")
         if (res.ok) {
           const data = await res.json()
           setPools(data.pools || [])

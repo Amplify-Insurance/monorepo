@@ -9,6 +9,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  experimental: {
+    instrumentationHook: true, // enables instrumentation.ts where we load the fetch patch
+  },
+};
 
-export default nextConfig
+export default nextConfig;

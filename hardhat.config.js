@@ -26,7 +26,7 @@ module.exports = {
             // }
         },
         base: {
-            url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
+            url: process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe",
             chainId: 8453,
             accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         },

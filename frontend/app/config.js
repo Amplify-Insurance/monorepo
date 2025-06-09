@@ -29,7 +29,7 @@ const baseMainnet = {
     default: {
       http: [
         // Use env variable in prod, fall back to public RPC in dev
-        process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org',
+        process.env.NEXT_PUBLIC_RPC_URL || 'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe',
       ],
     },
   },
@@ -49,7 +49,7 @@ export const config = getDefaultConfig({
   chains: [baseMainnet],
   transports: {
     [baseMainnet.id]: http(
-      process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org',
+      process.env.NEXT_PUBLIC_RPC_URL || 'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe',
     ),
   },
   ssr: true,
