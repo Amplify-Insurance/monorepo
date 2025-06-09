@@ -154,10 +154,19 @@ export default function CoverageModal({
             <div className="flex items-center p-3">
               <input
                 type="text"
+                inputMode="decimal"           // still shows the numeric keyboard
+                pattern="^\d*(\.\d{0,18})?$"  // 0-18 decimals, no leading zeros rule
                 value={amount}
-                onChange={handleAmountChange}
+                onChange={(e) => {
+                  const val = e.target.value.trim()
+                  // Allow empty string (user cleared the field) or valid decimal
+                  if (val === "" || /^\d*(\.\d{0,18})?$/.test(val)) {
+                    setAmount(val)
+                  }
+                }}
                 placeholder="0.00"
-                className="w-full bg-transparent text-xl sm:text-2xl font-medium text-gray-900 dark:text-white outline-none"
+                className="w-full bg-transparent text-xl sm:text-2xl font-medium
+                   text-gray-900 dark:text-white outline-none"
               />
               <div className="flex items-center ml-2">
                 <div className="h-6 w-6 sm:h-8 sm:w-8 mr-2">
