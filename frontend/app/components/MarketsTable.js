@@ -9,7 +9,9 @@ import { useAccount } from "wagmi"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
-import { ethers } from "ethers"
+import { utils as ethersUtils, BigNumber, ethers } from 'ethers';
+// import { formatUnits } from 'ethers';
+
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -26,23 +28,32 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
 
+  console.log(pools, "pools data")
+
   const markets = pools.map((pool) => {
     const name = PROTOCOL_NAMES[pool.protocolCovered] || `Pool ${pool.id}`
-    const underlyingDec = Number(pool.underlyingAssetDecimals)
+    // const underlyingDec = Number(pool.underlyingAssetDecimals)
     const protoDec = Number(pool.protocolTokenDecimals)
     const premium = Number(pool.premiumRateBps || 0) / 100
     const uwYield = Number(pool.underwriterYieldBps || 0) / 100
-    const capacity = Number(
-      ethers.utils.formatUnits(
-        BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold),
-        underlyingDec
-      )
-    )
+    
+    const pledged = BigNumber.from(pool.totalCapitalPledgedToPool);
+    const sold    = BigNumber.from(pool.totalCoverageSold);
+    
+    const decimals =
+    pool.underlyingAssetDecimals ??
+    pool.protocolTokenDecimals   ??   // this one **is** in the payload
+    18;                              // sensible default
+  
+  const capacity = Number(
+    ethersUtils.formatUnits(pledged.sub(sold), decimals)
+  );
+
     return {
       id: pool.id,
       name,
       description: `Risk pool for ${pool.protocolTokenToCover}`,
-      tvl: Number(ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, underlyingDec)),
+      tvl: Number(ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, decimals)),
       pools: [
         {
           token: pool.protocolTokenToCover,

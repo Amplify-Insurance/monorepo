@@ -5,9 +5,9 @@ import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import Image from "next/image"
 import CoverageModal from "../../../components/CoverageModal"
-import usePools from "../../../hooks/usePools"
+import usePools from "../../../../hooks/usePools"
 import { ethers } from "ethers"
-import { formatCurrency, formatPercentage } from "../../utils/formatting"
+import { formatCurrency, formatPercentage } from "../../../utils/formatting"
 
 const PROTOCOL_NAMES = {
   1: "Protocol A",
@@ -31,9 +31,11 @@ export default function PoolDetailsPage() {
     return <p>Loading...</p>
   }
 
+  console.log("Pools data:", pools)
+
   const pool = pools.find(
     (p) =>
-      String(p.protocolCovered) === protocol &&
+      // String(p.protocolCovered) === protocol &&
       p.protocolTokenToCover.toLowerCase() === token.toLowerCase(),
   )
 

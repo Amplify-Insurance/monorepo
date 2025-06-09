@@ -2,19 +2,63 @@
 import { NextResponse } from 'next/server';
 import { riskManager } from '../../../../lib/riskManager';
 
+/**
+ * Basis‑points denominator (10 000) expressed as bigint for fixed‑point math.
+ */
 const BPS = 10_000n;
 
+/**
+ * Recursively walk a value converting:
+ *   • native `bigint` → `string`
+ *   • ethers `BigNumber` → `string`
+ * While doing so we strip the numeric index keys automatically added by the
+ * ABI‑coder so the final JSON only contains the *named* Solidity struct fields.
+ *
+ * For inner structs that come back as an *array* **and** also carry named keys
+ * (e.g. `rateModel`), we keep the named‑key object instead of an index array so
+ * callers can reference `rateModel.base` rather than guessing positions.
+ */
 function bnToString(value: any): any {
+  // 1️⃣ Native bigint ────────────────────────────
   if (typeof value === 'bigint') return value.toString();
-  if (Array.isArray(value)) return value.map(bnToString);
+
+  // 2️⃣ ethers.js BigNumber ─────────────────────
+  if (value && typeof value === 'object' && value._isBigNumber) {
+    return value.toString();
+  }
+
+  // 3️⃣ Array (may also have named props) ───────
+  if (Array.isArray(value)) {
+    const hasNamedKeys = Object.keys(value).some((k) => isNaN(Number(k)));
+
+    if (hasNamedKeys) {
+      // Convert to a plain object of the named keys only.
+      return Object.fromEntries(
+        Object.entries(value)
+          .filter(([k]) => isNaN(Number(k)))
+          .map(([k, v]) => [k, bnToString(v)]),
+      );
+    }
+
+    // Pure, positional array → recurse element‑wise.
+    return value.map(bnToString);
+  }
+
+  // 4️⃣ Plain object ─────────────────────────────
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, bnToString(v)]),
+      Object.entries(value)
+        .filter(([k]) => isNaN(Number(k))) // drop numeric keys
+        .map(([k, v]) => [k, bnToString(v)]),
     );
   }
+
   return value;
 }
 
+/**
+ * Pool‑utilisation helper used by the premium‑rate function.
+ */
 function calcUtilization(pool: any): bigint {
   const totalCapital = BigInt(pool.totalCapitalPledgedToPool);
   const sold = BigInt(pool.totalCoverageSold);
@@ -22,6 +66,9 @@ function calcUtilization(pool: any): bigint {
   return (sold * BPS * 100n) / totalCapital;
 }
 
+/**
+ * Piece‑wise linear rate model taken from the contract.
+ */
 function calcPremiumRateBps(pool: any): bigint {
   const u = calcUtilization(pool);
   const base = BigInt(pool.rateModel.base);
@@ -34,13 +81,18 @@ function calcPremiumRateBps(pool: any): bigint {
   return base + (slope1 * kink) / BPS + (slope2 * (u - kink)) / BPS;
 }
 
+/**
+ * GET /api/pools – returns protocol pool metadata enriched with calculated
+ * premium rates and underwriter yields.
+ */
 export async function GET() {
   try {
+    /* 1️⃣ How many pools exist? */
     let count = 0n;
     try {
       count = await (riskManager as any).protocolRiskPoolsLength();
     } catch {
-      // fallback by iterating until failure
+      // Fallback: iterate until call‑revert when the length function is absent.
       while (true) {
         try {
           await riskManager.getPoolInfo(count);
@@ -50,36 +102,44 @@ export async function GET() {
         }
       }
     }
-    // catPremiumBps may not be present in the minimal ABI
-    let catPremiumBps: bigint = 2000n;
+
+    /* 2️⃣ Fetch catastrophe premium bps */
+    let catPremiumBps: bigint = 2000n; // default
     try {
       if (typeof (riskManager as any).catPremiumBps === 'function') {
-        catPremiumBps = await (riskManager as any).catPremiumBps();
+        const raw = await (riskManager as any).catPremiumBps();
+        catPremiumBps = BigInt(raw.toString());
       }
-    } catch { }
+    } catch {
+      // ignore – fallback already set
+    }
 
+    /* 3️⃣ Pull each pool and compute derivatives */
     const pools: any[] = [];
     for (let i = 0; i < Number(count); i++) {
-      console.log(i,  'fetching pool info')
       try {
-        const info = await riskManager.getPoolInfo(i);
+        const rawInfo = await riskManager.getPoolInfo(i);
+        const info = bnToString(rawInfo);
         const rate = calcPremiumRateBps(info);
         const uwYield = (rate * (BPS - catPremiumBps)) / BPS;
+
         pools.push({
           id: i,
-          ...bnToString(info),
+          ...info,
           premiumRateBps: rate.toString(),
           underwriterYieldBps: uwYield.toString(),
         });
-      } catch (inner) {
-        console.warn(`pool ${i} skipped:`, inner?.reason ?? inner);
+      } catch {
+        // skip pools that error out
+        continue;
       }
     }
+
     return NextResponse.json({ pools });
   } catch (err: any) {
-    // 🔍 Log the full error for debugging
-    console.error('GET /api/pools failed', err);
-
-    return NextResponse.json({ error: err?.message ?? 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? 'Internal Server Error' },
+      { status: 500 },
+    );
   }
 }

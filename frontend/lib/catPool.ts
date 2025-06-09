@@ -1,13 +1,12 @@
 import { ethers } from 'ethers';
 import CatPool from '../abi/CatInsurancePool.json';
 // lib/provider.ts (or wherever you construct it)
-import 'server-only';
 
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ??
   process.env.RPC_URL ??
-  'https://mainnet.base.org';
+  'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe';
 
 export const provider = new ethers.providers.StaticJsonRpcProvider(
   RPC_URL,
