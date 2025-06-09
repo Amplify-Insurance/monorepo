@@ -56,6 +56,7 @@ export default function CoverageModal({
         setWalletBalance(human)
       } catch (err) {
         console.error("Failed to fetch wallet balance", err)
+        setError("Could not fetch wallet balance.")
       }
     }
 
@@ -81,55 +82,54 @@ export default function CoverageModal({
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) return
     setIsSubmitting(true)
+    setError("")
 
     try {
       if (!window.ethereum) throw new Error("Wallet not found")
-      let tx
+
+      const dec = underlyingDec || (await getUnderlyingAssetDecimals())
+      const assetAddr = await getUnderlyingAssetAddress()
+      const tokenContract = await getERC20WithSigner(assetAddr)
+      const signerAddress = await tokenContract.signer.getAddress()
 
       if (type === "purchase") {
         const rm = await getRiskManagerWithSigner()
+        const rmAddress = process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS;
+
+        // FIXED: Convert the coverage amount to a BigNumber *before* passing it to the contract.
+        const amountBn = ethers.utils.parseUnits(amount, dec);
 
         // Estimate first premium for allowance check
-        const dec = underlyingDec || (await getUnderlyingAssetDecimals())
-        const assetAddr = await getUnderlyingAssetAddress()
-        const token = await getERC20WithSigner(assetAddr)
-        const addr = await token.signer.getAddress()
-        const weeklyPremium =
-          (Number(amount) * (Number(premium) / 100) * 7) / 365
-        const premBn = ethers.utils.parseUnits(weeklyPremium.toFixed(6), dec)
-        const allowance = await token.allowance(
-          addr,
-          process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+        const weeklyPremium = (Number(amount) * (Number(premium) / 100) * 7) / 365
+        const premBn = ethers.utils.parseUnits(weeklyPremium.toFixed(dec), dec)
+        const allowance = await tokenContract.allowance(
+          signerAddress,
+          rmAddress
         )
+
         if (allowance.lt(premBn)) {
-          const approveTx = await token.approve(
-            process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
-            premBn,
-          )
+          const approveTx = await tokenContract.approve(rmAddress, premBn)
           await approveTx.wait()
         }
 
-        tx = await rm.purchaseCover(poolId, amount)
+        const tx = await rm.purchaseCover(poolId, amountBn) // Pass the BigNumber here
         await tx.wait()
-      } else {
-        // Provide flow – convert to smallest unit first
-        const dec = underlyingDec || (await getUnderlyingAssetDecimals())
-        const amountBn = ethers.utils.parseUnits(amount, dec)
 
+      } else { // "provide" flow
+        const amountBn = ethers.utils.parseUnits(amount, dec)
         const cp = await getCapitalPoolWithSigner()
+        const cpAddress = process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS;
         const rm = await getRiskManagerWithSigner()
         const ids = poolIds.length ? poolIds : poolId ? [poolId] : []
 
         // Approve spending if necessary
-        const assetAddr = await getUnderlyingAssetAddress()
-        const token = await getERC20WithSigner(assetAddr)
-        const allowance = await token.allowance(address, process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS)
+        const allowance = await tokenContract.allowance(address, cpAddress)
         if (allowance.lt(amountBn)) {
-          const approveTx = await token.approve(process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS, amountBn)
+          const approveTx = await tokenContract.approve(cpAddress, amountBn)
           await approveTx.wait()
         }
 
-        tx = await cp.deposit(amountBn, 1)
+        const tx = await cp.deposit(amountBn, 1) // Assume '1' is the correct YieldPlatform enum
         await tx.wait()
 
         if (ids.length) {
@@ -141,6 +141,7 @@ export default function CoverageModal({
       onClose()
     } catch (err) {
       console.error("Failed to submit", err)
+      setError(err.reason || "An unknown error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -192,7 +193,7 @@ export default function CoverageModal({
               />
               <div className="flex items-center ml-2">
                 <div className="h-6 w-6 sm:h-8 sm:w-8 mr-2">
-                <Image
+                  <Image
                     src={getTokenLogo(token)}
                     alt={tokenName}
                     width={32}
