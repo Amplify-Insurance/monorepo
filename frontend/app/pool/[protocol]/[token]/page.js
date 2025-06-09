@@ -8,7 +8,7 @@ import CoverageModal from "../../../components/CoverageModal"
 import usePools from "../../../../hooks/usePools"
 import { ethers } from "ethers"
 import { formatCurrency, formatPercentage } from "../../../utils/formatting"
-import { getTokenName } from "../../../config/tokenNameMap"
+import { getTokenName, getTokenLogo } from "../../../config/tokenNameMap"
 
 export default function PoolDetailsPage() {
   const params = useParams()
@@ -52,7 +52,7 @@ export default function PoolDetailsPage() {
       </button>
       <div className="flex items-center mb-6">
         <Image
-          src={`/images/protocols/${protocol}.png`}
+          src={getTokenLogo(protocol)}
           alt={name}
           width={40}
           height={40}

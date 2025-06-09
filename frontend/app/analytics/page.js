@@ -7,7 +7,7 @@ import Link from "next/link"
 import { ethers } from "ethers"
 import useClaims from "../hooks/useClaims"
 import usePools from "../hooks/usePools"
-import { getTokenName } from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 
 
 export default function AnalyticsPage() {
@@ -271,7 +271,7 @@ export default function AnalyticsPage() {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-5 w-5 mr-2">
                         <Image
-                          src={`/images/tokens/${claim.coverAsset.toLowerCase()}.png`}
+                          src={getTokenLogo(claim.coverAsset)}
                           alt={claim.coverAssetName}
                           width={20}
                           height={20}

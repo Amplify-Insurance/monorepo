@@ -8,7 +8,7 @@ import { ethers } from "ethers"
 import { useAccount } from "wagmi"
 import useClaims from "../../hooks/useClaims"
 import usePools from "../../hooks/usePools"
-import { getTokenName } from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 
 export default function ClaimsSection({ displayCurrency }) {
   const [activeTab, setActiveTab] = useState("affected") // 'affected' or 'history'
@@ -63,8 +63,8 @@ export default function ClaimsSection({ displayCurrency }) {
           <li className="mr-2">
             <button
               className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === "affected"
-                  ? "text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400"
-                  : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                ? "text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400"
+                : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
                 }`}
               onClick={() => setActiveTab("affected")}
             >
@@ -74,8 +74,8 @@ export default function ClaimsSection({ displayCurrency }) {
           <li className="mr-2">
             <button
               className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === "history"
-                  ? "text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400"
-                  : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                ? "text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400"
+                : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
                 }`}
               onClick={() => setActiveTab("history")}
             >
@@ -153,7 +153,7 @@ export default function ClaimsSection({ displayCurrency }) {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
                           <Image
-                            src={`/images/protocols/${claim.protocol.toLowerCase()}.png`}
+                            src={getTokenLogo(claim.protocol)} 
                             alt={claim.protocol}
                             width={32}
                             height={32}
@@ -167,7 +167,7 @@ export default function ClaimsSection({ displayCurrency }) {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-6 w-6 mr-2">
                           <Image
-                            src={`/images/tokens/${claim.token.toLowerCase()}.png`}
+                            src={getTokenLogo(claim.token)}
                             alt={claim.tokenName}
                             width={24}
                             height={24}
@@ -202,10 +202,10 @@ export default function ClaimsSection({ displayCurrency }) {
                       ) : (
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${claim.status === "approved"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                              : claim.status === "denied"
-                                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            : claim.status === "denied"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                              : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                         >
                           {claim.status.charAt(0).toUpperCase() + claim.status.slice(1)}

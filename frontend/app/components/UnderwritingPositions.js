@@ -10,7 +10,7 @@ import usePools from "../../hooks/usePools";
 import { ethers } from "ethers";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
-import { getTokenName } from "../config/tokenNameMap";
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 
 export default function UnderwritingPositions({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -205,7 +205,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
                           <Image
-                            src={`/images/protocols/${position.protocol.toLowerCase()}.png`}
+                            src={getTokenLogo(position.protocol)}
                             alt={position.protocol}
                             width={32}
                             height={32}
@@ -221,8 +221,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-6 w-6 mr-2">
                           <Image
-                          src={`/images/tokens/${position.pool.toLowerCase()}.png`}
-                          alt={position.poolName}
+                            src={getTokenLogo(position.pool)}
+                            alt={position.poolName}
                             width={24}
                             height={24}
                             className="rounded-full"

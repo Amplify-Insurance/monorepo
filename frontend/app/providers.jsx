@@ -14,7 +14,7 @@ import '@rainbow-me/rainbowkit/styles.css'; // Import CSS
 // If using React.useState for client:
 // function Providers({ children }) {
 //  const [queryClient] = React.useState(() => new QueryClient());
-// ... rest is same
+// ... rest is 
 
 // This line already exports the function as a named export 'Providers'
 export function Providers({ children }) {

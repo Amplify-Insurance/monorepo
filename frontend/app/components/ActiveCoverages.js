@@ -8,7 +8,8 @@ import { useAccount } from "wagmi"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
 import { ethers } from "ethers"
-import { getTokenName } from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
+
 
 export default function ActiveCoverages({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false)
@@ -111,7 +112,7 @@ export default function ActiveCoverages({ displayCurrency }) {
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-8 w-8 mr-3">
                     <Image
-                      src={`/images/protocols/${coverage.protocol.toLowerCase()}.png`}
+                      src={getTokenLogo(coverage.protocol)}
                       alt={coverage.protocol}
                       width={32}
                       height={32}
@@ -125,7 +126,7 @@ export default function ActiveCoverages({ displayCurrency }) {
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-6 w-6 mr-2">
                     <Image
-                      src={`/images/tokens/${coverage.pool.toLowerCase()}.png`}
+                      src={getTokenLogo(coverage.pool)}
                       alt={coverage.poolName}
                       width={24}
                       height={24}

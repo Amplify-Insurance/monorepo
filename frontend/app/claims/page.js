@@ -8,7 +8,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatCurrency } from "../utils/formatting"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
-import { getTokenName } from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
 
@@ -143,7 +143,7 @@ export default function ClaimsPage() {
                       <div className="flex items-center mb-2">
                         <div className="flex-shrink-0 h-8 w-8 mr-3">
                           <Image
-                            src={`/images/protocols/${coverage.protocol.toLowerCase()}.png`}
+                            src={getTokenLogo(coverage.protocol)}
                             alt={coverage.protocol}
                             width={32}
                             height={32}
@@ -210,7 +210,7 @@ export default function ClaimsPage() {
                         <div className="flex items-center mb-3">
                           <div className="flex-shrink-0 h-10 w-10 mr-3">
                             <Image
-                              src={`/images/protocols/${selectedCoverage.protocol.toLowerCase()}.png`}
+                              src={getTokenLogo(selectedCoverage.protocol)}
                               alt={selectedCoverage.protocol}
                               width={40}
                               height={40}

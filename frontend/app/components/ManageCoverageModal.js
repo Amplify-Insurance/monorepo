@@ -12,7 +12,7 @@ import {
 import { getERC20WithSigner } from "../../lib/erc20";
 import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
-import { getTokenName } from "../config/tokenNameMap";
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 
 export default function ManageCoverageModal({
   isOpen,
@@ -63,28 +63,28 @@ export default function ManageCoverageModal({
     setIsSubmitting(true);
     try {
       let tx;
-        if (type === "coverage") {
-          if (!policyId) throw new Error("policyId required");
-          const rm = await getRiskManagerWithSigner();
+      if (type === "coverage") {
+        if (!policyId) throw new Error("policyId required");
+        const rm = await getRiskManagerWithSigner();
 
-          const due = await rm.premiumOwed(policyId);
-          const assetAddr = await getUnderlyingAssetAddress();
-          const token = await getERC20WithSigner(assetAddr);
-          const addr = await token.signer.getAddress();
-          const allowance = await token.allowance(
-            addr,
+        const due = await rm.premiumOwed(policyId);
+        const assetAddr = await getUnderlyingAssetAddress();
+        const token = await getERC20WithSigner(assetAddr);
+        const addr = await token.signer.getAddress();
+        const allowance = await token.allowance(
+          addr,
+          process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+        );
+        if (allowance.lt(due)) {
+          const approveTx = await token.approve(
             process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+            due,
           );
-          if (allowance.lt(due)) {
-            const approveTx = await token.approve(
-              process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
-              due,
-            );
-            await approveTx.wait();
-          }
+          await approveTx.wait();
+        }
 
-          tx = await rm.settlePremium(policyId);
-          await tx.wait();
+        tx = await rm.settlePremium(policyId);
+        await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
         const cp = await getCapitalPoolWithSigner();
@@ -145,7 +145,7 @@ export default function ManageCoverageModal({
             <div className="flex items-center">
               <div className="h-8 w-8 mr-2">
                 <Image
-                  src={`/images/tokens/${token.toLowerCase()}.png`}
+                  src={getTokenLogo(token)}
                   alt={tokenName}
                   width={32}
                   height={32}
@@ -174,8 +174,8 @@ export default function ManageCoverageModal({
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <button
               className={`py-2 rounded-lg font-medium ${action === "increase"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                 }`}
               onClick={() => setAction("increase")}
             >
@@ -183,8 +183,8 @@ export default function ManageCoverageModal({
             </button>
             <button
               className={`py-2 rounded-lg font-medium ${action === "decrease"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                 }`}
               onClick={() => setAction("decrease")}
             >
@@ -218,12 +218,13 @@ export default function ManageCoverageModal({
               <div className="flex items-center ml-2">
                 <div className="h-6 w-6 sm:h-8 sm:w-8 mr-2">
                   <Image
-                    src={`/images/tokens/${token.toLowerCase()}.png`}
+                    src={getTokenLogo(token)}
                     alt={tokenName}
                     width={32}
                     height={32}
                     className="rounded-full"
                   />
+
                 </div>
                 <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">
                   {tokenName}
@@ -287,8 +288,8 @@ export default function ManageCoverageModal({
         <button
           onClick={handleSubmit}
           className={`w-full py-3 rounded-lg font-medium text-white ${adjustAmount && Number.parseFloat(adjustAmount) > 0 && !isSubmitting
-              ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-gray-400 cursor-not-allowed"
+            ? "bg-blue-600 hover:bg-blue-700"
+            : "bg-gray-400 cursor-not-allowed"
             }`}
           disabled={
             !adjustAmount ||

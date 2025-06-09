@@ -11,6 +11,8 @@ import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
 import useTokenList from "../../hooks/useTokenList"
 import { ethers } from "ethers"
+import { getTokenDescription } from "../config/tokenNameMap"
+import { getTokenLogo } from "../config/tokenNameMap"
 
 // Protocol categories
 const protocolCategories = [
@@ -46,7 +48,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
         acc[id] = {
           id,
           name: getTokenName(pool.protocolTokenToCover),
-          description: `Risk pool for ${pool.protocolTokenToCover}`,
+          description: `${getTokenDescription(pool.protocolTokenToCover)}`,
           category: "lending",
           pools: [],
         }
@@ -155,7 +157,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
               <div className="flex items-center">
                 <div className="flex-shrink-0 h-6 w-6 mr-2">
                   <Image
-                    src={`/images/tokens/${selectedToken?.symbol?.toLowerCase()}.png`}
+                    src={getTokenLogo(selectedToken?.address)}
                     alt={selectedToken?.name || ''}
                     width={24}
                     height={24}
@@ -190,7 +192,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-6 w-6 mr-2">
                       <Image
-                        src={`/images/tokens/${token.symbol.toLowerCase()}.png`}
+                        src={getTokenLogo(token.address)}
                         alt={token.name}
                         width={24}
                         height={24}
@@ -274,7 +276,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 mr-3">
                         <Image
-                          src={`/images/protocols/${market.id}.png`}
+                          src={getTokenLogo(market.id)}
                           alt={market.name}
                           width={40}
                           height={40}

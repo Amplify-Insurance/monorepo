@@ -13,7 +13,7 @@ import {
   getUnderlyingAssetAddress,
 } from "../../lib/capitalPool"
 import { getERC20WithSigner } from "../../lib/erc20"
-import { getTokenName } from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
 
 export default function CoverageModal({
@@ -192,8 +192,13 @@ export default function CoverageModal({
               />
               <div className="flex items-center ml-2">
                 <div className="h-6 w-6 sm:h-8 sm:w-8 mr-2">
-                  <Image src={`/images/tokens/${token.toLowerCase()}.png`} alt={tokenName} width={32} height={32} className="rounded-full" />
-                </div>
+                <Image
+                    src={getTokenLogo(token)}
+                    alt={tokenName}
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />                </div>
                 <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">{tokenName}</span>
               </div>
             </div>

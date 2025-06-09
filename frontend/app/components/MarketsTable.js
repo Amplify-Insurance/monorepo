@@ -11,7 +11,7 @@ import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
 import { utils as ethersUtils, BigNumber, ethers } from 'ethers';
 // import { formatUnits } from 'ethers';
-import { getTokenName } from "../config/tokenNameMap";
+import { getTokenName, getTokenDescription, getTokenLogo } from "../config/tokenNameMap";
 
 export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const { isConnected } = useAccount()
@@ -28,23 +28,23 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     const protoDec = Number(pool.protocolTokenDecimals)
     const premium = Number(pool.premiumRateBps || 0) / 100
     const uwYield = Number(pool.underwriterYieldBps || 0) / 100
-    
+
     const pledged = BigNumber.from(pool.totalCapitalPledgedToPool);
-    const sold    = BigNumber.from(pool.totalCoverageSold);
-    
+    const sold = BigNumber.from(pool.totalCoverageSold);
+
     const decimals =
-    pool.underlyingAssetDecimals ??
-    pool.protocolTokenDecimals   ??   // this one **is** in the payload
-    18;                              // sensible default
-  
-  const capacity = Number(
-    ethersUtils.formatUnits(pledged.sub(sold), decimals)
-  );
+      pool.underlyingAssetDecimals ??
+      pool.protocolTokenDecimals ??   // this one **is** in the payload
+      18;                              // sensible default
+
+    const capacity = Number(
+      ethersUtils.formatUnits(pledged.sub(sold), decimals)
+    );
 
     return {
       id: pool.id,
       name,
-      description: `Risk pool for ${pool.protocolTokenToCover}`,
+      description: `${getTokenDescription(pool.protocolTokenToCover)}`,
       tvl: Number(ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, decimals)),
       pools: [
         {
@@ -148,7 +148,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-4">
                             <Image
-                              src={`/images/protocols/${market.id}.png`}
+                              src={getTokenLogo(market.id)}
                               alt={market.name}
                               width={40}
                               height={40}
@@ -209,7 +209,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                     <div className="flex items-center">
                                       <div className="flex-shrink-0 h-6 w-6 mr-2">
                                         <Image
-                                          src={`/images/tokens/${pool.token.toLowerCase()}.png`}
+                                          src={getTokenLogo(pool.token)}
                                           alt={pool.tokenName}
                                           width={24}
                                           height={24}
