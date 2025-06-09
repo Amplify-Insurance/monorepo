@@ -4,7 +4,13 @@ import { useState } from "react";
 import Image from "next/image";
 import { Info, Plus, Minus } from "lucide-react";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
-import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
+import {
+  getCapitalPoolWithSigner,
+  getUnderlyingAssetAddress,
+  getUnderlyingAssetDecimals,
+} from "../../lib/capitalPool";
+import { getERC20WithSigner } from "../../lib/erc20";
+import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
 
 export default function ManageCoverageModal({
@@ -69,7 +75,26 @@ export default function ManageCoverageModal({
         if (!poolId) throw new Error("poolId required");
         const cp = await getCapitalPoolWithSigner();
         const rm = await getRiskManagerWithSigner();
-        tx = await cp.deposit(adjustAmount, 1);
+
+        const dec = await getUnderlyingAssetDecimals();
+        const amountBn = ethers.utils.parseUnits(adjustAmount, dec);
+
+        const assetAddr = await getUnderlyingAssetAddress();
+        const token = await getERC20WithSigner(assetAddr);
+        const addr = await token.signer.getAddress();
+        const allowance = await token.allowance(
+          addr,
+          process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS,
+        );
+        if (allowance.lt(amountBn)) {
+          const approveTx = await token.approve(
+            process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS,
+            amountBn,
+          );
+          await approveTx.wait();
+        }
+
+        tx = await cp.deposit(amountBn, 1);
         await tx.wait();
         const tx2 = await rm.allocateCapital([poolId]);
         await tx2.wait();
