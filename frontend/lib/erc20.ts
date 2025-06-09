@@ -10,6 +10,14 @@ export function getERC20(address: string) {
   return new ethers.Contract(address, ERC20, provider)
 }
 
+export async function getERC20WithSigner(address: string) {
+  if (typeof window === 'undefined' || !window.ethereum)
+    throw new Error('Wallet not found')
+  const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
+  const signer = await browserProvider.getSigner()
+  return new ethers.Contract(address, ERC20, signer)
+}
+
 export async function getTokenSymbol(address: string) {
   try {
     const c = getERC20(address)

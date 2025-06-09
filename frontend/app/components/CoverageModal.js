@@ -10,7 +10,9 @@ import {
   getCapitalPoolWithSigner,
   getUnderlyingAssetBalance,
   getUnderlyingAssetDecimals,
+  getUnderlyingAssetAddress,
 } from "../../lib/capitalPool"
+import { getERC20WithSigner } from "../../lib/erc20"
 import Modal from "./Modal"
 
 export default function CoverageModal({
@@ -95,6 +97,15 @@ export default function CoverageModal({
         const cp = await getCapitalPoolWithSigner()
         const rm = await getRiskManagerWithSigner()
         const ids = poolIds.length ? poolIds : poolId ? [poolId] : []
+
+        // Approve spending if necessary
+        const assetAddr = await getUnderlyingAssetAddress()
+        const token = await getERC20WithSigner(assetAddr)
+        const allowance = await token.allowance(address, process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS)
+        if (allowance.lt(amountBn)) {
+          const approveTx = await token.approve(process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS, amountBn)
+          await approveTx.wait()
+        }
 
         tx = await cp.deposit(amountBn, 1)
         await tx.wait()
