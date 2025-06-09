@@ -3,7 +3,12 @@
 import { useState } from "react"
 import { useAccount } from "wagmi"
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { getCatPoolWithSigner } from "../lib/catPool"
+import {
+  getCatPoolWithSigner,
+  getUsdcAddress,
+  getUsdcDecimals,
+} from "../lib/catPool"
+import { getERC20WithSigner } from "../lib/erc20"
 import { ethers } from "ethers"
 
 export default function CatPoolPage() {
@@ -18,7 +23,23 @@ export default function CatPoolPage() {
     setIsSubmitting(true)
     try {
       const cp = await getCatPoolWithSigner()
-      const tx = await cp.depositLiquidity(ethers.parseUnits(depositAmount, 6))
+      const dec = await getUsdcDecimals()
+      const amountBn = ethers.parseUnits(depositAmount, dec)
+      const tokenAddr = await getUsdcAddress()
+      const token = await getERC20WithSigner(tokenAddr)
+      const addr = await token.signer.getAddress()
+      const allowance = await token.allowance(
+        addr,
+        process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
+      )
+      if (allowance.lt(amountBn)) {
+        const approveTx = await token.approve(
+          process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
+          amountBn,
+        )
+        await approveTx.wait()
+      }
+      const tx = await cp.depositLiquidity(amountBn)
       await tx.wait()
       setDepositAmount("")
     } catch (err) {

@@ -61,11 +61,28 @@ export default function ManageCoverageModal({
     setIsSubmitting(true);
     try {
       let tx;
-      if (type === "coverage") {
-        if (!policyId) throw new Error("policyId required");
-        const rm = await getRiskManagerWithSigner();
-        tx = await rm.settlePremium(policyId);
-        await tx.wait();
+        if (type === "coverage") {
+          if (!policyId) throw new Error("policyId required");
+          const rm = await getRiskManagerWithSigner();
+
+          const due = await rm.premiumOwed(policyId);
+          const assetAddr = await getUnderlyingAssetAddress();
+          const token = await getERC20WithSigner(assetAddr);
+          const addr = await token.signer.getAddress();
+          const allowance = await token.allowance(
+            addr,
+            process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+          );
+          if (allowance.lt(due)) {
+            const approveTx = await token.approve(
+              process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+              due,
+            );
+            await approveTx.wait();
+          }
+
+          tx = await rm.settlePremium(policyId);
+          await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
         const cp = await getCapitalPoolWithSigner();
