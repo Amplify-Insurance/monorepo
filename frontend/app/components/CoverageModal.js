@@ -1,11 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Info } from "lucide-react"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
-import { getCapitalPoolWithSigner } from "../../lib/capitalPool"
+import {
+  getCapitalPoolWithSigner,
+  getUnderlyingAssetBalance,
+  getUnderlyingAssetDecimals,
+} from "../../lib/capitalPool"
+import { useAccount } from "wagmi"
 import Modal from "./Modal"
 
 // Add the selectedMarkets prop to the component parameters
@@ -24,9 +29,25 @@ export default function CoverageModal({
 }) {
   const [amount, setAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
-  const maxAmount = capacity
+  const { address } = useAccount()
+  const [walletBalance, setWalletBalance] = useState(0)
+  const maxAmount = type === "purchase" ? capacity : walletBalance
   const tokenPrice = 1
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (type !== "provide" || !address || !isOpen) return
+    async function load() {
+      try {
+        const dec = await getUnderlyingAssetDecimals()
+        const bal = await getUnderlyingAssetBalance(address)
+        setWalletBalance(Number(ethers.formatUnits(bal, dec)))
+      } catch (err) {
+        console.error("Failed to fetch wallet balance", err)
+      }
+    }
+    load()
+  }, [type, address, isOpen])
 
   // Calculate USD value when amount changes
   const handleAmountChange = (e) => {

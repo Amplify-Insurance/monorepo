@@ -32,3 +32,33 @@ export function getCapitalPoolWriter() {
     signer,
   );
 }
+
+// Helper to query the underlying ERC20 asset used by the capital pool
+export async function getUnderlyingAssetAddress() {
+  const cp = new ethers.Contract(
+    process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS as string,
+    ['function underlyingAsset() view returns (address)'],
+    provider,
+  );
+  return await cp.underlyingAsset();
+}
+
+export async function getUnderlyingAssetDecimals() {
+  const assetAddr = await getUnderlyingAssetAddress();
+  const token = new ethers.Contract(
+    assetAddr,
+    ['function decimals() view returns (uint8)'],
+    provider,
+  );
+  return await token.decimals();
+}
+
+export async function getUnderlyingAssetBalance(address: string) {
+  const assetAddr = await getUnderlyingAssetAddress();
+  const token = new ethers.Contract(
+    assetAddr,
+    ['function balanceOf(address) view returns (uint256)'],
+    provider,
+  );
+  return await token.balanceOf(address);
+}
