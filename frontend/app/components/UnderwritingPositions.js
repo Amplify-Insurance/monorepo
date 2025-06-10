@@ -50,7 +50,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
     })
     .filter(Boolean);
 
-    console.log(pools, "pool details");
+  console.log(pools, "pool details");
 
   console.log("Underwriting positions:", underwritingPositions);
 
@@ -235,7 +235,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                       </div>
                       <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
                         {displayCurrency === "native"
-                          ? `${position.amount} ${position.poolName}`
+                          ? `${position.amount}`
                           : formatCurrency(position.nativeValue, "USD", "usd")}
                       </div>
                       <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
@@ -245,7 +245,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="text-sm text-gray-900 dark:text-white">
                         {displayCurrency === "native"
-                          ? `${position.amount} ${position.poolName}`
+                          ? `${position.amount}`
                           : formatCurrency(position.nativeValue, "USD", "usd")}
                       </div>
                     </td>
