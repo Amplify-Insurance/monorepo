@@ -16,7 +16,6 @@ import { getERC20WithSigner } from "../../lib/erc20"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
 import { Slider } from "../../components/ui/slider"
-import { Input } from "../../components/ui/input"
 
 export default function CoverageModal({
   isOpen,
@@ -36,24 +35,25 @@ export default function CoverageModal({
   const { address } = useAccount()
   const tokenName = getTokenName(token)
 
-  console.log(protocolTokenToCover, "token")
-
   /* ───── component state ───── */
   const [amount, setAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
   const [walletBalance, setWalletBalance] = useState(0)
   const [underlyingDec, setUnderlyingDec] = useState(18)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  // FIXED: Restored the missing error state declaration
   const [error, setError] = useState("");
 
   // Coverage duration state
-  const [durationWeeks, setDurationWeeks] = useState(1)
-  const [endDate, setEndDate] = useState(() => {
+  const [durationWeeks, setDurationWeeks] = useState(4) // Default to a more common duration
+  const [endDate, setEndDate] = useState("")
+
+  // Update end date whenever duration changes
+  useEffect(() => {
     const d = new Date()
-    d.setDate(d.getDate() + 7)
-    return d.toISOString().split("T")[0]
-  })
+    d.setDate(d.getDate() + durationWeeks * 7)
+    setEndDate(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))
+  }, [durationWeeks])
+
 
   /* Max amount depends on flow */
   const maxAmount = type === "purchase" ? capacity : walletBalance
@@ -199,7 +199,7 @@ export default function CoverageModal({
                 inputMode="decimal"
                 pattern="^\d*\.?\d*$"
                 value={amount}
-                onChange={handleAmountChange} // Use the handler function
+                onChange={handleAmountChange}
                 placeholder="0.00"
                 className="w-full bg-transparent text-xl sm:text-2xl font-medium
                    text-gray-900 dark:text-white outline-none"
@@ -227,47 +227,46 @@ export default function CoverageModal({
           </div>
         </div>
 
-        {/* Duration selector */}
+        {/* Redesigned Duration Selector */}
         {type === "purchase" && (
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              Coverage duration
-            </label>
-            <Slider
-              min={1}
-              max={52}
-              step={1}
-              value={[durationWeeks]}
-              onValueChange={(v) => {
-                const w = v[0]
-                setDurationWeeks(w)
-                const d = new Date()
-                d.setDate(d.getDate() + w * 7)
-                setEndDate(d.toISOString().split("T")[0])
-              }}
-              className="mb-2"
-            />
-            <div className="flex items-center space-x-2">
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setEndDate(val)
-                  const now = new Date()
-                  const sel = new Date(val)
-                  let diff = Math.ceil((sel.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000))
-                  if (diff < 1) diff = 1
-                  if (diff > 52) diff = 52
-                  setDurationWeeks(diff)
-                }}
-              />
-              <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                {durationWeeks} {durationWeeks === 1 ? "week" : "weeks"}
+          <div className="space-y-4">
+            <div className="flex justify-between items-baseline mb-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Coverage Duration
+              </label>
+              <span className="font-semibold text-lg text-gray-900 dark:text-white">
+                {durationWeeks} {durationWeeks === 1 ? "Week" : "Weeks"}
               </span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Premiums can fluctuate so the exact duration is just an estimate based on the current premium rate.
+
+
+            <div className="relative">
+              <Slider
+                min={1}
+                max={52}
+                step={1}
+                value={[durationWeeks]}
+                onValueChange={(v) => setDurationWeeks(v[0])}
+                // Pass the marker positions to the new prop
+                markers={[13, 26, 39]}
+              />
+              <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-2">
+                <span>1W</span>
+                <span>13W</span>
+                <span>26W</span>
+                <span>39W</span>
+                <span>52W</span>
+              </div>
+            </div>
+
+
+            <div className="text-center bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Coverage ends on: </span>
+              <span className="font-semibold text-sm text-gray-900 dark:text-white">{endDate}</span>
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-gray-400 pt-1 text-center">
+              Premiums can fluctuate, so the exact duration is an estimate based on the current rate.
             </p>
           </div>
         )}
@@ -329,18 +328,6 @@ export default function CoverageModal({
             ? "Submitting..."
             : "Confirm Transaction"}
         </button>
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex">
-            <div className="flex-shrink-0"><Info className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
-            <div className="ml-3">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                {type === "purchase"
-                  ? "Coverage is provided for smart contract risk and will be active immediately after purchase."
-                  : "By providing coverage, you're helping secure the DeFi ecosystem while earning yield on your assets."}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </Modal>
   )
