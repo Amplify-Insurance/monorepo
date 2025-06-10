@@ -24,6 +24,7 @@ export default function CoverageModal({
   token,
   premium,
   yield: underwriterYield,
+  yieldChoice = 1,
   poolId,
   poolIds = [],
   selectedMarkets = [],
@@ -130,7 +131,7 @@ export default function CoverageModal({
           await approveTx.wait()
         }
 
-        const tx = await cp.deposit(amountBn, 1) // Assume '1' is the correct YieldPlatform enum
+        const tx = await cp.deposit(amountBn, yieldChoice)
         await tx.wait()
 
         if (ids.length) {

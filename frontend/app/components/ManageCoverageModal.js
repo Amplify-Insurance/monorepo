@@ -23,6 +23,7 @@ export default function ManageCoverageModal({
   amount,
   premium,
   yield: underwriterYield,
+  yieldChoice = 1,
   capacity = 0,
   policyId,
   shares,
@@ -113,7 +114,7 @@ export default function ManageCoverageModal({
           await approveTx.wait();
         }
 
-        tx = await cp.deposit(amountBn, 1);
+        tx = await cp.deposit(amountBn, yieldChoice);
         await tx.wait();
         const tx2 = await rm.allocateCapital([poolId]);
         await tx2.wait();

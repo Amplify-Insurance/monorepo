@@ -287,6 +287,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
           yield={selectedPool.pool.underwriterYield}
           capacity={selectedPool.pool.capacity}
           poolId={selectedPool.market.id}
+          yieldChoice={1}
         />
       )}
     </div>

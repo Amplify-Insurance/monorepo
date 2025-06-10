@@ -44,6 +44,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
         yield: Number(pool.underwriterYieldBps || 0) / 100,
         status: "active",
         shares: details.masterShares,
+        yieldChoice: details.yieldChoice,
       };
     })
     .filter(Boolean);
@@ -321,6 +322,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
           yield={selectedPosition.yield}
           shares={selectedPosition.shares}
           poolId={selectedPosition.poolId}
+          yieldChoice={selectedPosition.yieldChoice}
         />
       )}
     </div>
