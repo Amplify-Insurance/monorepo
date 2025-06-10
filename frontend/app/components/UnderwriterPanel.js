@@ -10,6 +10,8 @@ import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
 import useTokenList from "../../hooks/useTokenList"
+import useYieldAdapters from "../../hooks/useYieldAdapters"
+import { YieldPlatform, getYieldPlatformInfo } from "../config/yieldPlatforms"
 import { ethers } from "ethers"
 import { getTokenDescription } from "../config/tokenNameMap"
 import { getTokenLogo, getTokenName } from "../config/tokenNameMap"
@@ -28,18 +30,27 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const { isConnected } = useAccount()
   const { pools, loading } = usePools()
   const tokens = useTokenList(pools)
+  const adapters = useYieldAdapters()
   const [selectedToken, setSelectedToken] = useState(null)
   const [tokenDropdownOpen, setTokenDropdownOpen] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
+  const [selectedYield, setSelectedYield] = useState(null)
+  const [yieldDropdownOpen, setYieldDropdownOpen] = useState(false)
 
   useEffect(() => {
     if (!selectedToken && tokens && tokens.length > 0) {
       setSelectedToken(tokens[0])
     }
   }, [tokens, selectedToken])
+
+  useEffect(() => {
+    if (adapters && adapters.length > 0 && selectedYield == null) {
+      setSelectedYield(adapters[0].id)
+    }
+  }, [adapters, selectedYield])
 
   const markets = Object.values(
     pools.reduce((acc, pool) => {
@@ -112,7 +123,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   }
 
   const handleOpenModal = () => {
-    if (selectedMarkets.length > 0) {
+    if (selectedMarkets.length > 0 && selectedYield !== null) {
       setModalOpen(true)
     }
   }
@@ -215,6 +226,68 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     >
                       {token.symbol} - {token.name}
                     </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Yield Platform Selection */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Select base yield platform:
+        </label>
+        <div className="relative">
+          <button
+            type="button"
+            className="relative w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            onClick={() => setYieldDropdownOpen(!yieldDropdownOpen)}
+          >
+            {selectedYield !== null && (
+              <div className="flex items-center">
+                <div className="flex-shrink-0 h-6 w-6 mr-2">
+                  <Image
+                    src={getYieldPlatformInfo(selectedYield).logo}
+                    alt={getYieldPlatformInfo(selectedYield).name}
+                    width={24}
+                    height={24}
+                    className="rounded-full"
+                  />
+                </div>
+                <span className="block truncate">
+                  {getYieldPlatformInfo(selectedYield).name}
+                </span>
+              </div>
+            )}
+            <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            </span>
+          </button>
+
+          {yieldDropdownOpen && (
+            <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+              {adapters.map((adapter) => (
+                <button
+                  key={adapter.id}
+                  className={`${adapter.id === selectedYield ? "text-white bg-blue-600" : "text-gray-900 dark:text-gray-200"} cursor-default select-none relative py-2 pl-3 pr-9 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
+                  onClick={() => {
+                    setSelectedYield(adapter.id);
+                    setYieldDropdownOpen(false);
+                  }}
+                >
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-6 w-6 mr-2">
+                      <Image
+                        src={adapter.logo}
+                        alt={adapter.name}
+                        width={24}
+                        height={24}
+                        className="rounded-full"
+                      />
+                    </div>
+                    <span className={`block truncate ${adapter.id === selectedYield ? "font-medium" : "font-normal"}`}>{adapter.name}</span>
                   </div>
                 </button>
               ))}
@@ -370,6 +443,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
           token={selectedToken?.symbol || ''}
           premium={0} // Not relevant for providing coverage
           yield={totalYield}
+          yieldChoice={selectedYield}
           poolIds={selectedMarkets}
           selectedMarkets={selectedMarkets.map((id) => {
             const market = markets.find((m) => m.id === id)
