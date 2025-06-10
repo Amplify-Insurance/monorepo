@@ -52,6 +52,13 @@ export default function UnderwriterPanel({ displayCurrency }) {
     }
   }, [adapters, selectedYield])
 
+  useEffect(() => {
+    if (selectedYield == null) return
+    setSelectedMarkets((prev) =>
+      prev.filter((id) => Number(id) - 1 !== selectedYield),
+    )
+  }, [selectedYield])
+
   console.log(adapters, "adapters data")
 
   const markets = Object.values(
@@ -90,12 +97,13 @@ export default function UnderwriterPanel({ displayCurrency }) {
   // Filter markets that support the selected token and category
   const filteredMarkets = selectedToken
     ? markets.filter(
-      (market) =>
-        market.pools.some(
-          (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase()
-        ) &&
-        (selectedCategory === "all" || market.category === selectedCategory),
-    )
+        (market) =>
+          market.pools.some(
+            (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase(),
+          ) &&
+          (selectedCategory === "all" || market.category === selectedCategory) &&
+          (selectedYield === null || Number(market.id) - 1 !== selectedYield),
+      )
     : []
 
   console.log("Filtered markets:", filteredMarkets)
