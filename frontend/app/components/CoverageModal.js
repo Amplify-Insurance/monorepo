@@ -15,6 +15,8 @@ import {
 import { getERC20WithSigner } from "../../lib/erc20"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
+import { Slider } from "../../components/ui/slider"
+import { Input } from "../../components/ui/input"
 
 export default function CoverageModal({
   isOpen,
@@ -44,6 +46,14 @@ export default function CoverageModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   // FIXED: Restored the missing error state declaration
   const [error, setError] = useState("");
+
+  // Coverage duration state
+  const [durationWeeks, setDurationWeeks] = useState(1)
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    return d.toISOString().split("T")[0]
+  })
 
   /* Max amount depends on flow */
   const maxAmount = type === "purchase" ? capacity : walletBalance
@@ -155,6 +165,10 @@ export default function CoverageModal({
   const estimatedValue = () => {
     const base = parseFloat(amount) || 0
     const rate = type === "purchase" ? premium : underwriterYield
+    if (type === "purchase") {
+      const weekly = (base * tokenPrice * (rate || 0) * 7) / (100 * 365)
+      return (weekly * durationWeeks).toFixed(2)
+    }
     return ((base * tokenPrice * (rate || 0)) / 100).toFixed(2)
   }
 
@@ -213,6 +227,51 @@ export default function CoverageModal({
           </div>
         </div>
 
+        {/* Duration selector */}
+        {type === "purchase" && (
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              Coverage duration
+            </label>
+            <Slider
+              min={1}
+              max={52}
+              step={1}
+              value={[durationWeeks]}
+              onValueChange={(v) => {
+                const w = v[0]
+                setDurationWeeks(w)
+                const d = new Date()
+                d.setDate(d.getDate() + w * 7)
+                setEndDate(d.toISOString().split("T")[0])
+              }}
+              className="mb-2"
+            />
+            <div className="flex items-center space-x-2">
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setEndDate(val)
+                  const now = new Date()
+                  const sel = new Date(val)
+                  let diff = Math.ceil((sel.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000))
+                  if (diff < 1) diff = 1
+                  if (diff > 52) diff = 52
+                  setDurationWeeks(diff)
+                }}
+              />
+              <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                {durationWeeks} {durationWeeks === 1 ? "week" : "weeks"}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Premiums can fluctuate so the exact duration is just an estimate based on the current premium rate.
+            </p>
+          </div>
+        )}
+
         {/* Transaction overview */}
         <div>
           <h4 className="text-base font-medium text-gray-900 dark:text-white mb-3">Transaction overview</h4>
@@ -222,7 +281,9 @@ export default function CoverageModal({
               <span className="text-sm font-medium text-gray-900 dark:text-white">{type === "purchase" ? premium : underwriterYield}% APY</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300">Estimated {type === "purchase" ? "Cost" : "Yield"} (Annual)</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                Estimated {type === "purchase" ? `Cost (${durationWeeks}w)` : "Yield (Annual)"}
+              </span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">${estimatedValue()}</span>
             </div>
 
