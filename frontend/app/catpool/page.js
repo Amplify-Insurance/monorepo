@@ -8,7 +8,7 @@ import {
   getUsdcAddress,
   getUsdcDecimals,
 } from "../lib/catPool"
-import { getERC20WithSigner } from "../lib/erc20"
+import { getERC20WithSigner } from "../../lib/erc20"
 import { ethers } from "ethers"
 
 export default function CatPoolPage() {

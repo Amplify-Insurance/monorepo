@@ -12,7 +12,7 @@ import usePools from "../../hooks/usePools"
 import useTokenList from "../../hooks/useTokenList"
 import { ethers } from "ethers"
 import { getTokenDescription } from "../config/tokenNameMap"
-import { getTokenLogo } from "../config/tokenNameMap"
+import { getTokenLogo, getTokenName } from "../config/tokenNameMap"
 
 // Protocol categories
 const protocolCategories = [
@@ -66,6 +66,10 @@ export default function UnderwriterPanel({ displayCurrency }) {
     }, {})
   )
 
+  console.log(pools, "pools data")
+
+
+
   if (loading) {
     return <p>Loading markets...</p>
   }
@@ -74,10 +78,14 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const filteredMarkets = selectedToken
     ? markets.filter(
       (market) =>
-        market.pools.some((pool) => pool.token === selectedToken?.symbol) &&
+        market.pools.some(
+          (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase()
+        ) &&
         (selectedCategory === "all" || market.category === selectedCategory),
     )
     : []
+
+  console.log("Filtered markets:", filteredMarkets)
 
   // Calculate total yield based on selected markets
   const calculateTotalYield = () => {
@@ -86,7 +94,9 @@ export default function UnderwriterPanel({ displayCurrency }) {
     return selectedMarkets.reduce((sum, marketId) => {
       const market = markets.find((m) => m.id === marketId)
       if (!market) return sum
-      const pool = market.pools.find((p) => p.token === selectedToken?.symbol)
+      const pool = market.pools.find(
+        (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase()
+      )
       return pool ? sum + pool.underwriterYield : sum
     }, 0)
   }
@@ -180,8 +190,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
                 <button
                   key={token.symbol}
                   className={`${token.symbol === selectedToken?.symbol
-                      ? "text-white bg-blue-600"
-                      : "text-gray-900 dark:text-gray-200"
+                    ? "text-white bg-blue-600"
+                    : "text-gray-900 dark:text-gray-200"
                     } cursor-default select-none relative py-2 pl-3 pr-9 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
                   onClick={() => {
                     setSelectedToken(token)
@@ -238,8 +248,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     <button
                       key={category.id}
                       className={`${category.id === selectedCategory
-                          ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-                          : "text-gray-700 dark:text-gray-200"
+                        ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                        : "text-gray-700 dark:text-gray-200"
                         } block px-4 py-2 text-sm w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
                       onClick={() => {
                         setSelectedCategory(category.id)
@@ -260,7 +270,9 @@ export default function UnderwriterPanel({ displayCurrency }) {
       <div className="mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredMarkets.map((market) => {
-            const pool = market.pools.find((p) => p.token === selectedToken?.symbol)
+            const pool = market.pools.find(
+              (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase()
+            )
             if (!pool) return null
 
             const isSelected = selectedMarkets.includes(market.id)
@@ -276,7 +288,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 mr-3">
                         <Image
-                          src={getTokenLogo(market.id)}
+                          src={getTokenLogo(pool.address)}
                           alt={market.name}
                           width={40}
                           height={40}

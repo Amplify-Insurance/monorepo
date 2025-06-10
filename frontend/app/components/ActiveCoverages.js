@@ -18,6 +18,8 @@ export default function ActiveCoverages({ displayCurrency }) {
   const { policies } = useUserPolicies(address)
   const { pools } = usePools()
 
+  // console.log("ActiveCoverages - policies:", policies)
+
   const activeCoverages = policies.map((p) => {
     const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
     if (!pool) return null
@@ -142,7 +144,7 @@ export default function ActiveCoverages({ displayCurrency }) {
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900 dark:text-white">{formatPercentage(coverage.premium)}%</div>
+                <div className="text-sm text-gray-900 dark:text-white">{formatPercentage(coverage.premium)}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">

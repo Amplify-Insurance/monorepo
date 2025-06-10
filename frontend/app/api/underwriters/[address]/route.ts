@@ -1,41 +1,43 @@
-import { NextResponse } from 'next/server';
-import { capitalPool } from '../../../../lib/capitalPool';
-import { riskManager } from '../../../../lib/riskManager';
+// app/api/underwriters/[address]/route.ts
+import { NextResponse } from 'next/server'
+import { capitalPool } from '@/lib/capitalPool'
+import { riskManager } from '@/lib/riskManager'
 
 export async function GET(
   _req: Request,
-  { params }: { params: { address: string } }
+  context: { params: Promise<{ address: string }> }
 ) {
   try {
-    const account = await capitalPool.getUnderwriterAccount(params.address);
+    /* Unwrap the promise that lives on context.params */
+    const { address } = await context.params
+    const addr = address.toLowerCase()
 
-    // ── Determine the list of pools this underwriter has allocated capital to ──
-    let poolCount = 0n;
+    // ── 1. fetch underwriter account ──
+    const account = await capitalPool.getUnderwriterAccount(addr)
+
+    // ── 2. count pools ──
+    let poolCount = 0n
     try {
-      poolCount = await (riskManager as any).protocolRiskPoolsLength();
+      poolCount = await (riskManager as any).protocolRiskPoolsLength()
     } catch {
-      // Fallback for older contract versions lacking the length helper
       while (true) {
         try {
-          await riskManager.getPoolInfo(poolCount);
-          poolCount++;
+          await riskManager.getPoolInfo(poolCount)
+          poolCount++
         } catch {
-          break;
+          break
         }
       }
     }
 
-    const allocatedPoolIds: number[] = [];
+    // ── 3. which pools this underwriter allocated ──
+    const allocatedPoolIds: number[] = []
     for (let i = 0; i < Number(poolCount); i++) {
       try {
-        const allocated = await riskManager.isAllocatedToPool(
-          params.address,
-          BigInt(i),
-        );
-        if (allocated) allocatedPoolIds.push(i);
+        const allocated = await riskManager.isAllocatedToPool(addr, BigInt(i))
+        if (allocated) allocatedPoolIds.push(i)
       } catch {
-        // ignore pools that error out
-        continue;
+        /* ignore pools that revert */
       }
     }
 
@@ -46,9 +48,13 @@ export async function GET(
       withdrawalRequestTimestamp: account[3],
       withdrawalRequestShares: account[4],
       allocatedPoolIds,
-    };
-    return NextResponse.json({ address: params.address, details });
+    }
+
+    return NextResponse.json({ address: addr, details })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? 'Internal Server Error' },
+      { status: 500 },
+    )
   }
 }

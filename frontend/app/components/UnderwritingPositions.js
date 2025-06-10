@@ -48,6 +48,9 @@ export default function UnderwritingPositions({ displayCurrency }) {
     })
     .filter(Boolean);
 
+  // console.log("Underwriting positions:", details);
+
+
   const handleOpenModal = (position) => {
     setSelectedPosition(position);
     setModalOpen(true);

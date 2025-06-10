@@ -19,5 +19,5 @@ export const formatCurrency = (value, currency = "usd", displayCurrency = "usd")
 
 // Format percentage values
 export const formatPercentage = (value) => {
-  return `${value.toFixed(2)}`
+  return `${value.toFixed(2)}%`
 }

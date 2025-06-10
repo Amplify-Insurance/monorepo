@@ -20,8 +20,6 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
 
-  console.log(pools, "pools data")
-
   const markets = pools.map((pool) => {
     const name = getTokenName(pool.protocolTokenToCover)
     // const underlyingDec = Number(pool.underlyingAssetDecimals)
@@ -40,6 +38,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     const capacity = Number(
       ethersUtils.formatUnits(pledged.sub(sold), decimals)
     );
+
 
     return {
       id: pool.id,
@@ -140,15 +139,17 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                   </th>
                 </tr>
               </thead>
+
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {markets.map((market) => (
                   <React.Fragment key={market.id}>
+
                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-750">
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-4">
                             <Image
-                              src={getTokenLogo(market.id)}
+                              src={getTokenLogo(market.pools[0].token)}
                               alt={market.name}
                               width={40}
                               height={40}

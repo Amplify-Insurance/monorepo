@@ -1,25 +1,36 @@
+// app/api/policies/user/[address]/route.ts
 import { NextResponse } from 'next/server'
-import { policyNft } from '../../../../../lib/policyNft'
-import { ethers } from 'ethers'
+import { policyNft } from '@/lib/policyNft'
 
-export async function GET(_req: Request, { params }: { params: { address: string }}) {
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ address: string }> }
+) {
   try {
-    const addr = params.address.toLowerCase()
-    const nextId: bigint = await policyNft.nextId()
+    /* await the promise that lives on `params` */
+    const { address } = await params
+    const addr = address.toLowerCase()
+
+    const nextId = await policyNft.nextId()
     const policies: any[] = []
+
     for (let i = 1n; i < nextId; i++) {
       try {
-        const owner: string = await policyNft.ownerOf(i)
+        const owner = await policyNft.ownerOf(i)
         if (owner.toLowerCase() === addr) {
           const p = await policyNft.getPolicy(i)
           policies.push({ id: Number(i), ...p })
         }
-      } catch (err) {
-        // ignore non-existent tokens
+      } catch {
+        /* token burned / does not exist — ignore */
       }
     }
+
     return NextResponse.json({ address: addr, policies })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json(
+      { error: err?.message ?? 'Internal Server Error' },
+      { status: 500 },
+    )
   }
 }

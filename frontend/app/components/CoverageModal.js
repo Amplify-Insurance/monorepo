@@ -38,6 +38,8 @@ export default function CoverageModal({
   const [walletBalance, setWalletBalance] = useState(0)
   const [underlyingDec, setUnderlyingDec] = useState(18)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // FIXED: Restored the missing error state declaration
+  const [error, setError] = useState("");
 
   /* Max amount depends on flow */
   const maxAmount = type === "purchase" ? capacity : walletBalance
@@ -96,7 +98,6 @@ export default function CoverageModal({
         const rm = await getRiskManagerWithSigner()
         const rmAddress = process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS;
 
-        // FIXED: Convert the coverage amount to a BigNumber *before* passing it to the contract.
         const amountBn = ethers.utils.parseUnits(amount, dec);
 
         // Estimate first premium for allowance check
@@ -112,7 +113,7 @@ export default function CoverageModal({
           await approveTx.wait()
         }
 
-        const tx = await rm.purchaseCover(poolId, amountBn) // Pass the BigNumber here
+        const tx = await rm.purchaseCover(poolId, amountBn)
         await tx.wait()
 
       } else { // "provide" flow
@@ -150,7 +151,7 @@ export default function CoverageModal({
   const estimatedValue = () => {
     const base = parseFloat(amount) || 0
     const rate = type === "purchase" ? premium : underwriterYield
-    return ((base * tokenPrice * rate) / 100).toFixed(2)
+    return ((base * tokenPrice * (rate || 0)) / 100).toFixed(2)
   }
 
   /* ───── UI ───── */
@@ -177,16 +178,10 @@ export default function CoverageModal({
             <div className="flex items-center p-3">
               <input
                 type="text"
-                inputMode="decimal"           // still shows the numeric keyboard
-                pattern="^\d*(\.\d{0,18})?$"  // 0-18 decimals, no leading zeros rule
+                inputMode="decimal"
+                pattern="^\d*\.?\d*$"
                 value={amount}
-                onChange={(e) => {
-                  const val = e.target.value.trim()
-                  // Allow empty string (user cleared the field) or valid decimal
-                  if (val === "" || /^\d*(\.\d{0,18})?$/.test(val)) {
-                    setAmount(val)
-                  }
-                }}
+                onChange={handleAmountChange} // Use the handler function
                 placeholder="0.00"
                 className="w-full bg-transparent text-xl sm:text-2xl font-medium
                    text-gray-900 dark:text-white outline-none"
@@ -199,7 +194,8 @@ export default function CoverageModal({
                     width={32}
                     height={32}
                     className="rounded-full"
-                  />                </div>
+                  />
+                </div>
                 <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">{tokenName}</span>
               </div>
             </div>
@@ -247,7 +243,27 @@ export default function CoverageModal({
           </div>
         </div>
 
-        {/* Info box */}
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Action button */}
+        <button
+          onClick={handleSubmit}
+          className={`w-full py-3 rounded-lg font-medium text-white transition-colors ${amount && parseFloat(amount) > 0 && !isSubmitting
+            ? type === "purchase"
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-green-600 hover:bg-green-700"
+            : "bg-gray-400 dark:bg-gray-600 cursor-not-allowed"}`}
+          disabled={!amount || parseFloat(amount) <= 0 || isSubmitting}
+        >
+          {isSubmitting
+            ? "Submitting..."
+            : "Confirm Transaction"}
+        </button>
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex">
             <div className="flex-shrink-0"><Info className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
@@ -260,23 +276,6 @@ export default function CoverageModal({
             </div>
           </div>
         </div>
-
-        {/* Action button */}
-        <button
-          onClick={handleSubmit}
-          className={`w-full py-3 rounded-lg font-medium text-white ${amount && parseFloat(amount) > 0
-            ? type === "purchase"
-              ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-green-600 hover:bg-green-700"
-            : "bg-gray-400 cursor-not-allowed"}`}
-          disabled={!amount || parseFloat(amount) <= 0 || isSubmitting}
-        >
-          {isSubmitting
-            ? "Submitting..."
-            : amount && parseFloat(amount) > 0
-              ? `${type === "purchase" ? "Purchase" : "Provide"} Coverage`
-              : "Enter an amount"}
-        </button>
       </div>
     </Modal>
   )
