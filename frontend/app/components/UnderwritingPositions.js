@@ -13,6 +13,7 @@ import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName } from "../config/tokenNameMap";
 
 export default function UnderwritingPositions({ displayCurrency }) {
+  const NOTICE_PERIOD = 600; // seconds
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -52,6 +53,22 @@ export default function UnderwritingPositions({ displayCurrency }) {
       };
     })
     .filter(Boolean);
+
+  const activePositions = underwritingPositions.filter(
+    (p) => p.status === "active"
+  );
+  const withdrawalPositions = underwritingPositions.filter(
+    (p) => p.status === "requested withdrawal"
+  );
+
+  const unlockTimestamp =
+    Number(details?.withdrawalRequestTimestamp || 0) + NOTICE_PERIOD;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const unlockDays = Math.max(
+    0,
+    Math.ceil((unlockTimestamp - currentTimestamp) / 86400)
+  );
+  const withdrawalReady = currentTimestamp >= unlockTimestamp;
 
   console.log(pools, "pool details");
 
@@ -157,7 +174,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
 
       <div className="overflow-x-auto -mx-4 sm:mx-0">
         <div className="inline-block min-w-full align-middle">
-          <div className="overflow-hidden shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+          <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
@@ -200,7 +217,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {underwritingPositions.map((position) => (
+                {activePositions.map((position) => (
                   <tr
                     key={position.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-750"
@@ -321,6 +338,71 @@ export default function UnderwritingPositions({ displayCurrency }) {
           </div>
         </div>
       </div>
+
+      {withdrawalPositions.length > 0 && (
+        <div className="mt-8 overflow-x-auto -mx-4 sm:mx-0">
+          <div className="inline-block min-w-full align-middle">
+            <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
+                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pool</th>
+                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">{displayCurrency === "native" ? "Amount" : "Value"}</th>
+                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Unlock</th>
+                    <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {withdrawalPositions.map((position) => (
+                    <tr key={position.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
+                            <Image src={getProtocolLogo(position.id)} alt={position.protocol} width={32} height={32} className="rounded-full" />
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{getProtocolName(position.id)}</div>
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-6 w-6 mr-2">
+                            <Image src={getTokenLogo(position.pool)} alt={position.poolName} width={24} height={24} className="rounded-full" />
+                          </div>
+                          <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
+                        </div>
+                        <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
+                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.nativeValue, "USD", "usd")}
+                        </div>
+                        <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
+                          {unlockDays}d
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.nativeValue, "USD", "usd")}
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <div className="text-sm font-medium text-green-600 dark:text-green-400">{unlockDays}d</div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={handleExecuteWithdrawal}
+                          disabled={!withdrawalReady || isExecuting}
+                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 disabled:opacity-50"
+                        >
+                          {isExecuting ? "Executing..." : "Withdraw"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mt-4 flex justify-end">
         <button
           onClick={handleClaimAllRewards}
