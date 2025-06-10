@@ -29,9 +29,12 @@ export default function CoverageModal({
   poolIds = [],
   selectedMarkets = [],
   capacity = 0,
+  protocolTokenToCover,
 }) {
   const { address } = useAccount()
   const tokenName = getTokenName(token)
+
+  console.log(protocolTokenToCover, "token")
 
   /* ───── component state ───── */
   const [amount, setAmount] = useState("")

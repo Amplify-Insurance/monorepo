@@ -10,7 +10,7 @@ import usePools from "../../hooks/usePools";
 import { ethers } from "ethers";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
-import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
+import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName } from "../config/tokenNameMap";
 
 export default function UnderwritingPositions({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -26,18 +26,18 @@ export default function UnderwritingPositions({ displayCurrency }) {
     .map((pid, i) => {
       const pool = pools.find((pl) => Number(pl.id) === Number(pid));
       if (!pool) return null;
-      const protocol = getTokenName(pool.protocolTokenToCover);
+      const protocol = getTokenName(pool.id);
       const amount = Number(
         ethers.utils.formatUnits(
           details.totalDepositedAssetPrincipal,
-          pool.underlyingAssetDecimals
+          6 // pool.underlyingAssetDecimals
         )
       );
       return {
         id: i,
         protocol,
         pool: pool.protocolTokenToCover,
-        poolName: getTokenName(pool.protocolTokenToCover),
+        poolName: getTokenName(pool.id),
         poolId: pid,
         amount,
         nativeValue: amount,
@@ -49,7 +49,9 @@ export default function UnderwritingPositions({ displayCurrency }) {
     })
     .filter(Boolean);
 
-  // console.log("Underwriting positions:", details);
+    console.log(pools, "pool details");
+
+  console.log("Underwriting positions:", underwritingPositions);
 
 
   const handleOpenModal = (position) => {
@@ -209,7 +211,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
                           <Image
-                            src={getTokenLogo(position.protocol)}
+                            src={getProtocolLogo(position.id)}
                             alt={position.protocol}
                             width={32}
                             height={32}
@@ -217,7 +219,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                           />
                         </div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {position.protocol}
+                          {getProtocolName(position.id)}
                         </div>
                       </div>
                     </td>
@@ -233,7 +235,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                           />
                         </div>
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {position.poolName}
+                          {getTokenName(position.pool)}
                         </div>
                       </div>
                       <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
