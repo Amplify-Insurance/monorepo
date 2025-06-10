@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, MoreHorizontal } from "lucide-react";
 import Image from "next/image";
 import { formatCurrency, formatPercentage } from "../utils/formatting";
 import ManageCoverageModal from "./ManageCoverageModal";
@@ -18,6 +18,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [isClaiming, setIsClaiming] = useState(false);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
   const { pools } = usePools();
@@ -173,13 +174,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                     scope="col"
                     className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
                   >
-                    Amount
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                  >
-                    Value
+                    {displayCurrency === "native" ? "Amount" : "Value"}
                   </th>
                   <th
                     scope="col"
@@ -255,15 +250,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {formatCurrency(
-                          position.nativeValue,
-                          "USD",
-                          displayCurrency
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="text-sm font-medium text-green-600 dark:text-green-400">
                         {formatPercentage(position.yield)}
                       </div>
@@ -273,27 +259,52 @@ export default function UnderwritingPositions({ displayCurrency }) {
                         {position.status}
                       </span>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
                       <button
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-2"
-                        onClick={() => handleOpenModal(position)}
+                        onClick={() =>
+                          setOpenDropdown(
+                            openDropdown === position.id ? null : position.id
+                          )
+                        }
+                        className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
                       >
-                        Manage
+                        <MoreHorizontal className="w-5 h-5" />
                       </button>
-                      <button
-                        className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 mr-2"
-                        onClick={() => handleClaimRewards(position)}
-                        disabled={isClaiming}
-                      >
-                        {isClaiming ? "Claiming..." : "Claim Rewards"}
-                      </button>
-                      <button
-                        className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300"
-                        onClick={handleExecuteWithdrawal}
-                        disabled={isExecuting}
-                      >
-                        {isExecuting ? "Executing..." : "Execute Withdrawal"}
-                      </button>
+                      {openDropdown === position.id && (
+                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                          <div className="py-1" role="menu" aria-orientation="vertical">
+                            <button
+                              className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => {
+                                handleOpenModal(position);
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              Manage
+                            </button>
+                            <button
+                              className="block px-4 py-2 text-sm w-full text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => {
+                                handleClaimRewards(position);
+                                setOpenDropdown(null);
+                              }}
+                              disabled={isClaiming}
+                            >
+                              {isClaiming ? "Claiming..." : "Claim Rewards"}
+                            </button>
+                            <button
+                              className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => {
+                                handleExecuteWithdrawal();
+                                setOpenDropdown(null);
+                              }}
+                              disabled={isExecuting}
+                            >
+                              {isExecuting ? "Executing..." : "Execute Withdrawal"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
