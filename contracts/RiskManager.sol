@@ -52,7 +52,7 @@ contract RiskManager is ReentrancyGuard, Ownable {
     uint256 public constant BPS = 10_000;
     uint256 public constant SECS_YEAR = 365 days;
     uint256 public constant CLAIM_FEE_BPS = 500; // 5%
-    uint256 public constant COVER_COOLDOWN_PERIOD = 5 days;
+    uint256 public constant COVER_COOLDOWN_PERIOD = 600 seconds;
     uint256 public constant MAX_ALLOCATIONS_PER_UNDERWRITER = 5;
 
     /* ───────────────────────── State Variables ──────────────────────── */

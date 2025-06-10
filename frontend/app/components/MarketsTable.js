@@ -21,7 +21,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const { pools, loading } = usePools()
 
   const markets = pools.map((pool) => {
-    const name = getTokenName(pool.protocolTokenToCover)
+    const name = getTokenName(pool.id)
     // const underlyingDec = Number(pool.underlyingAssetDecimals)
     const protoDec = Number(pool.protocolTokenDecimals)
     const premium = Number(pool.premiumRateBps || 0) / 100
@@ -43,12 +43,12 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     return {
       id: pool.id,
       name,
-      description: `${getTokenDescription(pool.protocolTokenToCover)}`,
+      description: `${getTokenDescription(pool.id)}`,
       tvl: Number(ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, decimals)),
       pools: [
         {
           token: pool.protocolTokenToCover,
-          tokenName: getTokenName(pool.protocolTokenToCover),
+          tokenName: getTokenName(pool.id),
           premium,
           underwriterYield: uwYield,
           tvl: Number(ethers.utils.formatUnits(pool.totalCoverageSold, protoDec)),
@@ -149,7 +149,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-4">
                             <Image
-                              src={getTokenLogo(market.pools[0].token)}
+                              src={getTokenLogo(market.id)}
                               alt={market.name}
                               width={40}
                               height={40}
@@ -210,7 +210,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                     <div className="flex items-center">
                                       <div className="flex-shrink-0 h-6 w-6 mr-2">
                                         <Image
-                                          src={getTokenLogo(pool.token)}
+                                          src={getTokenLogo(market.id)}
                                           alt={pool.tokenName}
                                           width={24}
                                           height={24}

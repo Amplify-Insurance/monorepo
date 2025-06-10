@@ -52,14 +52,16 @@ export default function UnderwriterPanel({ displayCurrency }) {
     }
   }, [adapters, selectedYield])
 
+  console.log(adapters, "adapters data")
+
   const markets = Object.values(
     pools.reduce((acc, pool) => {
       const id = String(pool.protocolCovered)
       if (!acc[id]) {
         acc[id] = {
           id,
-          name: getTokenName(pool.protocolTokenToCover),
-          description: `${getTokenDescription(pool.protocolTokenToCover)}`,
+          name: getTokenName(pool.id),
+          description: `${getTokenDescription(pool.id)}`,
           category: "lending",
           pools: [],
         }
@@ -280,7 +282,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-6 w-6 mr-2">
                       <Image
-                        src={adapter.logo}
+                        src={getTokenLogo(adapter.id)}
                         alt={adapter.name}
                         width={24}
                         height={24}
@@ -361,7 +363,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 mr-3">
                         <Image
-                          src={getTokenLogo(pool.address)}
+                          src={getTokenLogo(market.id -1)}
                           alt={market.name}
                           width={40}
                           height={40}

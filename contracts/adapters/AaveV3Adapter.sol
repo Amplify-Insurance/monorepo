@@ -7,8 +7,18 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IYieldAdapter.sol";
 
 interface IAaveV3Pool {
+    struct ReserveData {
+        /* …snip… */
+        uint128 liquidityRate;   // Ray-scaled; 1e27 = 100% APR
+        /* …snip… */
+    }
+
     function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
+    function getReserveData(address asset)
+        external
+        view
+        returns (ReserveData memory);
 }
 
 contract AaveV3Adapter is IYieldAdapter, Ownable {
@@ -16,17 +26,25 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
 
     IERC20 public immutable underlyingToken;
     IAaveV3Pool public immutable aavePool;
+
     IERC20 public immutable aToken;
 
     event FundsWithdrawn(address indexed to, uint256 requestedAmount, uint256 actualAmount);
 
-    constructor(IERC20 _asset, IAaveV3Pool _pool, IERC20 _aToken, address _initialOwner) Ownable(_initialOwner) {
+    constructor(
+        IERC20 _asset,
+        IAaveV3Pool _pool,
+        IERC20 _aToken,
+        address _initialOwner
+    ) Ownable(_initialOwner) {
         require(address(_asset) != address(0), "AaveV3Adapter: invalid asset");
         require(address(_pool) != address(0), "AaveV3Adapter: invalid pool");
         require(address(_aToken) != address(0), "AaveV3Adapter: invalid aToken");
+
         underlyingToken = _asset;
-        aavePool = _pool;
-        aToken = _aToken;
+        aavePool        = _pool;
+        aToken          = _aToken;
+
         _asset.approve(address(_pool), type(uint256).max);
     }
 
@@ -39,7 +57,7 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
         underlyingToken.safeTransferFrom(msg.sender, address(this), _amountToDeposit);
         aavePool.supply(address(underlyingToken), _amountToDeposit, address(this), 0);
     }
-    
+
     function withdraw(uint256 _targetAmountOfUnderlyingToWithdraw, address _to)
         external
         override
@@ -67,4 +85,8 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
         uint256 aTokenBal = aToken.balanceOf(address(this));
         return liquid + aTokenBal;
     }
+
+    function currentApr() external view returns (uint256) {
+    return aavePool.getReserveData(address(underlyingToken)).liquidityRate;
+}
 }

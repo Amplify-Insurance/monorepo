@@ -29,7 +29,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────────── Constants ───────────────────────── */
     uint256 public constant BPS = 10_000;
-    uint256 public constant UNDERWRITER_NOTICE_PERIOD = 30 days;
+    uint256 public constant UNDERWRITER_NOTICE_PERIOD = 600 seconds;
 
     /* ───────────────────────── State Variables ──────────────────────── */
 

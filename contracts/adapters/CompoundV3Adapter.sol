@@ -12,12 +12,18 @@ interface IComet {
     function baseToken() external view returns (address);
     function balanceOf(address account) external view returns (uint256);
 }
+interface ICometWithRates is IComet {
+    function getUtilization() external view returns (uint256);
+    function getSupplyRate(uint256 utilization) external view returns (uint256);
+}
+
 
 contract CompoundV3Adapter is IYieldAdapter, Ownable {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable underlyingToken;
     IComet public immutable comet;
+    uint256 private constant SECONDS_PER_YEAR = 365 days;
 
     event FundsWithdrawn(address indexed to, uint256 requestedAmount, uint256 actualAmount);
 
@@ -63,5 +69,19 @@ contract CompoundV3Adapter is IYieldAdapter, Ownable {
         uint256 liquid = underlyingToken.balanceOf(address(this));
         uint256 supplied = comet.balanceOf(address(this));
         return liquid + supplied;
+    }
+
+
+        /**
+     * @return aprWad  Current supplier APR, 1 = 1×10-18 (i.e. 1e-18-scaled)
+     *                 Multiply by 1e2 to display as a human %.
+     */
+    function currentApr() external view returns (uint256 aprWad) {
+        ICometWithRates c = ICometWithRates(address(comet));
+
+        uint256 util       = c.getUtilization();              // 1e18
+        uint256 ratePerSec = c.getSupplyRate(util);           // 1e18 per-sec
+
+        aprWad = ratePerSec * SECONDS_PER_YEAR;               // still 1e18-scaled
     }
 }
