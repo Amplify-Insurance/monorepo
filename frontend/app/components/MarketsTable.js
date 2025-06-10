@@ -75,7 +75,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     const maxPremium = Math.max(...premiums)
 
     if (minPremium === maxPremium) {
-      return `${formatPercentage(minPremium)} APY`
+      return `${formatPercentage(minPremium)} `
     }
 
     return `${formatPercentage(minPremium)} - ${formatPercentage(maxPremium)} APY`
