@@ -43,7 +43,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
         amount,
         nativeValue: amount,
         yield: Number(pool.underwriterYieldBps || 0) / 100,
-        status: "active",
+        status:
+          details.withdrawalRequestShares > 0 ?
+            "requested withdrawal" :
+            "active",
         shares: details.masterShares,
         yieldChoice: details.yieldChoice,
       };
@@ -255,7 +258,12 @@ export default function UnderwritingPositions({ displayCurrency }) {
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
+                        }`}
+                      >
                         {position.status}
                       </span>
                     </td>
