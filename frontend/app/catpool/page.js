@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ethers } from "ethers"
 import CatPoolModal from "../components/CatPoolModal"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
+import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { getCatPoolWithSigner } from "../../lib/catPool"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 
@@ -15,6 +16,15 @@ export default function CatPoolPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
+
+  const adapters = useYieldAdapters()
+  const [selectedAdapter, setSelectedAdapter] = useState(null)
+
+  useEffect(() => {
+    if (!selectedAdapter && adapters && adapters.length > 0) {
+      setSelectedAdapter(adapters[0])
+    }
+  }, [adapters, selectedAdapter])
 
   const { stats } = useCatPoolStats()
 
@@ -47,6 +57,28 @@ export default function CatPoolPage() {
     <div className="container mx-auto max-w-lg space-y-6">
       <h1 className="text-3xl font-bold mb-4">Cat Insurance Pool</h1>
 
+      {adapters.length > 0 && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Select Asset
+          </label>
+          <select
+            className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            value={selectedAdapter?.id ?? ''}
+            onChange={(e) => {
+              const found = adapters.find((a) => a.id === Number(e.target.value))
+              setSelectedAdapter(found)
+            }}
+          >
+            {adapters.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.assetSymbol || a.asset} - {a.apr.toFixed(2)}% APR
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
           <div className="text-xs text-gray-500 mb-1">Pool Liquidity</div>
@@ -57,7 +89,11 @@ export default function CatPoolPage() {
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
           <div className="text-xs text-gray-500 mb-1">Current APR</div>
           <div className="text-lg font-medium text-green-600">
-            {formatPercentage(Number(ethers.utils.formatUnits(stats.apr || '0', 18)) * 100)}
+            {selectedAdapter
+              ? `${selectedAdapter.apr.toFixed(2)}%`
+              : formatPercentage(
+                  Number(ethers.utils.formatUnits(stats.apr || '0', 18)) * 100,
+                )}
           </div>
         </div>
       </div>

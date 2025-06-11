@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { getYieldPlatformInfo } from '../app/config/yieldPlatforms';
+import { getTokenSymbol } from '../lib/erc20';
 
 export default function useYieldAdapters() {
   const [adapters, setAdapters] = useState([]);
@@ -16,19 +17,32 @@ export default function useYieldAdapters() {
             1: 18, // Compound uses 18 decimals
           };
 
-          const list = (data.adapters || []).map((item, index) => {
-            let apr = 0;
-            try {
-              const decimals = decimalsMap[index] ?? 18;
-              apr = parseFloat(ethers.utils.formatUnits(item.apr || '0', decimals)) * 100;
-            } catch {}
-            return {
-              id: index,
-              address: item.address,
-              apr,
-              ...getYieldPlatformInfo(index),
-            };
-          });
+          const list = await Promise.all(
+            (data.adapters || []).map(async (item, index) => {
+              let apr = 0;
+              try {
+                const decimals = decimalsMap[index] ?? 18;
+                apr =
+                  parseFloat(
+                    ethers.utils.formatUnits(item.apr || '0', decimals),
+                  ) * 100;
+              } catch {}
+
+              let symbol = '';
+              try {
+                symbol = await getTokenSymbol(item.asset);
+              } catch {}
+
+              return {
+                id: index,
+                address: item.address,
+                apr,
+                asset: item.asset,
+                assetSymbol: symbol,
+                ...getYieldPlatformInfo(index),
+              };
+            }),
+          );
           const filtered = list.filter(
             (a) => a.address && a.address !== '0x0000000000000000000000000000000000000000'
           );
