@@ -62,5 +62,24 @@ export async function getUsdcDecimals() {
   return await token.decimals();
 }
 
+export async function getCatShareAddress() {
+  const cp = new ethers.Contract(
+    process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string,
+    ['function catShareToken() view returns (address)'],
+    provider,
+  );
+  return await cp.catShareToken();
+}
+
+export async function getCatShareDecimals() {
+  const addr = await getCatShareAddress();
+  const token = new ethers.Contract(
+    addr,
+    ['function decimals() view returns (uint8)'],
+    provider,
+  );
+  return await token.decimals();
+}
+
 
 

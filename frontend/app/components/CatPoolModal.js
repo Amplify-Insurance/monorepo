@@ -8,19 +8,23 @@ import {
   getCatPoolWithSigner,
   getUsdcAddress,
   getUsdcDecimals,
+  getCatShareAddress,
 } from "../../lib/catPool";
 import { getERC20WithSigner, getTokenDecimals } from "../../lib/erc20";
 import { getTokenLogo } from "../config/tokenNameMap";
 
 export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, assetSymbol = 'USDC' }) {
   const isDeposit = mode === "deposit";
+  const symbol = isDeposit ? assetSymbol : "CATLP";
   const [amount, setAmount] = useState("");
   const [usdValue, setUsdValue] = useState("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [balance, setBalance] = useState("0");
   const projected = amount ? (parseFloat(amount) * (apr / 100)).toFixed(2) : "0";
 
-  const tokenAddr = token || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // default USDC
+  const [tokenAddr, setTokenAddr] = useState(
+    token || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  ); // default USDC
 
   const handleAmountChange = (e) => {
     const value = e.target.value;
@@ -32,11 +36,16 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
 
   const loadBalance = async () => {
     try {
-      const dec = await getTokenDecimals(tokenAddr);
-      const tokenContract = await getERC20WithSigner(tokenAddr);
+      let addr = tokenAddr;
+      if (!isDeposit) {
+        addr = await getCatShareAddress();
+        setTokenAddr(addr);
+      }
+      const dec = await getTokenDecimals(addr);
+      const tokenContract = await getERC20WithSigner(addr);
       const signerAddr = await tokenContract.signer.getAddress();
       const bal = await tokenContract.balanceOf(signerAddr);
-      const human = ethers.formatUnits(bal, dec);
+      const human = ethers.utils.formatUnits(bal, dec);
       setBalance(human);
       return human;
     } catch {
@@ -46,14 +55,13 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
   };
 
   const handleSetMax = async () => {
-    if (!isDeposit) return;
     const human = await loadBalance();
     setAmount(human);
     setUsdValue(human);
   };
 
   useEffect(() => {
-    if (isOpen && isDeposit) {
+    if (isOpen) {
       loadBalance();
     }
   }, [isOpen, isDeposit, tokenAddr]);
@@ -65,7 +73,7 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
       const cp = await getCatPoolWithSigner();
       if (isDeposit) {
         const dec = await getUsdcDecimals();
-        const amountBn = ethers.parseUnits(amount, dec);
+        const amountBn = ethers.utils.parseUnits(amount, dec);
         const usdcAddr = await getUsdcAddress();
         const usdcToken = await getERC20WithSigner(usdcAddr);
         const addr = await usdcToken.signer.getAddress();
@@ -83,7 +91,7 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
         const tx = await cp.depositLiquidity(amountBn);
         await tx.wait();
       } else {
-        const sharesBn = ethers.parseUnits(amount, 18);
+        const sharesBn = ethers.utils.parseUnits(amount, 18);
         const tx = await cp.withdrawLiquidity(sharesBn);
         await tx.wait();
       }
@@ -100,7 +108,7 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isDeposit ? `Deposit ${assetSymbol}` : "Withdraw"}
+      title={isDeposit ? `Deposit ${symbol}` : "Withdraw"}
     >
       <div className="space-y-6">
         <div>
@@ -126,7 +134,7 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
                 <div className="h-6 w-6 mr-2">
                   <Image src={getTokenLogo(tokenAddr)} alt="token" width={24} height={24} className="rounded-full" />
                 </div>
-                <span className="text-base font-medium text-gray-900 dark:text-white">{assetSymbol}</span>
+                <span className="text-base font-medium text-gray-900 dark:text-white">{symbol}</span>
               </div>
             </div>
             <div className="flex justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
@@ -138,9 +146,7 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
               )}
             </div>
           </div>
-          {isDeposit && (
-            <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">Balance: {parseFloat(balance).toFixed(4)} {assetSymbol}</div>
-          )}
+          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">Balance: {parseFloat(balance).toFixed(4)} {symbol}</div>
         </div>
         {isDeposit && (
           <div className="p-3 rounded-md bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-700 dark:text-blue-300">
@@ -149,7 +155,7 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
         )}
         {isDeposit && (
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            Projected yearly earnings: {projected} {assetSymbol}
+            Projected yearly earnings: {projected} {symbol}
           </div>
         )}
         <button
