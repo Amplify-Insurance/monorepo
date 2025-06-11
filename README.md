@@ -6,22 +6,31 @@ This repository contains a Hardhat project implementing a prototype insurance sy
 
 ```
 contracts/               Solidity sources
-├─ CoverPool.sol         Main pool that handles underwriting and claims
-├─ CatInsurancePool.sol  Pool that collects a share of premiums and covers losses
-├─ CatShare.sol          ERC20 token representing CatInsurancePool shares
-├─ PolicyNFT.sol         ERC721 token representing active cover
-├─ oShare.sol            ERC20 receipt token for underwriter deposits
-├─ MockERC20.sol         Simple ERC20 used in tests
-├─ MockYieldAdapter.sol  Test adapter implementing IYieldAdapter
-├─ SdaiAdapter.sol       Example adapter for depositing into sDAI
-├─ adapters/
-│  ├─ AaveV3Adapter.sol     IYieldAdapter wrapper for Aave V3
-│  └─ CompoundV3Adapter.sol IYieldAdapter wrapper for Compound V3
-└─ interfaces/           Minimal interfaces used by adapters
+├─ CapitalPool.sol       Vault that holds underwriter funds
+├─ RiskManager.sol       Core logic for selling policies and applying claims
+├─ CatInsurancePool.sol  Backstop pool funded by a share of premiums
+├─ adapters/             Yield strategy implementations
+│  ├─ AaveV3Adapter.sol
+│  ├─ CompoundV3Adapter.sol
+│  ├─ EulerAdapter.sol
+│  ├─ MoonwellAdapter.sol
+│  └─ MorhpoAdapter.sol
+├─ tokenization/         ERC20/721 tokens used by the protocol
+│  ├─ CatShare.sol
+│  ├─ PolicyNFT.sol
+│  └─ oShare.sol
+├─ interfaces/           Shared protocol interfaces
+│  ├─ IPolicyNFT.sol
+│  ├─ ISdai.sol
+│  └─ IYieldAdapter.sol
+└─ test/                 Mock contracts for unit tests
 
-hardhat.config.ts        Hardhat configuration
+frontend/                Next.js dApp for interacting with the contracts
+scripts/                 Deployment and helper scripts
+subgraphs/               The Graph subgraph definitions
+test/                    JavaScript test suite
+hardhat.config.js        Hardhat configuration
 package.json             Project dependencies and scripts
-test/                    Mocha/Chai tests
 ```
 
 ## Requirements
@@ -109,24 +118,16 @@ include:
 
 This project is licensed under the **Business Source License 1.1**. See [LICENSE](./LICENSE) for details.
 
+## Contract Flow
 
+```mermaid
 graph TD
-    A[Underwriters Deposit Funds] --> B[Funds Allocated into Yield Strategy]
-    B --> C[Base Yield Earned on Deposits]
-    B --> D[Funds Available for Insurance Coverage]
-    D --> E[Insurance Premiums Paid by Policyholders]
-    E --> F[Premiums Earned by Underwriters]
-    F --> G[Total Yield: Base Yield + Premiums]
-
-    subgraph Underwriter's Activities
-        A --> H[Select Protocols to Insure]
-        H --> D
-    end
-
-    subgraph Policyholder's Activities
-        I[Policyholders Purchase Insurance]
-        I --> E
-        I --> J[Specify Premium Rates]
-        J --> K[Compete for Coverage]
-        K --> L[Adjust Premium Rates Based on Supply and Demand]
-    end
+    Underwriter -->|deposit USDC| CapitalPool
+    CapitalPool -->|invest| YieldAdapter
+    Policyholder -->|purchase cover| RiskManager
+    RiskManager -->|mint| PolicyNFT
+    Policyholder -->|pay premium| CapitalPool
+    CapitalPool -->|share| CatInsurancePool
+    RiskManager -->|trigger claim| CapitalPool
+    CatInsurancePool -->|backstop funds| CapitalPool
+```
