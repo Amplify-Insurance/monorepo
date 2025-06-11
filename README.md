@@ -118,21 +118,28 @@ include:
 
 This project is licensed under the **Business Source License 1.1**. See [LICENSE](./LICENSE) for details.
 
-## Contract Flow
+## Underwriter Capital Flow
 
 ```mermaid
 graph TD
-    subgraph "Cover Purchase & Underwriting"
-        Underwriter -->|deposit USDC| CapitalPool
-        CapitalPool -->|invest| YieldAdapter
-        Policyholder -->|purchase cover| RiskManager
-        RiskManager -->|mint| PolicyNFT
-    end
+    Underwriter -->|deposit USDC| CapitalPool
+    CapitalPool -->|invest| YieldAdapter
+    YieldAdapter -->|yield| CapitalPool
+    Policyholder -->|buy policy| RiskManager
+    RiskManager -->|mint NFT| PolicyNFT
+    Policyholder -->|pay premium| CapitalPool
+    CapitalPool -->|share| CatInsurancePool
+```
 
-    subgraph "Premiums & Claims"
-        Policyholder -->|pay premium| CapitalPool
-        CapitalPool -->|share| CatInsurancePool
-        RiskManager -->|trigger claim| CapitalPool
-        CatInsurancePool -->|backstop funds| CapitalPool
-    end
+## Distressed Capital Flow During Claims
+
+```mermaid
+graph TD
+    Policyholder -->|file claim| RiskManager
+    RiskManager -->|request payout| CapitalPool
+    CapitalPool -->|withdraw funds| YieldAdapter
+    CapitalPool -->|pay out| Policyholder
+    Underwriter -.->|capital reduced| CapitalPool
+    CatInsurancePool -->|backstop funds| CapitalPool
+    RiskManager -->|distribute distressed assets| Underwriter
 ```
