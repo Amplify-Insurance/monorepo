@@ -122,12 +122,17 @@ This project is licensed under the **Business Source License 1.1**. See [LICENSE
 
 ```mermaid
 graph TD
-    Underwriter -->|deposit USDC| CapitalPool
-    CapitalPool -->|invest| YieldAdapter
-    Policyholder -->|purchase cover| RiskManager
-    RiskManager -->|mint| PolicyNFT
-    Policyholder -->|pay premium| CapitalPool
-    CapitalPool -->|share| CatInsurancePool
-    RiskManager -->|trigger claim| CapitalPool
-    CatInsurancePool -->|backstop funds| CapitalPool
+    subgraph "Cover Purchase & Underwriting"
+        Underwriter -->|deposit USDC| CapitalPool
+        CapitalPool -->|invest| YieldAdapter
+        Policyholder -->|purchase cover| RiskManager
+        RiskManager -->|mint| PolicyNFT
+    end
+
+    subgraph "Premiums & Claims"
+        Policyholder -->|pay premium| CapitalPool
+        CapitalPool -->|share| CatInsurancePool
+        RiskManager -->|trigger claim| CapitalPool
+        CatInsurancePool -->|backstop funds| CapitalPool
+    end
 ```
