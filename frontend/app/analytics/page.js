@@ -772,7 +772,10 @@ function ActiveCoverChart({ data }) {
     const el = canvasRef.current;
     const ctx = el.getContext("2d");
 
-    if (window.activeCoverChart) {
+    if (
+      window.activeCoverChart &&
+      typeof window.activeCoverChart.destroy === "function"
+    ) {
       window.activeCoverChart.destroy();
     }
 
@@ -841,7 +844,10 @@ function ActiveCoverChart({ data }) {
     });
 
     return () => {
-      if (window.activeCoverChart) {
+      if (
+        window.activeCoverChart &&
+        typeof window.activeCoverChart.destroy === "function"
+      ) {
         window.activeCoverChart.destroy();
       }
     };
