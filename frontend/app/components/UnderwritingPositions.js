@@ -7,6 +7,7 @@ import ManageCoverageModal from "./ManageCoverageModal";
 import { useAccount } from "wagmi";
 import useUnderwriterDetails from "../../hooks/useUnderwriterDetails";
 import usePools from "../../hooks/usePools";
+import useYieldAdapters from "../../hooks/useYieldAdapters";
 import { ethers } from "ethers";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
@@ -23,6 +24,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
   const { pools } = usePools();
+  const adapters = useYieldAdapters();
 
   const underwritingPositions = (details?.allocatedPoolIds || [])
     .map((pid, i) => {
@@ -135,6 +137,16 @@ export default function UnderwritingPositions({ displayCurrency }) {
   );
   const averageYield = totalValue > 0 ? weightedYield / totalValue : 0;
 
+  const totalDeposited = details
+    ? Number(
+        ethers.utils.formatUnits(details.totalDepositedAssetPrincipal, 6)
+      )
+    : 0;
+  const totalUnderwritten = totalDeposited * underwritingPositions.length;
+  const baseAdapter = adapters.find((a) => a.id === Number(details?.yieldChoice));
+  const baseYieldApr = baseAdapter?.apr || 0;
+  const totalApr = baseYieldApr + averageYield;
+
   if (underwritingPositions.length === 0) {
     return (
       <div className="text-center py-8">
@@ -155,21 +167,31 @@ export default function UnderwritingPositions({ displayCurrency }) {
   return (
     <div>
       <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <div className="text-sm text-blue-700 dark:text-blue-300">
-              Total Value
-            </div>
+            <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Deposited</div>
             <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-              {formatCurrency(totalValue)}
+              {formatCurrency(totalDeposited)}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Underwritten</div>
+            <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+              {formatCurrency(totalUnderwritten)}
             </div>
           </div>
           <div>
             <div className="text-sm text-blue-700 dark:text-blue-300">
-              Average Yield
+              Base Yield {baseAdapter ? `(${baseAdapter.name})` : ""}
             </div>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatPercentage(averageYield)}
+              {formatPercentage(baseYieldApr)}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-blue-700 dark:text-blue-300">Total APR</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              {formatPercentage(totalApr)}
             </div>
           </div>
         </div>
