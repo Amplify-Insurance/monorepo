@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowDown, ArrowUp, ExternalLink, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -523,436 +523,421 @@ export default function AnalyticsPage() {
 
 // Claims Over Time Chart Component
 function ClaimsOverTimeChart({ data }) {
-  if (typeof window === "undefined") {
-    return (
-      <div className="h-full flex items-center justify-center">
-        Loading chart...
-      </div>
-    );
-  }
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !data) return;
+    const el = canvasRef.current;
+    const ctx = el.getContext("2d");
+
+    // Clear previous chart if it exists
+    if (window.claimsTimeChart) {
+      window.claimsTimeChart.destroy();
+    }
+
+    // Set canvas dimensions for high DPI displays
+    const dpr = window.devicePixelRatio || 1;
+    const rect = el.getBoundingClientRect();
+    el.width = rect.width * dpr;
+    el.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Draw chart
+    const isDarkMode = document.documentElement.classList.contains("dark");
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+    const gridColor = isDarkMode
+      ? "rgba(75, 85, 99, 0.2)"
+      : "rgba(209, 213, 219, 0.5)";
+
+    const labels = data.map((item) => item.month);
+    const values = data.map((item) => item.amount);
+
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
+    gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)");
+    gradient.addColorStop(1, "rgba(52, 211, 153, 0.1)");
+
+    // Create chart
+    window.claimsTimeChart = new window.Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Claims Paid",
+            data: values,
+            backgroundColor: gradient,
+            borderColor: "rgb(52, 211, 153)",
+            borderWidth: 2,
+            pointBackgroundColor: "rgb(52, 211, 153)",
+            pointBorderColor: isDarkMode ? "#1f2937" : "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            fill: true,
+            tension: 0.3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+          tooltip: {
+            backgroundColor: isDarkMode
+              ? "rgba(31, 41, 55, 0.9)"
+              : "rgba(255, 255, 255, 0.9)",
+            titleColor: isDarkMode ? "#e5e7eb" : "#374151",
+            bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
+            borderColor: isDarkMode
+              ? "rgba(75, 85, 99, 0.2)"
+              : "rgba(209, 213, 219, 0.5)",
+            borderWidth: 1,
+            padding: 12,
+            displayColors: false,
+            callbacks: {
+              label: (context) => `$${context.raw.toLocaleString()}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              color: gridColor,
+            },
+            ticks: {
+              color: textColor,
+              maxRotation: 45,
+              minRotation: 45,
+            },
+          },
+          y: {
+            grid: {
+              color: gridColor,
+            },
+            ticks: {
+              color: textColor,
+              callback: (value) => {
+                if (value >= 1000000) {
+                  return `$${value / 1000000}M`;
+                }
+                if (value >= 1000) {
+                  return `$${value / 1000}K`;
+                }
+                return `$${value}`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      if (window.claimsTimeChart) {
+        window.claimsTimeChart.destroy();
+      }
+    };
+  }, [data]);
 
   return (
     <div className="h-full w-full">
       <canvas
         id="claimsOverTimeChart"
         className="h-full w-full"
-        ref={(el) => {
-          if (el && data) {
-            const ctx = el.getContext("2d");
-
-            // Clear previous chart if it exists
-            if (window.claimsTimeChart) {
-              window.claimsTimeChart.destroy();
-            }
-
-            // Set canvas dimensions for high DPI displays
-            const dpr = window.devicePixelRatio || 1;
-            const rect = el.getBoundingClientRect();
-            el.width = rect.width * dpr;
-            el.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-
-            // Draw chart
-            const isDarkMode =
-              document.documentElement.classList.contains("dark");
-            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-            const gridColor = isDarkMode
-              ? "rgba(75, 85, 99, 0.2)"
-              : "rgba(209, 213, 219, 0.5)";
-
-            const labels = data.map((item) => item.month);
-            const values = data.map((item) => item.amount);
-
-            // Create gradient
-            const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
-            gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)"); // Green  0, 0, rect.height)
-            gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)"); // Green
-            gradient.addColorStop(1, "rgba(52, 211, 153, 0.1)"); // Transparent green
-
-            // Create chart
-            window.claimsTimeChart = new window.Chart(ctx, {
-              type: "line",
-              data: {
-                labels: labels,
-                datasets: [
-                  {
-                    label: "Claims Paid",
-                    data: values,
-                    backgroundColor: gradient,
-                    borderColor: "rgb(52, 211, 153)",
-                    borderWidth: 2,
-                    pointBackgroundColor: "rgb(52, 211, 153)",
-                    pointBorderColor: isDarkMode ? "#1f2937" : "#ffffff",
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    fill: true,
-                    tension: 0.3,
-                  },
-                ],
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    display: false,
-                  },
-                  tooltip: {
-                    backgroundColor: isDarkMode
-                      ? "rgba(31, 41, 55, 0.9)"
-                      : "rgba(255, 255, 255, 0.9)",
-                    titleColor: isDarkMode ? "#e5e7eb" : "#374151",
-                    bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
-                    borderColor: isDarkMode
-                      ? "rgba(75, 85, 99, 0.2)"
-                      : "rgba(209, 213, 219, 0.5)",
-                    borderWidth: 1,
-                    padding: 12,
-                    displayColors: false,
-                    callbacks: {
-                      label: (context) => `$${context.raw.toLocaleString()}`,
-                    },
-                  },
-                },
-                scales: {
-                  x: {
-                    grid: {
-                      color: gridColor,
-                    },
-                    ticks: {
-                      color: textColor,
-                      maxRotation: 45,
-                      minRotation: 45,
-                    },
-                  },
-                  y: {
-                    grid: {
-                      color: gridColor,
-                    },
-                    ticks: {
-                      color: textColor,
-                      callback: (value) => {
-                        if (value >= 1000000) {
-                          return `$${value / 1000000}M`;
-                        }
-                        if (value >= 1000) {
-                          return `$${value / 1000}K`;
-                        }
-                        return `$${value}`;
-                      },
-                    },
-                  },
-                },
-              },
-            });
-          }
-        }}
+        ref={canvasRef}
       />
     </div>
   );
 }
 
 // Claims By Product Chart Component
+
 function ClaimsByProductChart({ data }) {
-  if (typeof window === "undefined") {
-    return (
-      <div className="h-full flex items-center justify-center">
-        Loading chart...
-      </div>
-    );
-  }
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !data) return;
+    const el = canvasRef.current;
+    const ctx = el.getContext("2d");
+
+    if (window.claimsProductChart) {
+      window.claimsProductChart.destroy();
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = el.getBoundingClientRect();
+    el.width = rect.width * dpr;
+    el.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const isDarkMode = document.documentElement.classList.contains("dark");
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+
+    const labels = data.map((item) => item.name);
+    const approvedValues = data.map((item) => item.amount);
+
+    window.claimsProductChart = new window.Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Approved Claims",
+            data: approvedValues,
+            backgroundColor: "rgba(52, 211, 153, 0.8)",
+            borderColor: "rgb(52, 211, 153)",
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "top",
+            labels: {
+              color: textColor,
+              padding: 20,
+              usePointStyle: true,
+              pointStyle: "rect",
+            },
+          },
+          tooltip: {
+            backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+            titleColor: isDarkMode ? "#e5e7eb" : "#374151",
+            bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
+            borderColor: isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)",
+            borderWidth: 1,
+            padding: 12,
+            callbacks: {
+              label: (context) => `${context.dataset.label}: $${context.raw.toLocaleString()}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false,
+            },
+            ticks: {
+              color: textColor,
+            },
+          },
+          y: {
+            grid: {
+              color: gridColor,
+            },
+            ticks: {
+              color: textColor,
+              callback: (value) => {
+                if (value >= 1000000) {
+                  return `$${value / 1000000}M`;
+                }
+                if (value >= 1000) {
+                  return `$${value / 1000}K`;
+                }
+                return `$${value}`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      if (window.claimsProductChart) {
+        window.claimsProductChart.destroy();
+      }
+    };
+  }, [data]);
 
   return (
     <div className="h-full w-full">
-      <canvas
-        id="claimsByProductChart"
-        className="h-full w-full"
-        ref={(el) => {
-          if (el && data) {
-            const ctx = el.getContext("2d");
-
-            // Clear previous chart if it exists
-            if (window.claimsProductChart) {
-              window.claimsProductChart.destroy();
-            }
-
-            // Set canvas dimensions for high DPI displays
-            const dpr = window.devicePixelRatio || 1;
-            const rect = el.getBoundingClientRect();
-            el.width = rect.width * dpr;
-            el.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-
-            // Draw chart
-            const isDarkMode =
-              document.documentElement.classList.contains("dark");
-            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-            const gridColor = isDarkMode
-              ? "rgba(75, 85, 99, 0.2)"
-              : "rgba(209, 213, 219, 0.5)";
-
-            const labels = data.map((item) => item.name);
-            const approvedValues = data.map((item) => item.amount);
-
-            // Create chart
-            window.claimsProductChart = new window.Chart(ctx, {
-              type: "bar",
-              data: {
-                labels: labels,
-                datasets: [
-                  {
-                    label: "Approved Claims",
-                    data: approvedValues,
-                    backgroundColor: "rgba(52, 211, 153, 0.8)",
-                    borderColor: "rgb(52, 211, 153)",
-                    borderWidth: 1,
-                  },
-                ],
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    display: true,
-                    position: "top",
-                    labels: {
-                      color: textColor,
-                      padding: 20,
-                      usePointStyle: true,
-                      pointStyle: "rect",
-                    },
-                  },
-                  tooltip: {
-                    backgroundColor: isDarkMode
-                      ? "rgba(31, 41, 55, 0.9)"
-                      : "rgba(255, 255, 255, 0.9)",
-                    titleColor: isDarkMode ? "#e5e7eb" : "#374151",
-                    bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
-                    borderColor: isDarkMode
-                      ? "rgba(75, 85, 99, 0.2)"
-                      : "rgba(209, 213, 219, 0.5)",
-                    borderWidth: 1,
-                    padding: 12,
-                    callbacks: {
-                      label: (context) =>
-                        `${
-                          context.dataset.label
-                        }: $${context.raw.toLocaleString()}`,
-                    },
-                  },
-                },
-                scales: {
-                  x: {
-                    grid: {
-                      display: false,
-                    },
-                    ticks: {
-                      color: textColor,
-                    },
-                  },
-                  y: {
-                    grid: {
-                      color: gridColor,
-                    },
-                    ticks: {
-                      color: textColor,
-                      callback: (value) => {
-                        if (value >= 1000000) {
-                          return `$${value / 1000000}M`;
-                        }
-                        if (value >= 1000) {
-                          return `$${value / 1000}K`;
-                        }
-                        return `$${value}`;
-                      },
-                    },
-                  },
-                },
-              },
-            });
-          }
-        }}
-      />
+      <canvas id="claimsByProductChart" className="h-full w-full" ref={canvasRef} />
     </div>
   );
 }
-
 // Active Cover Chart Component
 function ActiveCoverChart({ data }) {
-  if (typeof window === "undefined") {
-    return (
-      <div className="h-full flex items-center justify-center">Loading chart...</div>
-    );
-  }
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !data) return;
+    const el = canvasRef.current;
+    const ctx = el.getContext("2d");
+
+    if (window.activeCoverChart) {
+      window.activeCoverChart.destroy();
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = el.getBoundingClientRect();
+    el.width = rect.width * dpr;
+    el.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const isDarkMode = document.documentElement.classList.contains("dark");
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+
+    const labels = data.map((d) => d.date);
+    const values = data.map((d) => d.amount);
+
+    window.activeCoverChart = new window.Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Active Cover",
+            data: values,
+            backgroundColor: "rgba(59, 130, 246, 0.4)",
+            borderColor: "rgb(59, 130, 246)",
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+            titleColor: textColor,
+            bodyColor: textColor,
+            borderColor: gridColor,
+            borderWidth: 1,
+            padding: 12,
+            displayColors: false,
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: gridColor },
+            ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
+          },
+          y: {
+            grid: { color: gridColor },
+            ticks: {
+              color: textColor,
+              callback: (value) => {
+                if (value >= 1_000_000) return `$${value / 1_000_000}M`;
+                if (value >= 1_000) return `$${value / 1_000}K`;
+                return `$${value}`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      if (window.activeCoverChart) {
+        window.activeCoverChart.destroy();
+      }
+    };
+  }, [data]);
 
   return (
     <div className="h-full w-full">
-      <canvas
-        id="activeCoverChart"
-        className="h-full w-full"
-        ref={(el) => {
-          if (el && data) {
-            const ctx = el.getContext("2d");
-            if (window.activeCoverChart) {
-              window.activeCoverChart.destroy();
-            }
-            const dpr = window.devicePixelRatio || 1;
-            const rect = el.getBoundingClientRect();
-            el.width = rect.width * dpr;
-            el.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-
-            const isDarkMode = document.documentElement.classList.contains("dark");
-            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-            const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
-
-            const labels = data.map((d) => d.date);
-            const values = data.map((d) => d.amount);
-
-            window.activeCoverChart = new window.Chart(ctx, {
-              type: "line",
-              data: {
-                labels,
-                datasets: [
-                  {
-                    label: "Active Cover",
-                    data: values,
-                    backgroundColor: "rgba(59, 130, 246, 0.4)",
-                    borderColor: "rgb(59, 130, 246)",
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.3,
-                  },
-                ],
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
-                    titleColor: textColor,
-                    bodyColor: textColor,
-                    borderColor: gridColor,
-                    borderWidth: 1,
-                    padding: 12,
-                    displayColors: false,
-                  },
-                },
-                scales: {
-                  x: {
-                    grid: { color: gridColor },
-                    ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
-                  },
-                  y: {
-                    grid: { color: gridColor },
-                    ticks: {
-                      color: textColor,
-                      callback: (value) => {
-                        if (value >= 1_000_000) return `$${value / 1_000_000}M`;
-                        if (value >= 1_000) return `$${value / 1_000}K`;
-                        return `$${value}`;
-                      },
-                    },
-                  },
-                },
-              },
-            });
-          }
-        }}
-      />
+      <canvas id="activeCoverChart" className="h-full w-full" ref={canvasRef} />
     </div>
   );
 }
-
 // Lapsed Cover Chart Component
 function LapsedCoverChart({ data }) {
-  if (typeof window === "undefined") {
-    return (
-      <div className="h-full flex items-center justify-center">Loading chart...</div>
-    );
-  }
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !data) return;
+    const el = canvasRef.current;
+    const ctx = el.getContext("2d");
+    if (window.lapsedCoverChart) {
+      window.lapsedCoverChart.destroy();
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const rect = el.getBoundingClientRect();
+    el.width = rect.width * dpr;
+    el.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const isDarkMode = document.documentElement.classList.contains("dark");
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+
+    const labels = data.map((d) => d.date);
+    const values = data.map((d) => d.amount);
+
+    window.lapsedCoverChart = new window.Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Cover Dropped",
+            data: values,
+            backgroundColor: "rgba(239, 68, 68, 0.8)",
+            borderColor: "rgb(239, 68, 68)",
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+            titleColor: textColor,
+            bodyColor: textColor,
+            borderColor: gridColor,
+            borderWidth: 1,
+            padding: 12,
+            callbacks: {
+              label: (ctx) => `$${ctx.raw.toLocaleString()}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: gridColor },
+            ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
+          },
+          y: {
+            grid: { color: gridColor },
+            ticks: {
+              color: textColor,
+              callback: (value) => {
+                if (value >= 1_000_000) return `$${value / 1_000_000}M`;
+                if (value >= 1_000) return `$${value / 1_000}K`;
+                return `$${value}`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      if (window.lapsedCoverChart) {
+        window.lapsedCoverChart.destroy();
+      }
+    };
+  }, [data]);
 
   return (
     <div className="h-full w-full">
-      <canvas
-        id="lapsedCoverChart"
-        className="h-full w-full"
-        ref={(el) => {
-          if (el && data) {
-            const ctx = el.getContext("2d");
-            if (window.lapsedCoverChart) {
-              window.lapsedCoverChart.destroy();
-            }
-            const dpr = window.devicePixelRatio || 1;
-            const rect = el.getBoundingClientRect();
-            el.width = rect.width * dpr;
-            el.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-
-            const isDarkMode = document.documentElement.classList.contains("dark");
-            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-            const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
-
-            const labels = data.map((d) => d.date);
-            const values = data.map((d) => d.amount);
-
-            window.lapsedCoverChart = new window.Chart(ctx, {
-              type: "bar",
-              data: {
-                labels,
-                datasets: [
-                  {
-                    label: "Cover Dropped",
-                    data: values,
-                    backgroundColor: "rgba(239, 68, 68, 0.8)",
-                    borderColor: "rgb(239, 68, 68)",
-                    borderWidth: 1,
-                  },
-                ],
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
-                    titleColor: textColor,
-                    bodyColor: textColor,
-                    borderColor: gridColor,
-                    borderWidth: 1,
-                    padding: 12,
-                    callbacks: {
-                      label: (ctx) => `$${ctx.raw.toLocaleString()}`,
-                    },
-                  },
-                },
-                scales: {
-                  x: {
-                    grid: { color: gridColor },
-                    ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
-                  },
-                  y: {
-                    grid: { color: gridColor },
-                    ticks: {
-                      color: textColor,
-                      callback: (value) => {
-                        if (value >= 1_000_000) return `$${value / 1_000_000}M`;
-                        if (value >= 1_000) return `$${value / 1_000}K`;
-                        return `$${value}`;
-                      },
-                    },
-                  },
-                },
-              },
-            });
-          }
-        }}
-      />
+      <canvas id="lapsedCoverChart" className="h-full w-full" ref={canvasRef} />
     </div>
   );
 }
