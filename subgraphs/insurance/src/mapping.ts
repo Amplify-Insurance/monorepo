@@ -37,7 +37,7 @@ import {
   UsdcPremiumReceived
 } from "../generated/CatInsurancePool/CatInsurancePool";
 import {
-  PolicyLastPaidUpdated,
+  PolicyPremiumAccountUpdated,
   Transfer,
   OwnershipTransferred as PolicyNFTOwnershipTransferred
 } from "../generated/PolicyNFT/PolicyNFT";
@@ -74,7 +74,7 @@ export function handlePoolAdded(event: PoolAdded): void {
 
   let poolId = event.params.poolId.toString();
   let pool = new Pool(poolId);
-  pool.underlyingAsset = event.params.underlyingAsset;
+  pool.underlyingAsset = Address.zero();
   pool.protocolToken = event.params.protocolToken;
   pool.protocolCovered = event.params.protocolCovered;
   pool.save();
@@ -90,8 +90,8 @@ export function handleDeposit(event: Deposit): void {
     u.totalDeposited = BigInt.fromI32(0);
     u.masterShares = BigInt.fromI32(0);
   }
-  u.totalDeposited = u.totalDeposited.plus(event.params.amountDeposited);
-  u.masterShares = u.masterShares.plus(event.params.masterSharesMinted);
+  u.totalDeposited = u.totalDeposited.plus(event.params.amount);
+  u.masterShares = u.masterShares.plus(event.params.sharesMinted);
   u.save();
 }
 export function handleWithdrawalRequested(event: WithdrawalRequested): void { saveGeneric(event, "WithdrawalRequested"); }
@@ -133,7 +133,7 @@ export function handleProtocolAssetRewardsClaimed(event: ProtocolAssetRewardsCla
 export function handleUsdcPremiumReceived(event: UsdcPremiumReceived): void { saveGeneric(event, "UsdcPremiumReceived"); }
 
 // PolicyNFT events
-export function handlePolicyLastPaidUpdated(event: PolicyLastPaidUpdated): void { saveGeneric(event, "PolicyLastPaidUpdated"); }
+export function handlePolicyPremiumAccountUpdated(event: PolicyPremiumAccountUpdated): void { saveGeneric(event, "PolicyPremiumAccountUpdated"); }
 export function handleTransfer(event: Transfer): void {
   saveGeneric(event, "Transfer");
 

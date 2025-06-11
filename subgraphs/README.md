@@ -11,5 +11,25 @@ It stores a minimal set of entities for demonstration purposes, including a
 `ContractOwner` record that tracks the current owner address of each contract
 via the `OwnershipTransferred` events.
 
-Run `npm install` then `npm run codegen && npm run build` inside the
-subgraph directory to generate and build the subgraph.
+## Building and Deploying
+
+Install dependencies then generate the types and build the mappings:
+
+```bash
+cd subgraphs/insurance
+npm install
+npm run codegen
+npm run build
+```
+
+Before deploying edit `subgraph.yaml` and replace the placeholder contract
+addresses with the deployed values on your network. Once configured you can
+deploy using the Graph CLI (requires an access token):
+
+```bash
+graph auth --product hosted-service <ACCESS_TOKEN>
+npm run deploy -- --product hosted-service <GITHUB_USER>/<SUBGRAPH_NAME>
+```
+
+Refer to [The Graph documentation](https://thegraph.com/docs/en/deploying/subgra
+phs/) for details on obtaining an access token and creating a subgraph.
