@@ -138,8 +138,9 @@ export default function UnderwriterPanel({ displayCurrency }) {
     }
   }
 
-  const totalYield = calculateTotalYield()
   const selectedAdapter = adapters.find((a) => a.id === selectedYield)
+  const baseYield = selectedAdapter?.apr || 0
+  const totalYield = calculateTotalYield() + baseYield
 
   if (!isConnected) {
     return (
