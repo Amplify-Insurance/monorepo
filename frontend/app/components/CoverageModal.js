@@ -110,24 +110,27 @@ export default function CoverageModal({
 
       if (type === "purchase") {
         const rm = await getRiskManagerWithSigner()
-        const rmAddress = process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS;
+        const rmAddress = process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS
 
-        const amountBn = ethers.utils.parseUnits(amount, dec);
+        const amountBn = ethers.utils.parseUnits(amount, dec) // coverage amount
 
-        // Estimate first premium for allowance check
+        // Calculate deposit for selected duration
         const weeklyPremium = (Number(amount) * (Number(premium) / 100) * 7) / 365
-        const premBn = ethers.utils.parseUnits(weeklyPremium.toFixed(dec), dec)
+        const depositTotal = weeklyPremium * durationWeeks
+        const depositBn = ethers.utils.parseUnits(depositTotal.toFixed(dec), dec)
+
+        // Ensure sufficient allowance for the premium deposit
         const allowance = await tokenContract.allowance(
           signerAddress,
           rmAddress
         )
 
-        if (allowance.lt(premBn)) {
-          const approveTx = await tokenContract.approve(rmAddress, premBn)
+        if (allowance.lt(depositBn)) {
+          const approveTx = await tokenContract.approve(rmAddress, depositBn)
           await approveTx.wait()
         }
 
-        const tx = await rm.purchaseCover(poolId, amountBn)
+        const tx = await rm.purchaseCover(poolId, amountBn, depositBn)
         await tx.wait()
 
       } else { // "provide" flow
