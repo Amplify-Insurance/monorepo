@@ -219,7 +219,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                           className="rounded-full"
                                         />
                                       </div>
-                                      <span className="font-medium">{pool.tokenName}</span>
+                                      <span className="font-medium">{getTokenName(pool.token)}</span>
                                     </div>
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
                                       TVL: {formatCurrency(pool.tvl, "usd", displayCurrency)}
