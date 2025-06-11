@@ -27,10 +27,6 @@ dataSources:
       eventHandlers:
         - event: PoolAdded(indexed uint256,indexed address,uint8)
           handler: handlePoolAdded
-        - event: WithdrawalRequested(indexed address,uint256,uint256)
-          handler: handleWithdrawalRequested
-        - event: WithdrawalExecuted(indexed address,uint256,uint256)
-          handler: handleWithdrawalExecuted
         - event: CapitalAllocated(indexed address,indexed uint256,uint256)
           handler: handleCapitalAllocated
         - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
@@ -45,12 +41,6 @@ dataSources:
           handler: handleIncidentReported
         - event: PolicyLapsed(indexed uint256)
           handler: handlePolicyLapsed
-        - event: BaseYieldAdapterSet(indexed uint8,address)
-          handler: handleBaseYieldAdapterSet
-        - event: SystemValueSynced(uint256,uint256)
-          handler: handleSystemValueSynced
-        - event: AdapterCallFailed(indexed address,string,string)
-          handler: handleAdapterCallFailed
         - event: PremiumRewardsClaimed(indexed address,indexed uint256,uint256)
           handler: handlePremiumRewardsClaimed
         - event: DistressedAssetRewardsClaimed(indexed address,indexed uint256,indexed address,uint256)
@@ -94,7 +84,7 @@ dataSources:
           handler: handleAdapterCallFailed
         - event: RiskManagerSet(indexed address)
           handler: handleRiskManagerSet
-        - event: BaseYieldAdapterSet(indexed uint8,address)
+        - event: BaseYieldAdapterSet(indexed uint8,indexed address)
           handler: handleBaseYieldAdapterSet
         - event: OwnershipTransferred(indexed address,indexed address)
           handler: handleCapitalPoolOwnershipTransferred
@@ -164,8 +154,8 @@ dataSources:
         - name: PolicyNFT
           file: ./abis/PolicyNFT.json
       eventHandlers:
-        - event: PolicyLastPaidUpdated(indexed uint256,uint256,address)
-          handler: handlePolicyLastPaidUpdated
+        - event: PolicyPremiumAccountUpdated(indexed uint256,uint128,uint128)
+          handler: handlePolicyPremiumAccountUpdated
         - event: Transfer(indexed address,indexed address,indexed uint256)
           handler: handleTransfer
         - event: OwnershipTransferred(indexed address,indexed address)
