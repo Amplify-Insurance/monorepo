@@ -7,6 +7,7 @@ import ActiveCoverages from "../components/ActiveCoverages"
 import UnderwritingPositions from "../components/UnderwritingPositions"
 import { useAccount } from "wagmi"
 import ClaimsSection from "../components/ClaimsSection"
+import CatPoolDeposits from "../components/CatPoolDeposits"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 
@@ -63,6 +64,11 @@ export default function Dashboard() {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-xl font-semibold mb-4">Claims & Affected Positions</h2>
           <ClaimsSection displayCurrency={displayCurrency} />
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-xl font-semibold mb-4">My Cat Pool Deposits</h2>
+          <CatPoolDeposits displayCurrency={displayCurrency} />
         </div>
       </div>
     </div>
