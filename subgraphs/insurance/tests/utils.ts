@@ -60,3 +60,33 @@ export function createPoolAddedEvent(
   event.parameters.push(new ethereum.EventParam('protocolCovered', ethereum.Value.fromI32(protocolCovered)))
   return event
 }
+
+import { WithdrawalRequested } from '../generated/CapitalPool/CapitalPool'
+
+export function createWithdrawalRequestedEvent(
+  user: Address,
+  sharesToBurn: BigInt,
+  timestamp: BigInt
+): WithdrawalRequested {
+  let event = changetype<WithdrawalRequested>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('user', ethereum.Value.fromAddress(user)))
+  event.parameters.push(new ethereum.EventParam('sharesToBurn', ethereum.Value.fromUnsignedBigInt(sharesToBurn)))
+  event.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(timestamp)))
+  return event
+}
+
+import { OwnershipTransferred as RMOwnershipTransferred } from '../generated/RiskManager/RiskManager'
+
+export function createOwnershipTransferredEvent(
+  previousOwner: Address,
+  newOwner: Address,
+  contract: Address
+): RMOwnershipTransferred {
+  let event = changetype<RMOwnershipTransferred>(newMockEvent())
+  event.address = contract
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('previousOwner', ethereum.Value.fromAddress(previousOwner)))
+  event.parameters.push(new ethereum.EventParam('newOwner', ethereum.Value.fromAddress(newOwner)))
+  return event
+}
