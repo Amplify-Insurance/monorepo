@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
 import { getYieldPlatformInfo } from '../app/config/yieldPlatforms';
 
 export default function useYieldAdapters() {
@@ -10,12 +11,22 @@ export default function useYieldAdapters() {
         const res = await fetch('/api/adapters');
         if (res.ok) {
           const data = await res.json();
-          const list = (data.addresses || []).map((addr, index) => ({
-            id: index,
-            address: addr,
-            ...getYieldPlatformInfo(index),
-          }));
-          const filtered = list.filter(a => a.address && a.address !== '0x0000000000000000000000000000000000000000');
+          const list = (data.adapters || []).map((item, index) => {
+            let apr = 0;
+            try {
+              const decimals = index === 0 ? 27 : 18;
+              apr = parseFloat(ethers.utils.formatUnits(item.apr || '0', decimals)) * 100;
+            } catch {}
+            return {
+              id: index,
+              address: item.address,
+              apr,
+              ...getYieldPlatformInfo(index),
+            };
+          });
+          const filtered = list.filter(
+            (a) => a.address && a.address !== '0x0000000000000000000000000000000000000000'
+          );
           setAdapters(filtered);
         }
       } catch (err) {
