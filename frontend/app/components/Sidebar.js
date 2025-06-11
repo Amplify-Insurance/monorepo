@@ -56,7 +56,7 @@ export default function Sidebar() {
           </nav>
 
           {/* Documentation link moved to bottom, before social links */}
-          <div className="mt-auto">
+          <footer className="mt-auto">
             <Link
               href="/docs"
               className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white mx-2 mb-2"
@@ -85,7 +85,7 @@ export default function Sidebar() {
                 ))}
               </div>
             </div>
-          </div>
+          </footer>
         </div>
       </div>
     </div>
