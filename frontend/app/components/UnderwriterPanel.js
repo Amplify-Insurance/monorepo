@@ -139,6 +139,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   }
 
   const totalYield = calculateTotalYield()
+  const selectedAdapter = adapters.find((a) => a.id === selectedYield)
 
   if (!isConnected) {
     return (
@@ -269,6 +270,11 @@ export default function UnderwriterPanel({ displayCurrency }) {
                 <span className="block truncate">
                   {getYieldPlatformInfo(selectedYield).name}
                 </span>
+                {selectedAdapter && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    {selectedAdapter.apr.toFixed(2)}% APR
+                  </span>
+                )}
               </div>
             )}
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
@@ -287,17 +293,20 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     setYieldDropdownOpen(false);
                   }}
                 >
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-6 w-6 mr-2">
-                      <Image
-                        src={getProtocolLogo(adapter.id)}
-                        alt={adapter.name}
-                        width={24}
-                        height={24}
-                        className="rounded-full"
-                      />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-6 w-6 mr-2">
+                        <Image
+                          src={getProtocolLogo(adapter.id)}
+                          alt={adapter.name}
+                          width={24}
+                          height={24}
+                          className="rounded-full"
+                        />
+                      </div>
+                      <span className={`block truncate ${adapter.id === selectedYield ? "font-medium" : "font-normal"}`}>{adapter.name}</span>
                     </div>
-                    <span className={`block truncate ${adapter.id === selectedYield ? "font-medium" : "font-normal"}`}>{adapter.name}</span>
+                    <span className="ml-2 text-xs text-gray-500">{adapter.apr.toFixed(2)}% APR</span>
                   </div>
                 </button>
               ))}
