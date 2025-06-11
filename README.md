@@ -114,6 +114,22 @@ include:
 - `GET /api/catpool/rewards/[address]/[token]` – claimable distressed asset rewards
 - `GET /api/policies/[id]` – fetch details for a Policy NFT
 
+### Running Tests
+
+Frontend unit tests use **Vitest** with React Testing Library:
+
+```bash
+cd frontend
+npm run test
+```
+
+Subgraph mappings can be tested with **matchstick-as**:
+
+```bash
+cd subgraphs/insurance
+npm run test
+```
+
 ## License
 
 This project is licensed under the **Business Source License 1.1**. See [LICENSE](./LICENSE) for details.
