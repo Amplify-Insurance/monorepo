@@ -4,6 +4,7 @@ import { TrendingUp, MoreHorizontal } from "lucide-react";
 import Image from "next/image";
 import { formatCurrency, formatPercentage } from "../utils/formatting";
 import ManageCoverageModal from "./ManageCoverageModal";
+import ManageAllocationModal from "./ManageAllocationModal";
 import { useAccount } from "wagmi";
 import useUnderwriterDetails from "../../hooks/useUnderwriterDetails";
 import usePools from "../../hooks/usePools";
@@ -21,6 +22,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [isClaimingAll, setIsClaimingAll] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [showAllocModal, setShowAllocModal] = useState(false);
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
   const { pools } = usePools();
@@ -154,12 +156,34 @@ export default function UnderwritingPositions({ displayCurrency }) {
           <TrendingUp className="h-6 w-6 text-gray-500 dark:text-gray-400" />
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-          No underwriting positions
+          {totalDeposited > 0
+            ? "Capital deposited but not allocated"
+            : "No underwriting positions"}
         </h3>
-        <p className="text-gray-500 dark:text-gray-400">
-          You don't have any active underwriting positions. Visit the markets
-          page to provide coverage.
-        </p>
+        {totalDeposited > 0 ? (
+          <div>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              You have {formatCurrency(totalDeposited)} ready to allocate.
+            </p>
+            <button
+              onClick={() => setShowAllocModal(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+            >
+              Allocate Capital
+            </button>
+            {showAllocModal && (
+              <ManageAllocationModal
+                isOpen={showAllocModal}
+                onClose={() => setShowAllocModal(false)}
+              />
+            )}
+          </div>
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400">
+            You don't have any active underwriting positions. Visit the markets
+            page to provide coverage.
+          </p>
+        )}
       </div>
     );
   }
@@ -194,6 +218,14 @@ export default function UnderwritingPositions({ displayCurrency }) {
               {formatPercentage(totalApr)}
             </div>
           </div>
+        </div>
+        <div className="mt-4 text-right">
+          <button
+            onClick={() => setShowAllocModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+          >
+            Edit Allocation
+          </button>
         </div>
       </div>
 
@@ -453,6 +485,12 @@ export default function UnderwritingPositions({ displayCurrency }) {
           shares={selectedPosition.shares}
           poolId={selectedPosition.poolId}
           yieldChoice={selectedPosition.yieldChoice}
+        />
+      )}
+      {showAllocModal && (
+        <ManageAllocationModal
+          isOpen={showAllocModal}
+          onClose={() => setShowAllocModal(false)}
         />
       )}
     </div>
