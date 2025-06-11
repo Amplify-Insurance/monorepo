@@ -867,7 +867,10 @@ function LapsedCoverChart({ data }) {
     if (!canvasRef.current || !data) return;
     const el = canvasRef.current;
     const ctx = el.getContext("2d");
-    if (window.lapsedCoverChart) {
+    if (
+      window.lapsedCoverChart &&
+      typeof window.lapsedCoverChart.destroy === "function"
+    ) {
       window.lapsedCoverChart.destroy();
     }
     const dpr = window.devicePixelRatio || 1;
@@ -935,7 +938,10 @@ function LapsedCoverChart({ data }) {
     });
 
     return () => {
-      if (window.lapsedCoverChart) {
+      if (
+        window.lapsedCoverChart &&
+        typeof window.lapsedCoverChart.destroy === "function"
+      ) {
         window.lapsedCoverChart.destroy();
       }
     };
