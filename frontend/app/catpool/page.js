@@ -63,7 +63,7 @@ export default function CatPoolPage() {
             Select Asset
           </label>
           <select
-            className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={selectedAdapter?.id ?? ''}
             onChange={(e) => {
               const found = adapters.find((a) => a.id === Number(e.target.value))
@@ -130,7 +130,14 @@ export default function CatPoolPage() {
           Claim
         </button>
       </div>
-      <CatPoolModal isOpen={depositOpen} onClose={() => setDepositOpen(false)} mode="deposit" />
+      <CatPoolModal
+        isOpen={depositOpen}
+        onClose={() => setDepositOpen(false)}
+        mode="deposit"
+        token={selectedAdapter?.asset}
+        apr={selectedAdapter?.apr ?? 0}
+        assetSymbol={selectedAdapter?.assetSymbol || 'USDC'}
+      />
       <CatPoolModal isOpen={withdrawOpen} onClose={() => setWithdrawOpen(false)} mode="withdraw" />
     </div>
   )
