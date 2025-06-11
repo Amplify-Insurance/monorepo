@@ -32,23 +32,27 @@ export async function GET() {
   try {
     if (!SUBGRAPH_URL) throw new Error('SUBGRAPH_URL not configured');
 
-    const [createdEv, lapsedEv, claimEv, premiumEv] = await Promise.all([
+    const [createdEv, lapsedEv, claimEv, premiumEv, depositEv] = await Promise.all([
       fetchEvents('PolicyCreated'),
       fetchEvents('PolicyLapsed'),
       fetchEvents('ClaimProcessed'),
       fetchEvents('PremiumPaid'),
+      fetchEvents('Deposit'),
     ]);
 
     type E = { timestamp: number; type: string; policyId: number; coverage?: bigint };
     const events: E[] = [];
     const coverageMap = new Map<number, bigint>();
     const lapsedHistory: { timestamp: number; amount: string }[] = [];
+    const policyHolderSet = new Set<string>();
+    const underwriterSet = new Set<string>();
     let totalClaimFees = 0n;
     for (const ev of createdEv) {
       const [user, policyIdStr, poolIdStr, coverageStr] = ev.data.split(',');
       const cov = BigInt(coverageStr);
       const pid = Number(policyIdStr);
       coverageMap.set(pid, cov);
+      policyHolderSet.add(user.toLowerCase());
       events.push({ timestamp: Number(ev.timestamp), type: 'created', policyId: pid, coverage: cov });
     }
     for (const ev of lapsedEv) {
@@ -63,6 +67,11 @@ export async function GET() {
     for (const ev of premiumEv) {
       const [, , amountPaidStr] = ev.data.split(',');
       totalPremiums += BigInt(amountPaidStr);
+    }
+
+    for (const ev of depositEv) {
+      const [user] = ev.data.split(',');
+      underwriterSet.add(user.toLowerCase());
     }
 
     events.sort((a, b) => a.timestamp - b.timestamp);
@@ -99,6 +108,8 @@ export async function GET() {
       totalPremiumsPaid: totalPremiums.toString(),
       totalClaimFees: totalClaimFees.toString(),
       lapsedCoverHistory: lapsedHistory,
+      underwriterCount: underwriterSet.size,
+      policyHolderCount: policyHolderSet.size,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

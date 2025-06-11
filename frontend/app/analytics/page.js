@@ -152,6 +152,8 @@ export default function AnalyticsPage() {
         ethers.utils.formatUnits(analyticsData.totalClaimFees || "0", 6)
       )
     : 0;
+  const underwriterCount = analyticsData?.underwriterCount || 0;
+  const policyHolderCount = analyticsData?.policyHolderCount || 0;
   const lapsedHistory = (analyticsData?.lapsedCoverHistory || []).map((h) => ({
     date: new Date(h.timestamp * 1000).toISOString().slice(0, 10),
     amount: Number(ethers.utils.formatUnits(h.amount, 6)),
@@ -187,44 +189,6 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* DAI Claims */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-              Claims paid
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-              {(stats.byToken.DAI || 0).toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              DAI share
-            </div>
-          </div>
-
-          {/* ETH Claims */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-              Claims paid
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {(stats.byToken.ETH || 0).toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              ETH share
-            </div>
-          </div>
-
-          {/* USDC Claims */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-              Claims paid
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold text-blue-500 dark:text-blue-300">
-              {(stats.byToken.USDC || 0).toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              USDC share
-            </div>
-          </div>
         </div>
       </div>
 
@@ -252,6 +216,25 @@ export default function AnalyticsPage() {
               {totalClaimFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+          </div>
+        </div>
+      </div>
+
+      {/* User Counts */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Users</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">User Count (Underwriters)</div>
+            <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+              {underwriterCount.toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">User Count (Policy Holders)</div>
+            <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+              {policyHolderCount.toLocaleString()}
+            </div>
           </div>
         </div>
       </div>
