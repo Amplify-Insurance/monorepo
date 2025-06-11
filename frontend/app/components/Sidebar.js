@@ -17,10 +17,10 @@ export default function Sidebar() {
   ]
 
   const socialLinks = [
-    { name: "GitHub", href: "https://github.com", icon: "/images/social/github.png" },
-    { name: "Medium", href: "https://medium.com", icon: "/images/social/medium.png" },
-    { name: "Telegram", href: "https://telegram.org", icon: "/images/social/telegram.png" },
-    { name: "X", href: "https://twitter.com", icon: "/images/social/x.png" },
+    { name: "GitHub", href: "https://github.com", icon: "/images/social/github.svg" },
+    { name: "Medium", href: "https://medium.com", icon: "/images/social/medium.svg" },
+    { name: "Telegram", href: "https://telegram.org", icon: "/images/social/telegram.svg" },
+    { name: "X", href: "https://twitter.com", icon: "/images/social/x.svg" },
   ]
 
   return (
