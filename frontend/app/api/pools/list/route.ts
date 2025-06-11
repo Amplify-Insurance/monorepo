@@ -62,8 +62,20 @@ function bnToString(value: any): any {
 function calcUtilization(pool: any): bigint {
   const totalCapital = BigInt(pool.totalCapitalPledgedToPool);
   const sold = BigInt(pool.totalCoverageSold);
-  if (totalCapital === 0n) return sold > 0n ? BPS * 100n : 0n;
-  return (sold * BPS * 100n) / totalCapital;
+  if (totalCapital === 0n) return 0n;
+  return (sold * BPS) / totalCapital;
+}
+
+/**
+ * Effective annual yield to underwriters in basis points.
+ */
+function calcUnderwriterYieldBps(pool: any, catPremiumBps: bigint): bigint {
+  const rate = calcPremiumRateBps(pool);
+  const sold = BigInt(pool.totalCoverageSold);
+  const totalCapital = BigInt(pool.totalCapitalPledgedToPool);
+  if (totalCapital === 0n || sold === 0n) return 0n;
+  const uwRate = (rate * (BPS - catPremiumBps)) / BPS;
+  return (uwRate * sold) / totalCapital;
 }
 
 /**
@@ -121,7 +133,7 @@ export async function GET() {
         const rawInfo = await riskManager.getPoolInfo(i);
         const info = bnToString(rawInfo);
         const rate = calcPremiumRateBps(info);
-        const uwYield = (rate * (BPS - catPremiumBps)) / BPS;
+        const uwYield = calcUnderwriterYieldBps(info, catPremiumBps);
 
         pools.push({
           id: i,
