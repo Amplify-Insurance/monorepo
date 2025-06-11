@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { catPool } from '../../../../../../../lib/catPool';
+import { catPool } from '../../../../../../lib/catPool';
 
 export async function GET(_req: Request, { params }: { params: { address: string; token: string } }) {
   try {

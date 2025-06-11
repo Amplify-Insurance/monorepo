@@ -6,7 +6,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ethers } from "ethers"
 import CatPoolModal from "../components/CatPoolModal"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
-import { getCatPoolWithSigner } from "../lib/catPool"
+import { getCatPoolWithSigner } from "../../lib/catPool"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 
 export default function CatPoolPage() {

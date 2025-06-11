@@ -8,7 +8,7 @@ import {
   getCatPoolWithSigner,
   getUsdcAddress,
   getUsdcDecimals,
-} from "../lib/catPool";
+} from "../../lib/catPool";
 import { getERC20WithSigner } from "../../lib/erc20";
 import { getTokenLogo } from "../config/tokenNameMap";
 
