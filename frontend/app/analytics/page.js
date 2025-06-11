@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ethers } from "ethers";
 import useClaims from "../../hooks/useClaims";
 import usePools from "../../hooks/usePools";
+import useAnalytics from "../../hooks/useAnalytics";
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 
 export default function AnalyticsPage() {
@@ -19,6 +20,7 @@ export default function AnalyticsPage() {
   const itemsPerPage = 10;
   const { claims } = useClaims();
   const { pools } = usePools();
+  const { data: analyticsData } = useAnalytics();
 
   const mappedClaims = claims
     .map((c, idx) => {
@@ -137,6 +139,19 @@ export default function AnalyticsPage() {
     );
   };
 
+  const activeCover = analyticsData
+    ? Number(ethers.utils.formatUnits(analyticsData.totalActiveCover || "0", 6))
+    : 0;
+  const totalPremiums = analyticsData
+    ? Number(
+        ethers.utils.formatUnits(analyticsData.totalPremiumsPaid || "0", 6)
+      )
+    : 0;
+  const coverHistory = (analyticsData?.activeCoverHistory || []).map((h) => ({
+    date: new Date(h.timestamp * 1000).toISOString().slice(0, 10),
+    amount: Number(ethers.utils.formatUnits(h.active, 6)),
+  }));
+
   return (
     <div className="container mx-auto max-w-7xl">
       <div className="mb-6">
@@ -201,6 +216,35 @@ export default function AnalyticsPage() {
               USDC share
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Coverage Statistics */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Active Cover</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active cover</div>
+            <div className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
+              {activeCover.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Premiums collected</div>
+            <div className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
+              {totalPremiums.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Active Cover Chart */}
+      <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <h2 className="text-xl font-semibold mb-4">Active Cover Over Time</h2>
+        <div className="h-80">
+          <ActiveCoverChart data={coverHistory} />
         </div>
       </div>
 
@@ -697,6 +741,95 @@ function ClaimsByProductChart({ data }) {
                         if (value >= 1000) {
                           return `$${value / 1000}K`;
                         }
+                        return `$${value}`;
+                      },
+                    },
+                  },
+                },
+              },
+            });
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+// Active Cover Chart Component
+function ActiveCoverChart({ data }) {
+  if (typeof window === "undefined") {
+    return (
+      <div className="h-full flex items-center justify-center">Loading chart...</div>
+    );
+  }
+
+  return (
+    <div className="h-full w-full">
+      <canvas
+        id="activeCoverChart"
+        className="h-full w-full"
+        ref={(el) => {
+          if (el && data) {
+            const ctx = el.getContext("2d");
+            if (window.activeCoverChart) {
+              window.activeCoverChart.destroy();
+            }
+            const dpr = window.devicePixelRatio || 1;
+            const rect = el.getBoundingClientRect();
+            el.width = rect.width * dpr;
+            el.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const isDarkMode = document.documentElement.classList.contains("dark");
+            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+            const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+
+            const labels = data.map((d) => d.date);
+            const values = data.map((d) => d.amount);
+
+            window.activeCoverChart = new window.Chart(ctx, {
+              type: "line",
+              data: {
+                labels,
+                datasets: [
+                  {
+                    label: "Active Cover",
+                    data: values,
+                    backgroundColor: "rgba(59, 130, 246, 0.4)",
+                    borderColor: "rgb(59, 130, 246)",
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+                    titleColor: textColor,
+                    bodyColor: textColor,
+                    borderColor: gridColor,
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                  },
+                },
+                scales: {
+                  x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
+                  },
+                  y: {
+                    grid: { color: gridColor },
+                    ticks: {
+                      color: textColor,
+                      callback: (value) => {
+                        if (value >= 1_000_000) return `$${value / 1_000_000}M`;
+                        if (value >= 1_000) return `$${value / 1_000}K`;
                         return `$${value}`;
                       },
                     },
