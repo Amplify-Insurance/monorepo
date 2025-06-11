@@ -1,17 +1,1 @@
 npx hardhat run scripts/deploy.js --network base
-
-Deploying with: 0xA25bc8c1e230a476cB00f2e9c93ffC2D4e163dc5
-
-┌──────────────────┬──────────────────────────────────────────────┐
-│     (index)      │                    Values                    │
-├──────────────────┼──────────────────────────────────────────────┤
-│    PolicyNFT     │ '0x8525926998bE387032280293A4CEe7Cc6855D15e' │
-│ CatInsurancePool │ '0x75A89Dbc9F30BD1D1a087838124b179BFd21666C' │
-│   CapitalPool    │ '0xe74c9F8fEf99f6ad1004763e412a3e355D3C7F84' │
-│   RiskManager    │ '0xdf2dF4cD9A280A94a1C0D8dB36C6C6ff2f058846' │
-│   Aave Adapter   │ '0x14Dac6e700d4127aEc7Aa58C9A3c8C2cf5281235' │
-│ Compound Adapter │ '0xED3139493242132cd0092E6CC1DeA01131FB50Bc' │
-│ Moonwell Adapter │ '0x7068AA15ef6F427f6D71D55cF4F70DC074a61E0a' │
-│  Euler Adapter   │ '0x2768B3893eb2AF51Fc06b775C9f05bBF1B6CAc62' │
-└──────────────────┴──────────────────────────────────────────────┘
-

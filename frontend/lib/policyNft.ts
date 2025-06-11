@@ -19,7 +19,7 @@ console.log('RPC URL:', rpc);
 
 
 export const policyNft = new ethers.Contract(
-  process.env.POLICY_NFT_ADDRESS as string,
+  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS as string,
   PolicyNFT,
   provider
 );

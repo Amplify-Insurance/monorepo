@@ -66,7 +66,7 @@ async function main() {
   await riskManager.waitForDeployment();
 
   // Wiring permissions
-  await policyNFT.setCoverPoolAddress(riskManager.target);
+  // await policyNFT.setCoverPoolAddress(riskManager.target);
   await catPool.setCoverPoolAddress(riskManager.target);
   await capitalPool.setRiskManager(riskManager.target);
 
