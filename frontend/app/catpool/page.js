@@ -3,66 +3,20 @@
 import { useState } from "react"
 import { useAccount } from "wagmi"
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import {
-  getCatPoolWithSigner,
-  getUsdcAddress,
-  getUsdcDecimals,
-} from "../lib/catPool"
-import { getERC20WithSigner } from "../../lib/erc20"
 import { ethers } from "ethers"
+import CatPoolModal from "../components/CatPoolModal"
+import useCatPoolStats from "../../hooks/useCatPoolStats"
+import { getCatPoolWithSigner } from "../lib/catPool"
+import { formatCurrency, formatPercentage } from "../utils/formatting"
 
 export default function CatPoolPage() {
   const { isConnected } = useAccount()
-  const [depositAmount, setDepositAmount] = useState("")
-  const [withdrawShares, setWithdrawShares] = useState("")
   const [claimTokens, setClaimTokens] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [depositOpen, setDepositOpen] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
 
-  const handleDeposit = async () => {
-    if (!depositAmount) return
-    setIsSubmitting(true)
-    try {
-      const cp = await getCatPoolWithSigner()
-      const dec = await getUsdcDecimals()
-      const amountBn = ethers.parseUnits(depositAmount, dec)
-      const tokenAddr = await getUsdcAddress()
-      const token = await getERC20WithSigner(tokenAddr)
-      const addr = await token.signer.getAddress()
-      const allowance = await token.allowance(
-        addr,
-        process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
-      )
-      if (allowance.lt(amountBn)) {
-        const approveTx = await token.approve(
-          process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
-          amountBn,
-        )
-        await approveTx.wait()
-      }
-      const tx = await cp.depositLiquidity(amountBn)
-      await tx.wait()
-      setDepositAmount("")
-    } catch (err) {
-      console.error("Deposit failed", err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleWithdraw = async () => {
-    if (!withdrawShares) return
-    setIsSubmitting(true)
-    try {
-      const cp = await getCatPoolWithSigner()
-      const tx = await cp.withdrawLiquidity(ethers.parseUnits(withdrawShares, 18))
-      await tx.wait()
-      setWithdrawShares("")
-    } catch (err) {
-      console.error("Withdraw failed", err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  const { stats } = useCatPoolStats()
 
   const handleClaim = async () => {
     if (!claimTokens) return
@@ -93,37 +47,31 @@ export default function CatPoolPage() {
     <div className="container mx-auto max-w-lg space-y-6">
       <h1 className="text-3xl font-bold mb-4">Cat Insurance Pool</h1>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Deposit USDC</h2>
-        <input
-          type="text"
-          placeholder="Amount"
-          value={depositAmount}
-          onChange={(e) => setDepositAmount(e.target.value)}
-          className="w-full p-2 border rounded mb-3 text-gray-900 dark:text-gray-100 dark:bg-gray-700"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+          <div className="text-xs text-gray-500 mb-1">Pool Liquidity</div>
+          <div className="text-lg font-medium">
+            {formatCurrency(Number(ethers.utils.formatUnits(stats.liquidUsdc || '0', 6)))}
+          </div>
+        </div>
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+          <div className="text-xs text-gray-500 mb-1">Current APR</div>
+          <div className="text-lg font-medium text-green-600">
+            {formatPercentage(Number(ethers.utils.formatUnits(stats.apr || '0', 18)) * 100)}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-3">
         <button
-          onClick={handleDeposit}
-          disabled={isSubmitting || !depositAmount}
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
+          onClick={() => setDepositOpen(true)}
+          className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
         >
           Deposit
         </button>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Withdraw USDC</h2>
-        <input
-          type="text"
-          placeholder="Shares"
-          value={withdrawShares}
-          onChange={(e) => setWithdrawShares(e.target.value)}
-          className="w-full p-2 border rounded mb-3 text-gray-900 dark:text-gray-100 dark:bg-gray-700"
-        />
         <button
-          onClick={handleWithdraw}
-          disabled={isSubmitting || !withdrawShares}
-          className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50"
+          onClick={() => setWithdrawOpen(true)}
+          className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-md"
         >
           Withdraw
         </button>
@@ -146,6 +94,8 @@ export default function CatPoolPage() {
           Claim
         </button>
       </div>
+      <CatPoolModal isOpen={depositOpen} onClose={() => setDepositOpen(false)} mode="deposit" />
+      <CatPoolModal isOpen={withdrawOpen} onClose={() => setWithdrawOpen(false)} mode="withdraw" />
     </div>
   )
 }
