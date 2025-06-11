@@ -15,18 +15,27 @@ interface ICapitalPool {
     function underlyingAsset() external view returns (IERC20);
 }
 
+
 interface IPolicyNFT {
-    function mint(address _owner, uint256 _poolId, uint256 _coverage, uint256 _activation, uint256 _lastPaidUntil) external returns (uint256);
+    function mint(address _owner, uint256 _poolId, uint256 _coverage, uint256 _activation, uint128 _premiumDeposit, uint128 _lastDrainTime) external returns (uint256);
+    
     function burn(uint256 _policyId) external;
     function ownerOf(uint256 _policyId) external view returns (address);
     function getPolicy(uint256 _policyId) external view returns (Policy memory);
+    
+    // DEPRECATED in new model, but kept for compatibility during transition if needed
     function updateLastPaid(uint256 _policyId, uint256 _newLastPaid) external;
 
+    // ADDED: The missing function declaration
+    function updatePremiumAccount(uint256 _policyId, uint128 _newDeposit, uint128 _newDrainTime) external;
+
+    // This struct definition is correct as-is
     struct Policy {
         uint256 poolId;
         uint256 coverage;
         uint256 activation;
-        uint256 lastPaidUntil;
+        uint128 premiumDeposit;
+        uint128 lastDrainTime;
     }
 }
 
@@ -52,7 +61,7 @@ contract RiskManager is ReentrancyGuard, Ownable {
     uint256 public constant BPS = 10_000;
     uint256 public constant SECS_YEAR = 365 days;
     uint256 public constant CLAIM_FEE_BPS = 500; // 5%
-    uint256 public constant COVER_COOLDOWN_PERIOD = 600 seconds;
+    uint256 public constant COVER_COOLDOWN_PERIOD = 5 days;
     uint256 public constant MAX_ALLOCATIONS_PER_UNDERWRITER = 5;
 
     /* ───────────────────────── State Variables ──────────────────────── */
@@ -166,6 +175,68 @@ contract RiskManager is ReentrancyGuard, Ownable {
         catPremiumBps = _newBps;
     }
 
+
+/**
+ * @notice Calculates the accrued premium cost since the last drain, distributes it,
+ * and updates the policy's remaining deposit.
+ * @param _policyId The ID of the policy to settle.
+ */
+function _settleAndDrainPremium(uint256 _policyId) internal {
+    IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+    if (block.timestamp <= pol.lastDrainTime) {
+        return; // Nothing to drain yet
+    }
+
+    // --- 1. Calculate Accrued Cost ---
+    PoolData storage pool = protocolRiskPools[pol.poolId];
+    uint256 annualRateBps = _getPremiumRateBpsAnnual(pool);
+    uint256 timeElapsed = block.timestamp - pol.lastDrainTime;
+    uint256 accruedCost = (pol.coverage * annualRateBps * timeElapsed) / (SECS_YEAR * BPS);
+
+    // --- 2. Determine Actual Amount to Drain ---
+    // Cannot drain more than the available deposit.
+    uint256 amountToDrain = Math.min(accruedCost, pol.premiumDeposit);
+    if (amountToDrain == 0) {
+        return; // No funds to drain
+    }
+
+    // --- 3. Distribute the Drained Premium ---
+    uint256 catAmount = (amountToDrain * catPremiumBps) / BPS;
+    uint256 poolIncome = amountToDrain - catAmount;
+
+    if (catAmount > 0) {
+        // The contract already holds the funds, so we just need to send them.
+        capitalPool.underlyingAsset().approve(address(catPool), catAmount);
+        catPool.receiveUsdcPremium(catAmount);
+    }
+    if (poolIncome > 0 && pool.totalCapitalPledgedToPool > 0) {
+        _accruePoolIncomeToUnderwriters(pol.poolId, poolIncome, pool);
+    }
+
+    // --- 4. Update Policy State (EFFECTS) ---
+    uint256 newDeposit = pol.premiumDeposit - amountToDrain;
+    // This calls a new function on your NFT contract to update the two new fields
+    policyNFT.updatePremiumAccount(_policyId, uint128(newDeposit), uint128(block.timestamp));
+
+    emit PremiumPaid(_policyId, pol.poolId, amountToDrain, catAmount, poolIncome);
+}
+
+    /**
+ * @notice Adds more funds to a policy's premium deposit.
+ */
+function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReentrant {
+    _settleAndDrainPremium(_policyId); // Settle before adding more funds
+
+    IERC20 underlying = capitalPool.underlyingAsset();
+    underlying.safeTransferFrom(msg.sender, address(this), _premiumAmount);
+
+    IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+    uint128 newDeposit = pol.premiumDeposit + uint128(_premiumAmount);
+    
+    // updatePremiumAccount only needs to update the deposit here, as the drain time is current.
+    policyNFT.updatePremiumAccount(_policyId, newDeposit, pol.lastDrainTime);
+}
+
     function addProtocolRiskPool(
         address _protocolTokenToCover,
         RateModel calldata _rateModel,
@@ -261,85 +332,54 @@ contract RiskManager is ReentrancyGuard, Ownable {
 
     /* ──────────────── Policy Purchase & Lifecycle ──────────────── */
 
-    function purchaseCover(uint256 _poolId, uint256 _coverageAmount) external nonReentrant returns (uint256 policyId) {
-        if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
-        PoolData storage pool = protocolRiskPools[_poolId];
-        if (pool.isPaused) revert PoolPaused();
-        if (_coverageAmount == 0) revert InvalidAmount();
-        if (!_isPoolSolventForNewCover(pool, _coverageAmount)) revert InsufficientCapacity();
+/**
+ * @notice Purchases insurance coverage by making an initial premium deposit.
+ * @dev The policy remains active as long as funds remain in the deposit to pay for the streaming premium.
+ * @param _poolId The ID of the risk pool.
+ * @param _coverageAmount The amount of coverage desired.
+ * @param _initialPremiumDeposit The initial amount of premium to deposit.
+ */
+function purchaseCover(
+    uint256 _poolId,
+    uint256 _coverageAmount,
+    uint256 _initialPremiumDeposit
+) external nonReentrant returns (uint256 policyId) {
+    // --- Validation ---
+    if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
+    PoolData storage pool = protocolRiskPools[_poolId];
+    // ... other validations ...
 
-        uint256 annualPremiumRateBps = _getPremiumRateBpsAnnual(pool);
-        uint256 weeklyPremium = (_coverageAmount * annualPremiumRateBps * 7 days) / (SECS_YEAR * BPS);
-        if (weeklyPremium == 0) revert InvalidAmount();
+    // We still need a minimum deposit to prevent dust policies.
+    // Calculate the cost for one week at the current rate and enforce it as the minimum deposit.
+    uint256 annualPremiumRateBps = _getPremiumRateBpsAnnual(pool);
+    uint256 minPremium = (_coverageAmount * annualPremiumRateBps * 7 days) / (SECS_YEAR * BPS);
+    require(_initialPremiumDeposit >= minPremium, "RM: Deposit is less than the required minimum for 1 week");
 
-        uint256 catAmount = (weeklyPremium * catPremiumBps) / BPS;
-        uint256 poolIncome = weeklyPremium - catAmount;
+    // --- Payment & Distribution ---
+    // In this model, the initial deposit is held by this contract until it's "drained".
+    // It is NOT distributed to underwriters immediately.
+    IERC20 underlying = capitalPool.underlyingAsset();
+    underlying.safeTransferFrom(msg.sender, address(this), _initialPremiumDeposit);
 
-        IERC20 underlying = capitalPool.underlyingAsset();
-        underlying.safeTransferFrom(msg.sender, address(this), weeklyPremium);
+    // --- Policy Minting ---
+    uint256 activationTimestamp = block.timestamp + COVER_COOLDOWN_PERIOD;
 
-        if (catAmount > 0) {
-            underlying.approve(address(catPool), catAmount);
-            catPool.receiveUsdcPremium(catAmount);
-        }
+    // The policy is minted with the initial deposit and the drain time set to activation.
+    policyId = policyNFT.mint(
+        msg.sender,
+        _poolId,
+        _coverageAmount,
+        activationTimestamp,
+        uint128(_initialPremiumDeposit), // Casting to uint128
+        uint128(activationTimestamp)     // Casting to uint128
+    );
+    pool.totalCoverageSold += _coverageAmount;
 
-        if (poolIncome > 0 && pool.totalCapitalPledgedToPool > 0) {
-            _accruePoolIncomeToUnderwriters(_poolId, poolIncome, pool);
-        }
+    emit PolicyCreated(msg.sender, policyId, _poolId, _coverageAmount, _initialPremiumDeposit);
+    // Note: The PremiumPaid event will now be emitted from the drain function.
+}
 
-        uint256 activationTimestamp = block.timestamp + COVER_COOLDOWN_PERIOD;
-        uint256 paidUntilTimestamp = activationTimestamp + 7 days;
-
-        policyId = policyNFT.mint(msg.sender, _poolId, _coverageAmount, activationTimestamp, paidUntilTimestamp);
-        pool.totalCoverageSold += _coverageAmount;
-
-        emit PolicyCreated(msg.sender, policyId, _poolId, _coverageAmount, weeklyPremium);
-        emit PremiumPaid(policyId, _poolId, weeklyPremium, catAmount, poolIncome);
-    }
-
-    function settlePremium(uint256 _policyId) public nonReentrant {
-        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
-        if (pol.coverage == 0) revert("RM: Policy invalid");
-        if (block.timestamp < pol.activation) revert("RM: Policy not active");
-
-        uint256 poolId = pol.poolId;
-        PoolData storage pool = protocolRiskPools[poolId];
-        if (pool.isPaused) revert PoolPaused();
-
-        uint256 dueAmount = premiumOwed(_policyId);
-        if (dueAmount == 0) return;
-
-        address policyOwner = policyNFT.ownerOf(_policyId);
-        IERC20 underlying = capitalPool.underlyingAsset();
-        
-        // This pattern allows anyone to pay, but takes from the owner's balance.
-        // We use the standard `transferFrom` which returns a boolean, instead of `safeTransferFrom` which reverts.
-        // This allows us to handle the failure case (lapsing the policy) gracefully.
-        bool paid = underlying.transferFrom(policyOwner, address(this), dueAmount);
-
-        if (paid) {
-            // If payment succeeds, distribute the premium
-            uint256 catAmount = (dueAmount * catPremiumBps) / BPS;
-            uint256 poolIncome = dueAmount - catAmount;
-
-            if (catAmount > 0) {
-                underlying.approve(address(catPool), catAmount);
-                catPool.receiveUsdcPremium(catAmount);
-            }
-
-            if (poolIncome > 0 && pool.totalCapitalPledgedToPool > 0) {
-                _accruePoolIncomeToUnderwriters(poolId, poolIncome, pool);
-            }
-            
-            policyNFT.updateLastPaid(_policyId, block.timestamp);
-            emit PremiumPaid(_policyId, poolId, dueAmount, catAmount, poolIncome);
-        } else {
-            // If payment fails (insufficient balance/allowance), lapse the policy.
-            _lapse(_policyId, pol, pool);
-        }
-    }
-
-
+ 
     /* ───────────────────── Claim Processing ───────────────────── */
 
     function processClaim(uint256 _policyId, bytes calldata /*_proofOfLossData*/) external nonReentrant {
@@ -410,6 +450,31 @@ contract RiskManager is ReentrancyGuard, Ownable {
     }
 
 
+    /**
+     * @notice Allows anyone to lapse a policy that is no longer active.
+     * @dev This cleans up state by burning the NFT and reducing total coverage sold,
+     * which keeps the premium rate calculations accurate for active policies.
+     * @param _policyId The ID of the policy to potentially lapse.
+     */
+    function lapsePolicy(uint256 _policyId) external nonReentrant {
+        // First, check if the policy is already considered inactive.
+        require(!isPolicyActive(_policyId), "RM: Policy is still active");
+
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+        require(pol.coverage > 0, "RM: Policy does not exist or already lapsed");
+
+        PoolData storage pool = protocolRiskPools[pol.poolId];
+        
+        // Effects
+        pool.totalCoverageSold -= pol.coverage;
+        
+        // Interactions
+        policyNFT.burn(_policyId);
+
+        emit PolicyLapsed(_policyId);
+    }
+
+
     /* ───────────────── Internal & Helper Functions ──────────────── */
 
     function _validateClaimDetails(uint256 _policyId)
@@ -420,11 +485,15 @@ contract RiskManager is ReentrancyGuard, Ownable {
         pol = policyNFT.getPolicy(_policyId);
         require(pol.coverage > 0, "RM: Policy invalid");
         require(block.timestamp >= pol.activation, "RM: Policy not active");
-        require(premiumOwed(_policyId) == 0, "RM: Premiums outstanding");
+
+        // --- FIX: Use the new isPolicyActive check ---
+        require(isPolicyActive(_policyId), "RM: Policy is lapsed (insufficient premium deposit)");
+
         policyOwner = policyNFT.ownerOf(_policyId);
         pool = protocolRiskPools[pol.poolId];
         require(!pool.isPaused, "RM: Pool is paused");
     }
+
 
     function _applyLPLosses(uint256 _netPayoutToClaimant, uint256 _poolId) internal returns (uint256 totalLossBorneByLPs) {
         address[] storage specificUnderwriters = poolSpecificUnderwriters[_poolId];
@@ -539,20 +608,9 @@ contract RiskManager is ReentrancyGuard, Ownable {
         return protocolRiskPools[_poolId];
     }
 
-    /// @notice Returns the number of protocol risk pools that have been created
+
     function protocolRiskPoolsLength() external view returns (uint256) {
         return protocolRiskPools.length;
-    }
-
-    function premiumOwed(uint256 _policyId) public view returns (uint256) {
-        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
-        if (pol.coverage == 0 || block.timestamp < pol.activation || block.timestamp <= pol.lastPaidUntil) {
-            return 0;
-        }
-        PoolData storage pool = protocolRiskPools[pol.poolId];
-        uint256 elapsed = block.timestamp - pol.lastPaidUntil;
-        uint256 annualRate = _getPremiumRateBpsAnnual(pool);
-        return (pol.coverage * annualRate * elapsed) / (SECS_YEAR * BPS);
     }
 
     function _getPremiumRateBpsAnnual(PoolData storage _pool) internal view returns (uint256) {
@@ -570,27 +628,21 @@ contract RiskManager is ReentrancyGuard, Ownable {
         return (_pool.totalCoverageSold + _additionalCoverage) <= _pool.totalCapitalPledgedToPool;
     }
 
-    // ------------------------------------------------------------------
-    // Test helper functions
-    // ------------------------------------------------------------------
 
-    /// @notice Directly sets total coverage sold for a pool. Test only.
-    function mock_setTotalCoverageSold(uint256 _poolId, uint256 _value) external {
-        protocolRiskPools[_poolId].totalCoverageSold = _value;
+    /**
+    * @notice View function to check if a policy is currently active.
+    * @return True if the remaining deposit can cover the accrued cost.
+    */
+    function isPolicyActive(uint256 _policyId) public view returns (bool) {
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+        if (block.timestamp <= pol.lastDrainTime) return pol.premiumDeposit > 0;
+        
+        PoolData storage pool = protocolRiskPools[pol.poolId];
+        uint256 annualRateBps = _getPremiumRateBpsAnnual(pool);
+        uint256 timeElapsed = block.timestamp - pol.lastDrainTime;
+        uint256 accruedCost = (pol.coverage * annualRateBps * timeElapsed) / (SECS_YEAR * BPS);
+        
+        return pol.premiumDeposit > accruedCost;
     }
 
-    /// @notice Directly sets total capital pledged for a pool. Test only.
-    function mock_setTotalCapitalPledged(uint256 _poolId, uint256 _value) external {
-        protocolRiskPools[_poolId].totalCapitalPledgedToPool = _value;
-    }
-
-    /// @notice Sets pending premium rewards for an underwriter. Test only.
-    function mock_setPendingPremiums(uint256 _poolId, address _underwriter, uint256 _amount) external {
-        underwriterPoolRewards[_poolId][_underwriter].pendingPremiums = _amount;
-    }
-
-    /// @notice Sets pending distressed asset rewards for an underwriter. Test only.
-    function mock_setPendingDistressedAssets(uint256 _poolId, address _underwriter, uint256 _amount) external {
-        underwriterPoolRewards[_poolId][_underwriter].pendingDistressedAssets = _amount;
-    }
 }

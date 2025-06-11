@@ -29,7 +29,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────────── Constants ───────────────────────── */
     uint256 public constant BPS = 10_000;
-    uint256 public constant UNDERWRITER_NOTICE_PERIOD = 600 seconds;
+    uint256 public constant UNDERWRITER_NOTICE_PERIOD = 0 days;
 
     /* ───────────────────────── State Variables ──────────────────────── */
 
@@ -126,8 +126,8 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /**
      * @notice Allows an underwriter to deposit assets or add to an existing position.
-     * @dev An underwriter can only deposit into one yield platform at a time. To change platforms,
-     * they must first withdraw their entire position.
+     * @dev CORRECTED: Uses `masterShares` to check for an existing position, which is more robust
+     * than checking `totalDepositedAssetPrincipal`.
      * @param _amount The amount of the underlying asset to deposit.
      * @param _yieldChoice The chosen external yield platform for the deposited assets.
      */
@@ -140,9 +140,9 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
         if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
 
-        // **MODIFIED LOGIC**
-        // If the user has an existing deposit, they can only add to their current yield platform.
-        if (account.totalDepositedAssetPrincipal > 0 && account.yieldChoice != _yieldChoice) {
+        // -- Check for existing position using masterShares ---
+        // This prevents a user with 0 principal but remaining shares from changing their platform.
+        if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
             revert("CP: Cannot change yield platform; withdraw first.");
         }
 
@@ -157,14 +157,12 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (sharesToMint == 0) revert NoSharesToMint();
 
         // --- Update Account ---
-        // If this is the user's first deposit, set their platform choice.
-        if (account.totalDepositedAssetPrincipal == 0) {
+        // --- FIX: Check for a true first deposit using masterShares ---
+        if (account.masterShares == 0) {
             account.yieldChoice = _yieldChoice;
             account.yieldAdapter = chosenAdapter;
         }
-        
-        // **MODIFIED LOGIC**
-        // Add the new deposit amount and shares to the user's existing totals.
+
         account.totalDepositedAssetPrincipal += _amount;
         account.masterShares += sharesToMint;
 
@@ -244,7 +242,12 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
 
     /* ───────────────────── Trusted Functions (RiskManager Only) ────────────────── */
-
+    /**
+     * @notice Applies losses to a specific underwriter's principal.
+     * @dev CORRECTED: Now burns a proportional number of masterShares to keep principal and shares synchronized.
+     * @param _underwriter The address of the underwriter to apply losses to.
+     * @param _principalLossAmount The amount of principal to be lost.
+     */
     function applyLosses(address _underwriter, uint256 _principalLossAmount) external nonReentrant onlyRiskManager {
         if (_principalLossAmount == 0) revert InvalidAmount();
 
@@ -252,13 +255,32 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (account.totalDepositedAssetPrincipal == 0) revert NoActiveDeposit();
 
         uint256 actualLoss = Math.min(_principalLossAmount, account.totalDepositedAssetPrincipal);
-        
+
+        // --- FIX: Calculate and burn a proportional number of shares ---
+        // This must be done *before* reducing the principal to avoid division by zero.
+        if (account.totalDepositedAssetPrincipal > 0) {
+            uint256 sharesToBurn = (account.masterShares * actualLoss) / account.totalDepositedAssetPrincipal;
+            if (sharesToBurn > account.masterShares) {
+                // This can happen due to rounding; cap at the user's total shares.
+                sharesToBurn = account.masterShares;
+            }
+            account.masterShares -= sharesToBurn;
+            totalMasterSharesSystem -= sharesToBurn;
+        }
+
+        // --- State Updates ---
         account.totalDepositedAssetPrincipal -= actualLoss;
         totalSystemValue = totalSystemValue > actualLoss ? totalSystemValue - actualLoss : 0;
 
-        bool wipedOut = (account.totalDepositedAssetPrincipal == 0);
+        // A user is wiped out if their principal is zero OR if their shares are zero.
+        // Checking both provides robustness.
+        bool wipedOut = (account.totalDepositedAssetPrincipal == 0 || account.masterShares == 0);
         if (wipedOut) {
-            totalMasterSharesSystem -= account.masterShares;
+            // If any shares remain due to rounding, ensure they are removed from the system total
+            // before deleting the account.
+            if(account.masterShares > 0) {
+               totalMasterSharesSystem -= account.masterShares;
+            }
             delete underwriterAccounts[_underwriter];
         }
 

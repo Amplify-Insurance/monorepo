@@ -2,114 +2,106 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/Ownable.sol"; // Import Ownable
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract PolicyNFT is ERC721URIStorage, Ownable { // Inherit Ownable
+contract PolicyNFT is ERC721URIStorage, Ownable {
+    // --- CORRECTED: Updated Policy struct ---
     struct Policy {
-        uint256 coverage;        // liability in USDC (or other underlyingAsset)
-        uint256 poolId;          // CoverPool's protocolRiskPools index
-        uint256 start;           // block-timestamp of purchase
-        uint256 activation;      // start + COVER_COOLDOWN_PERIOD
-        uint256 lastPaidUntil;   // premium is settled up to (timestamp)
+        uint256 coverage;        // Liability in USDC
+        uint256 poolId;          // RiskManager's protocolRiskPools index
+        uint256 start;           // Timestamp of minting
+        uint256 activation;      // Timestamp when cover becomes active
+        uint128 premiumDeposit;  // The remaining premium balance for this policy
+        uint128 lastDrainTime;   // The timestamp when the premium was last drained
     }
 
     uint256 public nextId = 1;
     mapping(uint256 => Policy) public policies;
-    address public coverPoolContract; // Address of the authorized CoverPool contract
+    address public riskManagerContract; // Renamed for clarity
 
-    event PolicyLastPaidUpdated(uint256 indexed id, uint256 newLastPaidUntil, address caller);
+    // Events
+    event PolicyPremiumAccountUpdated(uint256 indexed policyId, uint128 newDeposit, uint128 newDrainTime);
+    event RiskManagerAddressSet(address indexed newRiskManagerAddress);
 
-    modifier onlyCoverPool() {
-        require(coverPoolContract != address(0), "PolicyNFT: CoverPool address not set");
-        require(msg.sender == coverPoolContract, "PolicyNFT: Caller is not the authorized CoverPool contract");
+    modifier onlyRiskManager() {
+        require(riskManagerContract != address(0), "PolicyNFT: RiskManager address not set");
+        require(msg.sender == riskManagerContract, "PolicyNFT: Caller is not the authorized RiskManager");
         _;
     }
 
+    constructor(address initialOwner) ERC721("Premium Drain Cover", "PCOVER") Ownable(initialOwner) {}
+
     /**
-     * @param initialOwner The account that will initially own this PolicyNFT contract (e.g., the deployer).
+     * @notice Sets or updates the authorized RiskManager contract address.
+     * @param _newRiskManagerAddress The address of the RiskManager contract.
      */
-    constructor(address initialOwner) ERC721("Perpetual Cover", "PCOVER") Ownable(initialOwner) {
-        // coverPoolContract is NOT set at construction.
-        // It will be set later by the owner via setCoverPoolAddress.
+    function setRiskManagerAddress(address _newRiskManagerAddress) external onlyOwner {
+        require(_newRiskManagerAddress != address(0), "PolicyNFT: Address cannot be zero");
+        riskManagerContract = _newRiskManagerAddress;
+        emit RiskManagerAddressSet(_newRiskManagerAddress);
     }
 
     /**
-     * @notice Sets or updates the authorized CoverPool contract address.
-     * @dev Can only be called by the owner of this PolicyNFT contract.
-     * This allows the CoverPool contract to mint, burn, and update policies.
-     * @param _newCoverPoolAddress The address of the CoverPool contract.
-     */
-    function setCoverPoolAddress(address _newCoverPoolAddress) external onlyOwner {
-        require(_newCoverPoolAddress != address(0), "PolicyNFT: CoverPool address cannot be zero");
-        coverPoolContract = _newCoverPoolAddress;
-        // Consider emitting an event
-        // emit CoverPoolAddressSet(_newCoverPoolAddress);
-    }
-
-    /**
-     * @notice Mints a new policy NFT. Only callable by the authorized CoverPool contract.
-     * @param to The recipient of the new policy NFT.
-     * @param pid The poolId from CoverPool this policy relates to.
-     * @param coverage The coverage amount.
-     * @param activation The timestamp when the policy becomes active.
-     * @param paidUntil The timestamp until which the first premium covers.
-     * @return id The ID of the newly minted policy NFT.
+     * @notice Mints a new policy NFT. Only callable by the authorized RiskManager contract.
+     * @dev CORRECTED: Signature updated to accept premium deposit fields.
      */
     function mint(
-        address  to,
-        uint256  pid,
-        uint256  coverage,
-        uint256  activation,
-        uint256  paidUntil
-    ) external onlyCoverPool returns (uint256 id) {
-        require(coverPoolContract != address(0), "PolicyNFT: CoverPool address not set");
+        address to,
+        uint256 pid,
+        uint256 coverage,
+        uint256 activation,
+        uint128 premiumDeposit,
+        uint128 lastDrainTime
+    ) external onlyRiskManager returns (uint256 id) {
         id = nextId++;
-        _safeMint(to, id); // Mints the ERC721 token
+        _safeMint(to, id);
         policies[id] = Policy({
-            coverage:  coverage,
-            poolId:    pid,
-            start:     block.timestamp, // Timestamp of minting
+            coverage: coverage,
+            poolId: pid,
+            start: block.timestamp,
             activation: activation,
-            lastPaidUntil: paidUntil
+            premiumDeposit: premiumDeposit,
+            lastDrainTime: lastDrainTime
         });
         return id;
     }
 
     /**
-     * @notice Burns a policy NFT. Only callable by the authorized CoverPool contract.
-     * @param id The ID of the policy NFT to burn.
+     * @notice Burns a policy NFT. Only callable by the authorized RiskManager contract.
      */
-    function burn(uint256 id) external onlyCoverPool {
-        require(coverPoolContract != address(0), "PolicyNFT: CoverPool address not set");
-        // _exists(id) check is implicitly handled by _burn.
-        // ERC721 _burn will revert if token doesn't exist or caller isn't authorized (but here CoverPool is always authorized by onlyCoverPool)
-        _burn(id); // Burns the ERC721 token
-        delete policies[id]; // Deletes associated policy data
+    function burn(uint256 id) external onlyRiskManager {
+        _burn(id);
+        delete policies[id];
     }
 
     /**
-     * @notice Updates the lastPaidUntil timestamp for a policy. Only callable by the authorized CoverPool contract.
+     * @notice ADDED: The missing function to update premium details.
      * @param id The ID of the policy NFT.
-     * @param ts The new lastPaidUntil timestamp.
-        */
-    function updateLastPaid(uint256 id, uint256 ts) external onlyCoverPool {
-        require(coverPoolContract != address(0), "PolicyNFT: CoverPool address not set");
-        require(policies[id].coverage > 0, "PolicyNFT: Policy does not exist or has zero coverage");
-        policies[id].lastPaidUntil = ts;
-        emit PolicyLastPaidUpdated(id, ts, msg.sender); // Add event
+     * @param newDeposit The new remaining premium deposit amount.
+     * @param newDrainTime The new drain timestamp (usually block.timestamp).
+     */
+    function updatePremiumAccount(uint256 id, uint128 newDeposit, uint128 newDrainTime) external onlyRiskManager {
+        // --- FIX: Check for policy existence by verifying a non-zero value in the struct ---
+        // The 'start' timestamp is always non-zero for a minted policy.
+        require(policies[id].start != 0, "PolicyNFT: Policy does not exist or has been burned");
+        
+        Policy storage policy = policies[id];
+        policy.premiumDeposit = newDeposit;
+        policy.lastDrainTime = newDrainTime;
+        emit PolicyPremiumAccountUpdated(id, newDeposit, newDrainTime);
     }
-
-
     /**
      * @notice Retrieves the data for a specific policy.
-     * @param id The ID of the policy NFT.
-     * @return p The Policy struct containing policy details.
      */
     function getPolicy(uint256 id) external view returns (Policy memory p) {
-        // No restriction needed as it's a view function, anyone can query policy data if they know the ID.
         p = policies[id];
     }
 
-    // Event for when CoverPool address is set (optional but good practice)
-    // event CoverPoolAddressSet(address indexed newCoverPoolAddress);
+    /**
+     * @notice DEPRECATED: This function belongs to the old premium model.
+     * It is left here to avoid breaking other potential dependencies but should not be used in the new model.
+     */
+    function updateLastPaid(uint256, uint256) external onlyRiskManager {
+        revert("PolicyNFT: updateLastPaid is deprecated; use updatePremiumAccount");
+    }
 }

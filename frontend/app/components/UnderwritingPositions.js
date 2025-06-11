@@ -35,6 +35,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
           6 // pool.underlyingAssetDecimals
         )
       );
+      console.log(Number(ethers.utils.formatUnits(details.withdrawalRequestShares)), "withdrawalRequestShares");
       return {
         id: i,
         protocol,
@@ -45,7 +46,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
         nativeValue: amount,
         yield: Number(pool.underwriterYieldBps || 0) / 100,
         status:
-          details.withdrawalRequestShares > 0 ?
+          Number(ethers.utils.formatUnits(details.withdrawalRequestShares)) > 0 ?
             "requested withdrawal" :
             "active",
         shares: details.masterShares,
@@ -61,8 +62,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
     (p) => p.status === "requested withdrawal"
   );
 
+  // console.log(details.withdrawalRequestShares, "withdrawalPositions")
+
   const unlockTimestamp =
-    Number(details?.withdrawalRequestTimestamp || 0) + NOTICE_PERIOD;
+    Number(ethers.utils.formatUnits(details?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD;
   const currentTimestamp = Math.floor(Date.now() / 1000);
   const unlockDays = Math.max(
     0,
@@ -172,172 +175,174 @@ export default function UnderwritingPositions({ displayCurrency }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <div className="inline-block min-w-full align-middle">
-          <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    Protocol
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    Pool
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                  >
-                    {displayCurrency === "native" ? "Amount" : "Value"}
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                  >
-                    Yield APY
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                  >
-                    Status
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {activePositions.map((position) => (
-                  <tr
-                    key={position.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-750"
-                  >
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
-                          <Image
-                            src={getProtocolLogo(position.id)}
-                            alt={position.protocol}
-                            width={32}
-                            height={32}
-                            className="rounded-full"
-                          />
-                        </div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {getProtocolName(position.id)}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-6 w-6 mr-2">
-                          <Image
-                            src={getTokenLogo(position.pool)}
-                            alt={position.poolName}
-                            width={24}
-                            height={24}
-                            className="rounded-full"
-                          />
-                        </div>
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {getTokenName(position.pool)}
-                        </div>
-                      </div>
-                      <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
-                        {displayCurrency === "native"
-                          ? `${position.amount}`
-                          : formatCurrency(position.nativeValue, "USD", "usd")}
-                      </div>
-                      <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
-                        {formatPercentage(position.yield)}
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {displayCurrency === "native"
-                          ? `${position.amount}`
-                          : formatCurrency(position.nativeValue, "USD", "usd")}
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                        {formatPercentage(position.yield)}
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
-                        }`}
-                      >
-                        {position.status}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                      <button
-                        onClick={() =>
-                          setOpenDropdown(
-                            openDropdown === position.id ? null : position.id
-                          )
-                        }
-                        className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
-                      >
-                        <MoreHorizontal className="w-5 h-5" />
-                      </button>
-                      {openDropdown === position.id && (
-                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
-                          <div className="py-1" role="menu" aria-orientation="vertical">
-                            <button
-                              className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() => {
-                                handleOpenModal(position);
-                                setOpenDropdown(null);
-                              }}
-                            >
-                              Manage
-                            </button>
-                            <button
-                              className="block px-4 py-2 text-sm w-full text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() => {
-                                handleClaimRewards(position);
-                                setOpenDropdown(null);
-                              }}
-                              disabled={isClaiming}
-                            >
-                              {isClaiming ? "Claiming..." : "Claim Rewards"}
-                            </button>
-                            <button
-                              className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() => {
-                                handleExecuteWithdrawal();
-                                setOpenDropdown(null);
-                              }}
-                              disabled={isExecuting}
-                            >
-                              {isExecuting ? "Executing..." : "Execute Withdrawal"}
-                            </button>
+      {activePositions.length > 0 && (
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="inline-block min-w-full align-middle">
+            <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
+                      Protocol
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
+                      Pool
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                    >
+                      {displayCurrency === "native" ? "Amount" : "Value"}
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                    >
+                      Yield APY
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                    >
+                      Status
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {activePositions.map((position) => (
+                    <tr
+                      key={position.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-750"
+                    >
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
+                            <Image
+                              src={getProtocolLogo(position.id)}
+                              alt={position.protocol}
+                              width={32}
+                              height={32}
+                              className="rounded-full"
+                            />
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {getProtocolName(position.id)}
                           </div>
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-6 w-6 mr-2">
+                            <Image
+                              src={getTokenLogo(position.pool)}
+                              alt={position.poolName}
+                              width={24}
+                              height={24}
+                              className="rounded-full"
+                            />
+                          </div>
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {getTokenName(position.pool)}
+                          </div>
+                        </div>
+                        <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
+                          {displayCurrency === "native"
+                            ? `${position.amount}`
+                            : formatCurrency(position.nativeValue, "USD", "usd")}
+                        </div>
+                        <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
+                          {formatPercentage(position.yield)}
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {displayCurrency === "native"
+                            ? `${position.amount}`
+                            : formatCurrency(position.nativeValue, "USD", "usd")}
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                          {formatPercentage(position.yield)}
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
+                            }`}
+                        >
+                          {position.status}
+                        </span>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                        <button
+                          onClick={() =>
+                            setOpenDropdown(
+                              openDropdown === position.id ? null : position.id
+                            )
+                          }
+                          className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
+                        >
+                          <MoreHorizontal className="w-5 h-5" />
+                        </button>
+                        {openDropdown === position.id && (
+                          <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                            <div className="py-1" role="menu" aria-orientation="vertical">
+                              <button
+                                className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => {
+                                  handleOpenModal(position);
+                                  setOpenDropdown(null);
+                                }}
+                              >
+                                Manage
+                              </button>
+                              <button
+                                className="block px-4 py-2 text-sm w-full text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => {
+                                  handleClaimRewards(position);
+                                  setOpenDropdown(null);
+                                }}
+                                disabled={isClaiming}
+                              >
+                                {isClaiming ? "Claiming..." : "Claim Rewards"}
+                              </button>
+                              <button
+                                className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => {
+                                  handleExecuteWithdrawal();
+                                  setOpenDropdown(null);
+                                }}
+                                disabled={isExecuting}
+                              >
+                                {isExecuting ? "Executing..." : "Execute Withdrawal"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {withdrawalPositions.length > 0 && (
         <div className="mt-8 overflow-x-auto -mx-4 sm:mx-0">

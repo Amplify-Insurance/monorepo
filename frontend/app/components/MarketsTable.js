@@ -98,6 +98,8 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     return <p>Loading markets...</p>
   }
 
+  console.log("Markets data:", markets)
+
   return (
     <div>
       {!isConnected && mode === "purchase" && (
@@ -210,7 +212,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                     <div className="flex items-center">
                                       <div className="flex-shrink-0 h-6 w-6 mr-2">
                                         <Image
-                                          src={getProtocolLogo(market.id)}
+                                          src={getTokenLogo(pool.token)}
                                           alt={pool.tokenName}
                                           width={24}
                                           height={24}
