@@ -147,6 +147,15 @@ export default function AnalyticsPage() {
         ethers.utils.formatUnits(analyticsData.totalPremiumsPaid || "0", 6)
       )
     : 0;
+  const totalClaimFees = analyticsData
+    ? Number(
+        ethers.utils.formatUnits(analyticsData.totalClaimFees || "0", 6)
+      )
+    : 0;
+  const lapsedHistory = (analyticsData?.lapsedCoverHistory || []).map((h) => ({
+    date: new Date(h.timestamp * 1000).toISOString().slice(0, 10),
+    amount: Number(ethers.utils.formatUnits(h.amount, 6)),
+  }));
   const coverHistory = (analyticsData?.activeCoverHistory || []).map((h) => ({
     date: new Date(h.timestamp * 1000).toISOString().slice(0, 10),
     amount: Number(ethers.utils.formatUnits(h.active, 6)),
@@ -237,6 +246,13 @@ export default function AnalyticsPage() {
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
           </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claim fees collected</div>
+            <div className="text-2xl sm:text-3xl font-bold text-pink-600 dark:text-pink-400">
+              {totalClaimFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+          </div>
         </div>
       </div>
 
@@ -245,6 +261,14 @@ export default function AnalyticsPage() {
         <h2 className="text-xl font-semibold mb-4">Active Cover Over Time</h2>
         <div className="h-80">
           <ActiveCoverChart data={coverHistory} />
+        </div>
+      </div>
+
+      {/* Cover Drop Off Chart */}
+      <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <h2 className="text-xl font-semibold mb-4">Cover Drop Off</h2>
+        <div className="h-80">
+          <LapsedCoverChart data={lapsedHistory} />
         </div>
       </div>
 
@@ -816,6 +840,95 @@ function ActiveCoverChart({ data }) {
                     borderWidth: 1,
                     padding: 12,
                     displayColors: false,
+                  },
+                },
+                scales: {
+                  x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
+                  },
+                  y: {
+                    grid: { color: gridColor },
+                    ticks: {
+                      color: textColor,
+                      callback: (value) => {
+                        if (value >= 1_000_000) return `$${value / 1_000_000}M`;
+                        if (value >= 1_000) return `$${value / 1_000}K`;
+                        return `$${value}`;
+                      },
+                    },
+                  },
+                },
+              },
+            });
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+// Lapsed Cover Chart Component
+function LapsedCoverChart({ data }) {
+  if (typeof window === "undefined") {
+    return (
+      <div className="h-full flex items-center justify-center">Loading chart...</div>
+    );
+  }
+
+  return (
+    <div className="h-full w-full">
+      <canvas
+        id="lapsedCoverChart"
+        className="h-full w-full"
+        ref={(el) => {
+          if (el && data) {
+            const ctx = el.getContext("2d");
+            if (window.lapsedCoverChart) {
+              window.lapsedCoverChart.destroy();
+            }
+            const dpr = window.devicePixelRatio || 1;
+            const rect = el.getBoundingClientRect();
+            el.width = rect.width * dpr;
+            el.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const isDarkMode = document.documentElement.classList.contains("dark");
+            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+            const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+
+            const labels = data.map((d) => d.date);
+            const values = data.map((d) => d.amount);
+
+            window.lapsedCoverChart = new window.Chart(ctx, {
+              type: "bar",
+              data: {
+                labels,
+                datasets: [
+                  {
+                    label: "Cover Dropped",
+                    data: values,
+                    backgroundColor: "rgba(239, 68, 68, 0.8)",
+                    borderColor: "rgb(239, 68, 68)",
+                    borderWidth: 1,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+                    titleColor: textColor,
+                    bodyColor: textColor,
+                    borderColor: gridColor,
+                    borderWidth: 1,
+                    padding: 12,
+                    callbacks: {
+                      label: (ctx) => `$${ctx.raw.toLocaleString()}`,
+                    },
                   },
                 },
                 scales: {

@@ -42,6 +42,8 @@ export async function GET() {
     type E = { timestamp: number; type: string; policyId: number; coverage?: bigint };
     const events: E[] = [];
     const coverageMap = new Map<number, bigint>();
+    const lapsedHistory: { timestamp: number; amount: string }[] = [];
+    let totalClaimFees = 0n;
     for (const ev of createdEv) {
       const [user, policyIdStr, poolIdStr, coverageStr] = ev.data.split(',');
       const cov = BigInt(coverageStr);
@@ -54,8 +56,8 @@ export async function GET() {
       events.push({ timestamp: Number(ev.timestamp), type: 'lapsed', policyId: Number(policyIdStr) });
     }
     for (const ev of claimEv) {
-      const [policyIdStr] = ev.data.split(',');
-      events.push({ timestamp: Number(ev.timestamp), type: 'claim', policyId: Number(policyIdStr) });
+      const [policyIdStr, , , netPayoutStr] = ev.data.split(',');
+      events.push({ timestamp: Number(ev.timestamp), type: 'claim', policyId: Number(policyIdStr), coverage: undefined, payout: BigInt(netPayoutStr) });
     }
     let totalPremiums = 0n;
     for (const ev of premiumEv) {
@@ -71,11 +73,21 @@ export async function GET() {
       if (ev.type === 'created' && ev.coverage !== undefined) {
         active += ev.coverage;
         knownCoverage.set(ev.policyId, ev.coverage);
-      } else if (ev.type === 'lapsed' || ev.type === 'claim') {
+      } else if (ev.type === 'lapsed') {
         const cov = knownCoverage.get(ev.policyId);
         if (cov) {
           active -= cov;
           knownCoverage.delete(ev.policyId);
+          lapsedHistory.push({ timestamp: ev.timestamp, amount: cov.toString() });
+        }
+      } else if (ev.type === 'claim') {
+        const cov = knownCoverage.get(ev.policyId);
+        if (cov) {
+          active -= cov;
+          knownCoverage.delete(ev.policyId);
+          lapsedHistory.push({ timestamp: ev.timestamp, amount: cov.toString() });
+          const fee = cov > (ev as any).payout ? cov - (ev as any).payout : 0n;
+          totalClaimFees += fee;
         }
       }
       activeHistory.push({ timestamp: ev.timestamp, active: active.toString() });
@@ -85,6 +97,8 @@ export async function GET() {
       totalActiveCover: active.toString(),
       activeCoverHistory: activeHistory,
       totalPremiumsPaid: totalPremiums.toString(),
+      totalClaimFees: totalClaimFees.toString(),
+      lapsedCoverHistory: lapsedHistory,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
