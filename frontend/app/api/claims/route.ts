@@ -11,22 +11,33 @@ export async function GET() {
       throw new Error('SUBGRAPH_URL not configured')
     }
 
-    const query = `{
-      genericEvents(first: 1000, orderBy: timestamp, orderDirection: desc, where: { eventName: "ClaimProcessed" }) {
-        blockNumber
-        timestamp
-        transactionHash
-        data
-      }
-    }`
+    const pageSize = 1000
+    let skip = 0
+    const events: any[] = []
 
-    const response = await fetch(SUBGRAPH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    })
-    const json = await response.json()
-    const events = json?.data?.genericEvents || []
+    while (true) {
+      const query = `{
+        genericEvents(first: ${pageSize}, skip: ${skip}, orderBy: timestamp, orderDirection: desc, where: { eventName: "ClaimProcessed" }) {
+          blockNumber
+          timestamp
+          transactionHash
+          data
+        }
+      }`
+
+      const response = await fetch(SUBGRAPH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      })
+
+      const json = await response.json()
+      const batch = json?.data?.genericEvents || []
+      events.push(...batch)
+
+      if (batch.length < pageSize) break
+      skip += pageSize
+    }
 
     const claims = await Promise.all(
       events.map(async (ev: any) => {
