@@ -5,8 +5,8 @@ import { ArrowDown, ArrowUp, ExternalLink, Info, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ethers } from "ethers";
-import useClaims from "../hooks/useClaims";
-import usePools from "../hooks/usePools";
+import useClaims from "../../hooks/useClaims";
+import usePools from "../../hooks/usePools";
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 
 export default function AnalyticsPage() {
