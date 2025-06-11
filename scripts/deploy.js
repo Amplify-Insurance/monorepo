@@ -9,6 +9,8 @@
  */
 
 const { ethers } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 // ────────────────────────────────────────────────────────────────────────────
 // Asset addresses (Base mainnet)
@@ -127,7 +129,7 @@ async function main() {
   // await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 5);
 
   /*──────────────────────────────── Output ──────────────────────────────*/
-  console.table({
+  const addresses = {
     PolicyNFT:        policyNFT.target,
     CatInsurancePool: catPool.target,
     CapitalPool:      capitalPool.target,
@@ -137,7 +139,13 @@ async function main() {
     "Moonwell Adapter": moonwellAdapter.target,
     // "Morpho Adapter":   morphoAdapter.target,
     "Euler Adapter":    eulerAdapter.target,
-  });
+  };
+
+  console.table(addresses);
+
+  const outPath = path.join(__dirname, "..", "deployedAddresses.json");
+  fs.writeFileSync(outPath, JSON.stringify(addresses, null, 2));
+  console.log(`Saved addresses to ${outPath}`);
 }
 
 main().catch((err) => {
