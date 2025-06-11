@@ -1,19 +1,25 @@
 "use client"
 
-// import { useAccount } from "wagmi"
 import { useState } from "react"
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { ConnectButton } from '@rainbow-me/rainbowkit'
 import CurrencyToggle from "../components/CurrencyToggle"
 import ActiveCoverages from "../components/ActiveCoverages"
 import UnderwritingPositions from "../components/UnderwritingPositions"
-// Import mock hook instead
 import { useAccount } from "wagmi"
-// Add the ClaimsSection import
 import ClaimsSection from "../components/ClaimsSection"
+import useUserPolicies from "../../hooks/useUserPolicies"
+import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 
 export default function Dashboard() {
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
   const [displayCurrency, setDisplayCurrency] = useState("native")
+  const { policies } = useUserPolicies(address)
+  const { details } = useUnderwriterDetails(address)
+
+  const hasActiveCoverages = (policies || []).length > 0
+  const hasUnderwritingPositions =
+    (details?.allocatedPoolIds || []).length > 0
+  const showPositionsFirst = hasUnderwritingPositions && !hasActiveCoverages
 
   if (!isConnected) {
     return (
@@ -23,6 +29,20 @@ export default function Dashboard() {
       </div>
     )
   }
+
+  const activeCoveragesSection = (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <h2 className="text-xl font-semibold mb-4">My Active Coverages</h2>
+      <ActiveCoverages displayCurrency={displayCurrency} />
+    </div>
+  )
+
+  const underwritingPositionsSection = (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <h2 className="text-xl font-semibold mb-4">My Underwriting Positions</h2>
+      <UnderwritingPositions displayCurrency={displayCurrency} />
+    </div>
+  )
 
   return (
     <div className="container mx-auto max-w-7xl">
@@ -36,15 +56,8 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-xl font-semibold mb-4">My Active Coverages</h2>
-          <ActiveCoverages displayCurrency={displayCurrency} />
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-xl font-semibold mb-4">My Underwriting Positions</h2>
-          <UnderwritingPositions displayCurrency={displayCurrency} />
-        </div>
+        {showPositionsFirst ? underwritingPositionsSection : activeCoveragesSection}
+        {showPositionsFirst ? activeCoveragesSection : underwritingPositionsSection}
 
         {/* Add Claims Section */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
