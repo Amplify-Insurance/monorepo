@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, ExternalLink, Info, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ethers } from "ethers";
@@ -85,7 +85,6 @@ export default function AnalyticsPage() {
       byProduct: Object.entries(byProduct).map(([name, amount]) => ({
         name,
         amount,
-        denied: 0,
       })),
       byMonth: Object.entries(byMonth).map(([month, amount]) => ({
         month,
@@ -238,19 +237,6 @@ export default function AnalyticsPage() {
               />
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             </div>
-          </div>
-          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 flex items-center">
-            <Info className="h-4 w-4 mr-1" />
-            <span>More info on claims history at </span>
-            <a
-              href="https://docs.nexusmutual.io/overview/claims-history"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-1 text-blue-600 dark:text-blue-400 hover:underline flex items-center"
-            >
-              https://docs.nexusmutual.io/overview/claims-history
-              <ExternalLink className="h-3 w-3 ml-1" />
-            </a>
           </div>
         </div>
 
@@ -639,10 +625,7 @@ function ClaimsByProductChart({ data }) {
               : "rgba(209, 213, 219, 0.5)";
 
             const labels = data.map((item) => item.name);
-            const approvedValues = data.map(
-              (item) => item.amount - item.denied
-            );
-            const deniedValues = data.map((item) => item.denied);
+            const approvedValues = data.map((item) => item.amount);
 
             // Create chart
             window.claimsProductChart = new window.Chart(ctx, {
@@ -655,13 +638,6 @@ function ClaimsByProductChart({ data }) {
                     data: approvedValues,
                     backgroundColor: "rgba(52, 211, 153, 0.8)",
                     borderColor: "rgb(52, 211, 153)",
-                    borderWidth: 1,
-                  },
-                  {
-                    label: "Denied Claims",
-                    data: deniedValues,
-                    backgroundColor: "rgba(239, 68, 68, 0.8)",
-                    borderColor: "rgb(239, 68, 68)",
                     borderWidth: 1,
                   },
                 ],
