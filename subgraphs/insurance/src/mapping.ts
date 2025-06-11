@@ -13,6 +13,7 @@ import {
   DistressedAssetRewardsClaimed,
   OwnershipTransferred as RiskManagerOwnershipTransferred
 } from "../generated/RiskManager/RiskManager";
+import { RiskManager } from "../generated/RiskManager/RiskManager";
 import {
   RiskManagerSet,
   BaseYieldAdapterSet,
@@ -39,8 +40,13 @@ import {
 import {
   PolicyPremiumAccountUpdated,
   Transfer,
+  RiskManagerAddressSet,
   OwnershipTransferred as PolicyNFTOwnershipTransferred
 } from "../generated/PolicyNFT/PolicyNFT";
+import {
+  FundsWithdrawn,
+  CapitalPoolAddressSet
+} from "../generated/AaveV3Adapter/YieldAdapter";
 
 function saveGeneric(event: ethereum.Event, name: string): void {
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
@@ -77,6 +83,13 @@ export function handlePoolAdded(event: PoolAdded): void {
   pool.underlyingAsset = Address.zero();
   pool.protocolToken = event.params.protocolToken;
   pool.protocolCovered = event.params.protocolCovered;
+
+  let rm = RiskManager.bind(event.address);
+  let info = rm.try_getPoolInfo(event.params.poolId);
+  if (!info.reverted) {
+    pool.protocolCovered = info.value.protocolCovered;
+    pool.protocolToken = info.value.protocolTokenToCover;
+  }
   pool.save();
 }
 
@@ -170,4 +183,18 @@ export function handlePolicyNFTOwnershipTransferred(
 ): void {
   saveGeneric(event, "OwnershipTransferred");
   saveOwner(event, event.params.newOwner);
+}
+
+export function handleRiskManagerAddressSet(event: RiskManagerAddressSet): void {
+  saveGeneric(event, "RiskManagerAddressSet");
+}
+
+export function handleFundsWithdrawn(event: FundsWithdrawn): void {
+  saveGeneric(event, "FundsWithdrawn");
+}
+
+export function handleCapitalPoolAddressSet(
+  event: CapitalPoolAddressSet
+): void {
+  saveGeneric(event, "CapitalPoolAddressSet");
 }

@@ -1,0 +1,20 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "requestedAmount", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "actualAmount", "type": "uint256" }
+    ],
+    "name": "FundsWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "newCapitalPool", "type": "address" }
+    ],
+    "name": "CapitalPoolAddressSet",
+    "type": "event"
+  }
+]

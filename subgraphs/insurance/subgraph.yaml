@@ -158,6 +158,138 @@ dataSources:
           handler: handlePolicyPremiumAccountUpdated
         - event: Transfer(indexed address,indexed address,indexed uint256)
           handler: handleTransfer
+        - event: RiskManagerAddressSet(indexed address)
+          handler: handleRiskManagerAddressSet
         - event: OwnershipTransferred(indexed address,indexed address)
           handler: handlePolicyNFTOwnershipTransferred
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: AaveV3Adapter
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+        - event: CapitalPoolAddressSet(indexed address)
+          handler: handleCapitalPoolAddressSet
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: CompoundV3Adapter
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+        - event: CapitalPoolAddressSet(indexed address)
+          handler: handleCapitalPoolAddressSet
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: EulerAdapter
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: MoonwellAdapter
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: MorhpoAdapter
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: SdaiAdapter
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
       file: ./src/mapping.ts
