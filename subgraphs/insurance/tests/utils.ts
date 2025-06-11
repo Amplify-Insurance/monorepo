@@ -30,3 +30,33 @@ export function createPolicyCreatedEvent(
   event.parameters.push(new ethereum.EventParam('premiumPaid', ethereum.Value.fromUnsignedBigInt(premiumPaid)))
   return event
 }
+
+import { Transfer } from '../generated/PolicyNFT/PolicyNFT'
+
+export function createTransferEvent(
+  from: Address,
+  to: Address,
+  tokenId: BigInt,
+): Transfer {
+  let event = changetype<Transfer>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(from)))
+  event.parameters.push(new ethereum.EventParam('to', ethereum.Value.fromAddress(to)))
+  event.parameters.push(new ethereum.EventParam('tokenId', ethereum.Value.fromUnsignedBigInt(tokenId)))
+  return event
+}
+
+import { PoolAdded } from '../generated/RiskManager/RiskManager'
+
+export function createPoolAddedEvent(
+  poolId: BigInt,
+  protocolToken: Address,
+  protocolCovered: i32,
+): PoolAdded {
+  let event = changetype<PoolAdded>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('poolId', ethereum.Value.fromUnsignedBigInt(poolId)))
+  event.parameters.push(new ethereum.EventParam('protocolToken', ethereum.Value.fromAddress(protocolToken)))
+  event.parameters.push(new ethereum.EventParam('protocolCovered', ethereum.Value.fromI32(protocolCovered)))
+  return event
+}
