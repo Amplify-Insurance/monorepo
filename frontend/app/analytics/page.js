@@ -1,119 +1,150 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ArrowDown, ArrowUp, Check, ExternalLink, Info, Search, X } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-import { ethers } from "ethers"
-import useClaims from "../hooks/useClaims"
-import usePools from "../hooks/usePools"
-import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
-
+import { useState } from "react";
+import { ArrowDown, ArrowUp, ExternalLink, Info, Search } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { ethers } from "ethers";
+import useClaims from "../hooks/useClaims";
+import usePools from "../hooks/usePools";
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 
 export default function AnalyticsPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" })
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
-  const { claims } = useClaims()
-  const { pools } = usePools()
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState({
+    key: "id",
+    direction: "desc",
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const { claims } = useClaims();
+  const { pools } = usePools();
 
   const mappedClaims = claims
     .map((c, idx) => {
-      const pool = pools.find((p) => Number(p.id) === c.poolId)
-      if (!pool) return null
-      const protocol = getTokenName(pool.protocolTokenToCover)
-      const token = pool.protocolTokenToCover
-      const tokenName = getTokenName(pool.protocolTokenToCover)
-      const amount = Number(
-        ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
-      )
-      const value = Number(
-        ethers.utils.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)
-      )
+      const pool = pools.find((p) => Number(p.id) === c.poolId);
+      if (!pool) return null;
+      const protocol = getTokenName(pool.protocolTokenToCover);
+      const token = pool.protocolTokenToCover;
+      const tokenName = getTokenName(pool.protocolTokenToCover);
+
+      const distressedAmount = Number(
+        ethers.utils.formatUnits(
+          c.protocolTokenAmountReceived,
+          pool.protocolTokenDecimals
+        )
+      );
+      const coverage = Number(
+        ethers.utils.formatUnits(c.coverage, pool.underlyingAssetDecimals)
+      );
+      const netPayout = Number(
+        ethers.utils.formatUnits(
+          c.netPayoutToClaimant,
+          pool.underlyingAssetDecimals
+        )
+      );
+      const claimFee = Number(
+        ethers.utils.formatUnits(c.claimFee, pool.underlyingAssetDecimals)
+      );
+
       return {
         id: idx + 1,
-        coverId: c.policyId,
-        verdict: "PAID",
+        policyId: c.policyId,
         url: `https://etherscan.io/tx/${c.transactionHash}`,
-        productName: protocol,
-        productType: "Protocol",
-        stakingPool: c.poolId,
-        coverAsset: token,
-        coverAssetName: tokenName,
-        coverAmount: amount,
-        coverAmountUSD: value,
-        claimAmount: value,
-        claimAmountUSD: value,
+        protocolName: protocol,
+        poolId: c.poolId,
+        token,
+        tokenName,
+        distressedAmount,
+        coverage,
+        netPayout,
+        claimFee,
         date: new Date(c.timestamp * 1000).toISOString().slice(0, 10),
-      }
+      };
     })
-    .filter(Boolean)
+    .filter(Boolean);
 
   const stats = (() => {
-    const byToken = {}
-    const byProduct = {}
-    const byMonth = {}
+    const byToken = {};
+    const byProduct = {};
+    const byMonth = {};
     for (const c of mappedClaims) {
-      byToken[c.coverAsset] = (byToken[c.coverAsset] || 0) + c.claimAmountUSD
-      byProduct[c.productName] = (byProduct[c.productName] || 0) + c.claimAmountUSD
-      const month = new Date(c.date).toLocaleString("en-US", { month: "short", year: "numeric" })
-      byMonth[month] = (byMonth[month] || 0) + c.claimAmountUSD
+      const tName = getTokenName(c.token);
+      byToken[tName] = (byToken[tName] || 0) + c.netPayout;
+      byProduct[c.protocolName] =
+        (byProduct[c.protocolName] || 0) + c.netPayout;
+      const month = new Date(c.date).toLocaleString("en-US", {
+        month: "short",
+        year: "numeric",
+      });
+      byMonth[month] = (byMonth[month] || 0) + c.netPayout;
     }
     return {
-      total: mappedClaims.reduce((sum, c) => sum + c.claimAmountUSD, 0),
+      total: mappedClaims.reduce((sum, c) => sum + c.netPayout, 0),
       byToken,
-      byProduct: Object.entries(byProduct).map(([name, amount]) => ({ name, amount, denied: 0 })),
-      byMonth: Object.entries(byMonth).map(([month, amount]) => ({ month, amount })),
-    }
-  })()
+      byProduct: Object.entries(byProduct).map(([name, amount]) => ({
+        name,
+        amount,
+        denied: 0,
+      })),
+      byMonth: Object.entries(byMonth).map(([month, amount]) => ({
+        month,
+        amount,
+      })),
+    };
+  })();
 
   // Filter claims based on search term
   const filteredClaims = mappedClaims.filter(
     (claim) =>
-      claim.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      claim.productType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      claim.coverAsset.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      claim.id.toString().includes(searchTerm),
-  )
+      claim.protocolName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      claim.token.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      claim.id.toString().includes(searchTerm)
+  );
 
   // Sort claims based on sort config
   const sortedClaims = [...filteredClaims].sort((a, b) => {
     if (a[sortConfig.key] < b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? -1 : 1
+      return sortConfig.direction === "asc" ? -1 : 1;
     }
     if (a[sortConfig.key] > b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? 1 : -1
+      return sortConfig.direction === "asc" ? 1 : -1;
     }
-    return 0
-  })
+    return 0;
+  });
 
   // Paginate claims
-  const indexOfLastItem = currentPage * itemsPerPage
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentClaims = sortedClaims.slice(indexOfFirstItem, indexOfLastItem)
-  const totalPages = Math.ceil(sortedClaims.length / itemsPerPage)
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentClaims = sortedClaims.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedClaims.length / itemsPerPage);
 
   // Handle sort
   const requestSort = (key) => {
-    let direction = "asc"
+    let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc"
+      direction = "desc";
     }
-    setSortConfig({ key, direction })
-  }
+    setSortConfig({ key, direction });
+  };
 
   // Get sort direction icon
   const getSortDirectionIcon = (key) => {
-    if (sortConfig.key !== key) return null
-    return sortConfig.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-  }
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="h-4 w-4" />
+    ) : (
+      <ArrowDown className="h-4 w-4" />
+    );
+  };
 
   return (
     <div className="container mx-auto max-w-7xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Analytics</h1>
-        <p className="text-gray-600 dark:text-gray-300">View historical claims data and insurance payout statistics</p>
+        <p className="text-gray-600 dark:text-gray-300">
+          View historical claims data and insurance payout statistics
+        </p>
       </div>
 
       {/* Claims Statistics */}
@@ -122,38 +153,54 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total Claims */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              Claims paid
+            </div>
             <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
               {stats.total.toLocaleString()}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Total
+            </div>
           </div>
 
           {/* DAI Claims */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              Claims paid
+            </div>
             <div className="text-2xl sm:text-3xl font-bold text-yellow-600 dark:text-yellow-400">
               {(stats.byToken.DAI || 0).toLocaleString()}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">DAI share</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              DAI share
+            </div>
           </div>
 
           {/* ETH Claims */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              Claims paid
+            </div>
             <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
               {(stats.byToken.ETH || 0).toLocaleString()}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">ETH share</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              ETH share
+            </div>
           </div>
 
           {/* USDC Claims */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              Claims paid
+            </div>
             <div className="text-2xl sm:text-3xl font-bold text-blue-500 dark:text-blue-300">
               {(stats.byToken.USDC || 0).toLocaleString()}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USDC share</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              USDC share
+            </div>
           </div>
         </div>
       </div>
@@ -168,7 +215,9 @@ export default function AnalyticsPage() {
 
       {/* Claims By Product Chart */}
       <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <h2 className="text-xl font-semibold mb-4">Claims Paid per Product Name</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          Claims Paid per Product Name
+        </h2>
         <div className="h-80">
           <ClaimsByProductChart data={stats.byProduct} />
         </div>
@@ -211,16 +260,14 @@ export default function AnalyticsPage() {
               <tr>
                 {[
                   { key: "id", label: "Claim ID" },
-                  { key: "coverId", label: "Cover ID" },
-                  { key: "verdict", label: "Verdict" },
-                  { key: "productName", label: "Product name" },
-                  { key: "productType", label: "Product type" },
-                  { key: "stakingPool", label: "Staking pool" },
-                  { key: "coverAsset", label: "Cover asset" },
-                  { key: "coverAmount", label: "Cover amount" },
-                  { key: "coverAmountUSD", label: "Cover amount (USD)" },
-                  { key: "claimAmount", label: "Claim amount" },
-                  { key: "claimAmountUSD", label: "Claim amount (USD)" },
+                  { key: "policyId", label: "Policy ID" },
+                  { key: "protocolName", label: "Protocol" },
+                  { key: "tokenName", label: "Asset" },
+                  { key: "distressedAmount", label: "Distressed Amt" },
+                  { key: "coverage", label: "Coverage" },
+                  { key: "netPayout", label: "Payout" },
+                  { key: "claimFee", label: "Fee" },
+                  { key: "date", label: "Date" },
                 ].map((column) => (
                   <th
                     key={column.key}
@@ -238,74 +285,64 @@ export default function AnalyticsPage() {
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {currentClaims.map((claim) => (
-                <tr key={`${claim.id}-${claim.coverId}`} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{claim.id}</td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{claim.coverId}</td>
-                  <td className="px-3 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${claim.verdict === "APPROVED"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                        }`}
+                <tr
+                  key={`${claim.id}-${claim.policyId}`}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-750"
+                >
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {claim.id}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {claim.policyId}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <Link
+                      href={claim.url}
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
                     >
-                      {claim.verdict === "APPROVED" ? (
-                        <Check className="mr-1 h-3 w-3" />
-                      ) : (
-                        <X className="mr-1 h-3 w-3" />
-                      )}
-                      {claim.verdict}
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    <Link href={claim.url} className="text-blue-600 dark:text-blue-400 hover:underline">
-                      {claim.productName}
+                      {claim.protocolName}
                     </Link>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {claim.productType}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {claim.stakingPool}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-5 w-5 mr-2">
                         <Image
-                          src={getTokenLogo(claim.coverAsset)}
-                          alt={claim.coverAssetName}
+                          src={getTokenLogo(claim.token)}
+                          alt={claim.tokenName}
                           width={20}
                           height={20}
                           className="rounded-full"
                         />
                       </div>
-                      {claim.coverAssetName}
+                      {claim.tokenName}
                     </div>
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {claim.coverAmount.toLocaleString(undefined, {
+                    {claim.distressedAmount.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    $
-                    {claim.coverAmountUSD.toLocaleString(undefined, {
+                    {`$${claim.coverage.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    })}
+                    })}`}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {claim.claimAmount.toLocaleString(undefined, {
+                    {`$${claim.netPayout.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    })}
+                    })}`}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    $
-                    {claim.claimAmountUSD.toLocaleString(undefined, {
+                    {`$${claim.claimFee.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    })}
+                    })}`}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {claim.date}
                   </td>
                 </tr>
               ))}
@@ -324,7 +361,9 @@ export default function AnalyticsPage() {
               Previous
             </button>
             <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, currentPage + 1))
+              }
               disabled={currentPage === totalPages}
               className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
             >
@@ -334,20 +373,29 @@ export default function AnalyticsPage() {
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-                <span className="font-medium">{Math.min(indexOfLastItem, sortedClaims.length)}</span> of{" "}
-                <span className="font-medium">{sortedClaims.length}</span> results
+                Showing{" "}
+                <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                <span className="font-medium">
+                  {Math.min(indexOfLastItem, sortedClaims.length)}
+                </span>{" "}
+                of <span className="font-medium">{sortedClaims.length}</span>{" "}
+                results
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <nav
+                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                aria-label="Pagination"
+              >
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">First</span>
-                  <span className="h-5 w-5 flex items-center justify-center">«</span>
+                  <span className="h-5 w-5 flex items-center justify-center">
+                    «
+                  </span>
                 </button>
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -355,43 +403,50 @@ export default function AnalyticsPage() {
                   className="relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">Previous</span>
-                  <span className="h-5 w-5 flex items-center justify-center">‹</span>
+                  <span className="h-5 w-5 flex items-center justify-center">
+                    ‹
+                  </span>
                 </button>
 
                 {/* Page numbers */}
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum
+                  let pageNum;
                   if (totalPages <= 5) {
-                    pageNum = i + 1
+                    pageNum = i + 1;
                   } else if (currentPage <= 3) {
-                    pageNum = i + 1
+                    pageNum = i + 1;
                   } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i
+                    pageNum = totalPages - 4 + i;
                   } else {
-                    pageNum = currentPage - 2 + i
+                    pageNum = currentPage - 2 + i;
                   }
 
                   return (
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`relative inline-flex items-center px-4 py-2 border ${currentPage === pageNum
+                      className={`relative inline-flex items-center px-4 py-2 border ${
+                        currentPage === pageNum
                           ? "z-10 bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400"
                           : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600"
-                        } text-sm font-medium`}
+                      } text-sm font-medium`}
                     >
                       {pageNum}
                     </button>
-                  )
+                  );
                 })}
 
                 <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
                   disabled={currentPage === totalPages}
                   className="relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">Next</span>
-                  <span className="h-5 w-5 flex items-center justify-center">›</span>
+                  <span className="h-5 w-5 flex items-center justify-center">
+                    ›
+                  </span>
                 </button>
                 <button
                   onClick={() => setCurrentPage(totalPages)}
@@ -399,7 +454,9 @@ export default function AnalyticsPage() {
                   className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">Last</span>
-                  <span className="h-5 w-5 flex items-center justify-center">»</span>
+                  <span className="h-5 w-5 flex items-center justify-center">
+                    »
+                  </span>
                 </button>
               </nav>
             </div>
@@ -407,13 +464,17 @@ export default function AnalyticsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // Claims Over Time Chart Component
 function ClaimsOverTimeChart({ data }) {
   if (typeof window === "undefined") {
-    return <div className="h-full flex items-center justify-center">Loading chart...</div>
+    return (
+      <div className="h-full flex items-center justify-center">
+        Loading chart...
+      </div>
+    );
   }
 
   return (
@@ -423,33 +484,36 @@ function ClaimsOverTimeChart({ data }) {
         className="h-full w-full"
         ref={(el) => {
           if (el && data) {
-            const ctx = el.getContext("2d")
+            const ctx = el.getContext("2d");
 
             // Clear previous chart if it exists
             if (window.claimsTimeChart) {
-              window.claimsTimeChart.destroy()
+              window.claimsTimeChart.destroy();
             }
 
             // Set canvas dimensions for high DPI displays
-            const dpr = window.devicePixelRatio || 1
-            const rect = el.getBoundingClientRect()
-            el.width = rect.width * dpr
-            el.height = rect.height * dpr
-            ctx.scale(dpr, dpr)
+            const dpr = window.devicePixelRatio || 1;
+            const rect = el.getBoundingClientRect();
+            el.width = rect.width * dpr;
+            el.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
 
             // Draw chart
-            const isDarkMode = document.documentElement.classList.contains("dark")
-            const textColor = isDarkMode ? "#e5e7eb" : "#374151"
-            const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
+            const isDarkMode =
+              document.documentElement.classList.contains("dark");
+            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+            const gridColor = isDarkMode
+              ? "rgba(75, 85, 99, 0.2)"
+              : "rgba(209, 213, 219, 0.5)";
 
-            const labels = data.map((item) => item.month)
-            const values = data.map((item) => item.amount)
+            const labels = data.map((item) => item.month);
+            const values = data.map((item) => item.amount);
 
             // Create gradient
-            const gradient = ctx.createLinearGradient(0, 0, 0, rect.height)
-            gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)") // Green  0, 0, rect.height)
-            gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)") // Green
-            gradient.addColorStop(1, "rgba(52, 211, 153, 0.1)") // Transparent green
+            const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
+            gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)"); // Green  0, 0, rect.height)
+            gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)"); // Green
+            gradient.addColorStop(1, "rgba(52, 211, 153, 0.1)"); // Transparent green
 
             // Create chart
             window.claimsTimeChart = new window.Chart(ctx, {
@@ -481,10 +545,14 @@ function ClaimsOverTimeChart({ data }) {
                     display: false,
                   },
                   tooltip: {
-                    backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+                    backgroundColor: isDarkMode
+                      ? "rgba(31, 41, 55, 0.9)"
+                      : "rgba(255, 255, 255, 0.9)",
                     titleColor: isDarkMode ? "#e5e7eb" : "#374151",
                     bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
-                    borderColor: isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)",
+                    borderColor: isDarkMode
+                      ? "rgba(75, 85, 99, 0.2)"
+                      : "rgba(209, 213, 219, 0.5)",
                     borderWidth: 1,
                     padding: 12,
                     displayColors: false,
@@ -512,29 +580,33 @@ function ClaimsOverTimeChart({ data }) {
                       color: textColor,
                       callback: (value) => {
                         if (value >= 1000000) {
-                          return `$${value / 1000000}M`
+                          return `$${value / 1000000}M`;
                         }
                         if (value >= 1000) {
-                          return `$${value / 1000}K`
+                          return `$${value / 1000}K`;
                         }
-                        return `$${value}`
+                        return `$${value}`;
                       },
                     },
                   },
                 },
               },
-            })
+            });
           }
         }}
       />
     </div>
-  )
+  );
 }
 
 // Claims By Product Chart Component
 function ClaimsByProductChart({ data }) {
   if (typeof window === "undefined") {
-    return <div className="h-full flex items-center justify-center">Loading chart...</div>
+    return (
+      <div className="h-full flex items-center justify-center">
+        Loading chart...
+      </div>
+    );
   }
 
   return (
@@ -544,28 +616,33 @@ function ClaimsByProductChart({ data }) {
         className="h-full w-full"
         ref={(el) => {
           if (el && data) {
-            const ctx = el.getContext("2d")
+            const ctx = el.getContext("2d");
 
             // Clear previous chart if it exists
             if (window.claimsProductChart) {
-              window.claimsProductChart.destroy()
+              window.claimsProductChart.destroy();
             }
 
             // Set canvas dimensions for high DPI displays
-            const dpr = window.devicePixelRatio || 1
-            const rect = el.getBoundingClientRect()
-            el.width = rect.width * dpr
-            el.height = rect.height * dpr
-            ctx.scale(dpr, dpr)
+            const dpr = window.devicePixelRatio || 1;
+            const rect = el.getBoundingClientRect();
+            el.width = rect.width * dpr;
+            el.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
 
             // Draw chart
-            const isDarkMode = document.documentElement.classList.contains("dark")
-            const textColor = isDarkMode ? "#e5e7eb" : "#374151"
-            const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
+            const isDarkMode =
+              document.documentElement.classList.contains("dark");
+            const textColor = isDarkMode ? "#e5e7eb" : "#374151";
+            const gridColor = isDarkMode
+              ? "rgba(75, 85, 99, 0.2)"
+              : "rgba(209, 213, 219, 0.5)";
 
-            const labels = data.map((item) => item.name)
-            const approvedValues = data.map((item) => item.amount - item.denied)
-            const deniedValues = data.map((item) => item.denied)
+            const labels = data.map((item) => item.name);
+            const approvedValues = data.map(
+              (item) => item.amount - item.denied
+            );
+            const deniedValues = data.map((item) => item.denied);
 
             // Create chart
             window.claimsProductChart = new window.Chart(ctx, {
@@ -604,14 +681,21 @@ function ClaimsByProductChart({ data }) {
                     },
                   },
                   tooltip: {
-                    backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+                    backgroundColor: isDarkMode
+                      ? "rgba(31, 41, 55, 0.9)"
+                      : "rgba(255, 255, 255, 0.9)",
                     titleColor: isDarkMode ? "#e5e7eb" : "#374151",
                     bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
-                    borderColor: isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)",
+                    borderColor: isDarkMode
+                      ? "rgba(75, 85, 99, 0.2)"
+                      : "rgba(209, 213, 219, 0.5)",
                     borderWidth: 1,
                     padding: 12,
                     callbacks: {
-                      label: (context) => `${context.dataset.label}: $${context.raw.toLocaleString()}`,
+                      label: (context) =>
+                        `${
+                          context.dataset.label
+                        }: $${context.raw.toLocaleString()}`,
                     },
                   },
                 },
@@ -632,21 +716,21 @@ function ClaimsByProductChart({ data }) {
                       color: textColor,
                       callback: (value) => {
                         if (value >= 1000000) {
-                          return `$${value / 1000000}M`
+                          return `$${value / 1000000}M`;
                         }
                         if (value >= 1000) {
-                          return `$${value / 1000}K`
+                          return `$${value / 1000}K`;
                         }
-                        return `$${value}`
+                        return `$${value}`;
                       },
                     },
                   },
                 },
               },
-            })
+            });
           }
         }}
       />
     </div>
-  )
+  );
 }
