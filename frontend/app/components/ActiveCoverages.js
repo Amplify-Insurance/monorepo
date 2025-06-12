@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Shield } from "lucide-react"
 import Image from "next/image"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
@@ -8,6 +8,7 @@ import { useAccount } from "wagmi"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
 import { ethers } from "ethers"
+import { getUnderlyingAssetDecimals } from "../../lib/capitalPool"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName} from "../config/tokenNameMap"
 
 
@@ -17,6 +18,19 @@ export default function ActiveCoverages({ displayCurrency }) {
   const { address } = useAccount()
   const { policies } = useUserPolicies(address)
   const { pools } = usePools()
+  const [underlyingDec, setUnderlyingDec] = useState(6)
+
+  useEffect(() => {
+    async function loadDec() {
+      try {
+        const dec = await getUnderlyingAssetDecimals()
+        setUnderlyingDec(Number(dec))
+      } catch (err) {
+        console.error('Failed to fetch asset decimals', err)
+      }
+    }
+    loadDec()
+  }, [])
 
   console.log("ActiveCoverages - raw policies:", policies) // For debugging the raw data
 
@@ -34,14 +48,15 @@ export default function ActiveCoverages({ displayCurrency }) {
 
     // ethers.utils.formatUnits can often handle BigNumber objects directly,
     // but it's safer to pass the hex value.
+    const decimals = pool.underlyingAssetDecimals ?? underlyingDec
     const coverageAmount = Number(
-      ethers.utils.formatUnits(p.coverage.hex, pool.underlyingAssetDecimals)
+      ethers.utils.formatUnits(p.coverage.hex, decimals)
     )
 
     const capacity = Number(
       ethers.utils.formatUnits(
         BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold),
-        pool.underlyingAssetDecimals
+        decimals
       )
     )
 
@@ -181,7 +196,11 @@ export default function ActiveCoverages({ displayCurrency }) {
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900 dark:text-white">
-                  {formatCurrency(coverage.coverageAmount)}
+                  {formatCurrency(
+                    coverage.coverageAmount,
+                    'USD',
+                    displayCurrency
+                  )}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
