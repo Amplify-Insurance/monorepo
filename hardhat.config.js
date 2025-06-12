@@ -6,8 +6,8 @@ require("dotenv").config();
 
 module.exports = {
     solidity: {
-        // Use the locally installed solc to avoid network downloads
-        version: "0.8.30",
+        // Use a built-in solc version to avoid network downloads
+        version: "0.8.20",
         settings: {
             optimizer: {
                 enabled: true,
