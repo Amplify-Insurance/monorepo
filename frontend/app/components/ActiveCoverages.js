@@ -172,7 +172,7 @@ export default function ActiveCoverages({ displayCurrency }) {
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-8 w-8 mr-3">
                     <Image
-                      src={getProtocolLogo(coverage.id)}
+                      src={coverage.protocolLogo}
                       alt={coverage.protocol}
                       width={32}
                       height={32}

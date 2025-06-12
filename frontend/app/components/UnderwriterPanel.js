@@ -55,7 +55,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   useEffect(() => {
     if (selectedYield == null) return
     setSelectedMarkets((prev) =>
-      prev.filter((id) => Number(id) - 1 !== selectedYield),
+      prev.filter((id) => Number(id) !== selectedYield),
     )
   }, [selectedYield])
 
@@ -102,7 +102,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
             (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase(),
           ) &&
           (selectedCategory === "all" || market.category === selectedCategory) &&
-          (selectedYield === null || Number(market.id) - 1 !== selectedYield),
+          (selectedYield === null || Number(market.id) !== selectedYield),
       )
     : []
 
@@ -381,7 +381,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 mr-3">
                         <Image
-                          src={getProtocolLogo(market.id -1)}
+                          src={getProtocolLogo(market.id)}
                           alt={market.name}
                           width={40}
                           height={40}

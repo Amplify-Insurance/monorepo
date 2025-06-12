@@ -20,12 +20,16 @@ export default function PoolDetailsPage() {
   const protocol = params.protocol
   const token = params.token
   const tokenName = getTokenName(token)
+  const tokenLogo = getTokenLogo(params.protocolTokenToCover)
+
+  console.log(tokenLogo, params.protocolTokenToCover, "params.protocolTokenToCover")
+
 
   if (loading) {
     return <p>Loading...</p>
   }
 
-  console.log("Pools data:", pools)
+  console.log("Pools data:", params)
 
   const pool = pools.find(
     (p) =>
@@ -52,7 +56,7 @@ export default function PoolDetailsPage() {
       </button>
       <div className="flex items-center mb-6">
         <Image
-          src={getTokenLogo(protocol)}
+          src={tokenLogo}
           alt={name}
           width={40}
           height={40}
