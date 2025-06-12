@@ -375,16 +375,18 @@ export default function UnderwritingPositions({ displayCurrency }) {
                               >
                                 {isClaiming ? "Claiming..." : "Claim Rewards"}
                               </button>
-                              <button
-                                className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                onClick={() => {
-                                  handleExecuteWithdrawal();
-                                  setOpenDropdown(null);
-                                }}
-                                disabled={isExecuting}
-                              >
-                                {isExecuting ? "Executing..." : "Execute Withdrawal"}
-                              </button>
+                              {withdrawalReady && details?.withdrawalRequestShares > 0 && (
+                                <button
+                                  className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  onClick={() => {
+                                    handleExecuteWithdrawal();
+                                    setOpenDropdown(null);
+                                  }}
+                                  disabled={isExecuting}
+                                >
+                                  {isExecuting ? "Executing..." : "Execute Withdrawal"}
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}
@@ -446,13 +448,15 @@ export default function UnderwritingPositions({ displayCurrency }) {
                         <div className="text-sm font-medium text-green-600 dark:text-green-400">{unlockDays}d</div>
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={handleExecuteWithdrawal}
-                          disabled={!withdrawalReady || isExecuting}
-                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 disabled:opacity-50"
-                        >
-                          {isExecuting ? "Executing..." : "Withdraw"}
-                        </button>
+                        {withdrawalReady && (
+                          <button
+                            onClick={handleExecuteWithdrawal}
+                            disabled={isExecuting}
+                            className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 disabled:opacity-50"
+                          >
+                            {isExecuting ? "Executing..." : "Withdraw"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
