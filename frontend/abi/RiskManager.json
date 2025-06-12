@@ -561,24 +561,37 @@
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "_poolIds",
-				"type": "uint256[]"
-			}
-		],
-		"name": "allocateCapital",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "capitalPool",
-		"outputs": [
-			{
+        {
+                "inputs": [
+                        {
+                                "internalType": "uint256[]",
+                                "name": "_poolIds",
+                                "type": "uint256[]"
+                        }
+                ],
+                "name": "allocateCapital",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+        },
+        {
+                "inputs": [
+                        {
+                                "internalType": "uint256[]",
+                                "name": "_poolIds",
+                                "type": "uint256[]"
+                        }
+                ],
+                "name": "deallocateCapital",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+        },
+        {
+                "inputs": [],
+                "name": "capitalPool",
+                "outputs": [
+                        {
 				"internalType": "contract ICapitalPool",
 				"name": "",
 				"type": "address"
