@@ -27,9 +27,19 @@ type Policy @entity {
   pool: Pool!
   coverageAmount: BigInt!
   premiumPaid: BigInt!
+  premiumRateBps: BigInt!
 }
 
 type ContractOwner @entity {
   id: ID!
   owner: Bytes!
+}
+
+type PoolUtilizationSnapshot @entity {
+  id: ID!
+  pool: Pool!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  utilizationBps: BigInt!
+  premiumRateBps: BigInt!
 }
