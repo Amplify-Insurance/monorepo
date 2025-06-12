@@ -1,5 +1,5 @@
 import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts";
-import { GenericEvent, Pool, Underwriter, Policy, ContractOwner } from "../generated/schema";
+import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot } from "../generated/schema";
 import {
   PoolAdded,
   IncidentReported,
@@ -74,6 +74,44 @@ function saveOwner(event: ethereum.Event, newOwner: Address): void {
   owner.save();
 }
 
+const BPS = BigInt.fromI32(10000);
+
+function snapshotPool(
+  rm: RiskManager,
+  event: ethereum.Event,
+  poolId: BigInt
+): BigInt | null {
+  let infoRes = rm.try_getPoolInfo(poolId);
+  if (infoRes.reverted) {
+    return null;
+  }
+  let info = infoRes.value;
+  let totalCapital = info.totalCapitalPledgedToPool;
+  let sold = info.totalCoverageSold;
+  let utilization = totalCapital.equals(BigInt.zero())
+    ? BigInt.zero()
+    : sold.times(BPS).div(totalCapital);
+  let base = info.rateModel.base;
+  let slope1 = info.rateModel.slope1;
+  let slope2 = info.rateModel.slope2;
+  let kink = info.rateModel.kink;
+  let rate = utilization.lt(kink)
+    ? base.plus(slope1.times(utilization).div(BPS))
+    : base
+        .plus(slope1.times(kink).div(BPS))
+        .plus(slope2.times(utilization.minus(kink)).div(BPS));
+
+  let snapId = poolId.toString() + "-" + event.block.number.toString();
+  let snap = new PoolUtilizationSnapshot(snapId);
+  snap.pool = poolId.toString();
+  snap.timestamp = event.block.timestamp;
+  snap.blockNumber = event.block.number;
+  snap.utilizationBps = utilization;
+  snap.premiumRateBps = rate;
+  snap.save();
+  return rate;
+}
+
 // RiskManager events
 export function handlePoolAdded(event: PoolAdded): void {
   saveGeneric(event, "PoolAdded");
@@ -110,9 +148,17 @@ export function handleDeposit(event: Deposit): void {
 export function handleWithdrawalRequested(event: WithdrawalRequested): void { saveGeneric(event, "WithdrawalRequested"); }
 export function handleWithdrawalExecuted(event: WithdrawalExecuted): void { saveGeneric(event, "WithdrawalExecuted"); }
 export function handlePremiumPaid(event: PremiumPaid): void { saveGeneric(event, "PremiumPaid"); }
-export function handleClaimProcessed(event: ClaimProcessed): void { saveGeneric(event, "ClaimProcessed"); }
+export function handleClaimProcessed(event: ClaimProcessed): void {
+  saveGeneric(event, "ClaimProcessed");
+  let rm = RiskManager.bind(event.address);
+  snapshotPool(rm, event, event.params.poolId);
+}
 export function handleLossesApplied(event: LossesApplied): void { saveGeneric(event, "LossesApplied"); }
-export function handleCapitalAllocated(event: CapitalAllocated): void { saveGeneric(event, "CapitalAllocated"); }
+export function handleCapitalAllocated(event: CapitalAllocated): void {
+  saveGeneric(event, "CapitalAllocated");
+  let rm = RiskManager.bind(event.address);
+  snapshotPool(rm, event, event.params.poolId);
+}
 export function handleCapitalDeallocated(event: CapitalDeallocated): void { saveGeneric(event, "CapitalDeallocated"); }
 export function handlePolicyCreated(event: PolicyCreated): void {
   saveGeneric(event, "PolicyCreated");
@@ -123,10 +169,20 @@ export function handlePolicyCreated(event: PolicyCreated): void {
   policy.pool = event.params.poolId.toString();
   policy.coverageAmount = event.params.coverageAmount;
   policy.premiumPaid = event.params.premiumPaid;
+  let rm = RiskManager.bind(event.address);
+  let rate = snapshotPool(rm, event, event.params.poolId);
+  policy.premiumRateBps = rate == null ? BigInt.fromI32(0) : rate as BigInt;
   policy.save();
 }
 export function handleIncidentReported(event: IncidentReported): void { saveGeneric(event, "IncidentReported"); }
-export function handlePolicyLapsed(event: PolicyLapsed): void { saveGeneric(event, "PolicyLapsed"); }
+export function handlePolicyLapsed(event: PolicyLapsed): void {
+  saveGeneric(event, "PolicyLapsed");
+  let policy = Policy.load(event.params.policyId.toString());
+  if (policy != null) {
+    let rm = RiskManager.bind(event.address);
+    snapshotPool(rm, event, BigInt.fromString(policy.pool));
+  }
+}
 export function handleBaseYieldAdapterSet(event: BaseYieldAdapterSet): void { saveGeneric(event, "BaseYieldAdapterSet"); }
 export function handleSystemValueSynced(event: SystemValueSynced): void { saveGeneric(event, "SystemValueSynced"); }
 export function handleAdapterCallFailed(event: AdapterCallFailed): void { saveGeneric(event, "AdapterCallFailed"); }
