@@ -7,6 +7,7 @@ import Link from "next/link"
 import Image from "next/image"
 import CoverageModal from "../../../components/CoverageModal"
 import usePools from "../../../../hooks/usePools"
+import useReserveConfig from "../../../../hooks/useReserveConfig"
 import {
   getProtocolName,
   getProtocolDescription,
@@ -74,6 +75,8 @@ export default function PoolDetailsPage() {
   const [utilHistory, setUtilHistory] = useState([])
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false)
   const [provideModalOpen, setProvideModalOpen] = useState(false)
+
+  const { config: reserveConfig } = useReserveConfig()
 
   const premiumCanvasRef = useRef(null)
   const utilCanvasRef = useRef(null)
@@ -195,10 +198,10 @@ export default function PoolDetailsPage() {
       const chartWidth = width - padding.left - padding.right
       const chartHeight = height - padding.top - padding.bottom
       const isDark = document.documentElement.classList.contains("dark")
-      const bg = isDark ? "#11182b" : "#f9fafb"
-      const grid = isDark ? "rgba(100,116,139,0.2)" : "rgba(203,213,225,0.5)"
-      const text = isDark ? "#cbd5e1" : "#4b5563"
-      const axis = isDark ? "#475569" : "#cbd5e1"
+      const bg = isDark ? "#11182b" : "#ffffff"
+      const grid = isDark ? "rgba(100,116,139,0.2)" : "rgba(203,213,225,0.3)"
+      const text = isDark ? "#cbd5e1" : "#6b7280"
+      const axis = isDark ? "#475569" : "#e5e7eb"
       const rateColor = "#ec4899"
       const optimalColor = "#22c55e"
       const currentColor = "#3b82f6"
@@ -229,7 +232,7 @@ export default function PoolDetailsPage() {
       ctx.lineTo(padding.left, padding.top + chartHeight)
       ctx.stroke()
       ctx.save()
-      ctx.translate(padding.left - 30, padding.top + chartHeight / 2)
+      ctx.translate(padding.left - 45, padding.top + chartHeight / 2)
       ctx.rotate(-Math.PI / 2)
       ctx.textAlign = "center"
       ctx.font = CHART_FONT
@@ -481,8 +484,12 @@ export default function PoolDetailsPage() {
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6 mb-8">
         <h2 className="text-lg md:text-xl font-semibold mb-4 text-gray-900 dark:text-white">Reserve Configuration</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[{label:'Reserve Factor',value:'N/A'},{label:'Max LTV',value:'N/A'},{label:'Liq. Threshold',value:'N/A'},{label:'Liq. Penalty',value:'N/A'}].map(item=>(
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {[
+            {label:'Cover Cooldown', value: reserveConfig ? `${reserveConfig.coverCooldownPeriod / 86400}d` : 'N/A'},
+            {label:'Claim Fee', value: reserveConfig ? formatPercentage(reserveConfig.claimFeeBps / 100) : 'N/A'},
+            {label:'Notice Period', value: reserveConfig ? `${reserveConfig.underwriterNoticePeriod / 86400}d` : 'N/A'},
+          ].map(item=>(
             <div key={item.label}><div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">{item.label}</div><div className="text-base sm:text-lg font-medium text-gray-800 dark:text-gray-200">{item.value}</div></div>
           ))}
         </div>
