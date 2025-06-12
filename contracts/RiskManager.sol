@@ -84,6 +84,7 @@ contract RiskManager is ReentrancyGuard, Ownable {
         uint8 protocolTokenDecimals;
         uint256 scaleToProtocolToken;      // For converting coverage amount to protocolToken amount.
         bool isPaused;
+        uint256 pauseTimestamp; // Timestamp of when the pool was paused.
     }
 
     PoolData[] public protocolRiskPools;
@@ -133,6 +134,7 @@ contract RiskManager is ReentrancyGuard, Ownable {
     error NoCapitalToAllocate();
     error WithdrawalInsolvent();
     error NoRewardsToClaim();
+    error ClaimBlockedDuringPause();
 
 
     /* ───────────────────────── Events ──────────────────────────── */
@@ -146,6 +148,8 @@ contract RiskManager is ReentrancyGuard, Ownable {
     event ClaimProcessed(uint256 indexed policyId, uint256 indexed poolId, address indexed claimant, uint256 netPayoutToClaimant);
     event PremiumRewardsClaimed(address indexed underwriter, uint256 indexed poolId, uint256 amount);
     event DistressedAssetRewardsClaimed(address indexed underwriter, uint256 indexed poolId, address indexed token, uint256 amount);
+    event PolicyCancelled(uint256 indexed policyId, address indexed user, uint256 refundAmount);
+    event RateModelUpdated(uint256 indexed poolId);
 
 
     /* ───────────────────── Constructor ─────────────────────────── */
@@ -173,6 +177,32 @@ contract RiskManager is ReentrancyGuard, Ownable {
     function setCatPremiumShareBps(uint256 _newBps) external onlyOwner {
         require(_newBps <= 5000, "RM: Max share is 50%");
         catPremiumBps = _newBps;
+    }
+    
+    /**
+     * @notice The committee can report an incident to pause new cover sales for a pool.
+     * @param _poolId The ID of the pool to pause or unpause.
+     * @param _pauseState The desired state (true for paused, false for unpaused).
+     */
+    function reportIncident(uint256 _poolId, bool _pauseState) external onlyCommittee {
+        if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
+        PoolData storage pool = protocolRiskPools[_poolId];
+        pool.isPaused = _pauseState;
+        if (_pauseState) {
+            pool.pauseTimestamp = block.timestamp;
+        } else {
+            pool.pauseTimestamp = 0; // Reset timestamp when unpausing
+        }
+        emit IncidentReported(_poolId, _pauseState);
+    }
+    
+    /**
+     * @notice Allows owner to update the rate model for a given pool.
+     */
+    function updateRateModel(uint256 _poolId, RateModel calldata _newRateModel) external onlyOwner {
+        if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
+        protocolRiskPools[_poolId].rateModel = _newRateModel;
+        emit RateModelUpdated(_poolId);
     }
 
 
@@ -256,7 +286,8 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
             protocolCovered: _protocolCovered,
             protocolTokenDecimals: protoDec,
             scaleToProtocolToken: 10**(protoDec >= underlyingDec ? protoDec - underlyingDec : 0),
-            isPaused: false
+            isPaused: false,
+            pauseTimestamp: 0
         }));
 
         emit PoolAdded(poolId, _protocolTokenToCover, _protocolCovered);
@@ -327,21 +358,43 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
         }
     }
     
-    // Note: A `deallocateCapital` function would be the inverse of `allocateCapital`.
-    // It would need similar solvency checks to `onWithdrawalRequested`.
+    /**
+     * @notice Allows an underwriter to remove their capital pledge from one or more risk pools.
+     * @param _poolIds An array of pool IDs to deallocate capital from.
+     */
+    function deallocateCapital(uint256[] calldata _poolIds) external nonReentrant {
+        address underwriter = msg.sender;
+        uint256 totalPledge = underwriterTotalPledge[underwriter];
+        if (totalPledge == 0) revert NoCapitalToAllocate(); // Should not happen if allocated, but good practice.
+
+        for (uint i = 0; i < _poolIds.length; i++) {
+            uint256 poolId = _poolIds[i];
+            if (poolId >= protocolRiskPools.length) revert InvalidPoolId();
+            if (!isAllocatedToPool[underwriter][poolId]) revert NotAllocated();
+
+            // Solvency check: Ensure deallocation doesn't leave the pool undercollateralized.
+            PoolData storage pool = protocolRiskPools[poolId];
+            uint256 newPledgedCapital = pool.totalCapitalPledgedToPool - totalPledge;
+            if (pool.totalCoverageSold > newPledgedCapital) {
+                revert WithdrawalInsolvent();
+            }
+
+            // Update pool state
+            pool.totalCapitalPledgedToPool = newPledgedCapital;
+
+            // Remove underwriter from tracking lists
+            _removeUnderwriterFromPool(underwriter, poolId);
+
+            emit CapitalDeallocated(underwriter, poolId, totalPledge);
+        }
+    }
+
 
     /* ──────────────── Policy Purchase & Lifecycle ──────────────── */
 
-/**
- * @notice Purchases insurance coverage by making an initial premium deposit.
- * @dev The policy remains active as long as funds remain in the deposit to pay for the streaming premium.
- * @param _poolId The ID of the risk pool.
- * @param _coverageAmount The amount of coverage desired.
- * @param _initialPremiumDeposit The initial amount of premium to deposit.
- */
     /**
-     * @notice Purchases insurance coverage by making an initial premium deposit.
-     * @dev CORRECTED: Added upfront validation for coverage amount and pool capacity.
+     * @notice Purchases insurance coverage bymaking an initial premium deposit.
+     * @dev The policy remains active as long as funds remain in the deposit to pay for the streaming premium.
      * @param _poolId The ID of the risk pool.
      * @param _coverageAmount The amount of coverage desired.
      * @param _initialPremiumDeposit The initial amount of premium to deposit.
@@ -351,21 +404,14 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
         uint256 _coverageAmount,
         uint256 _initialPremiumDeposit
     ) external nonReentrant returns (uint256 policyId) {
-
+        if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
         PoolData storage pool = protocolRiskPools[_poolId];
 
         if (pool.isPaused) revert PoolPaused();
         if (_coverageAmount == 0 || _initialPremiumDeposit == 0) revert InvalidAmount();
         if (_initialPremiumDeposit > type(uint128).max) revert InvalidAmount();
-
         if (!_isPoolSolventForNewCover(pool, _coverageAmount)) revert InsufficientCapacity();
-        // --- Validation ---
-        if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
-        
 
-        
-
-        // We still need a minimum deposit to prevent dust policies.
         uint256 annualPremiumRateBps = _getPremiumRateBpsAnnual(pool);
         uint256 minPremium = (_coverageAmount * annualPremiumRateBps * 7 days) / (SECS_YEAR * BPS);
         require(_initialPremiumDeposit >= minPremium, "RM: Deposit is less than the required minimum for 1 week");
@@ -376,7 +422,6 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
 
         // --- Policy Minting ---
         uint256 activationTimestamp = block.timestamp + COVER_COOLDOWN_PERIOD;
-
         policyId = policyNFT.mint(
             msg.sender,
             _poolId,
@@ -390,10 +435,52 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
         emit PolicyCreated(msg.sender, policyId, _poolId, _coverageAmount, _initialPremiumDeposit);
     }
 
+    /**
+     * @notice Allows a policyholder to cancel their active cover and get a refund for unspent premiums.
+     * @dev This function will first settle any accrued premium up to the current block.timestamp.
+     * It will then refund the remaining deposit, burn the NFT, and update pool statistics.
+     * @param _policyId The ID of the policy to cancel.
+     */
+    function cancelCover(uint256 _policyId) external nonReentrant {
+        // --- 1. Validation ---
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+        require(policyNFT.ownerOf(_policyId) == msg.sender, "RM: Not policy owner");
+        require(pol.coverage > 0, "RM: Policy already claimed or cancelled");
+        require(block.timestamp >= pol.activation, "RM: Cannot cancel during cooldown period");
+
+        // --- 2. Settle Premiums ---
+        // This is a critical step. It ensures underwriters are paid for the coverage
+        // provided up to this exact moment and updates the policy's premiumDeposit on-chain.
+        _settleAndDrainPremium(_policyId);
+
+        // --- 3. Get Refund Amount ---
+        // After settling, the remaining deposit is what we can refund.
+        // We must re-fetch the policy state as _settleAndDrainPremium updated it.
+        IPolicyNFT.Policy memory updatedPol = policyNFT.getPolicy(_policyId);
+        uint256 refundAmount = updatedPol.premiumDeposit;
+
+        // --- 4. State Updates (Effects) ---
+        PoolData storage pool = protocolRiskPools[updatedPol.poolId];
+        pool.totalCoverageSold -= pol.coverage; // Use the original coverage amount from `pol`
+
+        // --- 5. Final Actions (Interactions) ---
+        // Burn the user's Policy NFT
+        policyNFT.burn(_policyId);
+
+        // Refund the unspent premium to the user
+        if (refundAmount > 0) {
+            capitalPool.underlyingAsset().safeTransfer(msg.sender, refundAmount);
+        }
+
+        emit PolicyCancelled(_policyId, msg.sender, refundAmount);
+    }
  
     /* ───────────────────── Claim Processing ───────────────────── */
 
     function processClaim(uint256 _policyId, bytes calldata /*_proofOfLossData*/) external nonReentrant {
+        // --- Settle final premium before processing claim ---
+        _settleAndDrainPremium(_policyId);
+        
         // --- 1. Validation Helper ---
         (IPolicyNFT.Policy memory pol, PoolData storage pool, address policyOwner) = _validateClaimDetails(_policyId);
         require(msg.sender == policyOwner, "RM: Not policy owner");
@@ -468,6 +555,9 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
      * @param _policyId The ID of the policy to potentially lapse.
      */
     function lapsePolicy(uint256 _policyId) external nonReentrant {
+        // --- Settle final premium before lapsing ---
+        _settleAndDrainPremium(_policyId);
+
         // First, check if the policy is already considered inactive.
         require(!isPolicyActive(_policyId), "RM: Policy is still active");
 
@@ -487,6 +577,30 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
 
 
     /* ───────────────── Internal & Helper Functions ──────────────── */
+    
+    function _removeUnderwriterFromPool(address _underwriter, uint256 _poolId) internal {
+        // Remove from isAllocated mapping
+        isAllocatedToPool[_underwriter][_poolId] = false;
+
+        // Remove from underwriterAllocations array
+        uint256[] storage allocations = underwriterAllocations[_underwriter];
+        for (uint j = 0; j < allocations.length; j++) {
+            if (allocations[j] == _poolId) {
+                allocations[j] = allocations[allocations.length - 1];
+                allocations.pop();
+                break;
+            }
+        }
+        
+        // Remove from poolSpecificUnderwriters array (swap and pop)
+        uint256 storedIndex = underwriterIndexInPoolArray[_poolId][_underwriter];
+        address[] storage underwritersInPool = poolSpecificUnderwriters[_poolId];
+        address lastUnderwriter = underwritersInPool[underwritersInPool.length - 1];
+        underwritersInPool[storedIndex] = lastUnderwriter;
+        underwriterIndexInPoolArray[_poolId][lastUnderwriter] = storedIndex;
+        underwritersInPool.pop();
+        delete underwriterIndexInPoolArray[_poolId][_underwriter];
+    }
 
     function _validateClaimDetails(uint256 _policyId)
         internal
@@ -495,14 +609,18 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
     {
         pol = policyNFT.getPolicy(_policyId);
         require(pol.coverage > 0, "RM: Policy invalid");
-        require(block.timestamp >= pol.activation, "RM: Policy not active");
-
-        // --- FIX: Use the new isPolicyActive check ---
+        require(block.timestamp >= pol.activation, "RM: Policy not active yet");
         require(isPolicyActive(_policyId), "RM: Policy is lapsed (insufficient premium deposit)");
 
         policyOwner = policyNFT.ownerOf(_policyId);
         pool = protocolRiskPools[pol.poolId];
-        require(!pool.isPaused, "RM: Pool is paused");
+
+        // If the pool is paused, only allow claims from policies that were already
+        // fully active *before* the pause was initiated. Policies whose cooldown
+        // period was still pending at the time of the pause are blocked.
+        if (pool.isPaused) {
+            require(pol.activation < pool.pauseTimestamp, "RM: Claim blocked; policy was in cooldown during pause");
+        }
     }
 
 
@@ -558,13 +676,7 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
 
             if (_isFullRemoval) {
                 // Efficiently remove from poolSpecificUnderwriters array
-                uint256 storedIndex = underwriterIndexInPoolArray[poolId][_underwriter];
-                address[] storage underwritersInPool = poolSpecificUnderwriters[poolId];
-                address lastUnderwriter = underwritersInPool[underwritersInPool.length - 1];
-                underwritersInPool[storedIndex] = lastUnderwriter;
-                underwriterIndexInPoolArray[poolId][lastUnderwriter] = storedIndex;
-                underwritersInPool.pop();
-                delete underwriterIndexInPoolArray[poolId][_underwriter];
+                _removeUnderwriterFromPool(_underwriter, poolId);
             }
         }
         if (_isFullRemoval) {
@@ -646,6 +758,7 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
     */
     function isPolicyActive(uint256 _policyId) public view returns (bool) {
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+        if (pol.coverage == 0) return false; // Policy already terminated
         if (block.timestamp <= pol.lastDrainTime) return pol.premiumDeposit > 0;
         
         PoolData storage pool = protocolRiskPools[pol.poolId];
