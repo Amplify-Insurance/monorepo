@@ -8,6 +8,7 @@ import Image from "next/image"
 import CoverageModal from "../../../components/CoverageModal"
 import usePools from "../../../../hooks/usePools"
 import useReserveConfig from "../../../../hooks/useReserveConfig"
+import usePoolHistory from "../../../../hooks/usePoolHistory"
 import {
   getProtocolName,
   getProtocolDescription,
@@ -71,8 +72,16 @@ export default function PoolDetailsPage() {
   const [isClient, setIsClient] = useState(false)
   const [premiumTimeframe, setPremiumTimeframe] = useState("1m")
   const [utilTimeframe, setUtilTimeframe] = useState("1m")
-  const [premiumHistory, setPremiumHistory] = useState([])
-  const [utilHistory, setUtilHistory] = useState([])
+  const poolId = useMemo(() => {
+    if (!protocol) return null
+    if (!isNaN(Number(protocol))) return Number(protocol)
+    const mapping = { aave: 0, compound: 1, moonwell: 2, morpho: 3, euler: 4 }
+    return mapping[protocol] ?? null
+  }, [protocol])
+  const {
+    premiumHistory,
+    utilHistory,
+  } = usePoolHistory(poolId)
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false)
   const [provideModalOpen, setProvideModalOpen] = useState(false)
 
@@ -85,16 +94,6 @@ export default function PoolDetailsPage() {
   useEffect(() => {
     setIsClient(true)
   }, [])
-
-  // Convert incoming params into the numeric pool id and token address used by
-  // the API responses. The `protocol` param may be either a name (e.g. "aave")
-  // or a numeric id.
-  const poolId = useMemo(() => {
-    if (!protocol) return null
-    if (!isNaN(Number(protocol))) return Number(protocol)
-    const mapping = { aave: 0, compound: 1, moonwell: 2, morpho: 3, euler: 4 }
-    return mapping[protocol] ?? null
-  }, [protocol])
 
   const { pools } = usePools()
 
@@ -148,29 +147,6 @@ export default function PoolDetailsPage() {
     }
   }, [processedPool])
 
-  useEffect(() => {
-    if (!poolId && poolId !== 0) return
-    async function loadHistory() {
-      try {
-        const res = await fetch(`/api/pools/${poolId}/history`)
-        const json = await res.json()
-        const snaps = json.snapshots || []
-        const prem = snaps.map((s) => ({
-          date: new Date(Number(s.timestamp) * 1000).toISOString().split("T")[0],
-          value: Number(s.premiumRateBps) / 100,
-        }))
-        const util = snaps.map((s) => ({
-          date: new Date(Number(s.timestamp) * 1000).toISOString().split("T")[0],
-          value: Number(s.utilizationBps) / 100,
-        }))
-        setPremiumHistory(prem)
-        setUtilHistory(util)
-      } catch (err) {
-        console.error("Failed to load history", err)
-      }
-    }
-    loadHistory()
-  }, [poolId])
 
   const interestRateData = useMemo(() => {
     if (!processedPool) return []
