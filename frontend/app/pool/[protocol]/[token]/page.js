@@ -77,8 +77,23 @@ export default function PoolDetailsPage() {
     setIsClient(true)
   }, [])
 
-  const market = useMemo(() => markets.find((m) => m.id === protocol), [protocol])
-  const pool = useMemo(() => market?.pools.find((p) => p.token === token), [market, token])
+  // incoming params may be numerical ids and token addresses; map them to the
+  // names/symbols used in our static demo data
+  const protocolKey = useMemo(() => {
+    const map = { 0: "aave", 1: "compound", 2: "moonwell", 3: "morpho", 4: "euler" }
+    return map[protocol] ?? protocol
+  }, [protocol])
+
+  const tokenKey = useMemo(() => {
+    const map = { "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": "USDC" }
+    return map[token] ?? token
+  }, [token])
+
+  const market = useMemo(() => markets.find((m) => m.id === protocolKey), [protocolKey])
+  const pool = useMemo(
+    () => market?.pools.find((p) => p.token.toLowerCase() === tokenKey.toLowerCase()),
+    [market, tokenKey],
+  )
 
   // Map protocol name to pool id for API (demo purposes)
   const poolId = useMemo(() => {
