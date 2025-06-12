@@ -39,9 +39,25 @@ export default function CoverageModal({
   const [amount, setAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
   const [walletBalance, setWalletBalance] = useState(0)
-  const [underlyingDec, setUnderlyingDec] = useState(18)
+  const [underlyingDec, setUnderlyingDec] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState("");
+  const [error, setError] = useState("")
+
+  // Fetch underlying asset decimals whenever the modal opens
+  useEffect(() => {
+    if (!isOpen) return
+
+    const loadDecimals = async () => {
+      try {
+        const dec = await getUnderlyingAssetDecimals()
+        setUnderlyingDec(dec)
+      } catch (err) {
+        console.error("Failed to fetch asset decimals", err)
+      }
+    }
+
+    loadDecimals()
+  }, [isOpen])
 
   // Coverage duration state
   const [durationWeeks, setDurationWeeks] = useState(4) // Default to a more common duration
@@ -103,7 +119,8 @@ export default function CoverageModal({
     try {
       if (!window.ethereum) throw new Error("Wallet not found")
 
-      const dec = underlyingDec || (await getUnderlyingAssetDecimals())
+      const dec =
+        underlyingDec ?? (await getUnderlyingAssetDecimals())
       const assetAddr = await getUnderlyingAssetAddress()
       const tokenContract = await getERC20WithSigner(assetAddr)
       const signerAddress = await tokenContract.signer.getAddress()
