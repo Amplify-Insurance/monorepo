@@ -45,6 +45,7 @@ export default function ActiveCoverages({ displayCurrency }) {
     if (!pool) return null
 
     const protocol = getProtocolName(pool.id)
+    const protocolLogo = getProtocolLogo(pool.id)
 
     // ethers.utils.formatUnits can often handle BigNumber objects directly,
     // but it's safer to pass the hex value.
@@ -74,6 +75,7 @@ export default function ActiveCoverages({ displayCurrency }) {
     return {
       id: p.id,
       protocol,
+      protocolLogo,
       pool: pool.protocolTokenToCover,
       poolName: getTokenName(pool.protocolTokenToCover),
       coverageAmount,

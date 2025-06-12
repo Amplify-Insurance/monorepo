@@ -66,7 +66,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
     (p) => p.status === "requested withdrawal"
   );
 
-  // console.log(details.withdrawalRequestShares, "withdrawalPositions")
+  console.log(details, "the deets")
 
   const unlockTimestamp =
     Number(ethers.utils.formatUnits(details?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD;

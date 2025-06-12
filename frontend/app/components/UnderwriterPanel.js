@@ -63,7 +63,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
 
   const markets = Object.values(
     pools.reduce((acc, pool) => {
-      const id = String(pool.protocolCovered)
+      const id = String(pool.id)
       if (!acc[id]) {
         acc[id] = {
           id,
