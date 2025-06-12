@@ -15,11 +15,13 @@ export default function ManageAllocationModal({ isOpen, onClose }) {
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
   const [selectedPools, setSelectedPools] = useState([]);
+  const [initialPools, setInitialPools] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (details?.allocatedPoolIds) {
       setSelectedPools(details.allocatedPoolIds);
+      setInitialPools(details.allocatedPoolIds);
     }
   }, [details]);
 
@@ -33,8 +35,19 @@ export default function ManageAllocationModal({ isOpen, onClose }) {
     setIsSubmitting(true);
     try {
       const rm = await getRiskManagerWithSigner();
-      const tx = await rm.allocateCapital(selectedPools);
-      await tx.wait();
+      const toAllocate = selectedPools.filter((p) => !initialPools.includes(p));
+      const toDeallocate = initialPools.filter((p) => !selectedPools.includes(p));
+
+      if (toAllocate.length > 0) {
+        const tx = await rm.allocateCapital(toAllocate);
+        await tx.wait();
+      }
+
+      if (toDeallocate.length > 0) {
+        const tx2 = await rm.deallocateCapital(toDeallocate);
+        await tx2.wait();
+      }
+
       onClose();
     } catch (err) {
       console.error("Failed to allocate capital", err);
