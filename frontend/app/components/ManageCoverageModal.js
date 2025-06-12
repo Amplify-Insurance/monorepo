@@ -14,6 +14,7 @@ import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 import { Slider } from "../../components/ui/slider";
+import { formatPercentage } from "../utils/formatting";
 
 export default function ManageCoverageModal({
   isOpen,
@@ -170,7 +171,7 @@ export default function ManageCoverageModal({
           </div>
           <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             {type === "coverage" ? "Premium" : "Yield"}:{" "}
-            {type === "coverage" ? premium : underwriterYield}% APY
+            {formatPercentage(type === "coverage" ? premium : underwriterYield)} APY
           </div>
         </div>
 

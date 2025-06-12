@@ -16,6 +16,7 @@ import { getERC20WithSigner } from "../../lib/erc20"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
 import { Slider } from "../../components/ui/slider"
+import { formatPercentage } from "../utils/formatting"
 
 export default function CoverageModal({
   isOpen,
@@ -302,7 +303,7 @@ export default function CoverageModal({
           <div className="space-y-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-300">{type === "purchase" ? "Premium Rate" : "Yield Rate"}</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white">{type === "purchase" ? premium : underwriterYield}% APY</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">{formatPercentage(type === "purchase" ? premium : underwriterYield)} APY</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-300">
@@ -318,7 +319,7 @@ export default function CoverageModal({
                   {selectedMarkets.map((m, i) => (
                     <div key={i} className="flex justify-between items-center py-1 text-sm">
                       <span className="text-gray-700 dark:text-gray-300 truncate mr-2">{m.name}</span>
-                      <span className="text-green-600 dark:text-green-400 whitespace-nowrap">{m.yield.toFixed(2)}% APY</span>
+                      <span className="text-green-600 dark:text-green-400 whitespace-nowrap">{formatPercentage(m.yield)} APY</span>
                     </div>
                   ))}
                 </div>
