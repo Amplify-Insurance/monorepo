@@ -888,43 +888,6 @@ describe("CapitalPool", function () {
 
 
     describe("CapitalPool - View Functions", function () {
-        // --- FIXED FIXTURE ---
-        // A fixture to set up the CapitalPool with an active deposit and a known state.
-        async function deployAndDepositFixture() {
-            const [owner, depositor, nonDepositor] = await ethers.getSigners();
-
-            // Deploy Mocks & CapitalPool
-            const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-            const underlyingAsset = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
-
-            // Deploy a mock Risk Manager to provide a valid address
-            const MockRiskManagerFactory = await ethers.getContractFactory("MockRiskManager");
-            const mockRiskManager = await MockRiskManagerFactory.deploy();
-
-            const MockYieldAdapterFactory = await ethers.getContractFactory("MockYieldAdapter");
-            const yieldAdapter = await MockYieldAdapterFactory.deploy(
-                underlyingAsset.target,
-                ethers.ZeroAddress, // Use ethers.ZeroAddress
-                owner.address
-            );
-            const CapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
-            const capitalPool = await CapitalPoolFactory.deploy(owner.address, underlyingAsset.target);
-
-            // Configure CapitalPool with valid addresses
-            await capitalPool.connect(owner).setRiskManager(mockRiskManager.target);
-            await capitalPool.connect(owner).setBaseYieldAdapter(YieldPlatform.AAVE, yieldAdapter.target); // Use .target
-            await yieldAdapter.connect(owner).setDepositor(capitalPool.target); // Use .target
-
-            // Fund and deposit for the depositor
-            const depositAmount = ethers.parseUnits("10000", 6); // 10,000 USDC
-            await underlyingAsset.mint(depositor.address, depositAmount);
-            await underlyingAsset.connect(depositor).approve(capitalPool.target, depositAmount); // Use .target
-            await capitalPool.connect(depositor).deposit(depositAmount, YieldPlatform.AAVE);
-
-            const sharesOwned = depositAmount; // 1:1 on first deposit
-
-            return { capitalPool, depositor, nonDepositor, depositAmount, sharesOwned, owner, yieldAdapter };
-        }
 
         describe("getUnderwriterAccount", function () {
             it("should return all zero values for an account that has not deposited", async function () {
