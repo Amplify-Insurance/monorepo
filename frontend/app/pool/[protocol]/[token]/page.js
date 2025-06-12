@@ -6,7 +6,13 @@ import { ArrowLeft, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import CoverageModal from "../../../components/CoverageModal"
-import { markets } from "../../../../lib/marketData"
+import usePools from "../../../../hooks/usePools"
+import {
+  getProtocolName,
+  getProtocolDescription,
+  getProtocolLogo,
+  getTokenLogo,
+} from "../../../config/tokenNameMap"
 
 // Helper formatting functions
 const formatCurrency = (value, currency = "usd", displayCurrency = "usd") => {
@@ -77,30 +83,67 @@ export default function PoolDetailsPage() {
     setIsClient(true)
   }, [])
 
-  // incoming params may be numerical ids and token addresses; map them to the
-  // names/symbols used in our static demo data
-  const protocolKey = useMemo(() => {
-    const map = { 0: "aave", 1: "compound", 2: "moonwell", 3: "morpho", 4: "euler" }
-    return map[protocol] ?? protocol
+  // Convert incoming params into the numeric pool id and token address used by
+  // the API responses. The `protocol` param may be either a name (e.g. "aave")
+  // or a numeric id.
+  const poolId = useMemo(() => {
+    if (!protocol) return null
+    if (!isNaN(Number(protocol))) return Number(protocol)
+    const mapping = { aave: 0, compound: 1, moonwell: 2, morpho: 3, euler: 4 }
+    return mapping[protocol] ?? null
   }, [protocol])
 
-  const tokenKey = useMemo(() => {
-    const map = { "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": "USDC" }
-    return map[token] ?? token
-  }, [token])
+  const { pools } = usePools()
 
-  const market = useMemo(() => markets.find((m) => m.id === protocolKey), [protocolKey])
   const pool = useMemo(
-    () => market?.pools.find((p) => p.token.toLowerCase() === tokenKey.toLowerCase()),
-    [market, tokenKey],
+    () =>
+      pools.find(
+        (p) => Number(p.id) === poolId && p.protocolTokenToCover.toLowerCase() === token.toLowerCase(),
+      ),
+    [pools, poolId, token],
   )
 
-  // Map protocol name to pool id for API (demo purposes)
-  const poolId = useMemo(() => {
-    if (!market) return null
-    const mapping = { aave: 0, compound: 1, moonwell: 2, morpho: 3, euler: 4 }
-    return mapping[market.id] ?? null
-  }, [market])
+  const market = useMemo(
+    () =>
+      poolId != null
+        ? {
+            id: poolId,
+            name: getProtocolName(poolId),
+            description: getProtocolDescription(poolId),
+            logo: getProtocolLogo(poolId),
+          }
+        : null,
+    [poolId],
+  )
+
+  // Derive numeric metrics from the raw pool info
+  const processedPool = useMemo(() => {
+    if (!pool) return null
+    const decimals = Number(pool.protocolTokenDecimals ?? 18)
+    const pledged = BigInt(pool.totalCapitalPledgedToPool || 0)
+    const sold = BigInt(pool.totalCoverageSold || 0)
+    const tvl = Number((pledged / (10n ** BigInt(decimals))).toString())
+    const utilization = pledged > 0n ? Number((sold * 10000n) / pledged) / 100 : 0
+    return {
+      premium: Number(pool.premiumRateBps || 0) / 100,
+      underwriterYield: Number(pool.underwriterYieldBps || 0) / 100,
+      tvl,
+      utilizationRate: utilization,
+      rateModel: pool.rateModel,
+    }
+  }, [pool])
+
+  const rateParams = useMemo(() => {
+    if (!processedPool) {
+      return { optimal: 80, base: 0, s1: 0.04, s2: 0.6 }
+    }
+    return {
+      optimal: Number(processedPool.rateModel?.kink ?? 8000) / 100,
+      base: Number(processedPool.rateModel?.base ?? 0) / 10000,
+      s1: Number(processedPool.rateModel?.slope1 ?? 0) / 10000,
+      s2: Number(processedPool.rateModel?.slope2 ?? 0) / 10000,
+    }
+  }, [processedPool])
 
   useEffect(() => {
     if (!poolId && poolId !== 0) return
@@ -127,19 +170,19 @@ export default function PoolDetailsPage() {
   }, [poolId])
 
   const interestRateData = useMemo(() => {
-    if (!pool) return []
+    if (!processedPool) return []
     return generateInterestRateModelData(
-      pool.optimalUtilization ?? 80,
-      pool.baseRate ?? 0,
-      pool.slope1 ?? 0.04,
-      pool.slope2 ?? 0.6,
+      rateParams.optimal,
+      rateParams.base,
+      rateParams.s1,
+      rateParams.s2,
     )
-  }, [pool])
+  }, [processedPool, rateParams])
 
   // Drawing helpers
   const drawInterestRateChart = useCallback(
     (ctx) => {
-      if (!ctx || !pool || !interestRateData.length) return
+      if (!ctx || !processedPool || !interestRateData.length) return
       const canvas = ctx.canvas
       const dpr = window.devicePixelRatio || 1
       const rect = canvas.getBoundingClientRect()
@@ -230,7 +273,7 @@ export default function PoolDetailsPage() {
       })
       ctx.stroke()
 
-      const optimal = pool.optimalUtilization ?? 80
+      const optimal = rateParams.optimal
       const { x: optX } = map(optimal, 0)
       ctx.beginPath()
       ctx.lineWidth = 1
@@ -245,8 +288,11 @@ export default function PoolDetailsPage() {
       ctx.font = AXIS_LABEL_FONT
       ctx.fillText(`Optimal ${optimal}%`, optX, padding.top - 5)
 
-      const currentUtil = pool.utilizationRate
-      const currentRate = calculateRate(currentUtil, optimal, pool.baseRate ?? 0, pool.slope1 ?? 0.04, pool.slope2 ?? 0.6)
+      const currentUtil = processedPool.utilizationRate
+      const base = rateParams.base
+      const s1 = rateParams.s1
+      const s2 = rateParams.s2
+      const currentRate = calculateRate(currentUtil, optimal, base, s1, s2)
       const { x: curX, y: curY } = map(currentUtil, currentRate)
       ctx.beginPath()
       ctx.lineWidth = 1
@@ -267,7 +313,7 @@ export default function PoolDetailsPage() {
       ctx.arc(curX, curY, 4, 0, Math.PI*2)
       ctx.fill()
       ctx.stroke()
-    }, [pool, interestRateData])
+    }, [processedPool, interestRateData, rateParams])
 
   const drawHistoryChart = useCallback((ctx, dataPoints, colorRgb) => {
     if (!ctx || !dataPoints.length) return
@@ -388,12 +434,12 @@ export default function PoolDetailsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div className="flex items-center">
           <div className="flex-shrink-0 h-10 w-10 md:h-12 md:w-12 mr-3 md:mr-4">
-            <Image src={`/images/tokens/${token?.toLowerCase()}.png`} alt={`${token} logo`} width={48} height={48} className="rounded-full bg-gray-200 dark:bg-gray-700" onError={(e)=>{e.currentTarget.src='/images/tokens/default.png';e.currentTarget.onerror=null}}/>
+            <Image src={getTokenLogo(token)} alt={`${token} logo`} width={48} height={48} className="rounded-full bg-gray-200 dark:bg-gray-700" onError={(e)=>{e.currentTarget.src='/images/tokens/default.png';e.currentTarget.onerror=null}}/>
           </div>
           <div>
             <h1 className="text-xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center flex-wrap gap-x-2">
               <span className="inline-flex items-center">
-                <Image src={`/images/protocols/${protocol}.png`} alt={`${market.name} logo`} width={24} height={24} className="rounded-full mr-2" onError={(e)=>{e.currentTarget.style.display='none'}}/>
+                <Image src={market.logo} alt={`${market.name} logo`} width={24} height={24} className="rounded-full mr-2" onError={(e)=>{e.currentTarget.style.display='none'}}/>
                 {market.name}
               </span>
               <span>{token} Pool</span>
@@ -403,7 +449,7 @@ export default function PoolDetailsPage() {
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
-        {[{label:'Premium',value:formatPercentage(pool.premium,1),colorClass:'text-gray-900 dark:text-white'},{label:'Underwriter Yield',value:formatPercentage(pool.underwriterYield,1),colorClass:'text-green-600 dark:text-green-400'},{label:'Pool TVL',value:formatCurrency(pool.tvl),colorClass:'text-gray-900 dark:text-white'},{label:'Utilization',value:formatPercentage(pool.utilizationRate),colorClass:'text-blue-600 dark:text-blue-400'}].map(m=>(
+        {[{label:'Premium',value:formatPercentage(processedPool?.premium ?? 0,1),colorClass:'text-gray-900 dark:text-white'},{label:'Underwriter Yield',value:formatPercentage(processedPool?.underwriterYield ?? 0,1),colorClass:'text-green-600 dark:text-green-400'},{label:'Pool TVL',value:formatCurrency(processedPool?.tvl),colorClass:'text-gray-900 dark:text-white'},{label:'Utilization',value:formatPercentage(processedPool?.utilizationRate ?? 0),colorClass:'text-blue-600 dark:text-blue-400'}].map(m=>(
           <div key={m.label} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 transition-shadow hover:shadow-md">
             <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">{m.label}</div>
             <div className={`text-base sm:text-xl font-semibold ${m.colorClass}`}>{m.value}</div>
@@ -416,10 +462,10 @@ export default function PoolDetailsPage() {
           <a href="#" target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs sm:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">Interest Rate Strategy <ExternalLink className="ml-1 h-3.5 w-3.5"/></a>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-center sm:text-left">
-          <div><div className="text-xs text-gray-500 dark:text-gray-400">Current Utilization</div><div className="text-lg font-medium text-blue-600 dark:text-blue-400">{formatPercentage(pool.utilizationRate)}</div></div>
-          <div><div className="text-xs text-gray-500 dark:text-gray-400">Current Premium</div><div className="text-lg font-medium text-pink-600 dark:text-pink-400">{formatPercentage(calculateRate(pool.utilizationRate,pool.optimalUtilization??80,pool.baseRate??0,pool.slope1??0.04,pool.slope2??0.6))}</div></div>
-          <div><div className="text-xs text-gray-500 dark:text-gray-400">Optimal Utilization</div><div className="text-lg font-medium text-gray-700 dark:text-gray-300">{formatPercentage(pool.optimalUtilization??80)}</div></div>
-          <div><div className="text-xs text-gray-500 dark:text-gray-400">Rate at Optimal</div><div className="text-lg font-medium text-gray-700 dark:text-gray-300">{formatPercentage(calculateRate(pool.optimalUtilization??80,pool.optimalUtilization??80,pool.baseRate??0,pool.slope1??0.04,pool.slope2??0.6))}</div></div>
+          <div><div className="text-xs text-gray-500 dark:text-gray-400">Current Utilization</div><div className="text-lg font-medium text-blue-600 dark:text-blue-400">{formatPercentage(processedPool?.utilizationRate ?? 0)}</div></div>
+          <div><div className="text-xs text-gray-500 dark:text-gray-400">Current Premium</div><div className="text-lg font-medium text-pink-600 dark:text-pink-400">{formatPercentage(calculateRate(processedPool?.utilizationRate ?? 0,rateParams.optimal,rateParams.base,rateParams.s1,rateParams.s2))}</div></div>
+          <div><div className="text-xs text-gray-500 dark:text-gray-400">Optimal Utilization</div><div className="text-lg font-medium text-gray-700 dark:text-gray-300">{formatPercentage(rateParams.optimal)}</div></div>
+          <div><div className="text-xs text-gray-500 dark:text-gray-400">Rate at Optimal</div><div className="text-lg font-medium text-gray-700 dark:text-gray-300">{formatPercentage(calculateRate(rateParams.optimal,rateParams.optimal,rateParams.base,rateParams.s1,rateParams.s2))}</div></div>
         </div>
         <div className="h-64 md:h-72 w-full rounded-md overflow-hidden"><canvas ref={irCanvasRef} className="w-full h-full block"/></div>
       </div>
@@ -436,7 +482,7 @@ export default function PoolDetailsPage() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6 mb-8">
         <h2 className="text-lg md:text-xl font-semibold mb-4 text-gray-900 dark:text-white">Reserve Configuration</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[{label:'Reserve Factor',value:formatPercentage(pool.reserveFactor)},{label:'Max LTV',value:formatPercentage(pool.maxLTV)},{label:'Liq. Threshold',value:formatPercentage(pool.liquidationThreshold)},{label:'Liq. Penalty',value:formatPercentage(pool.liquidationPenalty)}].map(item=>(
+          {[{label:'Reserve Factor',value:'N/A'},{label:'Max LTV',value:'N/A'},{label:'Liq. Threshold',value:'N/A'},{label:'Liq. Penalty',value:'N/A'}].map(item=>(
             <div key={item.label}><div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">{item.label}</div><div className="text-base sm:text-lg font-medium text-gray-800 dark:text-gray-200">{item.value}</div></div>
           ))}
         </div>
@@ -445,8 +491,8 @@ export default function PoolDetailsPage() {
         <button className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors duration-150 ease-in-out text-sm sm:text-base flex items-center justify-center shadow-sm hover:shadow" onClick={()=>setPurchaseModalOpen(true)}>Purchase Coverage</button>
         <button className="flex-1 py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-150 ease-in-out text-sm sm:text-base flex items-center justify-center shadow-sm hover:shadow" onClick={()=>setProvideModalOpen(true)}>Provide Coverage</button>
       </div>
-      <CoverageModal isOpen={purchaseModalOpen} onClose={()=>setPurchaseModalOpen(false)} type="purchase" protocol={market.name} token={token} premium={pool.premium} yield={pool.underwriterYield}/>
-      <CoverageModal isOpen={provideModalOpen} onClose={()=>setProvideModalOpen(false)} type="provide" protocol={market.name} token={token} premium={pool.premium} yield={pool.underwriterYield}/>
+      <CoverageModal isOpen={purchaseModalOpen} onClose={()=>setPurchaseModalOpen(false)} type="purchase" protocol={market.name} token={token} premium={processedPool?.premium} yield={processedPool?.underwriterYield}/>
+      <CoverageModal isOpen={provideModalOpen} onClose={()=>setProvideModalOpen(false)} type="provide" protocol={market.name} token={token} premium={processedPool?.premium} yield={processedPool?.underwriterYield}/>
     </div>
   )
 }
