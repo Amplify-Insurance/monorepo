@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { catPool, provider } from '../../../../../../lib/catPool';
-import ERC20 from '../../../../../../abi/ERC20.json';
+import { catPool, provider } from '../../../../../lib/catPool';
+import ERC20 from '../../../../../abi/ERC20.json';
 import { ethers } from 'ethers';
 
 export async function GET(_req: Request, { params }: { params: { address: string } }) {
