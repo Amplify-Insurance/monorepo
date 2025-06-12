@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-
+import "../../contracts/interfaces/IPolicyNFT.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -33,10 +33,18 @@ contract MockPolicyNFT is Ownable {
 
     // --- Events for Testing ---
 
-    event PolicyMinted(uint256 indexed id, address indexed owner, uint256 poolId, uint256 coverage);
     event PolicyBurned(uint256 indexed id);
     event PolicyLastPaidUpdated(uint256 indexed id, uint256 newLastPaidUntil);
 
+    event PolicyMinted(
+        uint256 policyId,
+        address owner,
+        uint256 poolId,
+        uint256 coverage,
+        uint256 activation,
+        uint128 premium,
+        uint128 lastDrain
+    );
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
     // ------------------------------------------------------------------
@@ -44,6 +52,11 @@ contract MockPolicyNFT is Ownable {
     // test suite to directly manipulate policy state without going through a
     // full CoverPool workflow.
     // ------------------------------------------------------------------
+
+    modifier onlyCoverPool() {
+        require(msg.sender == coverPoolAddress, "MockPolicyNFT: Not CoverPool");
+        _;
+    }
 
     function setCoverPoolAddress(address _coverPool) external onlyOwner {
         require(_coverPool != address(0), "MockPolicyNFT: CoverPool address cannot be zero");
@@ -86,26 +99,27 @@ contract MockPolicyNFT is Ownable {
      * @notice Mocks the minting of a new policy.
      */
     function mint(
-        address to,
-        uint256 pid,
-        uint256 coverage,
-        uint256 activation,
-        uint256 paidUntil
-    ) external returns (uint256 id) {
-        id = nextTokenId++;
-        _owners[id] = to;
+        address _owner,
+        uint256 _poolId,
+        uint256 _coverage,
+        uint256 _activation,
+        uint128 _premiumDeposit,
+        uint128 _lastDrainTime
+    ) external override onlyCoverPool returns (uint256) {
+        uint256 id = nextPolicyId++;
         policies[id] = Policy({
-            poolId: pid,
-            coverage: coverage,
-            activation: activation,
-            lastPaidUntil: paidUntil
+            poolId: _poolId,
+            coverage: _coverage,
+            activation: _activation,
+            premiumDeposit: _premiumDeposit,
+            lastDrainTime: _lastDrainTime
         });
-        
-        last_mint_to = to; // Record for testing
-        emit PolicyMinted(id, to, pid, coverage);
+        _mint(_owner, id);
+        // Note: The PolicyMinted event is a custom event for testing purposes.
+        // It's defined here to match what the test expects.
+        emit PolicyMinted(id, _owner, _poolId, _coverage, _activation, _premiumDeposit, _lastDrainTime);
         return id;
     }
-
     /**
      * @notice Mocks the burning of a policy.
      */
@@ -143,5 +157,10 @@ contract MockPolicyNFT is Ownable {
         address owner = _owners[id];
         require(owner != address(0), "MockPolicyNFT: owner query for nonexistent token");
         return owner;
+    }
+
+        function updatePremiumAccount(uint256 _policyId, uint128 _newDeposit, uint128 _newDrainTime) external override onlyCoverPool {
+        policies[_policyId].premiumDeposit = _newDeposit;
+        policies[_policyId].lastDrainTime = _newDrainTime;
     }
 }

@@ -339,45 +339,56 @@ function addPremium(uint256 _policyId, uint256 _premiumAmount) external nonReent
  * @param _coverageAmount The amount of coverage desired.
  * @param _initialPremiumDeposit The initial amount of premium to deposit.
  */
-function purchaseCover(
-    uint256 _poolId,
-    uint256 _coverageAmount,
-    uint256 _initialPremiumDeposit
-) external nonReentrant returns (uint256 policyId) {
-    // --- Validation ---
-    if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
-    PoolData storage pool = protocolRiskPools[_poolId];
-    // ... other validations ...
+    /**
+     * @notice Purchases insurance coverage by making an initial premium deposit.
+     * @dev CORRECTED: Added upfront validation for coverage amount and pool capacity.
+     * @param _poolId The ID of the risk pool.
+     * @param _coverageAmount The amount of coverage desired.
+     * @param _initialPremiumDeposit The initial amount of premium to deposit.
+     */
+    function purchaseCover(
+        uint256 _poolId,
+        uint256 _coverageAmount,
+        uint256 _initialPremiumDeposit
+    ) external nonReentrant returns (uint256 policyId) {
 
-    // We still need a minimum deposit to prevent dust policies.
-    // Calculate the cost for one week at the current rate and enforce it as the minimum deposit.
-    uint256 annualPremiumRateBps = _getPremiumRateBpsAnnual(pool);
-    uint256 minPremium = (_coverageAmount * annualPremiumRateBps * 7 days) / (SECS_YEAR * BPS);
-    require(_initialPremiumDeposit >= minPremium, "RM: Deposit is less than the required minimum for 1 week");
+        PoolData storage pool = protocolRiskPools[_poolId];
 
-    // --- Payment & Distribution ---
-    // In this model, the initial deposit is held by this contract until it's "drained".
-    // It is NOT distributed to underwriters immediately.
-    IERC20 underlying = capitalPool.underlyingAsset();
-    underlying.safeTransferFrom(msg.sender, address(this), _initialPremiumDeposit);
+        if (pool.isPaused) revert PoolPaused();
+        if (_coverageAmount == 0 || _initialPremiumDeposit == 0) revert InvalidAmount();
+        if (_initialPremiumDeposit > type(uint128).max) revert InvalidAmount();
 
-    // --- Policy Minting ---
-    uint256 activationTimestamp = block.timestamp + COVER_COOLDOWN_PERIOD;
+        if (!_isPoolSolventForNewCover(pool, _coverageAmount)) revert InsufficientCapacity();
+        // --- Validation ---
+        if (_poolId >= protocolRiskPools.length) revert InvalidPoolId();
+        
 
-    // The policy is minted with the initial deposit and the drain time set to activation.
-    policyId = policyNFT.mint(
-        msg.sender,
-        _poolId,
-        _coverageAmount,
-        activationTimestamp,
-        uint128(_initialPremiumDeposit), // Casting to uint128
-        uint128(activationTimestamp)     // Casting to uint128
-    );
-    pool.totalCoverageSold += _coverageAmount;
+        
 
-    emit PolicyCreated(msg.sender, policyId, _poolId, _coverageAmount, _initialPremiumDeposit);
-    // Note: The PremiumPaid event will now be emitted from the drain function.
-}
+        // We still need a minimum deposit to prevent dust policies.
+        uint256 annualPremiumRateBps = _getPremiumRateBpsAnnual(pool);
+        uint256 minPremium = (_coverageAmount * annualPremiumRateBps * 7 days) / (SECS_YEAR * BPS);
+        require(_initialPremiumDeposit >= minPremium, "RM: Deposit is less than the required minimum for 1 week");
+
+        // --- Payment & Distribution ---
+        IERC20 underlying = capitalPool.underlyingAsset();
+        underlying.safeTransferFrom(msg.sender, address(this), _initialPremiumDeposit);
+
+        // --- Policy Minting ---
+        uint256 activationTimestamp = block.timestamp + COVER_COOLDOWN_PERIOD;
+
+        policyId = policyNFT.mint(
+            msg.sender,
+            _poolId,
+            _coverageAmount,
+            activationTimestamp,
+            uint128(_initialPremiumDeposit),
+            uint128(activationTimestamp)
+        );
+        pool.totalCoverageSold += _coverageAmount;
+
+        emit PolicyCreated(msg.sender, policyId, _poolId, _coverageAmount, _initialPremiumDeposit);
+    }
 
  
     /* ───────────────────── Claim Processing ───────────────────── */

@@ -69,6 +69,7 @@ async function main() {
   // await policyNFT.setCoverPoolAddress(riskManager.target);
   await catPool.setCoverPoolAddress(riskManager.target);
   await capitalPool.setRiskManager(riskManager.target);
+  await policyNFT.setRiskManager(riskManager.target);
 
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
