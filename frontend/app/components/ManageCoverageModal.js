@@ -13,6 +13,7 @@ import { getERC20WithSigner } from "../../lib/erc20";
 import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
+import { Slider } from "../../components/ui/slider";
 
 export default function ManageCoverageModal({
   isOpen,
@@ -36,6 +37,10 @@ export default function ManageCoverageModal({
   const tokenPrice = 1;
   const maxAmount = type === "coverage" ? capacity : amount;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [extendWeeks, setExtendWeeks] = useState(1);
+  const weeklyPremiumCost =
+    (Number(amount) * (Number(premium) / 100) * 7) / 365;
+  const extendCost = weeklyPremiumCost * extendWeeks;
 
   // Calculate USD value when amount changes
   const handleAmountChange = (e) => {
@@ -60,7 +65,7 @@ export default function ManageCoverageModal({
   };
 
   const handleSubmit = async () => {
-    if (!adjustAmount || Number.parseFloat(adjustAmount) <= 0) return;
+    if (type !== "coverage" && (!adjustAmount || Number.parseFloat(adjustAmount) <= 0)) return;
     setIsSubmitting(true);
     try {
       let tx;
@@ -68,7 +73,9 @@ export default function ManageCoverageModal({
         if (!policyId) throw new Error("policyId required");
         const rm = await getRiskManagerWithSigner();
 
-        const due = await rm.premiumOwed(policyId);
+        const dec = await getUnderlyingAssetDecimals();
+        const depositBn = ethers.utils.parseUnits(extendCost.toFixed(dec), dec);
+
         const assetAddr = await getUnderlyingAssetAddress();
         const token = await getERC20WithSigner(assetAddr);
         const addr = await token.signer.getAddress();
@@ -76,15 +83,15 @@ export default function ManageCoverageModal({
           addr,
           process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
         );
-        if (allowance.lt(due)) {
+        if (allowance.lt(depositBn)) {
           const approveTx = await token.approve(
             process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
-            due,
+            depositBn,
           );
           await approveTx.wait();
         }
 
-        tx = await rm.settlePremium(policyId);
+        tx = await rm.addPremium(policyId, depositBn);
         await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
@@ -167,34 +174,65 @@ export default function ManageCoverageModal({
           </div>
         </div>
 
-        {/* Action selector */}
-        <div>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-            Action
-          </label>
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            <button
-              className={`py-2 rounded-lg font-medium ${action === "increase"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                }`}
-              onClick={() => setAction("increase")}
-            >
-              <Plus className="h-4 w-4 inline mr-1" /> Increase
-            </button>
-            <button
-              className={`py-2 rounded-lg font-medium ${action === "decrease"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                }`}
-              onClick={() => setAction("decrease")}
-            >
-              <Minus className="h-4 w-4 inline mr-1" /> Decrease
-            </button>
+        {type === "coverage" && (
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              Extend Duration
+            </label>
+            <div className="relative">
+              <Slider
+                min={1}
+                max={52}
+                step={1}
+                value={[extendWeeks]}
+                onValueChange={(v) => setExtendWeeks(v[0])}
+                markers={[13, 26, 39]}
+              />
+              <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-2">
+                <span>1W</span>
+                <span>13W</span>
+                <span>26W</span>
+                <span>39W</span>
+                <span>52W</span>
+              </div>
+            </div>
+            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              Additional Premium: {extendCost.toFixed(2)} {tokenName}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Action selector */}
+        {type !== "coverage" && (
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              Action
+            </label>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <button
+                className={`py-2 rounded-lg font-medium ${action === "increase"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  }`}
+                onClick={() => setAction("increase")}
+              >
+                <Plus className="h-4 w-4 inline mr-1" /> Increase
+              </button>
+              <button
+                className={`py-2 rounded-lg font-medium ${action === "decrease"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  }`}
+                onClick={() => setAction("decrease")}
+              >
+                <Minus className="h-4 w-4 inline mr-1" /> Decrease
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Amount input */}
+        {type !== "coverage" && (
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -251,59 +289,59 @@ export default function ManageCoverageModal({
             </div>
           </div>
         </div>
+        )}
 
         {/* New position preview */}
-        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            New Position (Preview)
-          </h4>
-          <div className="flex justify-between items-center">
-            <span className="text-base font-medium text-gray-900 dark:text-white">
-              {action === "increase"
-                ? Number.parseFloat(amount) +
-                Number.parseFloat(adjustAmount || 0)
-                : Math.max(
-                  0,
-                  Number.parseFloat(amount) -
-                  Number.parseFloat(adjustAmount || 0)
-                )}{" "}
-              {tokenName}
-            </span>
-            <span className="text-sm text-gray-600 dark:text-gray-300">
-              $
-              {(
-                (action === "increase"
+        {type !== "coverage" && (
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              New Position (Preview)
+            </h4>
+            <div className="flex justify-between items-center">
+              <span className="text-base font-medium text-gray-900 dark:text-white">
+                {action === "increase"
                   ? Number.parseFloat(amount) +
-                  Number.parseFloat(adjustAmount || 0)
-                  : Math.max(
-                    0,
-                    Number.parseFloat(amount) -
                     Number.parseFloat(adjustAmount || 0)
-                  )) * tokenPrice
-              ).toFixed(2)}
-            </span>
+                  : Math.max(
+                      0,
+                      Number.parseFloat(amount) -
+                        Number.parseFloat(adjustAmount || 0)
+                    )}{" "}
+                {tokenName}
+              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                $
+                {(
+                  (action === "increase"
+                    ? Number.parseFloat(amount) +
+                      Number.parseFloat(adjustAmount || 0)
+                    : Math.max(
+                        0,
+                        Number.parseFloat(amount) -
+                          Number.parseFloat(adjustAmount || 0)
+                      )) * tokenPrice
+                ).toFixed(2)}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Action button */}
         <button
           onClick={handleSubmit}
-          className={`w-full py-3 rounded-lg font-medium text-white ${adjustAmount && Number.parseFloat(adjustAmount) > 0 && !isSubmitting
+          className={`w-full py-3 rounded-lg font-medium text-white ${!isSubmitting && (type === "coverage" || (adjustAmount && Number.parseFloat(adjustAmount) > 0))
             ? "bg-blue-600 hover:bg-blue-700"
-            : "bg-gray-400 cursor-not-allowed"
-            }`}
+            : "bg-gray-400 cursor-not-allowed"}`}
           disabled={
-            !adjustAmount ||
-            Number.parseFloat(adjustAmount) <= 0 ||
-            isSubmitting
+            isSubmitting ||
+            (type !== "coverage" && (!adjustAmount || Number.parseFloat(adjustAmount) <= 0))
           }
         >
           {isSubmitting
             ? "Submitting..."
-            : adjustAmount && Number.parseFloat(adjustAmount) > 0
-              ? `${action === "increase" ? "Increase" : "Decrease"} ${type === "coverage" ? "Coverage" : "Position"
-              }`
-              : "Enter an amount"}
+            : type === "coverage"
+            ? "Extend Coverage"
+            : `${action === "increase" ? "Increase" : "Decrease"} ${type === "coverage" ? "Coverage" : "Position"}`}
         </button>
       </div>
     </Modal>
