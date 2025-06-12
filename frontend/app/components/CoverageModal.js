@@ -99,6 +99,10 @@ export default function CoverageModal({
   const handleAmountChange = (e) => {
     const value = e.target.value
     if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      const dec = underlyingDec ?? 18
+      const parts = value.split(".")
+      if (parts[1] && parts[1].length > dec) return
+
       setAmount(value)
       const numValue = parseFloat(value) || 0
       setUsdValue((numValue * tokenPrice).toFixed(2))
@@ -106,7 +110,8 @@ export default function CoverageModal({
   }
 
   const handleSetMax = () => {
-    const maxTokens = maxAmount.toFixed(6)
+    const dec = underlyingDec ?? 6
+    const maxTokens = maxAmount.toFixed(dec)
     setAmount(maxTokens)
     setUsdValue((maxAmount * tokenPrice).toFixed(2))
   }
@@ -240,7 +245,7 @@ export default function CoverageModal({
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-3 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
               <span className="text-sm text-gray-500 dark:text-gray-400 mb-1 sm:mb-0">${usdValue}</span>
               <div className="flex items-center justify-between sm:justify-end sm:space-x-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Available: {maxAmount.toFixed(6)}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Available: {maxAmount.toFixed(underlyingDec ?? 6)}</span>
                 <button onClick={handleSetMax} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded ml-2">MAX</button>
               </div>
             </div>
