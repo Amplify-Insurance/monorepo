@@ -10,8 +10,8 @@ export default function Sidebar() {
 
   const navigation = [
     { name: "Markets", href: "/markets", icon: BarChart2 },
+    { name: "Dashboard", href: "/dashboard", icon: Shield },
     { name: "Cat Pool", href: "/catpool", icon: Coins },
-    { name: "My Coverage", href: "/dashboard", icon: Shield },
     { name: "Make a Claim", href: "/claims", icon: AlertTriangle },
     { name: "Analytics", href: "/analytics", icon: Activity },
     { name: "Staking", href: "/staking", icon: Coins },
