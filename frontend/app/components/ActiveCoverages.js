@@ -8,7 +8,7 @@ import { useAccount } from "wagmi"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
 import { ethers } from "ethers"
-import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName} from "../config/tokenNameMap"
 
 
 export default function ActiveCoverages({ displayCurrency }) {
@@ -18,25 +18,40 @@ export default function ActiveCoverages({ displayCurrency }) {
   const { policies } = useUserPolicies(address)
   const { pools } = usePools()
 
-  // console.log("ActiveCoverages - policies:", policies)
+  console.log("ActiveCoverages - raw policies:", policies) // For debugging the raw data
 
   const now = Math.floor(Date.now() / 1000)
 
   const activeCoverages = policies.map((p) => {
-    const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
+    // Convert poolId from hex to a number for comparison
+    const policyPoolId = p.poolId?.hex ? parseInt(p.poolId.hex, 16) : null
+    if (policyPoolId === null) return null
+
+    const pool = pools.find((pl) => Number(pl.id) === policyPoolId)
     if (!pool) return null
-    const protocol = getTokenName(pool.protocolTokenToCover)
+
+    const protocol = getProtocolName(pool.id)
+
+    // ethers.utils.formatUnits can often handle BigNumber objects directly,
+    // but it's safer to pass the hex value.
     const coverageAmount = Number(
-      ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
+      ethers.utils.formatUnits(p.coverage.hex, pool.underlyingAssetDecimals)
     )
+
     const capacity = Number(
       ethers.utils.formatUnits(
         BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold),
         pool.underlyingAssetDecimals
       )
     )
-    const activationTs = Number(p.activation || p.start || 0)
-    const expiryTs = Number(p.lastPaidUntil || 0)
+
+    // Convert timestamps from hex to numbers
+    const activationHex = p.activation?.hex || p.start?.hex || '0x0'
+    const expiryHex = p.lastPaidUntil?.hex || '0x0'
+
+    const activationTs = parseInt(activationHex, 16)
+    const expiryTs = parseInt(expiryHex, 16)
+
     let status = "active"
     if (now < activationTs) status = "pending"
     else if (expiryTs && now > expiryTs) status = "expired"
@@ -54,6 +69,9 @@ export default function ActiveCoverages({ displayCurrency }) {
       expiry: expiryTs,
     }
   }).filter(Boolean)
+
+  console.log("Processed Coverage data:", activeCoverages) // For debugging the processed data
+
 
   const handleOpenModal = (coverage) => {
     setSelectedCoverage(coverage)
@@ -73,6 +91,7 @@ export default function ActiveCoverages({ displayCurrency }) {
       </div>
     )
   }
+
 
   return (
     <div className="overflow-x-auto">
@@ -136,7 +155,7 @@ export default function ActiveCoverages({ displayCurrency }) {
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-8 w-8 mr-3">
                     <Image
-                      src={getTokenLogo(coverage.protocol)}
+                      src={getProtocolLogo(coverage.id)}
                       alt={coverage.protocol}
                       width={32}
                       height={32}
@@ -151,7 +170,7 @@ export default function ActiveCoverages({ displayCurrency }) {
                   <div className="flex-shrink-0 h-6 w-6 mr-2">
                     <Image
                       src={getTokenLogo(coverage.pool)}
-                      alt={coverage.poolName}
+                      alt={getProtocolName(coverage.poolName)}
                       width={24}
                       height={24}
                       className="rounded-full"
@@ -162,7 +181,7 @@ export default function ActiveCoverages({ displayCurrency }) {
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900 dark:text-white">
-                  {formatCurrency(coverage.coverageAmount, coverage.pool, displayCurrency)}
+                  {formatCurrency(coverage.coverageAmount)}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
