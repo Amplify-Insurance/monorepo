@@ -20,6 +20,8 @@ export default function ActiveCoverages({ displayCurrency }) {
 
   // console.log("ActiveCoverages - policies:", policies)
 
+  const now = Math.floor(Date.now() / 1000)
+
   const activeCoverages = policies.map((p) => {
     const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
     if (!pool) return null
@@ -33,6 +35,12 @@ export default function ActiveCoverages({ displayCurrency }) {
         pool.underlyingAssetDecimals
       )
     )
+    const activationTs = Number(p.activation || p.start || 0)
+    const expiryTs = Number(p.lastPaidUntil || 0)
+    let status = "active"
+    if (now < activationTs) status = "pending"
+    else if (expiryTs && now > expiryTs) status = "expired"
+
     return {
       id: p.id,
       protocol,
@@ -40,8 +48,10 @@ export default function ActiveCoverages({ displayCurrency }) {
       poolName: getTokenName(pool.protocolTokenToCover),
       coverageAmount,
       premium: Number(pool.premiumRateBps || 0) / 100,
-      status: "active",
+      status,
       capacity,
+      activation: activationTs,
+      expiry: expiryTs,
     }
   }).filter(Boolean)
 
@@ -56,9 +66,9 @@ export default function ActiveCoverages({ displayCurrency }) {
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
           <Shield className="h-6 w-6 text-gray-500 dark:text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No active coverages</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No coverages</h3>
         <p className="text-gray-500 dark:text-gray-400">
-          You don't have any active insurance coverages. Visit the markets page to purchase coverage.
+          You don't have any insurance coverages. Visit the markets page to purchase coverage.
         </p>
       </div>
     )
@@ -92,6 +102,18 @@ export default function ActiveCoverages({ displayCurrency }) {
               className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
             >
               Premium APY
+            </th>
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+            >
+              Starts
+            </th>
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+            >
+              Expires
             </th>
             <th
               scope="col"
@@ -145,6 +167,20 @@ export default function ActiveCoverages({ displayCurrency }) {
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900 dark:text-white">{formatPercentage(coverage.premium)}</div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-900 dark:text-white">
+                  {coverage.activation
+                    ? new Date(coverage.activation * 1000).toLocaleDateString()
+                    : "-"}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-900 dark:text-white">
+                  {coverage.expiry
+                    ? new Date(coverage.expiry * 1000).toLocaleDateString()
+                    : "-"}
+                </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
