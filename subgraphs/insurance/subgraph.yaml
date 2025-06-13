@@ -314,3 +314,29 @@ dataSources:
         - event: FundsWithdrawn(indexed address,uint256,uint256)
           handler: handleFundsWithdrawn
       file: ./src/mapping.ts
+  - kind: ethereum/contract
+    name: Committee
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: Committee
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - GovernanceProposal
+        - GovernanceVote
+      abis:
+        - name: Committee
+          file: ./abis/Committee.json
+      eventHandlers:
+        - event: ProposalCreated(indexed uint256,indexed address,uint256,bool,uint256)
+          handler: handleProposalCreated
+        - event: Voted(indexed uint256,indexed address,uint8,uint256)
+          handler: handleVoted
+        - event: ProposalExecuted(indexed uint256,bool)
+          handler: handleProposalExecuted
+      file: ./src/mapping.ts
