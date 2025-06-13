@@ -2,23 +2,25 @@
 
 import { NextResponse } from 'next/server';
 // import your provider and contract instances
-import { riskManager } from '../../../../lib/riskManager';
+import { getRiskManager } from '../../../../lib/riskManager';
+import deployments from '../../../config/deployments';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } } // CORRECT: Destructure params from the second argument
+  _request: Request,
+  { params }: { params: { id: string } },
 ) {
-  try {
-    const id = parseInt(params.id, 10);
-    if (isNaN(id)) {
-        return NextResponse.json({ error: "Invalid pool ID" }, { status: 400 });
-    }
-
-    const poolInfo = await riskManager.getPoolInfo(id);
-    return NextResponse.json({ id, poolInfo });
-
-  } catch (error) {
-    console.error(`Error fetching pool ${params.id}:`, error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  const idNum = parseInt(params.id, 10);
+  if (isNaN(idNum)) {
+    return NextResponse.json({ error: 'Invalid pool ID' }, { status: 400 });
   }
+
+  for (const dep of deployments) {
+    const riskManager = getRiskManager(dep.riskManager);
+    try {
+      const poolInfo = await riskManager.getPoolInfo(idNum);
+      return NextResponse.json({ id: idNum, deployment: dep.name, poolInfo });
+    } catch {}
+  }
+  return NextResponse.json({ error: 'Pool not found' }, { status: 404 });
+}
 }

@@ -41,7 +41,9 @@ export default function ActiveCoverages({ displayCurrency }) {
     const policyPoolId = p.poolId?.hex ? parseInt(p.poolId.hex, 16) : null
     if (policyPoolId === null) return null
 
-    const pool = pools.find((pl) => Number(pl.id) === policyPoolId)
+    const pool = pools.find(
+      (pl) => pl.deployment === p.deployment && Number(pl.id) === policyPoolId
+    )
     if (!pool) return null
 
     const protocol = getProtocolName(pool.id)

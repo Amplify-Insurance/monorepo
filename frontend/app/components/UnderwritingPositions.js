@@ -28,20 +28,19 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const { pools } = usePools();
   const adapters = useYieldAdapters();
 
-  const underwritingPositions = (details?.allocatedPoolIds || [])
-    .map((pid, i) => {
-      const pool = pools.find((pl) => Number(pl.id) === Number(pid));
+const underwritingPositions = (details || [])
+  .flatMap((d) =>
+    d.allocatedPoolIds.map((pid) => {
+      const pool = pools.find(
+        (pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid)
+      );
       if (!pool) return null;
       const protocol = getTokenName(pool.id);
       const amount = Number(
-        ethers.utils.formatUnits(
-          details.totalDepositedAssetPrincipal,
-          6 // pool.underlyingAssetDecimals
-        )
+        ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)
       );
-      console.log(Number(ethers.utils.formatUnits(details.withdrawalRequestShares)), "withdrawalRequestShares");
       return {
-        id: i,
+        id: `${d.deployment}-${pid}`,
         protocol,
         pool: pool.protocolTokenToCover,
         poolName: getTokenName(pool.id),
@@ -50,14 +49,15 @@ export default function UnderwritingPositions({ displayCurrency }) {
         nativeValue: amount,
         yield: Number(pool.underwriterYieldBps || 0) / 100,
         status:
-          Number(ethers.utils.formatUnits(details.withdrawalRequestShares)) > 0 ?
-            "requested withdrawal" :
-            "active",
-        shares: details.masterShares,
-        yieldChoice: details.yieldChoice,
+          Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
+            ? 'requested withdrawal'
+            : 'active',
+        shares: d.masterShares,
+        yieldChoice: d.yieldChoice,
       };
     })
-    .filter(Boolean);
+  )
+  .filter(Boolean);
 
   const activePositions = underwritingPositions.filter(
     (p) => p.status === "active"
@@ -69,7 +69,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   console.log(details, "the deets")
 
   const unlockTimestamp =
-    Number(ethers.utils.formatUnits(details?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD;
+    Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD;
   const currentTimestamp = Math.floor(Date.now() / 1000);
   const unlockDays = Math.max(
     0,
@@ -139,13 +139,12 @@ export default function UnderwritingPositions({ displayCurrency }) {
   );
   const averageYield = totalValue > 0 ? weightedYield / totalValue : 0;
 
-  const totalDeposited = details
-    ? Number(
-        ethers.utils.formatUnits(details.totalDepositedAssetPrincipal, 6)
-      )
-    : 0;
+  const totalDeposited = (details || []).reduce(
+    (sum, d) => sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)),
+    0
+  );
   const totalUnderwritten = totalDeposited * underwritingPositions.length;
-  const baseAdapter = adapters.find((a) => a.id === Number(details?.yieldChoice));
+  const baseAdapter = adapters.find((a) => a.id === Number(details?.[0]?.yieldChoice));
   const baseYieldApr = baseAdapter?.apr || 0;
   const totalApr = baseYieldApr + averageYield;
 
@@ -375,7 +374,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                               >
                                 {isClaiming ? "Claiming..." : "Claim Rewards"}
                               </button>
-                              {withdrawalReady && details?.withdrawalRequestShares > 0 && (
+                              {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
                                 <button
                                   className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                                   onClick={() => {

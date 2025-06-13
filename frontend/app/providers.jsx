@@ -25,19 +25,9 @@ export function Providers({ children }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         {/* 2. Wrap with RainbowKitProvider */}
-        <RainbowKitProvider
-          // Optional props for customization:
-          // modalSize="compact"
-          // theme={darkTheme()}
-          // avatar={CustomAvatar}
-          // locale="en-US"
-        >
-          {children}
-        </RainbowKitProvider>
+        <RainbowKitProvider>{children}</RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
 }
 
-// REMOVE THIS LINE - IT'S A DUPLICATE EXPORT
-// export { Providers };

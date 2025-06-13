@@ -1,53 +1,53 @@
 // app/api/underwriters/[address]/route.ts
 import { NextResponse } from 'next/server'
-import { capitalPool } from '@/lib/capitalPool'
-import { riskManager } from '@/lib/riskManager'
+import { getCapitalPool } from '@/lib/capitalPool'
+import { getRiskManager } from '@/lib/riskManager'
+import deployments from '../../../config/deployments'
 
 export async function GET(
   _req: Request,
   context: { params: Promise<{ address: string }> }
 ) {
   try {
-    /* Unwrap the promise that lives on context.params */
     const { address } = await context.params
     const addr = address.toLowerCase()
 
-    // ── 1. fetch underwriter account ──
-    const account = await capitalPool.getUnderwriterAccount(addr)
+    const details: any[] = []
 
-    // ── 2. count pools ──
-    let poolCount = 0n
-    try {
-      poolCount = await (riskManager as any).protocolRiskPoolsLength()
-    } catch {
-      while (true) {
-        try {
-          await riskManager.getPoolInfo(poolCount)
-          poolCount++
-        } catch {
-          break
-        }
-      }
-    }
+    for (const dep of deployments) {
+      const cp = getCapitalPool(dep.capitalPool)
+      const rm = getRiskManager(dep.riskManager)
 
-    // ── 3. which pools this underwriter allocated ──
-    const allocatedPoolIds: number[] = []
-    for (let i = 0; i < Number(poolCount); i++) {
       try {
-        const allocated = await riskManager.isAllocatedToPool(addr, BigInt(i))
-        if (allocated) allocatedPoolIds.push(i)
-      } catch {
-        /* ignore pools that revert */
-      }
-    }
+        const account = await cp.getUnderwriterAccount(addr)
 
-    const details = {
-      totalDepositedAssetPrincipal: account[0],
-      yieldChoice: account[1],
-      masterShares: account[2],
-      withdrawalRequestTimestamp: account[3],
-      withdrawalRequestShares: account[4],
-      allocatedPoolIds,
+        let poolCount = 0n
+        try {
+          poolCount = await (rm as any).protocolRiskPoolsLength()
+        } catch {
+          while (true) {
+            try { await rm.getPoolInfo(poolCount); poolCount++ } catch { break }
+          }
+        }
+
+        const allocatedPoolIds: number[] = []
+        for (let i = 0; i < Number(poolCount); i++) {
+          try {
+            const allocated = await rm.isAllocatedToPool(addr, BigInt(i))
+            if (allocated) allocatedPoolIds.push(i)
+          } catch {}
+        }
+
+        details.push({
+          deployment: dep.name,
+          totalDepositedAssetPrincipal: account[0],
+          yieldChoice: account[1],
+          masterShares: account[2],
+          withdrawalRequestTimestamp: account[3],
+          withdrawalRequestShares: account[4],
+          allocatedPoolIds,
+        })
+      } catch {}
     }
 
     return NextResponse.json({ address: addr, details })

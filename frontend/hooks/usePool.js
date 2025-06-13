@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 
+
 export default function usePool(id) {
   const [pool, setPool] = useState(null)
   const [loading, setLoading] = useState(true)

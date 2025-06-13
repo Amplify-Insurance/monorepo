@@ -20,7 +20,8 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
 
-  const markets = pools.map((pool) => {
+  const grouped = {}
+  for (const pool of pools) {
     const name = getProtocolName(pool.id)
     // const underlyingDec = Number(pool.underlyingAssetDecimals)
     const protoDec = Number(pool.protocolTokenDecimals)
@@ -44,25 +45,28 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
       ethersUtils.formatUnits(pool.totalCapitalPledgedToPool, decimals),
     )
 
-    return {
+    const entry = grouped[pool.id] || {
       id: pool.id,
       name,
       description: `${getProtocolDescription(pool.id)}`,
-      tvl: tvlNative,
+      tvl: 0,
       tokenPriceUsd: pool.tokenPriceUsd ?? 0,
-      pools: [
-        {
-          token: pool.protocolTokenToCover,
-          tokenName: getProtocolName(pool.id),
-          premium,
-          underwriterYield: uwYield,
-          tvl: Number(ethersUtils.formatUnits(pool.totalCoverageSold, protoDec)),
-          price: pool.tokenPriceUsd ?? 0,
-          capacity,
-        },
-      ],
+      pools: [],
     }
-  })
+    entry.tvl += tvlNative
+    entry.pools.push({
+      token: pool.protocolTokenToCover,
+      tokenName: getTokenName(pool.protocolTokenToCover),
+      premium,
+      underwriterYield: uwYield,
+      tvl: Number(ethersUtils.formatUnits(pool.totalCoverageSold, protoDec)),
+      price: pool.tokenPriceUsd ?? 0,
+      capacity,
+    })
+    grouped[pool.id] = entry
+  }
+
+  const markets = Object.values(grouped)
 
   const toggleMarket = (marketId) => {
     setExpandedMarkets((prev) => (prev.includes(marketId) ? prev.filter((id) => id !== marketId) : [...prev, marketId]))
