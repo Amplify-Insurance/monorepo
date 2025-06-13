@@ -12,7 +12,7 @@ export function createDepositEvent(user: Address, amount: BigInt, shares: BigInt
   return event
 }
 
-import { PolicyCreated } from '../generated/RiskManager/RiskManager'
+import { PolicyCreated, ClaimProcessed } from '../generated/RiskManager/RiskManager'
 
 export function createPolicyCreatedEvent(
   user: Address,
@@ -73,6 +73,23 @@ export function createWithdrawalRequestedEvent(
   event.parameters.push(new ethereum.EventParam('user', ethereum.Value.fromAddress(user)))
   event.parameters.push(new ethereum.EventParam('sharesToBurn', ethereum.Value.fromUnsignedBigInt(sharesToBurn)))
   event.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(timestamp)))
+  return event
+}
+
+export function createClaimProcessedEvent(
+  policyId: BigInt,
+  poolId: BigInt,
+  claimant: Address,
+  netPayout: BigInt,
+  contract: Address
+): ClaimProcessed {
+  let event = changetype<ClaimProcessed>(newMockEvent())
+  event.address = contract
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('policyId', ethereum.Value.fromUnsignedBigInt(policyId)))
+  event.parameters.push(new ethereum.EventParam('poolId', ethereum.Value.fromUnsignedBigInt(poolId)))
+  event.parameters.push(new ethereum.EventParam('claimant', ethereum.Value.fromAddress(claimant)))
+  event.parameters.push(new ethereum.EventParam('netPayoutToClaimant', ethereum.Value.fromUnsignedBigInt(netPayout)))
   return event
 }
 

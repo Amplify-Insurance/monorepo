@@ -43,3 +43,16 @@ type PoolUtilizationSnapshot @entity {
   utilizationBps: BigInt!
   premiumRateBps: BigInt!
 }
+
+type Claim @entity {
+  id: ID!
+  policyId: BigInt!
+  poolId: BigInt!
+  claimant: Bytes!
+  coverage: BigInt!
+  netPayoutToClaimant: BigInt!
+  claimFee: BigInt!
+  protocolTokenAmountReceived: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}

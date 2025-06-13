@@ -23,6 +23,7 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
         - PoolUtilizationSnapshot
+        - Claim
       abis:
         - name: RiskManager
           file: ./abis/RiskManager.json
@@ -69,6 +70,7 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
+        - Claim
       abis:
         - name: CapitalPool
           file: ./abis/CapitalPool.json
@@ -111,6 +113,7 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
+        - Claim
       abis:
         - name: CatInsurancePool
           file: ./abis/CatInsurancePool.json
@@ -155,6 +158,7 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
+        - Claim
       abis:
         - name: PolicyNFT
           file: ./abis/PolicyNFT.json
