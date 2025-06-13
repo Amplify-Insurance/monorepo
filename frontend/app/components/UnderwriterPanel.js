@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Info, ChevronDown, Filter } from "lucide-react"
+import { Info, ChevronDown, Filter, HelpCircle } from "lucide-react"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from "next/image"
 import { useAccount } from "wagmi"
@@ -15,6 +15,13 @@ import { YieldPlatform, getYieldPlatformInfo } from "../config/yieldPlatforms"
 import { ethers } from "ethers"
 import { getTokenDescription, getProtocolDescription } from "../config/tokenNameMap"
 import { getTokenLogo, getTokenName, getProtocolLogo, getProtocolName } from "../config/tokenNameMap"
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "../../components/ui/sheet"
 
 // Protocol categories
 const protocolCategories = [
@@ -39,6 +46,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
   const [selectedYield, setSelectedYield] = useState(null)
   const [yieldDropdownOpen, setYieldDropdownOpen] = useState(false)
+  const [yieldInfoOpen, setYieldInfoOpen] = useState(false)
 
   useEffect(() => {
     if (!selectedToken && tokens && tokens.length > 0) {
@@ -248,9 +256,24 @@ export default function UnderwriterPanel({ displayCurrency }) {
 
       {/* Yield Platform Selection */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Select base yield platform:
-        </label>
+        <div className="flex items-center mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Select base yield platform:
+          </label>
+          <Sheet open={yieldInfoOpen} onOpenChange={setYieldInfoOpen}>
+            <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
+              <HelpCircle className="w-4 h-4" />
+            </SheetTrigger>
+            <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
+              <SheetHeader>
+                <SheetTitle>Base Yield Platform</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 text-sm">
+                The base yield platform is where your deposit is parked to earn yield until it is needed to pay claims.
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
         <div className="relative">
           <button
             type="button"
