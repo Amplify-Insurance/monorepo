@@ -1,7 +1,8 @@
 // app/api/pools/route.ts
 import { NextResponse } from 'next/server';
-import { riskManager } from '../../../../lib/riskManager';
-import { priceOracle } from '../../../../lib/priceOracle';
+import { getRiskManager } from '../../../../lib/riskManager';
+import { getPriceOracle } from '../../../../lib/priceOracle';
+import deployments from '../../../config/deployments';
 import { ethers } from 'ethers';
 
 /**
@@ -100,7 +101,11 @@ function calcPremiumRateBps(pool: any): bigint {
  * premium rates and underwriter yields.
  */
 export async function GET() {
-  try {
+  const allPools: any[] = []
+  for (const dep of deployments) {
+    const riskManager = getRiskManager(dep.riskManager)
+    const priceOracle = getPriceOracle(dep.priceOracle)
+    try {
     /* 1️⃣ How many pools exist? */
     let count = 0n;
     try {
@@ -158,11 +163,13 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ pools });
+    for (const p of pools) {
+      allPools.push({ deployment: dep.name, ...p });
+    }
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.message ?? 'Internal Server Error' },
-      { status: 500 },
-    );
+    console.error('Failed to load pools for deployment', dep.name, err);
   }
+  }
+
+  return NextResponse.json({ pools: allPools });
 }
