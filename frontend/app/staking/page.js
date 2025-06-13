@@ -3,8 +3,6 @@
 import { useState } from "react"
 import { useAccount } from "wagmi"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
-import { ethers } from "ethers"
-import { getStakingWithSigner } from "../../lib/staking"
 import ProposalsTable from "../components/ProposalsTable"
 import { HelpCircle } from "lucide-react"
 import {
@@ -14,46 +12,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../../components/ui/sheet"
+import StakeModal from "../components/StakeModal"
+import BondModal from "../components/BondModal"
 
 export default function StakingPage() {
   const { isConnected } = useAccount()
-  const [stakeAmount, setStakeAmount] = useState("")
-  const [bondAmount, setBondAmount] = useState("")
-  const [bondPoolId, setBondPoolId] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [stakeOpen, setStakeOpen] = useState(false)
+  const [bondOpen, setBondOpen] = useState(false)
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
-
-  const handleStake = async () => {
-    if (!stakeAmount) return
-    setIsSubmitting(true)
-    try {
-      const staking = await getStakingWithSigner()
-      const tx = await staking.stake(ethers.utils.parseUnits(stakeAmount, 18))
-      await tx.wait()
-      setStakeAmount("")
-    } catch (err) {
-      console.error("Stake failed", err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleBond = async () => {
-    if (!bondAmount || bondPoolId === "") return
-    setIsSubmitting(true)
-    try {
-      const staking = await getStakingWithSigner()
-      const tx = await staking.depositBond(bondPoolId, ethers.utils.parseUnits(bondAmount, 18))
-      await tx.wait()
-      setBondAmount("")
-      setBondPoolId("")
-    } catch (err) {
-      console.error("Bond deposit failed", err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
 
   if (!isConnected) {
@@ -90,17 +57,9 @@ export default function StakingPage() {
               </SheetContent>
             </Sheet>
           </div>
-          <input
-            type="text"
-            placeholder="Amount"
-            value={stakeAmount}
-            onChange={(e) => setStakeAmount(e.target.value)}
-            className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-gray-100"
-          />
           <button
-            onClick={handleStake}
-            disabled={isSubmitting || !stakeAmount}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
+            onClick={() => setStakeOpen(true)}
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
           >
             Stake
           </button>
@@ -123,29 +82,17 @@ export default function StakingPage() {
               </SheetContent>
             </Sheet>
           </div>
-          <input
-            type="number"
-            placeholder="Pool ID"
-            value={bondPoolId}
-            onChange={(e) => setBondPoolId(e.target.value)}
-            className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-gray-100"
-          />
-          <input
-            type="text"
-            placeholder="Bond Amount"
-            value={bondAmount}
-            onChange={(e) => setBondAmount(e.target.value)}
-            className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-gray-100"
-          />
           <button
-            onClick={handleBond}
-            disabled={isSubmitting || !bondAmount || bondPoolId === ""}
-            className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50"
+            onClick={() => setBondOpen(true)}
+            className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded"
           >
             Deposit Bond
           </button>
         </div>
       </div>
+
+      <StakeModal isOpen={stakeOpen} onClose={() => setStakeOpen(false)} />
+      <BondModal isOpen={bondOpen} onClose={() => setBondOpen(false)} />
 
 
       <div className="mt-8">
