@@ -1,13 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ethers } from "ethers"
 import { getStakingWithSigner } from "../../lib/staking"
+import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/erc20"
 import Modal from "./Modal"
 
 export default function StakeModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [balance, setBalance] = useState("0")
+  const [symbol, setSymbol] = useState("")
+  const [decimals, setDecimals] = useState(18)
+  const tokenAddress = process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS
+
+  const loadBalance = async () => {
+    if (!tokenAddress) return
+    try {
+      const token = await getERC20WithSigner(tokenAddress)
+      const addr = await token.signer.getAddress()
+      const dec = await getTokenDecimals(tokenAddress)
+      const bal = await token.balanceOf(addr)
+      setBalance(ethers.utils.formatUnits(bal, dec))
+      setSymbol(await getTokenSymbol(tokenAddress))
+      setDecimals(dec)
+    } catch {
+      setBalance("0")
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      loadBalance()
+    }
+  }, [isOpen])
 
   const handleAmountChange = (e) => {
     const value = e.target.value
@@ -16,12 +42,16 @@ export default function StakeModal({ isOpen, onClose }) {
     }
   }
 
+  const handleSetMax = () => {
+    setAmount(balance)
+  }
+
   const handleStake = async () => {
     if (!amount) return
     setIsSubmitting(true)
     try {
       const staking = await getStakingWithSigner()
-      const tx = await staking.stake(ethers.utils.parseUnits(amount, 18))
+      const tx = await staking.stake(ethers.utils.parseUnits(amount, decimals))
       await tx.wait()
       setAmount("")
       onClose()
@@ -39,13 +69,25 @@ export default function StakeModal({ isOpen, onClose }) {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Amount
           </label>
-          <input
-            type="text"
-            value={amount}
-            onChange={handleAmountChange}
-            placeholder="0.00"
-            className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-gray-100"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={amount}
+              onChange={handleAmountChange}
+              placeholder="0.00"
+              className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-gray-100"
+            />
+            <button
+              type="button"
+              onClick={handleSetMax}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-blue-600 hover:text-blue-800"
+            >
+              MAX
+            </button>
+          </div>
+          <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Balance: {parseFloat(balance).toFixed(4)} {symbol}
+          </div>
         </div>
         <button
           onClick={handleStake}
