@@ -40,19 +40,24 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     );
 
 
+    const tvlNative = Number(
+      ethersUtils.formatUnits(pool.totalCapitalPledgedToPool, decimals),
+    )
+
     return {
       id: pool.id,
       name,
       description: `${getProtocolDescription(pool.id)}`,
-      tvl: Number(ethers.utils.formatUnits(pool.totalCapitalPledgedToPool, decimals)),
+      tvl: tvlNative,
+      tokenPriceUsd: pool.tokenPriceUsd ?? 0,
       pools: [
         {
           token: pool.protocolTokenToCover,
           tokenName: getProtocolName(pool.id),
           premium,
           underwriterYield: uwYield,
-          tvl: Number(ethers.utils.formatUnits(pool.totalCoverageSold, protoDec)),
-          price: 1,
+          tvl: Number(ethersUtils.formatUnits(pool.totalCoverageSold, protoDec)),
+          price: pool.tokenPriceUsd ?? 0,
           capacity,
         },
       ],
@@ -168,7 +173,13 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {formatCurrency(market.tvl, "usd", "usd")}
+                          {formatCurrency(
+                            displayCurrency === 'usd'
+                              ? market.tvl * market.tokenPriceUsd
+                              : market.tvl,
+                            'usd',
+                            displayCurrency,
+                          )}
                         </div>
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -222,7 +233,14 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                       <span className="font-medium">{getTokenName(pool.token)}</span>
                                     </div>
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      TVL: {formatCurrency(pool.tvl, "usd", displayCurrency)}
+                                      TVL:{' '}
+                                      {formatCurrency(
+                                        displayCurrency === 'usd'
+                                          ? pool.tvl * pool.price
+                                          : pool.tvl,
+                                        'usd',
+                                        displayCurrency,
+                                      )}
                                     </div>
                                   </div>
 
