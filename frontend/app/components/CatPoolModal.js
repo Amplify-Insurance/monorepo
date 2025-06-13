@@ -13,7 +13,7 @@ import {
 import { getERC20WithSigner, getTokenDecimals } from "../../lib/erc20";
 import { getTokenLogo } from "../config/tokenNameMap";
 
-export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, assetSymbol = 'USDC' }) {
+export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, assetSymbol = 'USDC', onActionComplete }) {
   const isDeposit = mode === "deposit";
   const symbol = isDeposit ? assetSymbol : "CATLP";
   const [amount, setAmount] = useState("");
@@ -95,8 +95,9 @@ export default function CatPoolModal({ isOpen, onClose, mode, token, apr = 0, as
         const tx = await cp.withdrawLiquidity(sharesBn);
         await tx.wait();
       }
-      onClose();
       setAmount("");
+      onActionComplete && onActionComplete();
+      onClose();
     } catch (err) {
       console.error("CatPool action failed", err);
     } finally {
