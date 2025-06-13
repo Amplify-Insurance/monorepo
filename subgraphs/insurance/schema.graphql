@@ -1,5 +1,6 @@
 type GenericEvent @entity {
   id: ID!
+  deployment: String!
   blockNumber: BigInt!
   timestamp: BigInt!
   transactionHash: Bytes!
@@ -10,6 +11,7 @@ type GenericEvent @entity {
 # New entities with minimal fields for the demo
 type Pool @entity {
   id: ID!
+  deployment: String!
   underlyingAsset: Bytes!
   protocolToken: Bytes!
   protocolCovered: Int!
@@ -17,12 +19,14 @@ type Pool @entity {
 
 type Underwriter @entity {
   id: ID!
+  deployment: String!
   totalDeposited: BigInt!
   masterShares: BigInt!
 }
 
 type Policy @entity {
   id: ID!
+  deployment: String!
   owner: Bytes!
   pool: Pool!
   coverageAmount: BigInt!
@@ -32,11 +36,13 @@ type Policy @entity {
 
 type ContractOwner @entity {
   id: ID!
+  deployment: String!
   owner: Bytes!
 }
 
 type PoolUtilizationSnapshot @entity {
   id: ID!
+  deployment: String!
   pool: Pool!
   timestamp: BigInt!
   blockNumber: BigInt!
@@ -46,6 +52,7 @@ type PoolUtilizationSnapshot @entity {
 
 type Claim @entity {
   id: ID!
+  deployment: String!
   policyId: BigInt!
   poolId: BigInt!
   claimant: Bytes!
@@ -59,6 +66,7 @@ type Claim @entity {
 
 type PolicyCreatedEvent @entity {
   id: ID!
+  deployment: String!
   policyId: BigInt!
   poolId: BigInt!
   user: Bytes!
@@ -69,6 +77,7 @@ type PolicyCreatedEvent @entity {
 
 type PolicyLapsedEvent @entity {
   id: ID!
+  deployment: String!
   policyId: BigInt!
   timestamp: BigInt!
   transactionHash: Bytes!
@@ -76,6 +85,7 @@ type PolicyLapsedEvent @entity {
 
 type PremiumPaidEvent @entity {
   id: ID!
+  deployment: String!
   policyId: BigInt!
   poolId: BigInt!
   amountPaid: BigInt!
@@ -87,6 +97,7 @@ type PremiumPaidEvent @entity {
 
 type GovernanceProposal @entity {
   id: ID!
+  deployment: String!
   proposer: Bytes!
   poolId: BigInt!
   pauseState: Boolean!
@@ -101,6 +112,7 @@ type GovernanceProposal @entity {
 
 type GovernanceVote @entity {
   id: ID!
+  deployment: String!
   proposal: GovernanceProposal!
   voter: Bytes!
   vote: Int!

@@ -1,4 +1,4 @@
-import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts";
+import { ethereum, BigInt, Address, dataSource } from "@graphprotocol/graph-ts";
 import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, PolicyCreatedEvent, PolicyLapsedEvent, PremiumPaidEvent, GovernanceProposal, GovernanceVote } from "../generated/schema";
 import {
   PoolAdded,
@@ -53,6 +53,10 @@ import { ProposalCreated, Voted, ProposalExecuted } from "../generated/Committee
 function saveGeneric(event: ethereum.Event, name: string): void {
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
   let entity = new GenericEvent(id);
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+  entity.deployment = deployment;
   entity.blockNumber = event.block.number;
   entity.timestamp = event.block.timestamp;
   entity.transactionHash = event.transaction.hash;
@@ -72,6 +76,10 @@ function saveOwner(event: ethereum.Event, newOwner: Address): void {
   if (owner == null) {
     owner = new ContractOwner(id);
   }
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+  owner.deployment = deployment;
   owner.owner = newOwner;
   owner.save();
 }
@@ -103,9 +111,13 @@ function snapshotPool(
         .plus(slope1.times(kink).div(BPS))
         .plus(slope2.times(utilization.minus(kink)).div(BPS));
 
-  let snapId = poolId.toString() + "-" + event.block.number.toString();
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+  let snapId = deployment + "-" + poolId.toString() + "-" + event.block.number.toString();
   let snap = new PoolUtilizationSnapshot(snapId);
-  snap.pool = poolId.toString();
+  snap.deployment = deployment;
+  snap.pool = deployment + "-" + poolId.toString();
   snap.timestamp = event.block.timestamp;
   snap.blockNumber = event.block.number;
   snap.utilizationBps = utilization;
@@ -118,8 +130,13 @@ function snapshotPool(
 export function handlePoolAdded(event: PoolAdded): void {
   saveGeneric(event, "PoolAdded");
 
-  let poolId = event.params.poolId.toString();
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let poolId = deployment + "-" + event.params.poolId.toString();
   let pool = new Pool(poolId);
+  pool.deployment = deployment;
   pool.underlyingAsset = Address.zero();
   pool.protocolToken = event.params.protocolToken;
   pool.protocolCovered = event.params.protocolCovered;
@@ -136,10 +153,15 @@ export function handlePoolAdded(event: PoolAdded): void {
 export function handleDeposit(event: Deposit): void {
   saveGeneric(event, "Deposit");
 
-  let id = event.params.user.toHex();
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let id = deployment + "-" + event.params.user.toHex();
   let u = Underwriter.load(id);
   if (u == null) {
     u = new Underwriter(id);
+    u.deployment = deployment;
     u.totalDeposited = BigInt.fromI32(0);
     u.masterShares = BigInt.fromI32(0);
   }
@@ -154,6 +176,10 @@ export function handlePremiumPaid(event: PremiumPaid): void {
 
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
   let ev = new PremiumPaidEvent(id);
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+  ev.deployment = deployment;
   ev.policyId = event.params.policyId;
   ev.poolId = event.params.poolId;
   ev.amountPaid = event.params.amountPaid;
@@ -167,6 +193,10 @@ export function handleClaimProcessed(event: ClaimProcessed): void {
   saveGeneric(event, "ClaimProcessed");
   let rm = RiskManager.bind(event.address);
   snapshotPool(rm, event, event.params.poolId);
+
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
 
   let coverage = BigInt.zero();
   let policyAddr = rm.try_policyNFT();
@@ -193,6 +223,7 @@ export function handleClaimProcessed(event: ClaimProcessed): void {
 
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
   let entity = new Claim(id);
+  entity.deployment = deployment;
   entity.policyId = event.params.policyId;
   entity.poolId = event.params.poolId;
   entity.claimant = event.params.claimant;
@@ -214,10 +245,15 @@ export function handleCapitalDeallocated(event: CapitalDeallocated): void { save
 export function handlePolicyCreated(event: PolicyCreated): void {
   saveGeneric(event, "PolicyCreated");
 
-  let policyId = event.params.policyId.toString();
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let policyId = deployment + "-" + event.params.policyId.toString();
   let policy = new Policy(policyId);
+  policy.deployment = deployment;
   policy.owner = event.params.user;
-  policy.pool = event.params.poolId.toString();
+  policy.pool = deployment + "-" + event.params.poolId.toString();
   policy.coverageAmount = event.params.coverageAmount;
   policy.premiumPaid = event.params.premiumPaid;
   let rm = RiskManager.bind(event.address);
@@ -227,6 +263,7 @@ export function handlePolicyCreated(event: PolicyCreated): void {
 
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
   let ev = new PolicyCreatedEvent(id);
+  ev.deployment = deployment;
   ev.policyId = event.params.policyId;
   ev.poolId = event.params.poolId;
   ev.user = event.params.user;
@@ -239,16 +276,21 @@ export function handleIncidentReported(event: IncidentReported): void { saveGene
 export function handlePolicyLapsed(event: PolicyLapsed): void {
   saveGeneric(event, "PolicyLapsed");
 
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
   let ev = new PolicyLapsedEvent(id);
+  ev.deployment = deployment;
   ev.policyId = event.params.policyId;
   ev.timestamp = event.block.timestamp;
   ev.transactionHash = event.transaction.hash;
   ev.save();
-  let policy = Policy.load(event.params.policyId.toString());
+  let policy = Policy.load(deployment + "-" + event.params.policyId.toString());
   if (policy != null) {
     let rm = RiskManager.bind(event.address);
-    snapshotPool(rm, event, BigInt.fromString(policy.pool));
+    snapshotPool(rm, event, BigInt.fromString(policy.pool.split("-")[1]));
   }
 }
 export function handleBaseYieldAdapterSet(event: BaseYieldAdapterSet): void { saveGeneric(event, "BaseYieldAdapterSet"); }
@@ -274,7 +316,11 @@ export function handlePolicyPremiumAccountUpdated(event: PolicyPremiumAccountUpd
 export function handleTransfer(event: Transfer): void {
   saveGeneric(event, "Transfer");
 
-  let policy = Policy.load(event.params.tokenId.toString());
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let policy = Policy.load(deployment + "-" + event.params.tokenId.toString());
   if (policy != null) {
     policy.owner = event.params.to;
     policy.save();
@@ -326,8 +372,13 @@ export function handleCapitalPoolAddressSet(
 export function handleProposalCreated(event: ProposalCreated): void {
   saveGeneric(event, "ProposalCreated");
 
-  let id = event.params.proposalId.toString();
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let id = deployment + "-" + event.params.proposalId.toString();
   let p = new GovernanceProposal(id);
+  p.deployment = deployment;
   p.proposer = event.params.proposer;
   p.poolId = event.params.poolId;
   p.pauseState = event.params.pauseState;
@@ -343,9 +394,14 @@ export function handleProposalCreated(event: ProposalCreated): void {
 export function handleVoted(event: Voted): void {
   saveGeneric(event, "Voted");
 
-  let proposalId = event.params.proposalId.toString();
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let proposalId = deployment + "-" + event.params.proposalId.toString();
   let voteId = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
   let v = new GovernanceVote(voteId);
+  v.deployment = deployment;
   v.proposal = proposalId;
   v.voter = event.params.voter;
   v.vote = event.params.vote;
@@ -368,7 +424,11 @@ export function handleVoted(event: Voted): void {
 export function handleProposalExecuted(event: ProposalExecuted): void {
   saveGeneric(event, "ProposalExecuted");
 
-  let id = event.params.proposalId.toString();
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let id = deployment + "-" + event.params.proposalId.toString();
   let p = GovernanceProposal.load(id);
   if (p != null) {
     p.executed = true;
