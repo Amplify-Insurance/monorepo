@@ -56,3 +56,31 @@ type Claim @entity {
   timestamp: BigInt!
   transactionHash: Bytes!
 }
+
+type PolicyCreatedEvent @entity {
+  id: ID!
+  policyId: BigInt!
+  poolId: BigInt!
+  user: Bytes!
+  coverage: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PolicyLapsedEvent @entity {
+  id: ID!
+  policyId: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PremiumPaidEvent @entity {
+  id: ID!
+  policyId: BigInt!
+  poolId: BigInt!
+  amountPaid: BigInt!
+  catAmount: BigInt!
+  poolIncome: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}

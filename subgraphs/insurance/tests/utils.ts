@@ -93,6 +93,32 @@ export function createClaimProcessedEvent(
   return event
 }
 
+import { PolicyLapsed, PremiumPaid } from '../generated/RiskManager/RiskManager'
+
+export function createPolicyLapsedEvent(policyId: BigInt): PolicyLapsed {
+  let event = changetype<PolicyLapsed>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('policyId', ethereum.Value.fromUnsignedBigInt(policyId)))
+  return event
+}
+
+export function createPremiumPaidEvent(
+  policyId: BigInt,
+  poolId: BigInt,
+  amountPaid: BigInt,
+  catAmount: BigInt,
+  poolIncome: BigInt
+): PremiumPaid {
+  let event = changetype<PremiumPaid>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('policyId', ethereum.Value.fromUnsignedBigInt(policyId)))
+  event.parameters.push(new ethereum.EventParam('poolId', ethereum.Value.fromUnsignedBigInt(poolId)))
+  event.parameters.push(new ethereum.EventParam('amountPaid', ethereum.Value.fromUnsignedBigInt(amountPaid)))
+  event.parameters.push(new ethereum.EventParam('catAmount', ethereum.Value.fromUnsignedBigInt(catAmount)))
+  event.parameters.push(new ethereum.EventParam('poolIncome', ethereum.Value.fromUnsignedBigInt(poolIncome)))
+  return event
+}
+
 import { OwnershipTransferred as RMOwnershipTransferred } from '../generated/RiskManager/RiskManager'
 
 export function createOwnershipTransferredEvent(
