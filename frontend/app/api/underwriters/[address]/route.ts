@@ -15,8 +15,8 @@ export async function GET(
     const details: any[] = []
 
     for (const dep of deployments) {
-      const cp = getCapitalPool(dep.capitalPool)
-      const rm = getRiskManager(dep.riskManager)
+      const cp = getCapitalPool(dep.capitalPool, dep.name)
+      const rm = getRiskManager(dep.riskManager, dep.name)
 
       try {
         const account = await cp.getUnderwriterAccount(addr)

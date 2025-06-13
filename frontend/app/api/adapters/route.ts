@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCapitalPool } from '../../../lib/capitalPool';
-import { provider } from '../../../lib/provider';
+import { getProvider } from '../../../lib/provider';
 import { ethers } from 'ethers';
 import deployments from '../../config/deployments';
 
@@ -15,13 +15,13 @@ export async function GET(req: Request) {
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
 
-    const cp = getCapitalPool(dep.capitalPool);
+    const cp = getCapitalPool(dep.capitalPool, dep.name);
 
     const adapters: { address: string; apr: string; asset: string }[] = [];
     for (let i = 0; i < 20; i++) {
       try {
         const addr = await (cp as any).activeYieldAdapterAddresses(i);
-        const contract = new ethers.Contract(addr, ADAPTER_ABI, provider);
+        const contract = new ethers.Contract(addr, ADAPTER_ABI, getProvider(dep.name));
         let apr = '0';
         let asset = ethers.constants.AddressZero;
         try {

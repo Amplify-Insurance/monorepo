@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { provider } from '../../../../../lib/provider';
+import { getProvider } from '../../../../../lib/provider';
 import CatPoolAbi from '../../../../../abi/CatInsurancePool.json';
 import ERC20 from '../../../../../abi/ERC20.json';
 import { ethers } from 'ethers';
@@ -10,11 +10,11 @@ export async function GET(req: Request, { params }: { params: { address: string 
     const url = new URL(req.url);
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const cp = new ethers.Contract(dep.catPool, CatPoolAbi, provider);
+    const cp = new ethers.Contract(dep.catPool, CatPoolAbi, getProvider(dep.name));
 
     const addr = params.address.toLowerCase();
     const catShareAddr = await cp.catShareToken();
-    const token = new ethers.Contract(catShareAddr, ERC20, provider);
+    const token = new ethers.Contract(catShareAddr, ERC20, getProvider(dep.name));
     const [balance, totalSupply, liquid] = await Promise.all([
       token.balanceOf(addr),
       token.totalSupply(),

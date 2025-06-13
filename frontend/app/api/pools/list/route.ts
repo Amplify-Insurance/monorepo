@@ -104,8 +104,8 @@ function calcPremiumRateBps(pool: any): bigint {
 export async function GET() {
   const allPools: any[] = []
   for (const dep of deployments) {
-    const riskManager = getRiskManager(dep.riskManager)
-    const priceOracle = getPriceOracle(dep.priceOracle)
+    const riskManager = getRiskManager(dep.riskManager, dep.name)
+    const priceOracle = getPriceOracle(dep.priceOracle, dep.name)
     try {
     /* 1️⃣ How many pools exist? */
     let count = 0n;
@@ -135,7 +135,7 @@ export async function GET() {
     }
 
     /* 3️⃣ Pull each pool and compute derivatives via multicall */
-    const multicall = getMulticallReader(dep.multicallReader);
+    const multicall = getMulticallReader(dep.multicallReader, dep.name);
     const pools: any[] = [];
 
     const poolCalls = [] as { target: string; callData: string }[];
