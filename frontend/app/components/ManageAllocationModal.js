@@ -9,9 +9,11 @@ import Link from "next/link";
 import { getProtocolLogo, getProtocolName } from "../config/tokenNameMap";
 import { formatPercentage } from "../utils/formatting";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
+import deployments, { getDeployment } from "../config/deployments";
 
-export default function ManageAllocationModal({ isOpen, onClose }) {
+export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const { pools } = usePools();
+  const poolsForDeployment = pools.filter((p) => p.deployment === deployment);
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
   const [selectedPools, setSelectedPools] = useState([]);
@@ -19,11 +21,16 @@ export default function ManageAllocationModal({ isOpen, onClose }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (details?.allocatedPoolIds) {
-      setSelectedPools(details.allocatedPoolIds);
-      setInitialPools(details.allocatedPoolIds);
+    if (details) {
+      const d = Array.isArray(details)
+        ? details.find((dt) => dt.deployment === deployment)
+        : details;
+      if (d?.allocatedPoolIds) {
+        setSelectedPools(d.allocatedPoolIds);
+        setInitialPools(d.allocatedPoolIds);
+      }
     }
-  }, [details]);
+  }, [details, deployment]);
 
   const togglePool = (id) => {
     setSelectedPools((prev) =>
@@ -34,7 +41,8 @@ export default function ManageAllocationModal({ isOpen, onClose }) {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const rm = await getRiskManagerWithSigner();
+      const dep = getDeployment(deployment);
+      const rm = await getRiskManagerWithSigner(dep.riskManager);
       const toAllocate = selectedPools.filter((p) => !initialPools.includes(p));
       const toDeallocate = initialPools.filter((p) => !selectedPools.includes(p));
 
@@ -59,7 +67,7 @@ export default function ManageAllocationModal({ isOpen, onClose }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Manage Protocol Allocation">
       <div className="space-y-4">
-        {pools.map((pool) => {
+        {poolsForDeployment.map((pool) => {
           const yieldRate = Number(pool.underwriterYieldBps || 0) / 100;
           return (
             <div

@@ -22,3 +22,7 @@ if (!deployments.length) {
 }
 
 export default deployments;
+
+export function getDeployment(name) {
+  return deployments.find((d) => d.name === name) || deployments[0];
+}

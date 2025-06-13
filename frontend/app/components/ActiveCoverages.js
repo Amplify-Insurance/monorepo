@@ -76,6 +76,7 @@ export default function ActiveCoverages({ displayCurrency }) {
 
     return {
       id: p.id,
+      deployment: p.deployment,
       protocol,
       protocolLogo,
       pool: pool.protocolTokenToCover,
@@ -254,6 +255,7 @@ export default function ActiveCoverages({ displayCurrency }) {
           premium={selectedCoverage.premium}
           capacity={selectedCoverage.capacity}
           policyId={selectedCoverage.id}
+          deployment={selectedCoverage.deployment}
         />
       )}
     </div>

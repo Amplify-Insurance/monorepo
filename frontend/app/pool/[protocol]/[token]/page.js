@@ -474,8 +474,8 @@ export default function PoolDetailsPage() {
         <button className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors duration-150 ease-in-out text-sm sm:text-base flex items-center justify-center shadow-sm hover:shadow" onClick={()=>setPurchaseModalOpen(true)}>Purchase Coverage</button>
         <button className="flex-1 py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-150 ease-in-out text-sm sm:text-base flex items-center justify-center shadow-sm hover:shadow" onClick={()=>setProvideModalOpen(true)}>Provide Coverage</button>
       </div>
-      <CoverageModal isOpen={purchaseModalOpen} onClose={()=>setPurchaseModalOpen(false)} type="purchase" protocol={market.name} token={token} premium={processedPool?.premium} yield={processedPool?.underwriterYield}/>
-      <CoverageModal isOpen={provideModalOpen} onClose={()=>setProvideModalOpen(false)} type="provide" protocol={market.name} token={token} premium={processedPool?.premium} yield={processedPool?.underwriterYield}/>
+      <CoverageModal isOpen={purchaseModalOpen} onClose={()=>setPurchaseModalOpen(false)} type="purchase" protocol={market.name} token={token} premium={processedPool?.premium} yield={processedPool?.underwriterYield} deployment={pool?.deployment}/>
+      <CoverageModal isOpen={provideModalOpen} onClose={()=>setProvideModalOpen(false)} type="provide" protocol={market.name} token={token} premium={processedPool?.premium} yield={processedPool?.underwriterYield} deployment={pool?.deployment}/>
     </div>
   )
 }

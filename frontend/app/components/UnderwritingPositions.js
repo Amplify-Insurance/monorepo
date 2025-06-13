@@ -13,6 +13,7 @@ import { ethers } from "ethers";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName } from "../config/tokenNameMap";
+import deployments, { getDeployment } from "../config/deployments";
 
 export default function UnderwritingPositions({ displayCurrency }) {
   const NOTICE_PERIOD = 600; // seconds
@@ -27,6 +28,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const { details } = useUnderwriterDetails(address);
   const { pools } = usePools();
   const adapters = useYieldAdapters();
+  const defaultDeployment = details?.[0]?.deployment;
 
 const underwritingPositions = (details || [])
   .flatMap((d) =>
@@ -41,6 +43,7 @@ const underwritingPositions = (details || [])
       );
       return {
         id: `${d.deployment}-${pid}`,
+        deployment: d.deployment,
         protocol,
         pool: pool.protocolTokenToCover,
         poolName: getTokenName(pool.id),
@@ -90,7 +93,8 @@ const underwritingPositions = (details || [])
   const handleClaimRewards = async (position) => {
     setIsClaiming(true);
     try {
-      const rm = await getRiskManagerWithSigner();
+      const dep = getDeployment(position.deployment);
+      const rm = await getRiskManagerWithSigner(dep.riskManager);
       await (await rm.claimPremiumRewards(position.poolId)).wait();
       await (await rm.claimDistressedAssets(position.poolId)).wait();
     } catch (err) {
@@ -104,10 +108,17 @@ const underwritingPositions = (details || [])
     if (underwritingPositions.length === 0) return;
     setIsClaimingAll(true);
     try {
-      const rm = await getRiskManagerWithSigner();
-      for (const id of underwritingPositions.map((p) => p.poolId)) {
-        await (await rm.claimPremiumRewards(id)).wait();
-        await (await rm.claimDistressedAssets(id)).wait();
+      const grouped = underwritingPositions.reduce((acc, p) => {
+        (acc[p.deployment] = acc[p.deployment] || []).push(p.poolId);
+        return acc;
+      }, {});
+      for (const [depName, ids] of Object.entries(grouped)) {
+        const dep = getDeployment(depName);
+        const rm = await getRiskManagerWithSigner(dep.riskManager);
+        for (const id of ids) {
+          await (await rm.claimPremiumRewards(id)).wait();
+          await (await rm.claimDistressedAssets(id)).wait();
+        }
       }
     } catch (err) {
       console.error("Failed to claim all rewards", err);
@@ -119,7 +130,8 @@ const underwritingPositions = (details || [])
   const handleExecuteWithdrawal = async () => {
     setIsExecuting(true);
     try {
-      const cp = await getCapitalPoolWithSigner();
+      const dep = getDeployment(defaultDeployment);
+      const cp = await getCapitalPoolWithSigner(dep.capitalPool);
       await (await cp.executeWithdrawal()).wait();
     } catch (err) {
       console.error("Failed to execute withdrawal", err);
@@ -174,6 +186,7 @@ const underwritingPositions = (details || [])
               <ManageAllocationModal
                 isOpen={showAllocModal}
                 onClose={() => setShowAllocModal(false)}
+                deployment={defaultDeployment}
               />
             )}
           </div>
@@ -488,12 +501,14 @@ const underwritingPositions = (details || [])
           shares={selectedPosition.shares}
           poolId={selectedPosition.poolId}
           yieldChoice={selectedPosition.yieldChoice}
+          deployment={selectedPosition.deployment}
         />
       )}
       {showAllocModal && (
         <ManageAllocationModal
           isOpen={showAllocModal}
           onClose={() => setShowAllocModal(false)}
+          deployment={defaultDeployment}
         />
       )}
     </div>

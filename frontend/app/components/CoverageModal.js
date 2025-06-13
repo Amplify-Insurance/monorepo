@@ -14,6 +14,7 @@ import {
 } from "../../lib/capitalPool"
 import { getERC20WithSigner } from "../../lib/erc20"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
+import deployments, { getDeployment } from "../config/deployments"
 import Modal from "./Modal"
 import { Slider } from "../../components/ui/slider"
 import { formatPercentage } from "../utils/formatting"
@@ -32,6 +33,7 @@ export default function CoverageModal({
   selectedMarkets = [],
   capacity = 0,
   protocolTokenToCover,
+  deployment,
 }) {
   const { address } = useAccount()
   const tokenName = getTokenName(token)
@@ -50,7 +52,8 @@ export default function CoverageModal({
 
     const loadDecimals = async () => {
       try {
-        const dec = await getUnderlyingAssetDecimals()
+        const dep = getDeployment(deployment)
+        const dec = await getUnderlyingAssetDecimals(dep.capitalPool)
         setUnderlyingDec(dec)
       } catch (err) {
         console.error("Failed to fetch asset decimals", err)
@@ -82,8 +85,9 @@ export default function CoverageModal({
 
     const load = async () => {
       try {
-        const dec = await getUnderlyingAssetDecimals()
-        const bal = await getUnderlyingAssetBalance(address)
+        const dep = getDeployment(deployment)
+        const dec = await getUnderlyingAssetDecimals(dep.capitalPool)
+        const bal = await getUnderlyingAssetBalance(address, dep.capitalPool)
         const human = Number(ethers.utils.formatUnits(bal, dec))
         setUnderlyingDec(dec)
         setWalletBalance(human)
@@ -125,15 +129,16 @@ export default function CoverageModal({
     try {
       if (!window.ethereum) throw new Error("Wallet not found")
 
+      const dep = getDeployment(deployment)
       const dec =
-        underlyingDec ?? (await getUnderlyingAssetDecimals())
-      const assetAddr = await getUnderlyingAssetAddress()
+        underlyingDec ?? (await getUnderlyingAssetDecimals(dep.capitalPool))
+      const assetAddr = await getUnderlyingAssetAddress(dep.capitalPool)
       const tokenContract = await getERC20WithSigner(assetAddr)
       const signerAddress = await tokenContract.signer.getAddress()
 
       if (type === "purchase") {
-        const rm = await getRiskManagerWithSigner()
-        const rmAddress = process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS
+        const rm = await getRiskManagerWithSigner(dep.riskManager)
+        const rmAddress = dep.riskManager
 
         const amountBn = ethers.utils.parseUnits(amount, dec) // coverage amount
 
@@ -158,9 +163,9 @@ export default function CoverageModal({
 
       } else { // "provide" flow
         const amountBn = ethers.utils.parseUnits(amount, dec)
-        const cp = await getCapitalPoolWithSigner()
-        const cpAddress = process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS;
-        const rm = await getRiskManagerWithSigner()
+        const cp = await getCapitalPoolWithSigner(dep.capitalPool)
+        const cpAddress = dep.capitalPool;
+        const rm = await getRiskManagerWithSigner(dep.riskManager)
         const ids = poolIds.length ? poolIds : poolId ? [poolId] : []
 
         // Approve spending if necessary
