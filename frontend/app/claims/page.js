@@ -36,6 +36,7 @@ export default function ClaimsPage() {
       const coverageAmount = Number(
         ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals),
       )
+      const activationTs = Number(p.activation || p.start)
       return {
         id: p.id,
         protocol: getTokenName(pool.protocolTokenToCover),
@@ -43,9 +44,9 @@ export default function ClaimsPage() {
         poolName: getTokenName(pool.protocolTokenToCover),
         coverageAmount,
         premium: Number(pool.premiumRateBps || 0) / 100,
-        status: "active",
-        startDate: new Date(Number(p.activation || p.start) * 1000).toISOString(),
+        startDate: new Date(activationTs * 1000).toISOString(),
         endDate: new Date(Number(p.lastPaidUntil) * 1000).toISOString(),
+        isActive: Date.now() / 1000 >= activationTs,
       }
     })
     .filter(Boolean)
@@ -163,7 +164,9 @@ export default function ClaimsPage() {
                             {coverage.protocol} {coverage.poolName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Expires: {new Date(coverage.endDate).toLocaleDateString()}
+                            {coverage.isActive
+                              ? `Expires: ${new Date(coverage.endDate).toLocaleDateString()}`
+                              : `Activates: ${new Date(coverage.startDate).toLocaleDateString()}`}
                           </div>
                         </div>
                       </div>
@@ -185,7 +188,7 @@ export default function ClaimsPage() {
                   <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
                     <HelpCircle className="w-4 h-4" />
                   </SheetTrigger>
-                  <SheetContent side="right" className="w-2/3 sm:max-w-xs">
+                  <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
                     <SheetHeader>
                       <SheetTitle>Make a Claim</SheetTitle>
                     </SheetHeader>
