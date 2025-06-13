@@ -70,8 +70,8 @@ Deploy the **PriceOracle** and register Chainlink feeds on Base with:
 npx hardhat run scripts/deploy-oracle.js --network base
 ```
 
-Then update `frontend/.env` using the printed `PriceOracle` address so the
-frontend can display token prices.
+Then update `frontend/.env` using the printed `PriceOracle` and `MulticallReader`
+addresses so the frontend can display token prices and batch queries.
 
 The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.ts` to add or customise networks.
 
@@ -138,6 +138,7 @@ Each deployment object supports the following keys:
 - `capitalPool` – `CapitalPool` contract address
 - `catPool` – `CatInsurancePool` contract address
 - `priceOracle` – `PriceOracle` contract address
+- `multicallReader` – `MulticallReader` contract address
 - `rpcUrl` – RPC endpoint for read‑only queries
 - `subgraphUrl` – GraphQL endpoint for the deployment's subgraph
 
@@ -151,6 +152,7 @@ NEXT_PUBLIC_DEPLOYMENTS='[
     "capitalPool": "0xdef...",
     "catPool": "0xghi...",
     "priceOracle": "0xjkl...",
+    "multicallReader": "0x123...",
     "rpcUrl": "https://base.publicnode.com",
     "subgraphUrl": "https://api.thegraph.com/subgraphs/name/project/base"
   },
@@ -160,6 +162,7 @@ NEXT_PUBLIC_DEPLOYMENTS='[
     "capitalPool": "0x456...",
     "catPool": "0x789...",
     "priceOracle": "0xabc...",
+    "multicallReader": "0xdef...",
     "rpcUrl": "https://optimism.publicnode.com",
     "subgraphUrl": "https://api.thegraph.com/subgraphs/name/project/optimism"
   }

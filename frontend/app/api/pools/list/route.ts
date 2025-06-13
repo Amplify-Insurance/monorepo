@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getRiskManager } from '../../../../lib/riskManager';
 import { getPriceOracle } from '../../../../lib/priceOracle';
+import { getMulticallReader } from '../../../../lib/multicallReader';
 import deployments from '../../../config/deployments';
 import { ethers } from 'ethers';
 
@@ -133,34 +134,62 @@ export async function GET() {
       // ignore – fallback already set
     }
 
-    /* 3️⃣ Pull each pool and compute derivatives */
+    /* 3️⃣ Pull each pool and compute derivatives via multicall */
+    const multicall = getMulticallReader(dep.multicallReader);
     const pools: any[] = [];
+
+    const poolCalls = [] as { target: string; callData: string }[];
     for (let i = 0; i < Number(count); i++) {
+      poolCalls.push({
+        target: dep.riskManager,
+        callData: riskManager.interface.encodeFunctionData('getPoolInfo', [i]),
+      });
+    }
+
+    const poolResults = await multicall.tryAggregate(true, poolCalls);
+
+    for (let i = 0; i < poolResults.length; i++) {
+      if (!poolResults[i].success) continue;
       try {
-        const rawInfo = await riskManager.getPoolInfo(i);
+        const decoded = riskManager.interface.decodeFunctionResult(
+          'getPoolInfo',
+          poolResults[i].returnData,
+        );
+        const rawInfo = decoded[0];
         const info = bnToString(rawInfo);
         const rate = calcPremiumRateBps(info);
         const uwYield = calcUnderwriterYieldBps(info, catPremiumBps);
-
-        let tokenPriceUsd = 0;
-        try {
-          const [p, dec] = await priceOracle.getLatestUsdPrice(
-            info.protocolTokenToCover,
-          );
-          tokenPriceUsd = parseFloat(ethers.utils.formatUnits(p, dec));
-        } catch {}
-
         pools.push({
           id: i,
           ...info,
           premiumRateBps: rate.toString(),
           underwriterYieldBps: uwYield.toString(),
-          tokenPriceUsd,
+          tokenPriceUsd: 0,
         });
-      } catch {
-        // skip pools that error out
-        continue;
-      }
+      } catch {}
+    }
+
+    const priceCalls = pools.map((p) => ({
+      target: dep.priceOracle,
+      callData: priceOracle.interface.encodeFunctionData(
+        'getLatestUsdPrice',
+        [p.protocolTokenToCover],
+      ),
+    }));
+
+    const priceResults = await multicall.tryAggregate(false, priceCalls);
+
+    for (let i = 0; i < priceResults.length; i++) {
+      if (!priceResults[i].success) continue;
+      try {
+        const [price, dec] = priceOracle.interface.decodeFunctionResult(
+          'getLatestUsdPrice',
+          priceResults[i].returnData,
+        );
+        pools[i].tokenPriceUsd = parseFloat(
+          ethers.utils.formatUnits(price, dec),
+        );
+      } catch {}
     }
 
     for (const p of pools) {

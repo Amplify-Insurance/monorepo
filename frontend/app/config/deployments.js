@@ -17,6 +17,7 @@ if (!deployments.length) {
       capitalPool: process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS,
       catPool: process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
       priceOracle: process.env.NEXT_PUBLIC_PRICE_ORACLE_ADDRESS,
+      multicallReader: process.env.NEXT_PUBLIC_MULTICALL_READER_ADDRESS,
     },
   ];
 }
