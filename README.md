@@ -123,6 +123,55 @@ include:
 - `GET /api/catpool/rewards/[address]/[token]` – claimable distressed asset rewards
 - `GET /api/policies/[id]` – fetch details for a Policy NFT
 
+### Multiple Deployments
+
+The frontend can aggregate contract data from several deployments. Set
+`NEXT_PUBLIC_DEPLOYMENTS` in `.env` to a JSON array where each entry defines the
+addresses and optional RPC/Subgraph endpoints for a deployment. When the
+variable is not provided, the single address variables such as
+`NEXT_PUBLIC_RISK_MANAGER_ADDRESS` are used instead.
+
+Each deployment object supports the following keys:
+
+- `name` – label reported in API responses
+- `riskManager` – `RiskManager` contract address
+- `capitalPool` – `CapitalPool` contract address
+- `catPool` – `CatInsurancePool` contract address
+- `priceOracle` – `PriceOracle` contract address
+- `rpcUrl` – RPC endpoint for read‑only queries
+- `subgraphUrl` – GraphQL endpoint for the deployment's subgraph
+
+Example:
+
+```json
+NEXT_PUBLIC_DEPLOYMENTS='[
+  {
+    "name": "base",
+    "riskManager": "0xabc...",
+    "capitalPool": "0xdef...",
+    "catPool": "0xghi...",
+    "priceOracle": "0xjkl...",
+    "rpcUrl": "https://base.publicnode.com",
+    "subgraphUrl": "https://api.thegraph.com/subgraphs/name/project/base"
+  },
+  {
+    "name": "optimism",
+    "riskManager": "0x123...",
+    "capitalPool": "0x456...",
+    "catPool": "0x789...",
+    "priceOracle": "0xabc...",
+    "rpcUrl": "https://optimism.publicnode.com",
+    "subgraphUrl": "https://api.thegraph.com/subgraphs/name/project/optimism"
+  }
+]'
+```
+
+The API routes iterate over each deployment, combining results so callers see a
+single aggregated view across all configured deployments.
+
+To provide defaults when `rpcUrl` or `subgraphUrl` are omitted you can also set
+the server‑side `RPC_URL` and `SUBGRAPH_URL` variables in `.env`.
+
 ### Running Tests
 
 Frontend unit tests use **Vitest** with React Testing Library:
