@@ -3,7 +3,7 @@ import { Address, BigInt } from '@graphprotocol/graph-ts'
 import { handlePolicyCreated } from '../src/mapping'
 import { createPolicyCreatedEvent } from './utils'
 
-test('handlePolicyCreated creates Policy and GenericEvent', () => {
+test('handlePolicyCreated creates Policy and events', () => {
   clearStore()
   let user = Address.fromString('0x0000000000000000000000000000000000000002')
   let event = createPolicyCreatedEvent(
@@ -25,5 +25,12 @@ test('handlePolicyCreated creates Policy and GenericEvent', () => {
     event.transaction.hash.toHex() + '-' + event.logIndex.toString(),
     'eventName',
     'PolicyCreated'
+  )
+  assert.entityCount('PolicyCreatedEvent', 1)
+  assert.fieldEquals(
+    'PolicyCreatedEvent',
+    event.transaction.hash.toHex() + '-' + event.logIndex.toString(),
+    'policyId',
+    '1'
   )
 })

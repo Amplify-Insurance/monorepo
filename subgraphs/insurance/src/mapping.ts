@@ -1,5 +1,5 @@
 import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts";
-import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim } from "../generated/schema";
+import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, PolicyCreatedEvent, PolicyLapsedEvent, PremiumPaidEvent } from "../generated/schema";
 import {
   PoolAdded,
   IncidentReported,
@@ -148,7 +148,20 @@ export function handleDeposit(event: Deposit): void {
 }
 export function handleWithdrawalRequested(event: WithdrawalRequested): void { saveGeneric(event, "WithdrawalRequested"); }
 export function handleWithdrawalExecuted(event: WithdrawalExecuted): void { saveGeneric(event, "WithdrawalExecuted"); }
-export function handlePremiumPaid(event: PremiumPaid): void { saveGeneric(event, "PremiumPaid"); }
+export function handlePremiumPaid(event: PremiumPaid): void {
+  saveGeneric(event, "PremiumPaid");
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let ev = new PremiumPaidEvent(id);
+  ev.policyId = event.params.policyId;
+  ev.poolId = event.params.poolId;
+  ev.amountPaid = event.params.amountPaid;
+  ev.catAmount = event.params.catAmount;
+  ev.poolIncome = event.params.poolIncome;
+  ev.timestamp = event.block.timestamp;
+  ev.transactionHash = event.transaction.hash;
+  ev.save();
+}
 export function handleClaimProcessed(event: ClaimProcessed): void {
   saveGeneric(event, "ClaimProcessed");
   let rm = RiskManager.bind(event.address);
@@ -210,10 +223,27 @@ export function handlePolicyCreated(event: PolicyCreated): void {
   let rate = snapshotPool(rm, event, event.params.poolId);
   policy.premiumRateBps = rate == null ? BigInt.fromI32(0) : rate as BigInt;
   policy.save();
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let ev = new PolicyCreatedEvent(id);
+  ev.policyId = event.params.policyId;
+  ev.poolId = event.params.poolId;
+  ev.user = event.params.user;
+  ev.coverage = event.params.coverageAmount;
+  ev.timestamp = event.block.timestamp;
+  ev.transactionHash = event.transaction.hash;
+  ev.save();
 }
 export function handleIncidentReported(event: IncidentReported): void { saveGeneric(event, "IncidentReported"); }
 export function handlePolicyLapsed(event: PolicyLapsed): void {
   saveGeneric(event, "PolicyLapsed");
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let ev = new PolicyLapsedEvent(id);
+  ev.policyId = event.params.policyId;
+  ev.timestamp = event.block.timestamp;
+  ev.transactionHash = event.transaction.hash;
+  ev.save();
   let policy = Policy.load(event.params.policyId.toString());
   if (policy != null) {
     let rm = RiskManager.bind(event.address);

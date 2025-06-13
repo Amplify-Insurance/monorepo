@@ -24,6 +24,9 @@ dataSources:
         - PoolUtilizationSnapshot
         - PoolUtilizationSnapshot
         - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
       abis:
         - name: RiskManager
           file: ./abis/RiskManager.json
@@ -71,6 +74,9 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
         - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
       abis:
         - name: CapitalPool
           file: ./abis/CapitalPool.json
@@ -114,6 +120,9 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
         - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
       abis:
         - name: CatInsurancePool
           file: ./abis/CatInsurancePool.json
@@ -159,6 +168,9 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
         - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
       abis:
         - name: PolicyNFT
           file: ./abis/PolicyNFT.json
