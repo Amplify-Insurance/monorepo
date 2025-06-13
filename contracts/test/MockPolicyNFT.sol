@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * that are called by an external contract like a RiskManager. It does not
  * implement the full ERC721 standard to keep it simple and focused for testing.
  */
-contract MockPolicyNFT is Ownable {
+contract MockPolicyNFT is Ownable, IPolicyNFT {
 
     // Mimic the Policy struct from the real contract
     struct Policy {
@@ -18,14 +18,18 @@ contract MockPolicyNFT is Ownable {
         uint256 coverage;
         uint256 activation;
         uint256 lastPaidUntil;
+        uint128 premiumDeposit;
+        uint128 lastDrainTime;
     }
 
     // --- State for Mocking ---
 
-    uint256 public nextTokenId = 1;
+    // Counter for the next policy token id
+    uint256 public nextPolicyId = 1;
     mapping(uint256 => Policy) public policies;
     mapping(uint256 => address) private _owners; // Internal mapping to mock ownerOf
-    address public coverPoolContract;
+    // Address of the CoverPool contract that is allowed to mint/burn
+    address public coverPoolAddress;
 
     // Variables to record the last call for testing convenience
     address public last_mint_to;
@@ -47,6 +51,18 @@ contract MockPolicyNFT is Ownable {
     );
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
+    /**
+     * @dev Internal mint function used by the mock to assign ownership of a
+     *      newly created policy. This keeps the implementation minimal but
+     *      mirrors the behaviour needed by the tests.
+     */
+    function _mint(address to, uint256 id) internal {
+        require(to != address(0), "MockPolicyNFT: mint to zero address");
+        require(_owners[id] == address(0), "MockPolicyNFT: policy already minted");
+        _owners[id] = to;
+        last_mint_to = to;
+    }
+
     // ------------------------------------------------------------------
     // Convenience setters used only in the tests. These functions allow the
     // test suite to directly manipulate policy state without going through a
@@ -60,7 +76,7 @@ contract MockPolicyNFT is Ownable {
 
     function setCoverPoolAddress(address _coverPool) external onlyOwner {
         require(_coverPool != address(0), "MockPolicyNFT: CoverPool address cannot be zero");
-        coverPoolContract = _coverPool;
+        coverPoolAddress = _coverPool;
     }
 
     function mock_setPolicy(
@@ -69,13 +85,17 @@ contract MockPolicyNFT is Ownable {
         uint256 pid,
         uint256 coverage,
         uint256 activation,
-        uint256 paidUntil
+        uint256 paidUntil,
+        uint128 premiumDeposit,
+        uint128 lastDrainTime
     ) external {
         policies[id] = Policy({
             poolId: pid,
             coverage: coverage,
             activation: activation,
-            lastPaidUntil: paidUntil
+            lastPaidUntil: paidUntil,
+            premiumDeposit: premiumDeposit,
+            lastDrainTime: lastDrainTime
         });
         _owners[id] = owner;
     }
@@ -111,6 +131,7 @@ contract MockPolicyNFT is Ownable {
             poolId: _poolId,
             coverage: _coverage,
             activation: _activation,
+            lastPaidUntil: 0,
             premiumDeposit: _premiumDeposit,
             lastDrainTime: _lastDrainTime
         });

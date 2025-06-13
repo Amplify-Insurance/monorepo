@@ -525,7 +525,9 @@ describe("RiskManager - processClaim", function () {
             0, // poolId
             coverageAmount,
             now - 86400, // Activated yesterday
-            now + 864000 // Paid up for a while
+            now + 864000, // Paid up for a while
+            0,
+            0
         );
 
         // --- Fund PolicyHolder with underlying (for payout) and protocol token (for distressed asset transfer) ---
@@ -988,7 +990,7 @@ describe("RiskManager - claimDistressedAssets", function () {
         await riskManager.connect(underwriter).allocateCapital([poolId]);
 
         const coverageAmount = ethers.parseUnits("50000", 6);
-        await mockPolicyNFT.mock_setPolicy(policyId, policyHolder.address, poolId, coverageAmount, 0, ethers.MaxUint256);
+        await mockPolicyNFT.mock_setPolicy(policyId, policyHolder.address, poolId, coverageAmount, 0, ethers.MaxUint256, 0, 0);
 
         // --- Execute a Claim to Accrue Distressed Assets ---
         await usdc.mint(riskManager.target, coverageAmount); // Pre-fund RM for payout
