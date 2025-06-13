@@ -15,6 +15,7 @@ import Modal from "./Modal";
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 import { Slider } from "../../components/ui/slider";
 import { formatPercentage } from "../utils/formatting";
+import deployments, { getDeployment } from "../config/deployments";
 
 export default function ManageCoverageModal({
   isOpen,
@@ -30,6 +31,7 @@ export default function ManageCoverageModal({
   policyId,
   shares,
   poolId,
+  deployment,
 }) {
   const [action, setAction] = useState("increase"); // increase or decrease
   const tokenName = getTokenName(token);
@@ -69,24 +71,25 @@ export default function ManageCoverageModal({
     if (type !== "coverage" && (!adjustAmount || Number.parseFloat(adjustAmount) <= 0)) return;
     setIsSubmitting(true);
     try {
+      const depInfo = getDeployment(deployment);
       let tx;
       if (type === "coverage") {
         if (!policyId) throw new Error("policyId required");
-        const rm = await getRiskManagerWithSigner();
+        const rm = await getRiskManagerWithSigner(depInfo.riskManager);
 
-        const dec = await getUnderlyingAssetDecimals();
+        const dec = await getUnderlyingAssetDecimals(depInfo.capitalPool);
         const depositBn = ethers.utils.parseUnits(extendCost.toFixed(dec), dec);
 
-        const assetAddr = await getUnderlyingAssetAddress();
+        const assetAddr = await getUnderlyingAssetAddress(depInfo.capitalPool);
         const token = await getERC20WithSigner(assetAddr);
         const addr = await token.signer.getAddress();
         const allowance = await token.allowance(
           addr,
-          process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+          depInfo.riskManager,
         );
         if (allowance.lt(depositBn)) {
           const approveTx = await token.approve(
-            process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
+            depInfo.riskManager,
             depositBn,
           );
           await approveTx.wait();
@@ -96,27 +99,28 @@ export default function ManageCoverageModal({
         await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
-        const cp = await getCapitalPoolWithSigner();
+        const cp = await getCapitalPoolWithSigner(depInfo.capitalPool);
         tx = await cp.requestWithdrawal(shares);
         await tx.wait();
       } else if (action === "increase") {
         if (!poolId) throw new Error("poolId required");
-        const cp = await getCapitalPoolWithSigner();
-        const rm = await getRiskManagerWithSigner();
+        const depInfo = getDeployment(deployment);
+        const cp = await getCapitalPoolWithSigner(depInfo.capitalPool);
+        const rm = await getRiskManagerWithSigner(depInfo.riskManager);
 
-        const dec = await getUnderlyingAssetDecimals();
+        const dec = await getUnderlyingAssetDecimals(depInfo.capitalPool);
         const amountBn = ethers.utils.parseUnits(adjustAmount, dec);
 
-        const assetAddr = await getUnderlyingAssetAddress();
+        const assetAddr = await getUnderlyingAssetAddress(depInfo.capitalPool);
         const token = await getERC20WithSigner(assetAddr);
         const addr = await token.signer.getAddress();
         const allowance = await token.allowance(
           addr,
-          process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS,
+          depInfo.capitalPool,
         );
         if (allowance.lt(amountBn)) {
           const approveTx = await token.approve(
-            process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS,
+            depInfo.capitalPool,
             amountBn,
           );
           await approveTx.wait();

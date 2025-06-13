@@ -55,6 +55,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     }
     entry.tvl += tvlNative
     entry.pools.push({
+      deployment: pool.deployment,
       token: pool.protocolTokenToCover,
       tokenName: getTokenName(pool.protocolTokenToCover),
       premium,
@@ -312,6 +313,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
           capacity={selectedPool.pool.capacity}
           poolId={selectedPool.market.id}
           yieldChoice={1}
+          deployment={selectedPool.pool.deployment}
         />
       )}
     </div>
