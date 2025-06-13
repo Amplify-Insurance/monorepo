@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   try {
     const { policyId, deployment: depName } = await req.json();
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const rm = getRiskManagerWriter(dep.riskManager);
+    const rm = getRiskManagerWriter(dep.riskManager, dep.name);
     const tx = await rm.settlePremium(policyId);
     await tx.wait();
     return NextResponse.json({ txHash: tx.hash });

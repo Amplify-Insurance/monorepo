@@ -15,7 +15,7 @@ export async function GET(
   }
 
   for (const dep of deployments) {
-    const riskManager = getRiskManager(dep.riskManager);
+    const riskManager = getRiskManager(dep.riskManager, dep.name);
     try {
       const poolInfo = await riskManager.getPoolInfo(idNum);
       return NextResponse.json({ id: idNum, deployment: dep.name, poolInfo });
