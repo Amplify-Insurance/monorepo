@@ -6,6 +6,14 @@ import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { ethers } from "ethers"
 import { getStakingWithSigner } from "../../lib/staking"
 import ProposalsTable from "../components/ProposalsTable"
+import { HelpCircle } from "lucide-react"
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "../../components/ui/sheet"
 
 export default function StakingPage() {
   const { isConnected } = useAccount()
@@ -13,6 +21,8 @@ export default function StakingPage() {
   const [bondAmount, setBondAmount] = useState("")
   const [bondPoolId, setBondPoolId] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
+  const [bondInfoOpen, setBondInfoOpen] = useState(false)
 
   const handleStake = async () => {
     if (!stakeAmount) return
@@ -64,7 +74,22 @@ export default function StakingPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-          <h2 className="text-xl font-semibold">Stake Voting Token</h2>
+          <div className="flex items-center">
+            <h2 className="text-xl font-semibold">Stake Voting Token</h2>
+            <Sheet open={stakeInfoOpen} onOpenChange={setStakeInfoOpen}>
+              <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
+                <HelpCircle className="w-4 h-4" />
+              </SheetTrigger>
+              <SheetContent side="right">
+                <SheetHeader>
+                  <SheetTitle>Stake Voting Token</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 text-sm">
+                  Staking your voting tokens grants you voting power in protocol governance. The more you stake, the more influence you have over proposals.
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
           <input
             type="text"
             placeholder="Amount"
@@ -82,7 +107,22 @@ export default function StakingPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-          <h2 className="text-xl font-semibold">Deposit Bond</h2>
+          <div className="flex items-center">
+            <h2 className="text-xl font-semibold">Deposit Bond</h2>
+            <Sheet open={bondInfoOpen} onOpenChange={setBondInfoOpen}>
+              <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
+                <HelpCircle className="w-4 h-4" />
+              </SheetTrigger>
+              <SheetContent side="right">
+                <SheetHeader>
+                  <SheetTitle>Deposit Bond</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 text-sm">
+                  Depositing a bond locks tokens as collateral while you participate in governance. Bonds help ensure honest behaviour and are returned after your duties end.
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
           <input
             type="number"
             placeholder="Pool ID"
