@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import CurrencyToggle from "../components/CurrencyToggle"
 import ActiveCoverages from "../components/ActiveCoverages"
@@ -89,7 +90,15 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-          <h2 className="text-xl font-semibold mb-4">My Cat Pool Deposits</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">My Cat Pool Deposits</h2>
+            <Link
+              href="/catpool"
+              className="py-1 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md transition-colors"
+            >
+              Manage
+            </Link>
+          </div>
           <CatPoolDeposits displayCurrency={displayCurrency} />
           {rewards.length > 0 && (
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
