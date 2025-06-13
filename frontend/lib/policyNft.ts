@@ -1,41 +1,25 @@
-import { ethers } from 'ethers';
-import PolicyNFT from '../abi/PolicyNFT.json';
+import { ethers } from 'ethers'
+import PolicyNFT from '../abi/PolicyNFT.json'
+import { getProvider } from './provider'
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL ??
-  process.env.RPC_URL ??
-  'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe';
+const DEFAULT_ADDRESS =
+  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS ?? process.env.POLICY_NFT_ADDRESS
 
-export const provider = new ethers.providers.StaticJsonRpcProvider(
-  RPC_URL,
-  {
-    name: 'base',
-    chainId: 8453,
-  },
-);
-
-const rpc = process.env.NEXT_PUBLIC_RPC_URL;
-console.log('RPC URL:', rpc);
-
-
-const READ_ADDRESS =
-  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS ??
-  process.env.POLICY_NFT_ADDRESS;
-
-if (!READ_ADDRESS) {
-  console.error('❌  POLICY_NFT_ADDRESS env var is missing');
-  throw new Error('POLICY_NFT_ADDRESS not set');
+export function getPolicyNft(
+  address: string = DEFAULT_ADDRESS as string,
+  provider = getProvider(),
+) {
+  return new ethers.Contract(address, PolicyNFT, provider)
 }
 
-export const policyNft = new ethers.Contract(
-  READ_ADDRESS as string,
-  PolicyNFT,
-  provider,
-);
+export const policyNft = getPolicyNft()
 
-export function getPolicyNftWriter() {
+export function getPolicyNftWriter(
+  address: string = DEFAULT_ADDRESS as string,
+  provider = getProvider(),
+) {
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PRIVATE_KEY not set');
   const signer = new ethers.Wallet(pk, provider);
-  return new ethers.Contract(process.env.POLICY_NFT_ADDRESS as string, PolicyNFT, signer);
+  return new ethers.Contract(address, PolicyNFT, signer);
 }

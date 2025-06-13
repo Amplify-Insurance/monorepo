@@ -1,12 +1,9 @@
 import { ethers } from 'ethers'
 import ERC20 from '../abi/ERC20.json'
-import { provider } from './provider'
-
-const rpc = process.env.NEXT_PUBLIC_RPC_URL;
-console.log('RPC URL:', rpc);
+import { getProvider } from './provider'
 
 
-export function getERC20(address: string) {
+export function getERC20(address: string, provider = getProvider()) {
   return new ethers.Contract(address, ERC20, provider)
 }
 
@@ -18,27 +15,30 @@ export async function getERC20WithSigner(address: string) {
   return new ethers.Contract(address, ERC20, signer)
 }
 
-export async function getTokenSymbol(address: string) {
+export async function getTokenSymbol(address: string, provider = getProvider()) {
   try {
-    const c = getERC20(address)
+    const c = getERC20(address, provider)
     return await c.symbol()
   } catch {
     return ''
   }
 }
 
-export async function getTokenName(address: string) {
+export async function getTokenName(address: string, provider = getProvider()) {
   try {
-    const c = getERC20(address)
+    const c = getERC20(address, provider)
     return await c.name()
   } catch {
     return ''
   }
 }
 
-export async function getTokenDecimals(address: string) {
+export async function getTokenDecimals(
+  address: string,
+  provider = getProvider(),
+) {
   try {
-    const c = getERC20(address)
+    const c = getERC20(address, provider)
     return await c.decimals()
   } catch {
     return 18

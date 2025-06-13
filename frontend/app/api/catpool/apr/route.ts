@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { catPool, provider } from '../../../../lib/catPool';
+import { catPool } from '../../../../lib/catPool';
+import { getProvider } from '../../../../lib/provider';
 import { ethers } from 'ethers';
 
 const APR_ABI = ['function currentApr() view returns (uint256)'];
@@ -9,6 +10,7 @@ export async function GET() {
     const adapterAddr = await catPool.adapter();
     let apr = '0';
     if (adapterAddr !== ethers.constants.AddressZero) {
+      const provider = getProvider();
       const contract = new ethers.Contract(adapterAddr, APR_ABI, provider);
       try {
         const res = await contract.currentApr();

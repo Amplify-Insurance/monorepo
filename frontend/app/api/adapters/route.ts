@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { capitalPool } from '../../../lib/capitalPool';
-import { provider } from '../../../lib/provider';
+import { getProvider } from '../../../lib/provider';
 import { ethers } from 'ethers';
 
 const ADAPTER_ABI = [
@@ -11,6 +11,7 @@ const ADAPTER_ABI = [
 export async function GET() {
   try {
     const adapters: { address: string; apr: string; asset: string }[] = [];
+    const provider = getProvider();
     for (let i = 0; i < 20; i++) {
       try {
         const addr = await (capitalPool as any).activeYieldAdapterAddresses(i);
