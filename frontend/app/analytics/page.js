@@ -172,69 +172,46 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
-      {/* Claims Statistics */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Claims Paid</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Total Claims */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-              Claims paid
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-              {stats.total.toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Total
-            </div>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
+          <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+            {stats.total.toLocaleString()}
           </div>
-
+          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total</div>
         </div>
-      </div>
-
-      {/* Coverage Statistics */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Active Cover</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active cover</div>
-            <div className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
-              {activeCover.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active cover</div>
+          <div className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
+            {activeCover.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Premiums collected</div>
-            <div className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
-              {totalPremiums.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Premiums collected</div>
+          <div className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
+            {totalPremiums.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claim fees collected</div>
-            <div className="text-2xl sm:text-3xl font-bold text-pink-600 dark:text-pink-400">
-              {totalClaimFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claim fees collected</div>
+          <div className="text-2xl sm:text-3xl font-bold text-pink-600 dark:text-pink-400">
+            {totalClaimFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Underwriters</div>
+          <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+            {underwriterCount.toLocaleString()}
           </div>
         </div>
-      </div>
-
-      {/* User Counts */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Users</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">User Count (Underwriters)</div>
-            <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-              {underwriterCount.toLocaleString()}
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">User Count (Policy Holders)</div>
-            <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-              {policyHolderCount.toLocaleString()}
-            </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Policy holders</div>
+          <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+            {policyHolderCount.toLocaleString()}
           </div>
         </div>
       </div>
