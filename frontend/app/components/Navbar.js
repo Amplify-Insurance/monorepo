@@ -27,6 +27,7 @@ export default function Navbar() {
   const navigation = [
     { name: "Markets", href: "/markets" },
     { name: "Dashboard", href: "/dashboard" },
+    { name: "Staking", href: "/staking" },
   ]
 
   return (

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { BarChart2, Shield, Activity, Settings, FileText, AlertTriangle, Coins } from "lucide-react"
+import { BarChart2, Shield, Activity, FileText, AlertTriangle, Coins } from "lucide-react"
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -14,7 +14,7 @@ export default function Sidebar() {
     { name: "My Coverage", href: "/dashboard", icon: Shield },
     { name: "Make a Claim", href: "/claims", icon: AlertTriangle },
     { name: "Analytics", href: "/analytics", icon: Activity },
-    { name: "Settings", href: "/settings", icon: Settings },
+    { name: "Staking", href: "/staking", icon: Coins },
   ]
 
   const socialLinks = [
