@@ -4,11 +4,19 @@ import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { ethers } from "ethers"
+import { HelpCircle } from "lucide-react"
 import CatPoolModal from "../components/CatPoolModal"
 import CatPoolDeposits from "../components/CatPoolDeposits"
 import CurrencyToggle from "../components/CurrencyToggle"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "../../components/ui/sheet"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 
 export default function CatPoolPage() {
@@ -17,6 +25,7 @@ export default function CatPoolPage() {
   const [depositOpen, setDepositOpen] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [infoOpen, setInfoOpen] = useState(false)
 
   const adapters = useYieldAdapters()
   const [selectedAdapter, setSelectedAdapter] = useState(null)
@@ -43,7 +52,22 @@ export default function CatPoolPage() {
     <div className="container mx-auto max-w-7xl">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Cat Insurance Pool</h1>
+          <div className="flex items-center">
+            <h1 className="text-3xl font-bold">Cat Insurance Pool</h1>
+            <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
+              <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
+                <HelpCircle className="w-4 h-4" />
+              </SheetTrigger>
+              <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
+                <SheetHeader>
+                  <SheetTitle>Catastrophe Insurance</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 text-sm">
+                  Catastrophe insurance acts as a reserve for extreme losses. Depositors provide USDC to earn a share of underwriting premiums. If a severe event wipes out a pool, these funds reimburse affected policyholders.
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
           <p className="text-gray-600 dark:text-gray-300 mt-1">Deposit USDC and earn underwriting yield</p>
         </div>
         <CurrencyToggle displayCurrency={displayCurrency} setDisplayCurrency={setDisplayCurrency} />
