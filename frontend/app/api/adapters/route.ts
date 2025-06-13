@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { capitalPool } from '../../../lib/capitalPool';
+import { getCapitalPool } from '../../../lib/capitalPool';
 import { getProvider } from '../../../lib/provider';
 import { ethers } from 'ethers';
 
@@ -12,9 +12,10 @@ export async function GET() {
   try {
     const adapters: { address: string; apr: string; asset: string }[] = [];
     const provider = getProvider();
+    const cp = getCapitalPool(undefined, provider);
     for (let i = 0; i < 20; i++) {
       try {
-        const addr = await (capitalPool as any).activeYieldAdapterAddresses(i);
+        const addr = await (cp as any).activeYieldAdapterAddresses(i);
         const contract = new ethers.Contract(addr, ADAPTER_ABI, provider);
         let apr = '0';
         let asset = ethers.constants.AddressZero;
