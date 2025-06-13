@@ -4,8 +4,13 @@ This directory contains subgraph definitions for indexing the insurance
 protocol contracts using [The Graph](https://thegraph.com/).
 
 The `insurance` subgraph indexes events emitted by `RiskManager`,
-`CapitalPool`, `CatInsurancePool` and `PolicyNFT`. Update the contract addresses in
-`subgraph.yaml` before deployment.
+`CapitalPool`, `CatInsurancePool` and `PolicyNFT`.  Each data source now has a
+`deployment` context so multiple deployments can be indexed by duplicating the
+entries in `subgraph.yaml` with different addresses and `deployment` names.
+Update the placeholder contract addresses before deployment.
+
+Entities include a `deployment` field allowing queries to filter by the
+originating deployment.
 
 It stores a minimal set of entities for demonstration purposes, including a
 `ContractOwner` record that tracks the current owner address of each contract
