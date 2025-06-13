@@ -28,16 +28,67 @@ async function fetchEvents(eventName: string) {
   return items;
 }
 
+async function fetchClaims() {
+  if (!SUBGRAPH_URL) throw new Error('SUBGRAPH_URL not configured');
+  const pageSize = 1000;
+  let skip = 0;
+  const items: any[] = [];
+  while (true) {
+    const query = `{
+      claims(first: ${pageSize}, skip: ${skip}, orderBy: timestamp, orderDirection: asc) {
+        policyId
+        coverage
+        netPayoutToClaimant
+        timestamp
+      }
+    }`;
+    const res = await fetch(SUBGRAPH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    const json = await res.json();
+    const batch = json?.data?.claims || [];
+    items.push(...batch);
+    if (batch.length < pageSize) break;
+    skip += pageSize;
+  }
+  return items;
+}
+
+async function fetchUnderwriters() {
+  if (!SUBGRAPH_URL) throw new Error('SUBGRAPH_URL not configured');
+  const pageSize = 1000;
+  let skip = 0;
+  const items: any[] = [];
+  while (true) {
+    const query = `{
+      underwriters(first: ${pageSize}, skip: ${skip}) { id }
+    }`;
+    const res = await fetch(SUBGRAPH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    const json = await res.json();
+    const batch = json?.data?.underwriters || [];
+    items.push(...batch);
+    if (batch.length < pageSize) break;
+    skip += pageSize;
+  }
+  return items;
+}
+
 export async function GET() {
   try {
     if (!SUBGRAPH_URL) throw new Error('SUBGRAPH_URL not configured');
 
-    const [createdEv, lapsedEv, claimEv, premiumEv, depositEv] = await Promise.all([
+    const [createdEv, lapsedEv, claims, premiumEv, underwriters] = await Promise.all([
       fetchEvents('PolicyCreated'),
       fetchEvents('PolicyLapsed'),
-      fetchEvents('ClaimProcessed'),
+      fetchClaims(),
       fetchEvents('PremiumPaid'),
-      fetchEvents('Deposit'),
+      fetchUnderwriters(),
     ]);
 
     type E = { timestamp: number; type: string; policyId: number; coverage?: bigint };
@@ -59,9 +110,8 @@ export async function GET() {
       const [policyIdStr] = ev.data.split(',');
       events.push({ timestamp: Number(ev.timestamp), type: 'lapsed', policyId: Number(policyIdStr) });
     }
-    for (const ev of claimEv) {
-      const [policyIdStr, , , netPayoutStr] = ev.data.split(',');
-      events.push({ timestamp: Number(ev.timestamp), type: 'claim', policyId: Number(policyIdStr), coverage: undefined, payout: BigInt(netPayoutStr) });
+    for (const c of claims) {
+      events.push({ timestamp: Number(c.timestamp), type: 'claim', policyId: Number(c.policyId), coverage: undefined, payout: BigInt(c.netPayoutToClaimant) });
     }
     let totalPremiums = 0n;
     for (const ev of premiumEv) {
@@ -69,9 +119,8 @@ export async function GET() {
       totalPremiums += BigInt(amountPaidStr);
     }
 
-    for (const ev of depositEv) {
-      const [user] = ev.data.split(',');
-      underwriterSet.add(user.toLowerCase());
+    for (const u of underwriters) {
+      underwriterSet.add((u.id as string).toLowerCase());
     }
 
     events.sort((a, b) => a.timestamp - b.timestamp);
