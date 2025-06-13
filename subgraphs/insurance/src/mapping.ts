@@ -1,5 +1,5 @@
 import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts";
-import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot } from "../generated/schema";
+import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim } from "../generated/schema";
 import {
   PoolAdded,
   IncidentReported,
@@ -41,7 +41,8 @@ import {
   PolicyPremiumAccountUpdated,
   Transfer,
   RiskManagerAddressSet,
-  OwnershipTransferred as PolicyNFTOwnershipTransferred
+  OwnershipTransferred as PolicyNFTOwnershipTransferred,
+  PolicyNFT
 } from "../generated/PolicyNFT/PolicyNFT";
 import {
   FundsWithdrawn,
@@ -152,6 +153,42 @@ export function handleClaimProcessed(event: ClaimProcessed): void {
   saveGeneric(event, "ClaimProcessed");
   let rm = RiskManager.bind(event.address);
   snapshotPool(rm, event, event.params.poolId);
+
+  let coverage = BigInt.zero();
+  let policyAddr = rm.try_policyNFT();
+  if (!policyAddr.reverted) {
+    let policyNft = PolicyNFT.bind(policyAddr.value);
+    let polRes = policyNft.try_getPolicy(event.params.policyId);
+    if (!polRes.reverted) {
+      coverage = polRes.value.coverage;
+    }
+  }
+
+  let scale = BigInt.zero();
+  let infoRes = rm.try_getPoolInfo(event.params.poolId);
+  if (!infoRes.reverted) {
+    scale = infoRes.value.scaleToProtocolToken;
+  }
+
+  let protocolTokenAmountReceived = coverage.times(scale);
+  let net = event.params.netPayoutToClaimant;
+  let claimFee = BigInt.zero();
+  if (coverage > net) {
+    claimFee = coverage.minus(net);
+  }
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let entity = new Claim(id);
+  entity.policyId = event.params.policyId;
+  entity.poolId = event.params.poolId;
+  entity.claimant = event.params.claimant;
+  entity.coverage = coverage;
+  entity.netPayoutToClaimant = net;
+  entity.claimFee = claimFee;
+  entity.protocolTokenAmountReceived = protocolTokenAmountReceived;
+  entity.timestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
 }
 export function handleLossesApplied(event: LossesApplied): void { saveGeneric(event, "LossesApplied"); }
 export function handleCapitalAllocated(event: CapitalAllocated): void {
