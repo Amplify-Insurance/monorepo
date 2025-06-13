@@ -9,14 +9,11 @@ import CatPoolDeposits from "../components/CatPoolDeposits"
 import CurrencyToggle from "../components/CurrencyToggle"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
-import { getCatPoolWithSigner } from "../../lib/catPool"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 
 export default function CatPoolPage() {
   const { isConnected } = useAccount()
   const [displayCurrency, setDisplayCurrency] = useState("native")
-  const [claimTokens, setClaimTokens] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -32,21 +29,6 @@ export default function CatPoolPage() {
 
   const { stats } = useCatPoolStats()
 
-  const handleClaim = async () => {
-    if (!claimTokens) return
-    setIsSubmitting(true)
-    try {
-      const cp = await getCatPoolWithSigner()
-      const tokens = claimTokens.split(',').map((t) => t.trim()).filter(Boolean)
-      const tx = await cp.claimProtocolAssetRewards(tokens)
-      await tx.wait()
-      setClaimTokens("")
-    } catch (err) {
-      console.error("Claim failed", err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   if (!isConnected) {
     return (
@@ -133,23 +115,6 @@ export default function CatPoolPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Claim Protocol Asset Rewards</h2>
-        <input
-          type="text"
-          placeholder="Token addresses (comma separated)"
-          value={claimTokens}
-          onChange={(e) => setClaimTokens(e.target.value)}
-          className="w-full p-2 border rounded mb-3 text-gray-900 dark:text-gray-100 dark:bg-gray-700"
-        />
-        <button
-          onClick={handleClaim}
-          disabled={isSubmitting || !claimTokens}
-          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
-        >
-          Claim
-        </button>
-      </div>
       <CatPoolModal
         isOpen={depositOpen}
         onClose={() => setDepositOpen(false)}
