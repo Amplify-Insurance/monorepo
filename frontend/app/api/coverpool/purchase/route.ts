@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getRiskManagerWriter } from '../../../../lib/riskManager';
+import deployments from '../../../config/deployments';
 
 export async function POST(req: Request) {
   try {
-    const { poolId, coverageAmount, initialPremiumDeposit } = await req.json();
-    const rm = getRiskManagerWriter();
+    const { poolId, coverageAmount, initialPremiumDeposit, deployment: depName } = await req.json();
+    const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
+    const rm = getRiskManagerWriter(dep.riskManager);
     const tx = await rm.purchaseCover(poolId, coverageAmount, initialPremiumDeposit);
     await tx.wait();
     return NextResponse.json({ txHash: tx.hash });

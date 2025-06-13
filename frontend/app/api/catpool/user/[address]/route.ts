@@ -1,17 +1,24 @@
 import { NextResponse } from 'next/server';
-import { catPool, provider } from '../../../../../lib/catPool';
+import { provider } from '../../../../../lib/provider';
+import CatPoolAbi from '../../../../../abi/CatInsurancePool.json';
 import ERC20 from '../../../../../abi/ERC20.json';
 import { ethers } from 'ethers';
+import deployments from '../../../../config/deployments';
 
-export async function GET(_req: Request, { params }: { params: { address: string } }) {
+export async function GET(req: Request, { params }: { params: { address: string } }) {
   try {
+    const url = new URL(req.url);
+    const depName = url.searchParams.get('deployment');
+    const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
+    const cp = new ethers.Contract(dep.catPool, CatPoolAbi, provider);
+
     const addr = params.address.toLowerCase();
-    const catShareAddr = await catPool.catShareToken();
+    const catShareAddr = await cp.catShareToken();
     const token = new ethers.Contract(catShareAddr, ERC20, provider);
     const [balance, totalSupply, liquid] = await Promise.all([
       token.balanceOf(addr),
       token.totalSupply(),
-      catPool.liquidUsdc(),
+      cp.liquidUsdc(),
     ]);
     let value = 0n;
     if (totalSupply > 0n) {

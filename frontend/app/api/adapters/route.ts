@@ -1,19 +1,26 @@
 import { NextResponse } from 'next/server';
-import { capitalPool } from '../../../lib/capitalPool';
+import { getCapitalPool } from '../../../lib/capitalPool';
 import { provider } from '../../../lib/provider';
 import { ethers } from 'ethers';
+import deployments from '../../config/deployments';
 
 const ADAPTER_ABI = [
   'function currentApr() view returns (uint256)',
   'function asset() view returns (address)',
 ];
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const depName = url.searchParams.get('deployment');
+    const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
+
+    const cp = getCapitalPool(dep.capitalPool);
+
     const adapters: { address: string; apr: string; asset: string }[] = [];
     for (let i = 0; i < 20; i++) {
       try {
-        const addr = await (capitalPool as any).activeYieldAdapterAddresses(i);
+        const addr = await (cp as any).activeYieldAdapterAddresses(i);
         const contract = new ethers.Contract(addr, ADAPTER_ABI, provider);
         let apr = '0';
         let asset = ethers.constants.AddressZero;

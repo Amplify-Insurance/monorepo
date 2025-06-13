@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server'
-import { riskManager } from '../../../lib/riskManager'
-import { capitalPool } from '../../../lib/capitalPool'
+import { getRiskManager } from '../../../lib/riskManager'
+import { getCapitalPool } from '../../../lib/capitalPool'
+import deployments from '../../config/deployments'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url)
+    const depName = url.searchParams.get('deployment')
+    const dep = deployments.find((d) => d.name === depName) ?? deployments[0]
+    const rm = getRiskManager(dep.riskManager)
+    const cp = getCapitalPool(dep.capitalPool)
+
     const [cooldown, claimFee, notice] = await Promise.all([
-      (riskManager as any).COVER_COOLDOWN_PERIOD(),
-      (riskManager as any).CLAIM_FEE_BPS(),
-      (capitalPool as any).UNDERWRITER_NOTICE_PERIOD(),
+      (rm as any).COVER_COOLDOWN_PERIOD(),
+      (rm as any).CLAIM_FEE_BPS(),
+      (cp as any).UNDERWRITER_NOTICE_PERIOD(),
     ])
     return NextResponse.json({
       coverCooldownPeriod: cooldown.toString(),
