@@ -1,12 +1,12 @@
 import { ethers } from 'ethers'
 import ERC20 from '../abi/ERC20.json'
-import { provider } from './provider'
+import { getProvider } from './provider'
 
 const rpc = process.env.NEXT_PUBLIC_RPC_URL;
 console.log('RPC URL:', rpc);
 
 
-export function getERC20(address: string) {
+export function getERC20(address: string, provider = getProvider()) {
   return new ethers.Contract(address, ERC20, provider)
 }
 

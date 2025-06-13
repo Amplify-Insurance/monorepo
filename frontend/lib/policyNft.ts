@@ -1,18 +1,6 @@
 import { ethers } from 'ethers';
 import PolicyNFT from '../abi/PolicyNFT.json';
-
-const RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL ??
-  process.env.RPC_URL ??
-  'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe';
-
-export const provider = new ethers.providers.StaticJsonRpcProvider(
-  RPC_URL,
-  {
-    name: 'base',
-    chainId: 8453,
-  },
-);
+import { getProvider } from './provider';
 
 const rpc = process.env.NEXT_PUBLIC_RPC_URL;
 console.log('RPC URL:', rpc);
@@ -30,10 +18,10 @@ if (!READ_ADDRESS) {
 export const policyNft = new ethers.Contract(
   READ_ADDRESS as string,
   PolicyNFT,
-  provider,
+  getProvider(),
 );
 
-export function getPolicyNftWriter() {
+export function getPolicyNftWriter(provider = getProvider()) {
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PRIVATE_KEY not set');
   const signer = new ethers.Wallet(pk, provider);

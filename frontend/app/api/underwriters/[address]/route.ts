@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getCapitalPool } from '@/lib/capitalPool'
 import { getRiskManager } from '@/lib/riskManager'
+import { getProvider } from '@/lib/provider'
 import deployments from '../../../config/deployments'
 
 export async function GET(
@@ -15,8 +16,9 @@ export async function GET(
     const details: any[] = []
 
     for (const dep of deployments) {
-      const cp = getCapitalPool(dep.capitalPool)
-      const rm = getRiskManager(dep.riskManager)
+      const provider = getProvider(dep.name)
+      const cp = getCapitalPool(dep.capitalPool, provider)
+      const rm = getRiskManager(dep.riskManager, provider)
 
       try {
         const account = await cp.getUnderwriterAccount(addr)

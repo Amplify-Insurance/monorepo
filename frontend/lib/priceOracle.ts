@@ -1,10 +1,13 @@
 import { ethers } from 'ethers'
 import PriceOracle from '../abi/PriceOracle.json'
-import { provider } from './provider'
+import { getProvider } from './provider'
 
 const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_PRICE_ORACLE_ADDRESS as string;
 
-export function getPriceOracle(address: string = DEFAULT_ADDRESS) {
+export function getPriceOracle(
+  address: string = DEFAULT_ADDRESS,
+  provider = getProvider(),
+) {
   return new ethers.Contract(address, PriceOracle, provider);
 }
 

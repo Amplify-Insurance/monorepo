@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getRiskManager } from '../../../lib/riskManager'
 import { getCapitalPool } from '../../../lib/capitalPool'
+import { getProvider } from '../../../lib/provider'
 import deployments from '../../config/deployments'
 
 export async function GET(req: Request) {
@@ -8,8 +9,9 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const depName = url.searchParams.get('deployment')
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0]
-    const rm = getRiskManager(dep.riskManager)
-    const cp = getCapitalPool(dep.capitalPool)
+    const provider = getProvider(dep.name)
+    const rm = getRiskManager(dep.riskManager, provider)
+    const cp = getCapitalPool(dep.capitalPool, provider)
 
     const [cooldown, claimFee, notice] = await Promise.all([
       (rm as any).COVER_COOLDOWN_PERIOD(),

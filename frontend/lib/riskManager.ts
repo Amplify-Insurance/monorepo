@@ -1,7 +1,7 @@
 // lib/riskManager.ts
 import { ethers } from 'ethers';
 import RiskManager from '../abi/RiskManager.json';
-import { provider } from './provider';
+import { getProvider } from './provider';
 
 /* ───────────────────────────────
    Validate & create read-only contract
@@ -14,7 +14,10 @@ if (!DEFAULT_ADDRESS) {
   throw new Error('NEXT_PUBLIC_RISK_MANAGER_ADDRESS not set');
 }
 
-export function getRiskManager(address: string = DEFAULT_ADDRESS) {
+export function getRiskManager(
+  address: string = DEFAULT_ADDRESS,
+  provider = getProvider(),
+) {
   return new ethers.Contract(address, RiskManager, provider);
 }
 
@@ -51,7 +54,10 @@ export async function getRiskManagerWithSigner(address: string = DEFAULT_ADDRESS
    Server/CI writer (private-key signer)
 ────────────────────────────────── */
 
-export function getRiskManagerWriter(address: string = DEFAULT_ADDRESS) {
+export function getRiskManagerWriter(
+  address: string = DEFAULT_ADDRESS,
+  provider = getProvider(),
+) {
   try {
     const pk = process.env.PRIVATE_KEY;
     if (!pk) {

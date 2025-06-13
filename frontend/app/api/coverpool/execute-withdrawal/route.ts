@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCapitalPoolWriter } from '../../../../lib/capitalPool';
+import { getProvider } from '../../../../lib/provider';
 import deployments from '../../../config/deployments';
 
 export async function POST(req: Request) {
@@ -7,7 +8,8 @@ export async function POST(req: Request) {
     const url = new URL(req.url);
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const cp = getCapitalPoolWriter(dep.capitalPool);
+    const provider = getProvider(dep.name);
+    const cp = getCapitalPoolWriter(dep.capitalPool, provider);
     const tx = await cp.executeWithdrawal();
     await tx.wait();
     return NextResponse.json({ txHash: tx.hash });

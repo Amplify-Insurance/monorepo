@@ -1,6 +1,6 @@
 import { ethers } from 'ethers'
 import Staking from '../abi/Staking.json'
-import { provider } from './provider'
+import { getProvider } from './provider'
 
 // Validate presence of the staking contract address
 const ADDRESS = process.env.NEXT_PUBLIC_STAKING_ADDRESS as string
@@ -10,7 +10,7 @@ if (!ADDRESS) {
   throw new Error('NEXT_PUBLIC_STAKING_ADDRESS not set')
 }
 
-export const staking = new ethers.Contract(ADDRESS, Staking, provider)
+export const staking = new ethers.Contract(ADDRESS, Staking, getProvider())
 
 export async function getStakingWithSigner() {
   if (typeof window === 'undefined' || !window.ethereum)
