@@ -2,15 +2,33 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import useProposals from '../../hooks/useProposals'
+import { getCommitteeWithSigner } from '../../lib/committee'
+import { useAccount } from 'wagmi'
 
 export default function ProposalsTable() {
   const { proposals, loading } = useProposals()
   const [expanded, setExpanded] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { isConnected } = useAccount()
 
   const toggle = (id) => {
     setExpanded((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
+  }
+
+  const handleVote = async (id, vote) => {
+    if (!isConnected) return
+    setIsSubmitting(true)
+    try {
+      const committee = await getCommitteeWithSigner()
+      const tx = await committee.vote(id, vote)
+      await tx.wait()
+    } catch (err) {
+      console.error('Vote failed', err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (loading) return <p>Loading proposals...</p>
@@ -78,6 +96,31 @@ export default function ProposalsTable() {
                           </div>
                           {p.executed && (
                             <div className="mt-3 text-sm">Result: {p.passed ? 'Passed' : 'Failed'}</div>
+                          )}
+                          {!p.executed && p.votingDeadline * 1000 > Date.now() && (
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                onClick={() => handleVote(p.id, 1)}
+                                disabled={isSubmitting}
+                                className="py-1 px-3 text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                              >
+                                Vote For
+                              </button>
+                              <button
+                                onClick={() => handleVote(p.id, 0)}
+                                disabled={isSubmitting}
+                                className="py-1 px-3 text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
+                              >
+                                Vote Against
+                              </button>
+                              <button
+                                onClick={() => handleVote(p.id, 2)}
+                                disabled={isSubmitting}
+                                className="py-1 px-3 text-white bg-gray-600 rounded hover:bg-gray-700 disabled:opacity-50"
+                              >
+                                Abstain
+                              </button>
+                            </div>
                           )}
                         </div>
                       </td>
