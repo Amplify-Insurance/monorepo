@@ -3,7 +3,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // --- Your other settings ---
-  reactStrictMode: true,
+  // Disable React strict mode to prevent double rendering during development,
+  // which caused data flicker on the Dashboard page.
+  reactStrictMode: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
