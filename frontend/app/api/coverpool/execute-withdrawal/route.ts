@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getCapitalPoolWriter } from '../../../../lib/capitalPool';
+import deployments from '../../../config/deployments';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const cp = getCapitalPoolWriter();
+    const url = new URL(req.url);
+    const depName = url.searchParams.get('deployment');
+    const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
+    const cp = getCapitalPoolWriter(dep.capitalPool);
     const tx = await cp.executeWithdrawal();
     await tx.wait();
     return NextResponse.json({ txHash: tx.hash });
