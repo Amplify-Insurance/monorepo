@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, BarChart2, Shield, Activity, Settings, FileText, AlertTriangle } from "lucide-react"
+import { Menu, X, BarChart2, Shield, Activity, FileText, AlertTriangle, Coins } from "lucide-react"
 
 export default function MobileNav() {
   const [isOpen, setIsOpen] = useState(false)
@@ -31,7 +31,7 @@ export default function MobileNav() {
     { name: "My Coverage", href: "/dashboard", icon: Shield },
     { name: "Make a Claim", href: "/claims", icon: AlertTriangle },
     { name: "Analytics", href: "/analytics", icon: Activity },
-    { name: "Settings", href: "/settings", icon: Settings },
+    { name: "Staking", href: "/staking", icon: Coins },
     { name: "Documentation", href: "/docs", icon: FileText },
   ]
 
