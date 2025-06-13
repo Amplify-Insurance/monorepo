@@ -1,12 +1,16 @@
 "use client"
 import { useAccount } from "wagmi"
+import { useEffect } from "react"
 import { ethers } from "ethers"
 import { formatCurrency } from "../utils/formatting"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
-
-export default function CatPoolDeposits({ displayCurrency }) {
+export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { address } = useAccount()
-  const { info } = useCatPoolUserInfo(address)
+  const { info, refresh } = useCatPoolUserInfo(address)
+
+  useEffect(() => {
+    refresh()
+  }, [refreshTrigger])
 
   if (!info || info.balance === "0") {
     return <p className="text-gray-500">No deposits in the Cat Pool.</p>

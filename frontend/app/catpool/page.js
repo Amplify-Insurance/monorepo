@@ -19,6 +19,7 @@ export default function CatPoolPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const adapters = useYieldAdapters()
   const [selectedAdapter, setSelectedAdapter] = useState(null)
@@ -89,7 +90,7 @@ export default function CatPoolPage() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-sm text-gray-500 mb-1">My Deposits</h3>
-          <CatPoolDeposits displayCurrency={displayCurrency} />
+          <CatPoolDeposits displayCurrency={displayCurrency} refreshTrigger={refreshKey} />
         </div>
       </div>
 
@@ -156,8 +157,14 @@ export default function CatPoolPage() {
         token={selectedAdapter?.asset}
         apr={selectedAdapter?.apr ?? 0}
         assetSymbol={selectedAdapter?.assetSymbol || 'USDC'}
+        onActionComplete={() => setRefreshKey((k) => k + 1)}
       />
-      <CatPoolModal isOpen={withdrawOpen} onClose={() => setWithdrawOpen(false)} mode="withdraw" />
+      <CatPoolModal
+        isOpen={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        mode="withdraw"
+        onActionComplete={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   )
 }
