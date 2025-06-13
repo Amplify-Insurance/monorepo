@@ -1,0 +1,6 @@
+[
+  "function aggregate((address target, bytes callData)[] calls) view returns (uint256 blockNumber, bytes[] returnData)",
+  "function tryAggregate(bool requireSuccess, (address target, bytes callData)[] calls) view returns ((bool success, bytes returnData)[] results)",
+  "function getBlockNumber() view returns (uint256)",
+  "function getCurrentBlockTimestamp() view returns (uint256)"
+]
