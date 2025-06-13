@@ -1,6 +1,8 @@
 // app/api/pools/route.ts
 import { NextResponse } from 'next/server';
 import { riskManager } from '../../../../lib/riskManager';
+import { priceOracle } from '../../../../lib/priceOracle';
+import { ethers } from 'ethers';
 
 /**
  * Basis‑points denominator (10 000) expressed as bigint for fixed‑point math.
@@ -135,11 +137,20 @@ export async function GET() {
         const rate = calcPremiumRateBps(info);
         const uwYield = calcUnderwriterYieldBps(info, catPremiumBps);
 
+        let tokenPriceUsd = 0;
+        try {
+          const [p, dec] = await priceOracle.getLatestUsdPrice(
+            info.protocolTokenToCover,
+          );
+          tokenPriceUsd = parseFloat(ethers.utils.formatUnits(p, dec));
+        } catch {}
+
         pools.push({
           id: i,
           ...info,
           premiumRateBps: rate.toString(),
           underwriterYieldBps: uwYield.toString(),
+          tokenPriceUsd,
         });
       } catch {
         // skip pools that error out

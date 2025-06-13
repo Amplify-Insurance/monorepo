@@ -80,7 +80,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
         tvl: Number(
           ethers.utils.formatUnits(pool.totalCoverageSold, pool.protocolTokenDecimals)
         ),
-        price: 1,
+        price: pool.tokenPriceUsd ?? 0,
       })
       return acc
     }, {})
@@ -414,7 +414,13 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     <div className="flex justify-between items-center mt-1">
                       <span className="text-sm text-gray-500 dark:text-gray-400">TVL:</span>
                       <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {formatCurrency(pool.tvl, "USD", displayCurrency)}
+                        {formatCurrency(
+                          displayCurrency === 'usd'
+                            ? pool.tvl * pool.price
+                            : pool.tvl,
+                          'USD',
+                          displayCurrency,
+                        )}
                       </span>
                     </div>
                   </div>
