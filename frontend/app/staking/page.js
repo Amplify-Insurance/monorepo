@@ -80,12 +80,12 @@ export default function StakingPage() {
               <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
                 <HelpCircle className="w-4 h-4" />
               </SheetTrigger>
-              <SheetContent side="right">
+              <SheetContent side="right" className="w-2/3 sm:max-w-xs">
                 <SheetHeader>
                   <SheetTitle>Stake Voting Token</SheetTitle>
                 </SheetHeader>
                 <div className="mt-4 text-sm">
-                  Staking your voting tokens grants you voting power in protocol governance. The more you stake, the more influence you have over proposals.
+                  Calling <code>stake(amount)</code> on the staking contract locks your governance tokens and mints voting power used by the <code>Committee</code> contract. You can withdraw later by invoking <code>unstake(amount)</code>.
                 </div>
               </SheetContent>
             </Sheet>
@@ -113,12 +113,12 @@ export default function StakingPage() {
               <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
                 <HelpCircle className="w-4 h-4" />
               </SheetTrigger>
-              <SheetContent side="right">
+              <SheetContent side="right" className="w-2/3 sm:max-w-xs">
                 <SheetHeader>
                   <SheetTitle>Deposit Bond</SheetTitle>
                 </SheetHeader>
                 <div className="mt-4 text-sm">
-                  Depositing a bond locks tokens as collateral while you participate in governance. Bonds help ensure honest behaviour and are returned after your duties end.
+                  Depositing a bond triggers <code>depositBond(poolId, amount)</code>. The bond is tied to the selected risk pool and remains locked as collateral until the protocol releases it (for example through <code>freezePool</code>). Bonds encourage honest participation in governance.
                 </div>
               </SheetContent>
             </Sheet>
