@@ -12,8 +12,6 @@ export default function StakingPage() {
   const [stakeAmount, setStakeAmount] = useState("")
   const [bondAmount, setBondAmount] = useState("")
   const [bondPoolId, setBondPoolId] = useState("")
-  const [freezePoolId, setFreezePoolId] = useState("")
-  const [freeze, setFreeze] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleStake = async () => {
@@ -47,20 +45,6 @@ export default function StakingPage() {
     }
   }
 
-  const handleFreeze = async () => {
-    if (freezePoolId === "") return
-    setIsSubmitting(true)
-    try {
-      const staking = await getStakingWithSigner()
-      const tx = await staking.freezePool(freezePoolId, freeze)
-      await tx.wait()
-      setFreezePoolId("")
-    } catch (err) {
-      console.error("Freeze action failed", err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   if (!isConnected) {
     return (
@@ -75,7 +59,7 @@ export default function StakingPage() {
     <div className="container mx-auto max-w-7xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Governance</h1>
-        <p className="text-gray-600 dark:text-gray-300 mt-1">Stake tokens, deposit a bond and manage pool freeze status</p>
+        <p className="text-gray-600 dark:text-gray-300 mt-1">Stake tokens and deposit a bond to participate in governance</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -123,32 +107,6 @@ export default function StakingPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Freeze / Unfreeze Pool</h2>
-        <input
-          type="number"
-          placeholder="Pool ID"
-          value={freezePoolId}
-          onChange={(e) => setFreezePoolId(e.target.value)}
-          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:text-gray-100"
-        />
-        <label className="inline-flex items-center text-sm gap-2">
-          <input
-            type="checkbox"
-            checked={freeze}
-            onChange={() => setFreeze(!freeze)}
-            className="form-checkbox"
-          />
-          Freeze pool
-        </label>
-        <button
-          onClick={handleFreeze}
-          disabled={isSubmitting || freezePoolId === ""}
-          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
-        >
-          Submit
-        </button>
-      </div>
 
       <div className="mt-8">
         <ProposalsTable />
