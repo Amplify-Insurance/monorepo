@@ -1,5 +1,5 @@
 import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts";
-import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, PolicyCreatedEvent, PolicyLapsedEvent, PremiumPaidEvent } from "../generated/schema";
+import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, PolicyCreatedEvent, PolicyLapsedEvent, PremiumPaidEvent, GovernanceProposal, GovernanceVote } from "../generated/schema";
 import {
   PoolAdded,
   IncidentReported,
@@ -48,6 +48,7 @@ import {
   FundsWithdrawn,
   CapitalPoolAddressSet
 } from "../generated/AaveV3Adapter/YieldAdapter";
+import { ProposalCreated, Voted, ProposalExecuted } from "../generated/Committee/Committee";
 
 function saveGeneric(event: ethereum.Event, name: string): void {
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
@@ -320,4 +321,58 @@ export function handleCapitalPoolAddressSet(
   event: CapitalPoolAddressSet
 ): void {
   saveGeneric(event, "CapitalPoolAddressSet");
+}
+
+export function handleProposalCreated(event: ProposalCreated): void {
+  saveGeneric(event, "ProposalCreated");
+
+  let id = event.params.proposalId.toString();
+  let p = new GovernanceProposal(id);
+  p.proposer = event.params.proposer;
+  p.poolId = event.params.poolId;
+  p.pauseState = event.params.pauseState;
+  p.votingDeadline = event.params.votingDeadline;
+  p.executed = false;
+  p.passed = false;
+  p.forVotes = BigInt.fromI32(0);
+  p.againstVotes = BigInt.fromI32(0);
+  p.abstainVotes = BigInt.fromI32(0);
+  p.save();
+}
+
+export function handleVoted(event: Voted): void {
+  saveGeneric(event, "Voted");
+
+  let proposalId = event.params.proposalId.toString();
+  let voteId = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let v = new GovernanceVote(voteId);
+  v.proposal = proposalId;
+  v.voter = event.params.voter;
+  v.vote = event.params.vote;
+  v.weight = event.params.weight;
+  v.save();
+
+  let p = GovernanceProposal.load(proposalId);
+  if (p != null) {
+    if (event.params.vote == 1) {
+      p.forVotes = p.forVotes.plus(event.params.weight);
+    } else if (event.params.vote == 0) {
+      p.againstVotes = p.againstVotes.plus(event.params.weight);
+    } else {
+      p.abstainVotes = p.abstainVotes.plus(event.params.weight);
+    }
+    p.save();
+  }
+}
+
+export function handleProposalExecuted(event: ProposalExecuted): void {
+  saveGeneric(event, "ProposalExecuted");
+
+  let id = event.params.proposalId.toString();
+  let p = GovernanceProposal.load(id);
+  if (p != null) {
+    p.executed = true;
+    p.passed = event.params.passed;
+    p.save();
+  }
 }

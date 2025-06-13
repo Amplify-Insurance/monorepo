@@ -1,0 +1,94 @@
+"use client"
+import { useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import useProposals from '../../hooks/useProposals'
+
+export default function ProposalsTable() {
+  const { proposals, loading } = useProposals()
+  const [expanded, setExpanded] = useState([])
+
+  const toggle = (id) => {
+    setExpanded((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  if (loading) return <p>Loading proposals...</p>
+
+  return (
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
+      <div className="inline-block min-w-full align-middle">
+        <div className="overflow-hidden shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Proposal</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Deadline</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Status</th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {proposals.map((p) => (
+                <>
+                  <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">Pool {p.poolId} - {p.pauseState ? 'Pause' : 'Unpause'}</div>
+                      <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
+                        {p.executed ? (p.passed ? 'Passed' : 'Failed') : 'Active'}
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      <div className="text-sm text-gray-900 dark:text-white">{new Date(p.votingDeadline * 1000).toLocaleDateString()}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      <div className="text-sm text-gray-900 dark:text-white">{p.executed ? (p.passed ? 'Passed' : 'Failed') : 'Active'}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button onClick={() => toggle(p.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto">
+                        <span className="hidden sm:inline">{expanded.includes(p.id) ? 'Hide' : 'View'}</span>
+                        {expanded.includes(p.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
+                    </td>
+                  </tr>
+                  {expanded.includes(p.id) && (
+                    <tr>
+                      <td colSpan={4} className="px-3 sm:px-6 py-4">
+                        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4">
+                          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Votes</h4>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                              <thead>
+                                <tr>
+                                  <th className="px-2 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Voter</th>
+                                  <th className="px-2 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Vote</th>
+                                  <th className="px-2 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Weight</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {p.votes.map((v) => (
+                                  <tr key={v.id}>
+                                    <td className="px-2 py-1 font-mono text-xs break-all">{v.voter}</td>
+                                    <td className="px-2 py-1">{v.vote === 1 ? 'For' : v.vote === 0 ? 'Against' : 'Abstain'}</td>
+                                    <td className="px-2 py-1">{v.weight}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {p.executed && (
+                            <div className="mt-3 text-sm">Result: {p.passed ? 'Passed' : 'Failed'}</div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}

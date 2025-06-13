@@ -1,0 +1,34 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "proposalId", "type": "uint256"},
+      {"indexed": true, "internalType": "address", "name": "proposer", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "poolId", "type": "uint256"},
+      {"indexed": false, "internalType": "bool", "name": "pauseState", "type": "bool"},
+      {"indexed": false, "internalType": "uint256", "name": "votingDeadline", "type": "uint256"}
+    ],
+    "name": "ProposalCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "proposalId", "type": "uint256"},
+      {"indexed": true, "internalType": "address", "name": "voter", "type": "address"},
+      {"indexed": false, "internalType": "uint8", "name": "vote", "type": "uint8"},
+      {"indexed": false, "internalType": "uint256", "name": "weight", "type": "uint256"}
+    ],
+    "name": "Voted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "proposalId", "type": "uint256"},
+      {"indexed": false, "internalType": "bool", "name": "passed", "type": "bool"}
+    ],
+    "name": "ProposalExecuted",
+    "type": "event"
+  }
+]

@@ -5,6 +5,7 @@ import { useAccount } from "wagmi"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { ethers } from "ethers"
 import { getStakingWithSigner } from "../../lib/staking"
+import ProposalsTable from "../components/ProposalsTable"
 
 export default function StakingPage() {
   const { isConnected } = useAccount()
@@ -147,6 +148,10 @@ export default function StakingPage() {
         >
           Submit
         </button>
+      </div>
+
+      <div className="mt-8">
+        <ProposalsTable />
       </div>
     </div>
   )

@@ -120,6 +120,7 @@ export function createPremiumPaidEvent(
 }
 
 import { OwnershipTransferred as RMOwnershipTransferred } from '../generated/RiskManager/RiskManager'
+import { ProposalCreated, Voted, ProposalExecuted } from '../generated/Committee/Committee'
 
 export function createOwnershipTransferredEvent(
   previousOwner: Address,
@@ -131,5 +132,48 @@ export function createOwnershipTransferredEvent(
   event.parameters = new Array()
   event.parameters.push(new ethereum.EventParam('previousOwner', ethereum.Value.fromAddress(previousOwner)))
   event.parameters.push(new ethereum.EventParam('newOwner', ethereum.Value.fromAddress(newOwner)))
+  return event
+}
+
+export function createProposalCreatedEvent(
+  proposalId: BigInt,
+  proposer: Address,
+  poolId: BigInt,
+  pauseState: boolean,
+  deadline: BigInt,
+): ProposalCreated {
+  let event = changetype<ProposalCreated>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('proposalId', ethereum.Value.fromUnsignedBigInt(proposalId)))
+  event.parameters.push(new ethereum.EventParam('proposer', ethereum.Value.fromAddress(proposer)))
+  event.parameters.push(new ethereum.EventParam('poolId', ethereum.Value.fromUnsignedBigInt(poolId)))
+  event.parameters.push(new ethereum.EventParam('pauseState', ethereum.Value.fromBoolean(pauseState)))
+  event.parameters.push(new ethereum.EventParam('votingDeadline', ethereum.Value.fromUnsignedBigInt(deadline)))
+  return event
+}
+
+export function createVotedEvent(
+  proposalId: BigInt,
+  voter: Address,
+  vote: i32,
+  weight: BigInt,
+): Voted {
+  let event = changetype<Voted>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('proposalId', ethereum.Value.fromUnsignedBigInt(proposalId)))
+  event.parameters.push(new ethereum.EventParam('voter', ethereum.Value.fromAddress(voter)))
+  event.parameters.push(new ethereum.EventParam('vote', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(vote))))
+  event.parameters.push(new ethereum.EventParam('weight', ethereum.Value.fromUnsignedBigInt(weight)))
+  return event
+}
+
+export function createProposalExecutedEvent(
+  proposalId: BigInt,
+  passed: boolean,
+): ProposalExecuted {
+  let event = changetype<ProposalExecuted>(newMockEvent())
+  event.parameters = new Array()
+  event.parameters.push(new ethereum.EventParam('proposalId', ethereum.Value.fromUnsignedBigInt(proposalId)))
+  event.parameters.push(new ethereum.EventParam('passed', ethereum.Value.fromBoolean(passed)))
   return event
 }

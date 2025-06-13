@@ -84,3 +84,25 @@ type PremiumPaidEvent @entity {
   timestamp: BigInt!
   transactionHash: Bytes!
 }
+
+type GovernanceProposal @entity {
+  id: ID!
+  proposer: Bytes!
+  poolId: BigInt!
+  pauseState: Boolean!
+  votingDeadline: BigInt!
+  executed: Boolean!
+  passed: Boolean
+  forVotes: BigInt!
+  againstVotes: BigInt!
+  abstainVotes: BigInt!
+  votes: [GovernanceVote!] @derivedFrom(field: "proposal")
+}
+
+type GovernanceVote @entity {
+  id: ID!
+  proposal: GovernanceProposal!
+  voter: Bytes!
+  vote: Int!
+  weight: BigInt!
+}
