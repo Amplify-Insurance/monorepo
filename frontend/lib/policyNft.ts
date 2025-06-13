@@ -18,10 +18,19 @@ const rpc = process.env.NEXT_PUBLIC_RPC_URL;
 console.log('RPC URL:', rpc);
 
 
+const READ_ADDRESS =
+  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS ??
+  process.env.POLICY_NFT_ADDRESS;
+
+if (!READ_ADDRESS) {
+  console.error('❌  POLICY_NFT_ADDRESS env var is missing');
+  throw new Error('POLICY_NFT_ADDRESS not set');
+}
+
 export const policyNft = new ethers.Contract(
-  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS as string,
+  READ_ADDRESS as string,
   PolicyNFT,
-  provider
+  provider,
 );
 
 export function getPolicyNftWriter() {
