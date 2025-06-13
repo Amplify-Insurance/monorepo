@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useAccount } from "wagmi"
-import { AlertTriangle, Info, Search } from "lucide-react"
+import { AlertTriangle, Info, Search, HelpCircle } from "lucide-react"
 import Image from "next/image"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatCurrency } from "../utils/formatting"
@@ -11,6 +11,13 @@ import usePools from "../../hooks/usePools"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "../../components/ui/sheet"
 
 export default function ClaimsPage() {
   const { address, isConnected } = useAccount()
@@ -20,6 +27,7 @@ export default function ClaimsPage() {
   const [selectedCoverage, setSelectedCoverage] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [claimInfoOpen, setClaimInfoOpen] = useState(false)
 
   const activeCoverages = policies
     .map((p) => {
@@ -171,7 +179,22 @@ export default function ClaimsPage() {
 
           <div className="md:col-span-2">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-              <h2 className="text-lg font-semibold mb-4">Make a Claim</h2>
+              <div className="flex items-center mb-4">
+                <h2 className="text-lg font-semibold">Make a Claim</h2>
+                <Sheet open={claimInfoOpen} onOpenChange={setClaimInfoOpen}>
+                  <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
+                    <HelpCircle className="w-4 h-4" />
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-2/3 sm:max-w-xs">
+                    <SheetHeader>
+                      <SheetTitle>Make a Claim</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-4 text-sm">
+                      Filing a claim calls <code>processClaim(policyId, proof)</code> on the RiskManager. After review, you receive your coverage minus the claim fee.
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
 
               {!selectedCoverage ? (
                 <div className="text-center py-8">
