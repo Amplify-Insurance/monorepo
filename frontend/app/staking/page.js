@@ -80,7 +80,7 @@ export default function StakingPage() {
               <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
                 <HelpCircle className="w-4 h-4" />
               </SheetTrigger>
-              <SheetContent side="right" className="w-2/3 sm:max-w-xs">
+              <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
                 <SheetHeader>
                   <SheetTitle>Stake Voting Token</SheetTitle>
                 </SheetHeader>
@@ -113,7 +113,7 @@ export default function StakingPage() {
               <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
                 <HelpCircle className="w-4 h-4" />
               </SheetTrigger>
-              <SheetContent side="right" className="w-2/3 sm:max-w-xs">
+              <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
                 <SheetHeader>
                   <SheetTitle>Deposit Bond</SheetTitle>
                 </SheetHeader>
