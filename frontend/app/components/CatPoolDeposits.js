@@ -20,14 +20,38 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const value = Number(ethers.utils.formatUnits(info.value || "0", 6))
 
   return (
-    <div className="space-y-2">
-      <div className="flex justify-between">
-        <span className="text-sm text-gray-500">CatShare Balance</span>
-        <span className="text-sm font-medium text-gray-900 dark:text-white">{shares.toFixed(4)}</span>
-      </div>
-      <div className="flex justify-between">
-        <span className="text-sm text-gray-500">Current Value</span>
-        <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(value, "USD", displayCurrency)}</span>
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
+      <div className="inline-block min-w-full align-middle">
+        <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Token
+                </th>
+                <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Balance
+                </th>
+                <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Value
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tr>
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                  CATLP
+                </td>
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
+                  {shares.toFixed(4)}
+                </td>
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
+                  {formatCurrency(value, "USD", displayCurrency)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
