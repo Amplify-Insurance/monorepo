@@ -18,8 +18,8 @@ const WETH_ADDRESS = "0x4200000000000000000000000000000000000006" // WETH
 
 // Chainlink price feed aggregators (Base)
 // TODO: replace with real feed addresses
-const USDC_USD_FEED = "0x0000000000000000000000000000000000000000"
-const WETH_USD_FEED = "0x0000000000000000000000000000000000000000"
+const USDC_USD_FEED = "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B"
+const WETH_USD_FEED = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70"
 
 async function main() {
   const [deployer] = await ethers.getSigners()
@@ -34,7 +34,7 @@ async function main() {
   await oracle.setAggregator(WETH_ADDRESS, WETH_USD_FEED)
 
   // Persist address to deployedAddresses.json
-  const addressesPath = path.join(__dirname, "..", "deployedAddresses.json")
+  const addressesPath = path.join(__dirname, "..", "oracle_deployedAddresses.json")
   let addresses = {}
   if (fs.existsSync(addressesPath)) {
     addresses = JSON.parse(fs.readFileSync(addressesPath, "utf8"))
