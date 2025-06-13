@@ -1,7 +1,7 @@
 // lib/riskManager.ts
-import { ethers } from 'ethers';
-import RiskManager from '../abi/RiskManager.json';
-import { provider } from './provider';
+import { ethers } from 'ethers'
+import RiskManager from '../abi/RiskManager.json'
+import { getProvider, provider } from './provider'
 
 /* ───────────────────────────────
    Validate & create read-only contract
@@ -14,8 +14,11 @@ if (!DEFAULT_ADDRESS) {
   throw new Error('NEXT_PUBLIC_RISK_MANAGER_ADDRESS not set');
 }
 
-export function getRiskManager(address: string = DEFAULT_ADDRESS) {
-  return new ethers.Contract(address, RiskManager, provider);
+export function getRiskManager(
+  address: string = DEFAULT_ADDRESS,
+  prov = getProvider(),
+) {
+  return new ethers.Contract(address, RiskManager, prov)
 }
 
 export const riskManager = getRiskManager();

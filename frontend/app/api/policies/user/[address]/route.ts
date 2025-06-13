@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { policyNft } from '@/lib/policyNft'
 import { getRiskManager } from '@/lib/riskManager'
+import { getProvider } from '@/lib/provider'
 import deployments from '../../../../config/deployments'
 
 export async function GET(
@@ -23,7 +24,8 @@ export async function GET(
           const p = await policyNft.getPolicy(i)
           let deployment: string | null = null
           for (const dep of deployments) {
-            const rm = getRiskManager(dep.riskManager)
+            const provider = getProvider(dep)
+            const rm = getRiskManager(dep.riskManager, provider)
             try {
               await rm.getPoolInfo(p.poolId)
               deployment = dep.name

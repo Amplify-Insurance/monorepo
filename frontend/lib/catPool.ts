@@ -1,32 +1,27 @@
-import { ethers } from 'ethers';
-import CatPool from '../abi/CatInsurancePool.json';
-// lib/provider.ts (or wherever you construct it)
+import { ethers } from 'ethers'
+import CatPool from '../abi/CatInsurancePool.json'
+import { getProvider, provider } from './provider'
 
+const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL ??
-  process.env.RPC_URL ??
-  'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe';
+export function getCatPool(
+  address: string = DEFAULT_ADDRESS,
+  prov = getProvider(),
+) {
+  return new ethers.Contract(address, CatPool, prov)
+}
 
-export const provider = new ethers.providers.StaticJsonRpcProvider(
-  RPC_URL,
-  {
-    name: 'base',
-    chainId: 8453,
-  },
-);
+export const catPool = getCatPool()
 
-export const catPool = new ethers.Contract(
-  process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string,
-  CatPool,
-  provider
-);
-
-export function getCatPoolWriter() {
+export function getCatPoolWriter(prov = provider) {
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PRIVATE_KEY not set');
-  const signer = new ethers.Wallet(pk, provider);
-  return new ethers.Contract(process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string, CatPool, signer);
+  const signer = new ethers.Wallet(pk, prov);
+  return new ethers.Contract(
+    process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string,
+    CatPool,
+    signer,
+  );
 }
 
 export async function getCatPoolWithSigner() {
@@ -43,40 +38,40 @@ export async function getCatPoolWithSigner() {
   );
 }
 
-export async function getUsdcAddress() {
+export async function getUsdcAddress(prov = getProvider()) {
   const cp = new ethers.Contract(
     process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string,
     ['function usdc() view returns (address)'],
-    provider,
+    prov,
   );
   return await cp.usdc();
 }
 
-export async function getUsdcDecimals() {
-  const addr = await getUsdcAddress();
+export async function getUsdcDecimals(prov = getProvider()) {
+  const addr = await getUsdcAddress(prov);
   const token = new ethers.Contract(
     addr,
     ['function decimals() view returns (uint8)'],
-    provider,
+    prov,
   );
   return await token.decimals();
 }
 
-export async function getCatShareAddress() {
+export async function getCatShareAddress(prov = getProvider()) {
   const cp = new ethers.Contract(
     process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string,
     ['function catShareToken() view returns (address)'],
-    provider,
+    prov,
   );
   return await cp.catShareToken();
 }
 
-export async function getCatShareDecimals() {
-  const addr = await getCatShareAddress();
+export async function getCatShareDecimals(prov = getProvider()) {
+  const addr = await getCatShareAddress(prov);
   const token = new ethers.Contract(
     addr,
     ['function decimals() view returns (uint8)'],
-    provider,
+    prov,
   );
   return await token.decimals();
 }

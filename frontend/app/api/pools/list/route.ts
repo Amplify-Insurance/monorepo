@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getRiskManager } from '../../../../lib/riskManager';
 import { getPriceOracle } from '../../../../lib/priceOracle';
+import { getProvider } from '../../../../lib/provider';
 import deployments from '../../../config/deployments';
 import { ethers } from 'ethers';
 
@@ -103,8 +104,9 @@ function calcPremiumRateBps(pool: any): bigint {
 export async function GET() {
   const allPools: any[] = []
   for (const dep of deployments) {
-    const riskManager = getRiskManager(dep.riskManager)
-    const priceOracle = getPriceOracle(dep.priceOracle)
+    const provider = getProvider(dep)
+    const riskManager = getRiskManager(dep.riskManager, provider)
+    const priceOracle = getPriceOracle(dep.priceOracle, provider)
     try {
     /* 1️⃣ How many pools exist? */
     let count = 0n;

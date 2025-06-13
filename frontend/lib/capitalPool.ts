@@ -1,11 +1,14 @@
-import { ethers } from 'ethers';
-import CapitalPool from '../abi/CapitalPool.json';
-import { provider } from './provider';
+import { ethers } from 'ethers'
+import CapitalPool from '../abi/CapitalPool.json'
+import { getProvider, provider } from './provider'
 
 const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS as string;
 
-export function getCapitalPool(address: string = DEFAULT_ADDRESS) {
-  return new ethers.Contract(address, CapitalPool, provider);
+export function getCapitalPool(
+  address: string = DEFAULT_ADDRESS,
+  prov = getProvider(),
+) {
+  return new ethers.Contract(address, CapitalPool, prov)
 }
 
 export const capitalPool = getCapitalPool();
@@ -28,27 +31,41 @@ export function getCapitalPoolWriter(address: string = DEFAULT_ADDRESS) {
 }
 
 // Helper to query the underlying ERC20 asset used by the capital pool
-export async function getUnderlyingAssetAddress(address: string = DEFAULT_ADDRESS) {
-  const cp = new ethers.Contract(address, ['function underlyingAsset() view returns (address)'], provider);
-  return await cp.underlyingAsset();
+export async function getUnderlyingAssetAddress(
+  address: string = DEFAULT_ADDRESS,
+  prov = getProvider(),
+) {
+  const cp = new ethers.Contract(
+    address,
+    ['function underlyingAsset() view returns (address)'],
+    prov,
+  )
+  return await cp.underlyingAsset()
 }
 
-export async function getUnderlyingAssetDecimals(address: string = DEFAULT_ADDRESS) {
-  const assetAddr = await getUnderlyingAssetAddress(address);
+export async function getUnderlyingAssetDecimals(
+  address: string = DEFAULT_ADDRESS,
+  prov = getProvider(),
+) {
+  const assetAddr = await getUnderlyingAssetAddress(address, prov)
   const token = new ethers.Contract(
     assetAddr,
     ['function decimals() view returns (uint8)'],
-    provider,
-  );
-  return await token.decimals();
+    prov,
+  )
+  return await token.decimals()
 }
 
-export async function getUnderlyingAssetBalance(address: string, poolAddr: string = DEFAULT_ADDRESS) {
-  const assetAddr = await getUnderlyingAssetAddress(poolAddr);
+export async function getUnderlyingAssetBalance(
+  address: string,
+  poolAddr: string = DEFAULT_ADDRESS,
+  prov = getProvider(),
+) {
+  const assetAddr = await getUnderlyingAssetAddress(poolAddr, prov)
   const token = new ethers.Contract(
     assetAddr,
     ['function balanceOf(address) view returns (uint256)'],
-    provider,
-  );
-  return await token.balanceOf(address);
+    prov,
+  )
+  return await token.balanceOf(address)
 }

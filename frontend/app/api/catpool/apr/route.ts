@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { provider } from '../../../../lib/provider';
+import { getProvider } from '../../../../lib/provider';
 import { ethers } from 'ethers';
 import CatPoolAbi from '../../../../abi/CatInsurancePool.json';
 import deployments from '../../../config/deployments';
@@ -12,6 +12,7 @@ export async function GET(req: Request) {
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
 
+    const provider = getProvider(dep);
     const cp = new ethers.Contract(dep.catPool, CatPoolAbi, provider);
     const adapterAddr = await cp.adapter();
     let apr = '0';

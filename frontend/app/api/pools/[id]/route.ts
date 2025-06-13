@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 // import your provider and contract instances
 import { getRiskManager } from '../../../../lib/riskManager';
 import deployments from '../../../config/deployments';
+import { getProvider } from '../../../../lib/provider';
 
 export async function GET(
   _request: Request,
@@ -15,7 +16,8 @@ export async function GET(
   }
 
   for (const dep of deployments) {
-    const riskManager = getRiskManager(dep.riskManager);
+    const provider = getProvider(dep);
+    const riskManager = getRiskManager(dep.riskManager, provider);
     try {
       const poolInfo = await riskManager.getPoolInfo(idNum);
       return NextResponse.json({ id: idNum, deployment: dep.name, poolInfo });

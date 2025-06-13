@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCapitalPool } from '../../../lib/capitalPool';
-import { provider } from '../../../lib/provider';
+import { getProvider } from '../../../lib/provider';
 import { ethers } from 'ethers';
 import deployments from '../../config/deployments';
 
@@ -15,7 +15,8 @@ export async function GET(req: Request) {
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
 
-    const cp = getCapitalPool(dep.capitalPool);
+    const provider = getProvider(dep);
+    const cp = getCapitalPool(dep.capitalPool, provider);
 
     const adapters: { address: string; apr: string; asset: string }[] = [];
     for (let i = 0; i < 20; i++) {

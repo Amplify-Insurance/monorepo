@@ -1,6 +1,6 @@
 import { ethers } from 'ethers'
 import Committee from '../abi/Committee.json'
-import { provider } from './provider'
+import { getProvider, provider } from './provider'
 
 const ADDRESS = process.env.NEXT_PUBLIC_COMMITTEE_ADDRESS as string
 
@@ -9,7 +9,11 @@ if (!ADDRESS) {
   throw new Error('NEXT_PUBLIC_COMMITTEE_ADDRESS not set')
 }
 
-export const committee = new ethers.Contract(ADDRESS, Committee, provider)
+export function getCommittee(prov = getProvider()) {
+  return new ethers.Contract(ADDRESS, Committee, prov)
+}
+
+export const committee = getCommittee()
 
 export async function getCommitteeWithSigner() {
   if (typeof window === 'undefined' || !window.ethereum)
