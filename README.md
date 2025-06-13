@@ -64,6 +64,15 @@ Run Slither static analysis with:
 npm run slither
 ```
 
+Deploy the **PriceOracle** and register Chainlink feeds on Base with:
+
+```bash
+npx hardhat run scripts/deploy-oracle.js --network base
+```
+
+Then update `frontend/.env` using the printed `PriceOracle` address so the
+frontend can display token prices.
+
 The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.ts` to add or customise networks.
 
 ## Contracts Overview
