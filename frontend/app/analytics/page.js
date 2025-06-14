@@ -1,53 +1,41 @@
-"use client";
+"use client"
 
-import { useState, useRef, useEffect } from "react";
-import { ArrowDown, ArrowUp, ExternalLink, Search } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { ethers } from "ethers";
-import useClaims from "../../hooks/useClaims";
-import usePools from "../../hooks/usePools";
-import useAnalytics from "../../hooks/useAnalytics";
-import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
+import { useState, useRef, useEffect } from "react"
+import { ArrowDown, ArrowUp, Search } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { ethers } from "ethers"
+import useClaims from "../../hooks/useClaims"
+import usePools from "../../hooks/usePools"
+import useAnalytics from "../../hooks/useAnalytics"
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 
 export default function AnalyticsPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState("")
   const [sortConfig, setSortConfig] = useState({
     key: "id",
     direction: "desc",
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  const { claims } = useClaims();
-  const { pools } = usePools();
-  const { data: analyticsData } = useAnalytics();
+  })
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+  const { claims } = useClaims()
+  const { pools } = usePools()
+  const { data: analyticsData } = useAnalytics()
 
   const mappedClaims = claims
     .map((c, idx) => {
-      const pool = pools.find((p) => Number(p.id) === c.poolId);
-      if (!pool) return null;
-      const protocol = getTokenName(pool.protocolTokenToCover);
-      const token = pool.protocolTokenToCover;
-      const tokenName = getTokenName(pool.protocolTokenToCover);
+      const pool = pools.find((p) => Number(p.id) === c.poolId)
+      if (!pool) return null
+      const protocol = getTokenName(pool.protocolTokenToCover)
+      const token = pool.protocolTokenToCover
+      const tokenName = getTokenName(pool.protocolTokenToCover)
 
       const distressedAmount = Number(
-        ethers.utils.formatUnits(
-          c.protocolTokenAmountReceived,
-          pool.protocolTokenDecimals
-        )
-      );
-      const coverage = Number(
-        ethers.utils.formatUnits(c.coverage, pool.underlyingAssetDecimals)
-      );
-      const netPayout = Number(
-        ethers.utils.formatUnits(
-          c.netPayoutToClaimant,
-          pool.underlyingAssetDecimals
-        )
-      );
-      const claimFee = Number(
-        ethers.utils.formatUnits(c.claimFee, pool.underlyingAssetDecimals)
-      );
+        ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals),
+      )
+      const coverage = Number(ethers.utils.formatUnits(c.coverage, pool.underlyingAssetDecimals))
+      const netPayout = Number(ethers.utils.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals))
+      const claimFee = Number(ethers.utils.formatUnits(c.claimFee, pool.underlyingAssetDecimals))
 
       return {
         id: idx + 1,
@@ -62,24 +50,23 @@ export default function AnalyticsPage() {
         netPayout,
         claimFee,
         date: new Date(c.timestamp * 1000).toISOString().slice(0, 10),
-      };
+      }
     })
-    .filter(Boolean);
+    .filter(Boolean)
 
   const stats = (() => {
-    const byToken = {};
-    const byProduct = {};
-    const byMonth = {};
+    const byToken = {}
+    const byProduct = {}
+    const byMonth = {}
     for (const c of mappedClaims) {
-      const tName = getTokenName(c.token);
-      byToken[tName] = (byToken[tName] || 0) + c.netPayout;
-      byProduct[c.protocolName] =
-        (byProduct[c.protocolName] || 0) + c.netPayout;
+      const tName = getTokenName(c.token)
+      byToken[tName] = (byToken[tName] || 0) + c.netPayout
+      byProduct[c.protocolName] = (byProduct[c.protocolName] || 0) + c.netPayout
       const month = new Date(c.date).toLocaleString("en-US", {
         month: "short",
         year: "numeric",
-      });
-      byMonth[month] = (byMonth[month] || 0) + c.netPayout;
+      })
+      byMonth[month] = (byMonth[month] || 0) + c.netPayout
     }
     return {
       total: mappedClaims.reduce((sum, c) => sum + c.netPayout, 0),
@@ -92,126 +79,229 @@ export default function AnalyticsPage() {
         month,
         amount,
       })),
-    };
-  })();
+    }
+  })()
 
   // Filter claims based on search term
   const filteredClaims = mappedClaims.filter(
     (claim) =>
       claim.protocolName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       claim.token.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      claim.id.toString().includes(searchTerm)
-  );
+      claim.id.toString().includes(searchTerm),
+  )
 
   // Sort claims based on sort config
   const sortedClaims = [...filteredClaims].sort((a, b) => {
     if (a[sortConfig.key] < b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? -1 : 1;
+      return sortConfig.direction === "asc" ? -1 : 1
     }
     if (a[sortConfig.key] > b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? 1 : -1;
+      return sortConfig.direction === "asc" ? 1 : -1
     }
-    return 0;
-  });
+    return 0
+  })
 
   // Paginate claims
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentClaims = sortedClaims.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(sortedClaims.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentClaims = sortedClaims.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(sortedClaims.length / itemsPerPage)
 
   // Handle sort
   const requestSort = (key) => {
-    let direction = "asc";
+    let direction = "asc"
     if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
+      direction = "desc"
     }
-    setSortConfig({ key, direction });
-  };
+    setSortConfig({ key, direction })
+  }
 
   // Get sort direction icon
   const getSortDirectionIcon = (key) => {
-    if (sortConfig.key !== key) return null;
-    return sortConfig.direction === "asc" ? (
-      <ArrowUp className="h-4 w-4" />
-    ) : (
-      <ArrowDown className="h-4 w-4" />
-    );
-  };
+    if (sortConfig.key !== key) return null
+    return sortConfig.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+  }
 
-  const activeCover = analyticsData
-    ? Number(ethers.utils.formatUnits(analyticsData.totalActiveCover || "0", 6))
-    : 0;
-  const totalPremiums = analyticsData
-    ? Number(
-        ethers.utils.formatUnits(analyticsData.totalPremiumsPaid || "0", 6)
-      )
-    : 0;
-  const totalClaimFees = analyticsData
-    ? Number(
-        ethers.utils.formatUnits(analyticsData.totalClaimFees || "0", 6)
-      )
-    : 0;
-  const underwriterCount = analyticsData?.underwriterCount || 0;
-  const policyHolderCount = analyticsData?.policyHolderCount || 0;
+  const activeCover = analyticsData ? Number(ethers.utils.formatUnits(analyticsData.totalActiveCover || "0", 6)) : 0
+  const totalPremiums = analyticsData ? Number(ethers.utils.formatUnits(analyticsData.totalPremiumsPaid || "0", 6)) : 0
+  const totalClaimFees = analyticsData ? Number(ethers.utils.formatUnits(analyticsData.totalClaimFees || "0", 6)) : 0
+  const underwriterCount = analyticsData?.underwriterCount || 0
+  const policyHolderCount = analyticsData?.policyHolderCount || 0
   const lapsedHistory = (analyticsData?.lapsedCoverHistory || []).map((h) => ({
     date: new Date(h.timestamp * 1000).toISOString().slice(0, 10),
     amount: Number(ethers.utils.formatUnits(h.amount, 6)),
-  }));
+  }))
   const coverHistory = (analyticsData?.activeCoverHistory || []).map((h) => ({
     date: new Date(h.timestamp * 1000).toISOString().slice(0, 10),
     amount: Number(ethers.utils.formatUnits(h.active, 6)),
-  }));
+  }))
 
   return (
     <div className="container mx-auto max-w-7xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Analytics</h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          View historical claims data and insurance payout statistics
-        </p>
+        <p className="text-gray-600 dark:text-gray-300">View historical claims data and insurance payout statistics</p>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claims paid</div>
-          <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-            {stats.total.toLocaleString()}
+      <div className="mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Claims Paid</div>
+                <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                  ${stats.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-6 h-6 text-red-600 dark:text-red-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active cover</div>
-          <div className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
-            {activeCover.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Active Cover</div>
+                <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                  ${activeCover.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-6 h-6 text-green-600 dark:text-green-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Premiums collected</div>
-          <div className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
-            {totalPremiums.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Premiums Collected</div>
+                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  ${totalPremiums.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-6 h-6 text-purple-600 dark:text-purple-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claim fees collected</div>
-          <div className="text-2xl sm:text-3xl font-bold text-pink-600 dark:text-pink-400">
-            {totalClaimFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Claim Fees</div>
+                <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">
+                  ${totalClaimFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-pink-600 dark:text-pink-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">USD</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Underwriters</div>
-          <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-            {underwriterCount.toLocaleString()}
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Underwriters</div>
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {underwriterCount.toLocaleString()}
+                </div>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Policy holders</div>
-          <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-            {policyHolderCount.toLocaleString()}
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Policy Holders</div>
+                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {policyHolderCount.toLocaleString()}
+                </div>
+              </div>
+              <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-indigo-600 dark:text-indigo-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -242,9 +332,7 @@ export default function AnalyticsPage() {
 
       {/* Claims By Product Chart */}
       <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <h2 className="text-xl font-semibold mb-4">
-          Claims Paid per Product Name
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Claims Paid per Product Name</h2>
         <div className="h-80">
           <ClaimsByProductChart data={stats.byProduct} />
         </div>
@@ -299,21 +387,13 @@ export default function AnalyticsPage() {
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {currentClaims.map((claim) => (
-                <tr
-                  key={`${claim.id}-${claim.policyId}`}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-750"
-                >
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {claim.id}
-                  </td>
+                <tr key={`${claim.id}-${claim.policyId}`} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{claim.id}</td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                     {claim.policyId}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    <Link
-                      href={claim.url}
-                      className="text-blue-600 dark:text-blue-400 hover:underline"
-                    >
+                    <Link href={claim.url} className="text-blue-600 dark:text-blue-400 hover:underline">
                       {claim.protocolName}
                     </Link>
                   </td>
@@ -321,7 +401,7 @@ export default function AnalyticsPage() {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-5 w-5 mr-2">
                         <Image
-                          src={getTokenLogo(claim.token)}
+                          src={getTokenLogo(claim.token) || "/placeholder.svg"}
                           alt={claim.tokenName}
                           width={20}
                           height={20}
@@ -355,9 +435,7 @@ export default function AnalyticsPage() {
                       maximumFractionDigits: 2,
                     })}`}
                   </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {claim.date}
-                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{claim.date}</td>
                 </tr>
               ))}
             </tbody>
@@ -375,9 +453,7 @@ export default function AnalyticsPage() {
               Previous
             </button>
             <button
-              onClick={() =>
-                setCurrentPage(Math.min(totalPages, currentPage + 1))
-              }
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
               className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
             >
@@ -387,29 +463,20 @@ export default function AnalyticsPage() {
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                Showing{" "}
-                <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, sortedClaims.length)}
-                </span>{" "}
-                of <span className="font-medium">{sortedClaims.length}</span>{" "}
-                results
+                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                <span className="font-medium">{Math.min(indexOfLastItem, sortedClaims.length)}</span> of{" "}
+                <span className="font-medium">{sortedClaims.length}</span> results
               </p>
             </div>
             <div>
-              <nav
-                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                aria-label="Pagination"
-              >
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">First</span>
-                  <span className="h-5 w-5 flex items-center justify-center">
-                    «
-                  </span>
+                  <span className="h-5 w-5 flex items-center justify-center">«</span>
                 </button>
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -417,22 +484,20 @@ export default function AnalyticsPage() {
                   className="relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">Previous</span>
-                  <span className="h-5 w-5 flex items-center justify-center">
-                    ‹
-                  </span>
+                  <span className="h-5 w-5 flex items-center justify-center">‹</span>
                 </button>
 
                 {/* Page numbers */}
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
+                  let pageNum
                   if (totalPages <= 5) {
-                    pageNum = i + 1;
+                    pageNum = i + 1
                   } else if (currentPage <= 3) {
-                    pageNum = i + 1;
+                    pageNum = i + 1
                   } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                    pageNum = totalPages - 4 + i
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    pageNum = currentPage - 2 + i
                   }
 
                   return (
@@ -447,20 +512,16 @@ export default function AnalyticsPage() {
                     >
                       {pageNum}
                     </button>
-                  );
+                  )
                 })}
 
                 <button
-                  onClick={() =>
-                    setCurrentPage(Math.min(totalPages, currentPage + 1))
-                  }
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                   className="relative inline-flex items-center px-2 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">Next</span>
-                  <span className="h-5 w-5 flex items-center justify-center">
-                    ›
-                  </span>
+                  <span className="h-5 w-5 flex items-center justify-center">›</span>
                 </button>
                 <button
                   onClick={() => setCurrentPage(totalPages)}
@@ -468,9 +529,7 @@ export default function AnalyticsPage() {
                   className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                   <span className="sr-only">Last</span>
-                  <span className="h-5 w-5 flex items-center justify-center">
-                    »
-                  </span>
+                  <span className="h-5 w-5 flex items-center justify-center">»</span>
                 </button>
               </nav>
             </div>
@@ -478,44 +537,42 @@ export default function AnalyticsPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // Claims Over Time Chart Component
 function ClaimsOverTimeChart({ data }) {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null)
 
   useEffect(() => {
-    if (!canvasRef.current || !data) return;
-    const el = canvasRef.current;
-    const ctx = el.getContext("2d");
+    if (!canvasRef.current || !data) return
+    const el = canvasRef.current
+    const ctx = el.getContext("2d")
 
     // Clear previous chart if it exists
     if (window.claimsTimeChart) {
-      window.claimsTimeChart.destroy();
+      window.claimsTimeChart.destroy()
     }
 
     // Set canvas dimensions for high DPI displays
-    const dpr = window.devicePixelRatio || 1;
-    const rect = el.getBoundingClientRect();
-    el.width = rect.width * dpr;
-    el.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    const dpr = window.devicePixelRatio || 1
+    const rect = el.getBoundingClientRect()
+    el.width = rect.width * dpr
+    el.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
 
     // Draw chart
-    const isDarkMode = document.documentElement.classList.contains("dark");
-    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-    const gridColor = isDarkMode
-      ? "rgba(75, 85, 99, 0.2)"
-      : "rgba(209, 213, 219, 0.5)";
+    const isDarkMode = document.documentElement.classList.contains("dark")
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151"
+    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
 
-    const labels = data.map((item) => item.month);
-    const values = data.map((item) => item.amount);
+    const labels = data.map((item) => item.month)
+    const values = data.map((item) => item.amount)
 
     // Create gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
-    gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)");
-    gradient.addColorStop(1, "rgba(52, 211, 153, 0.1)");
+    const gradient = ctx.createLinearGradient(0, 0, 0, rect.height)
+    gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)")
+    gradient.addColorStop(1, "rgba(52, 211, 153, 0.1)")
 
     // Create chart
     window.claimsTimeChart = new window.Chart(ctx, {
@@ -547,14 +604,10 @@ function ClaimsOverTimeChart({ data }) {
             display: false,
           },
           tooltip: {
-            backgroundColor: isDarkMode
-              ? "rgba(31, 41, 55, 0.9)"
-              : "rgba(255, 255, 255, 0.9)",
+            backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
             titleColor: isDarkMode ? "#e5e7eb" : "#374151",
             bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
-            borderColor: isDarkMode
-              ? "rgba(75, 85, 99, 0.2)"
-              : "rgba(209, 213, 219, 0.5)",
+            borderColor: isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)",
             borderWidth: 1,
             padding: 12,
             displayColors: false,
@@ -582,63 +635,59 @@ function ClaimsOverTimeChart({ data }) {
               color: textColor,
               callback: (value) => {
                 if (value >= 1000000) {
-                  return `$${value / 1000000}M`;
+                  return `$${value / 1000000}M`
                 }
                 if (value >= 1000) {
-                  return `$${value / 1000}K`;
+                  return `$${value / 1000}K`
                 }
-                return `$${value}`;
+                return `$${value}`
               },
             },
           },
         },
       },
-    });
+    })
 
     return () => {
       if (window.claimsTimeChart) {
-        window.claimsTimeChart.destroy();
+        window.claimsTimeChart.destroy()
       }
-    };
-  }, [data]);
+    }
+  }, [data])
 
   return (
     <div className="h-full w-full">
-      <canvas
-        id="claimsOverTimeChart"
-        className="h-full w-full"
-        ref={canvasRef}
-      />
+      <canvas id="claimsOverTimeChart" className="h-full w-full" ref={canvasRef} />
     </div>
-  );
+  )
 }
 
 // Claims By Product Chart Component
 
 function ClaimsByProductChart({ data }) {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null)
 
   useEffect(() => {
-    if (!canvasRef.current || !data) return;
-    const el = canvasRef.current;
-    const ctx = el.getContext("2d");
+    if (!canvasRef.current || !data) return
+    const el = canvasRef.current
+    const ctx = el.getContext("2d")
 
     if (window.claimsProductChart) {
-      window.claimsProductChart.destroy();
+      window.claimsProductChart.destroy()
     }
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = el.getBoundingClientRect();
-    el.width = rect.width * dpr;
-    el.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    const dpr = window.devicePixelRatio || 1
+    const rect = el.getBoundingClientRect()
+    el.width = rect.width * dpr
+    el.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
 
-    const isDarkMode = document.documentElement.classList.contains("dark");
-    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+    const isDarkMode = document.documentElement.classList.contains("dark")
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151"
+    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
 
-    const labels = data.map((item) => item.name);
-    const approvedValues = data.map((item) => item.amount);
+    const labels = data.map((item) => item.name)
+    const approvedValues = data.map((item) => item.amount)
 
     window.claimsProductChart = new window.Chart(ctx, {
       type: "bar",
@@ -697,60 +746,57 @@ function ClaimsByProductChart({ data }) {
               color: textColor,
               callback: (value) => {
                 if (value >= 1000000) {
-                  return `$${value / 1000000}M`;
+                  return `$${value / 1000000}M`
                 }
                 if (value >= 1000) {
-                  return `$${value / 1000}K`;
+                  return `$${value / 1000}K`
                 }
-                return `$${value}`;
+                return `$${value}`
               },
             },
           },
         },
       },
-    });
+    })
 
     return () => {
       if (window.claimsProductChart) {
-        window.claimsProductChart.destroy();
+        window.claimsProductChart.destroy()
       }
-    };
-  }, [data]);
+    }
+  }, [data])
 
   return (
     <div className="h-full w-full">
       <canvas id="claimsByProductChart" className="h-full w-full" ref={canvasRef} />
     </div>
-  );
+  )
 }
 // Active Cover Chart Component
 function ActiveCoverChart({ data }) {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null)
 
   useEffect(() => {
-    if (!canvasRef.current || !data) return;
-    const el = canvasRef.current;
-    const ctx = el.getContext("2d");
+    if (!canvasRef.current || !data) return
+    const el = canvasRef.current
+    const ctx = el.getContext("2d")
 
-    if (
-      window.activeCoverChart &&
-      typeof window.activeCoverChart.destroy === "function"
-    ) {
-      window.activeCoverChart.destroy();
+    if (window.activeCoverChart && typeof window.activeCoverChart.destroy === "function") {
+      window.activeCoverChart.destroy()
     }
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = el.getBoundingClientRect();
-    el.width = rect.width * dpr;
-    el.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    const dpr = window.devicePixelRatio || 1
+    const rect = el.getBoundingClientRect()
+    el.width = rect.width * dpr
+    el.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
 
-    const isDarkMode = document.documentElement.classList.contains("dark");
-    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+    const isDarkMode = document.documentElement.classList.contains("dark")
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151"
+    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
 
-    const labels = data.map((d) => d.date);
-    const values = data.map((d) => d.amount);
+    const labels = data.map((d) => d.date)
+    const values = data.map((d) => d.amount)
 
     window.activeCoverChart = new window.Chart(ctx, {
       type: "line",
@@ -793,58 +839,52 @@ function ActiveCoverChart({ data }) {
             ticks: {
               color: textColor,
               callback: (value) => {
-                if (value >= 1_000_000) return `$${value / 1_000_000}M`;
-                if (value >= 1_000) return `$${value / 1_000}K`;
-                return `$${value}`;
+                if (value >= 1_000_000) return `$${value / 1_000_000}M`
+                if (value >= 1_000) return `$${value / 1_000}K`
+                return `$${value}`
               },
             },
           },
         },
       },
-    });
+    })
 
     return () => {
-      if (
-        window.activeCoverChart &&
-        typeof window.activeCoverChart.destroy === "function"
-      ) {
-        window.activeCoverChart.destroy();
+      if (window.activeCoverChart && typeof window.activeCoverChart.destroy === "function") {
+        window.activeCoverChart.destroy()
       }
-    };
-  }, [data]);
+    }
+  }, [data])
 
   return (
     <div className="h-full w-full">
       <canvas id="activeCoverChart" className="h-full w-full" ref={canvasRef} />
     </div>
-  );
+  )
 }
 // Lapsed Cover Chart Component
 function LapsedCoverChart({ data }) {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null)
 
   useEffect(() => {
-    if (!canvasRef.current || !data) return;
-    const el = canvasRef.current;
-    const ctx = el.getContext("2d");
-    if (
-      window.lapsedCoverChart &&
-      typeof window.lapsedCoverChart.destroy === "function"
-    ) {
-      window.lapsedCoverChart.destroy();
+    if (!canvasRef.current || !data) return
+    const el = canvasRef.current
+    const ctx = el.getContext("2d")
+    if (window.lapsedCoverChart && typeof window.lapsedCoverChart.destroy === "function") {
+      window.lapsedCoverChart.destroy()
     }
-    const dpr = window.devicePixelRatio || 1;
-    const rect = el.getBoundingClientRect();
-    el.width = rect.width * dpr;
-    el.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    const dpr = window.devicePixelRatio || 1
+    const rect = el.getBoundingClientRect()
+    el.width = rect.width * dpr
+    el.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
 
-    const isDarkMode = document.documentElement.classList.contains("dark");
-    const textColor = isDarkMode ? "#e5e7eb" : "#374151";
-    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)";
+    const isDarkMode = document.documentElement.classList.contains("dark")
+    const textColor = isDarkMode ? "#e5e7eb" : "#374151"
+    const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
 
-    const labels = data.map((d) => d.date);
-    const values = data.map((d) => d.amount);
+    const labels = data.map((d) => d.date)
+    const values = data.map((d) => d.amount)
 
     window.lapsedCoverChart = new window.Chart(ctx, {
       type: "bar",
@@ -887,29 +927,26 @@ function LapsedCoverChart({ data }) {
             ticks: {
               color: textColor,
               callback: (value) => {
-                if (value >= 1_000_000) return `$${value / 1_000_000}M`;
-                if (value >= 1_000) return `$${value / 1_000}K`;
-                return `$${value}`;
+                if (value >= 1_000_000) return `$${value / 1_000_000}M`
+                if (value >= 1_000) return `$${value / 1_000}K`
+                return `$${value}`
               },
             },
           },
         },
       },
-    });
+    })
 
     return () => {
-      if (
-        window.lapsedCoverChart &&
-        typeof window.lapsedCoverChart.destroy === "function"
-      ) {
-        window.lapsedCoverChart.destroy();
+      if (window.lapsedCoverChart && typeof window.lapsedCoverChart.destroy === "function") {
+        window.lapsedCoverChart.destroy()
       }
-    };
-  }, [data]);
+    }
+  }, [data])
 
   return (
     <div className="h-full w-full">
       <canvas id="lapsedCoverChart" className="h-full w-full" ref={canvasRef} />
     </div>
-  );
+  )
 }

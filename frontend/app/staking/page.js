@@ -3,15 +3,9 @@
 import { useState } from "react"
 import { useAccount } from "wagmi"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
+import { HelpCircle, Vote, Shield, Users } from "lucide-react"
 import ProposalsTable from "../components/ProposalsTable"
-import { HelpCircle } from "lucide-react"
-import {
-  Sheet,
-  SheetTrigger,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "../../components/ui/sheet"
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet"
 import StakeModal from "../components/StakeModal"
 import BondModal from "../components/BondModal"
 
@@ -22,81 +16,173 @@ export default function StakingPage() {
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
 
-
   if (!isConnected) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <h1 className="text-2xl font-bold mb-6">Connect your wallet to participate in governance</h1>
-        <ConnectButton />
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 max-w-md w-full">
+            <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Vote className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Connect Your Wallet</h1>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Connect your wallet to participate in governance and help secure the protocol
+            </p>
+            <ConnectButton />
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Governance</h1>
-        <p className="text-gray-600 dark:text-gray-300 mt-1">Stake tokens and deposit a bond to participate in governance</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-          <div className="flex items-center">
-            <h2 className="text-xl font-semibold">Stake Voting Token</h2>
-            <Sheet open={stakeInfoOpen} onOpenChange={setStakeInfoOpen}>
-              <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
-                <HelpCircle className="w-4 h-4" />
-              </SheetTrigger>
-              <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
-                <SheetHeader>
-                  <SheetTitle>Stake Voting Token</SheetTitle>
-                </SheetHeader>
-                <div className="mt-4 text-sm">
-                  Calling <code>stake(amount)</code> on the staking contract locks your governance tokens and mints voting power used by the <code>Committee</code> contract. You can withdraw later by invoking <code>unstake(amount)</code>.
-                </div>
-              </SheetContent>
-            </Sheet>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto max-w-7xl px-4 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center space-x-3 mb-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Governance</h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                Stake tokens and deposit bonds to participate in protocol governance
+              </p>
+            </div>
           </div>
-          <button
-            onClick={() => setStakeOpen(true)}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded"
-          >
-            Stake
-          </button>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-          <div className="flex items-center">
-            <h2 className="text-xl font-semibold">Deposit Bond</h2>
-            <Sheet open={bondInfoOpen} onOpenChange={setBondInfoOpen}>
-              <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
-                <HelpCircle className="w-4 h-4" />
-              </SheetTrigger>
-              <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
-                <SheetHeader>
-                  <SheetTitle>Deposit Bond</SheetTitle>
-                </SheetHeader>
-                <div className="mt-4 text-sm">
-                  Depositing a bond triggers <code>depositBond(poolId, amount)</code>. The bond is tied to the selected risk pool and remains locked as collateral until the protocol releases it (for example through <code>freezePool</code>). Bonds encourage honest participation in governance.
+        {/* Action Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Stake Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                  <Vote className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
-              </SheetContent>
-            </Sheet>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Stake Voting Token</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Lock tokens to gain voting power</p>
+                </div>
+              </div>
+              <Sheet open={stakeInfoOpen} onOpenChange={setStakeInfoOpen}>
+                <SheetTrigger className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                  <HelpCircle className="w-5 h-5" />
+                </SheetTrigger>
+                <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
+                  <SheetHeader>
+                    <SheetTitle>Stake Voting Token</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4 text-sm space-y-3">
+                    <p>
+                      Calling <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">stake(amount)</code> on the
+                      staking contract locks your governance tokens and mints voting power used by the Committee
+                      contract.
+                    </p>
+                    <p>
+                      You can withdraw later by invoking{" "}
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">unstake(amount)</code>.
+                    </p>
+                    <p>Staked tokens give you the power to vote on protocol proposals and governance decisions.</p>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <p className="font-medium mb-1">Benefits</p>
+                  <ul className="text-xs space-y-1">
+                    <li>• Vote on protocol proposals</li>
+                    <li>• Influence protocol direction</li>
+                    <li>• Unstake anytime</li>
+                  </ul>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setStakeOpen(true)}
+                className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                Stake Tokens
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setBondOpen(true)}
-            className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded"
-          >
-            Deposit Bond
-          </button>
+
+          {/* Bond Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
+                  <Shield className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Deposit Bond</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Secure the protocol with collateral</p>
+                </div>
+              </div>
+              <Sheet open={bondInfoOpen} onOpenChange={setBondInfoOpen}>
+                <SheetTrigger className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                  <HelpCircle className="w-5 h-5" />
+                </SheetTrigger>
+                <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
+                  <SheetHeader>
+                    <SheetTitle>Deposit Bond</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4 text-sm space-y-3">
+                    <p>
+                      Depositing a bond triggers{" "}
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">depositBond(poolId, amount)</code>.
+                      The bond is tied to the selected risk pool and remains locked as collateral.
+                    </p>
+                    <p>Bonds encourage honest participation in governance by putting your own assets at risk.</p>
+                    <p className="text-red-600 dark:text-red-400 font-medium">
+                      ⚠️ Bonds may be slashed if governance decisions are not supported by the community.
+                    </p>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="text-sm text-green-800 dark:text-green-200">
+                  <p className="font-medium mb-1">Bond Features</p>
+                  <ul className="text-xs space-y-1">
+                    <li>• Earn up to 2x bond value</li>
+                    <li>• Secure protocol operations</li>
+                    <li>• Risk of slashing if dishonest</li>
+                  </ul>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setBondOpen(true)}
+                className="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                Deposit Bond
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <StakeModal isOpen={stakeOpen} onClose={() => setStakeOpen(false)} />
-      <BondModal isOpen={bondOpen} onClose={() => setBondOpen(false)} />
+        {/* Modals */}
+        <StakeModal isOpen={stakeOpen} onClose={() => setStakeOpen(false)} />
+        <BondModal isOpen={bondOpen} onClose={() => setBondOpen(false)} />
 
-
-      <div className="mt-8">
-        <ProposalsTable />
+        {/* Proposals Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+              <Vote className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Active Proposals</h2>
+          </div>
+          <ProposalsTable />
+        </div>
       </div>
     </div>
   )
