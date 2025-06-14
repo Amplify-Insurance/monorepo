@@ -23,4 +23,3 @@ export async function GET(
   }
   return NextResponse.json({ error: 'Pool not found' }, { status: 404 });
 }
-}
