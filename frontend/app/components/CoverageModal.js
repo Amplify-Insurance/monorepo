@@ -6,6 +6,7 @@ import { Info } from "lucide-react"
 import { ethers } from "ethers" // v5 namespace import
 import { useAccount } from "wagmi"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getPoolManagerWithSigner } from "../../lib/poolManager"
 import {
   getCapitalPoolWithSigner,
   getUnderlyingAssetBalance,
@@ -135,8 +136,8 @@ export default function CoverageModal({
       const signerAddress = await tokenContract.signer.getAddress()
 
       if (type === "purchase") {
-        const rm = await getRiskManagerWithSigner(dep.riskManager)
-        const rmAddress = dep.riskManager
+        const pm = await getPoolManagerWithSigner(dep.poolManager)
+        const pmAddress = dep.poolManager
 
         const amountBn = ethers.utils.parseUnits(amount, dec) // coverage amount
 
@@ -146,14 +147,14 @@ export default function CoverageModal({
         const depositBn = ethers.utils.parseUnits(depositTotal.toFixed(dec), dec)
 
         // Ensure sufficient allowance for the premium deposit
-        const allowance = await tokenContract.allowance(signerAddress, rmAddress)
+        const allowance = await tokenContract.allowance(signerAddress, pmAddress)
 
         if (allowance.lt(depositBn)) {
-          const approveTx = await tokenContract.approve(rmAddress, depositBn)
+          const approveTx = await tokenContract.approve(pmAddress, depositBn)
           await approveTx.wait()
         }
 
-        const tx = await rm.purchaseCover(poolId, amountBn, depositBn)
+        const tx = await pm.purchaseCover(poolId, amountBn, depositBn)
         await tx.wait()
       } else {
         // "provide" flow
