@@ -35,7 +35,13 @@ async function deployFixture() {
   await Proto.connect(owner).mint(coverPoolAcc.address, protoSupply);
   await Proto.connect(coverPoolAcc).approve(catPool.target, protoSupply);
 
-  return { owner, coverPoolAcc, user1, user2, other, usdc, Proto, adapter, catPool, catShare };
+  const RewardDistributor = await hardhatEthers.getContractFactory("RewardDistributor");
+  const rewardDist = await RewardDistributor.deploy(catPool.target);
+  await catPool.connect(owner).setRewardDistributor(rewardDist.target);
+  await rewardDist.connect(owner).setCatPool(catPool.target);
+  await catPool.connect(owner).setRiskManagerAddress(coverPoolAcc.address);
+
+  return { owner, coverPoolAcc, user1, user2, other, usdc, Proto, adapter, catPool, catShare, rewardDist };
 }
 
 describe("CatInsurancePool", function () {
@@ -123,7 +129,7 @@ describe("CatInsurancePool", function () {
   });
 
   it("Distributes and allows claiming protocol assets", async function () {
-    const { catPool, coverPoolAcc, user1, Proto, catShare } = await loadFixture(deployFixture);
+    const { catPool, coverPoolAcc, user1, Proto, catShare, rewardDist } = await loadFixture(deployFixture);
     const dep = toWei(1000, 6);
     await catPool.connect(user1).depositLiquidity(dep);
     const amount = toWei(100, 18);
@@ -138,5 +144,6 @@ describe("CatInsurancePool", function () {
       .withArgs(user1.address, Proto.target, amount);
     expect(await Proto.balanceOf(user1.address)).to.equal(before + amount);
     expect(await catPool.calculateClaimableProtocolAssetRewards(user1.address, Proto.target)).to.equal(0);
+    expect(await rewardDist.pendingRewards(user1.address, catPool.CAT_POOL_REWARD_ID(), Proto.target, await catShare.balanceOf(user1.address))).to.equal(0);
   });
 });
