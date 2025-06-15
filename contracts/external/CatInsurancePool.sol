@@ -226,7 +226,9 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
                 amountSent += actuallyWithdrawn;
             }
         }
-        emit DrawFromFund(amountToDraw, amountSent);
+        if (amountSent > 0) {
+            emit DrawFromFund(amountToDraw, amountSent);
+        }
     }
 
     function receiveProtocolAssetsForDistribution(address protocolAsset, uint256 amount) external onlyRiskManager nonReentrant {

@@ -92,8 +92,8 @@ contract EulerV2Adapter is IYieldAdapter, Ownable {
         actuallyWithdrawn = afterBal - beforeBal;
         if (actuallyWithdrawn > 0) {
             underlyingToken.safeTransfer(to, actuallyWithdrawn);
+            emit FundsWithdrawn(to, amount, actuallyWithdrawn);
         }
-        emit FundsWithdrawn(to, amount, actuallyWithdrawn);
     }
 
     function getCurrentValueHeld() external view override returns (uint256) {

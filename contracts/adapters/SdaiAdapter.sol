@@ -102,9 +102,8 @@ contract SdaiAdapter is IYieldAdapter, Ownable {
         if (actuallyWithdrawn > 0) {
             // Transfer the withdrawn underlyingToken from this adapter to the requested `_to` address.
             underlyingToken.safeTransfer(_to, actuallyWithdrawn);
+            emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
         }
-        
-        emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
         return actuallyWithdrawn;
     }
 
