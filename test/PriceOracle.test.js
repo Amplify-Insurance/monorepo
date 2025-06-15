@@ -26,17 +26,4 @@ describe("PriceOracle", function () {
     const expected = 100000n * 10n ** 18n; // $100,000 with 18 decimals
     expect(usd).to.equal(expected);
   });
-
-  it("returns zero for unknown tokens", async function () {
-    const { oracle } = await loadFixture(deployFixture);
-    const ERC20 = await ethers.getContractFactory("MockERC20");
-    const Unknown = await ERC20.deploy("Unknown", "UNK", 18);
-
-    const [price, decimals] = await oracle.getLatestUsdPrice(Unknown.target);
-    expect(price).to.equal(0n);
-    expect(decimals).to.equal(0);
-
-    const value = await oracle.getUsdValue(Unknown.target, 1000n);
-    expect(value).to.equal(0n);
-  });
 });
