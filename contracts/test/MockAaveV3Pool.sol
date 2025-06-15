@@ -4,11 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./MockERC20.sol";
-
-interface IMintableERC20 is IERC20 {
-    function mint(address to, uint256 amount) external;
-    function burnFrom(address account, uint256 amount) external;
-}
+import "./IMintableERC20.sol";
 
 /// @title Mock Aave V3 Pool
 /// @notice Minimal mock of the Aave V3 pool for adapter testing

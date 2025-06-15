@@ -8,15 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../tokens/CatShare.sol";
 import "../interfaces/IYieldAdapter.sol";
-
-// Interface for the central Reward Distributor
-interface IRewardDistributor {
-    function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external;
-    function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
-    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
-    function pendingRewards(address user, uint256 poolId, address rewardToken, uint256 userPledge) external view returns (uint256);
-    function setCatPool(address _catPool) external;
-}
+import "../interfaces/IRewardDistributor.sol";
 
 contract CatInsurancePool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;

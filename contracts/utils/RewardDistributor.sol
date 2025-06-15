@@ -4,18 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-
-/**
- * @title IRewardDistributor
- * @notice Interface for the RewardDistributor contract.
- */
-interface IRewardDistributor {
-    function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external;
-    function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
-    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
-    function updateUserState(address user, uint256 poolId, address rewardToken, uint256 userPledge) external;
-    function pendingRewards(address user, uint256 poolId, address rewardToken, uint256 userPledge) external view returns (uint256);
-}
+import "../interfaces/IRewardDistributor.sol";
 
 /**
  * @title RewardDistributor

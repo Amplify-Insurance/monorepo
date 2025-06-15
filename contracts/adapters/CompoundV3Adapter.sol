@@ -6,27 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IYieldAdapter.sol";
-
-// Interfaces for Compound V3
-// CORRECTED: Expanded interface to include necessary functions for value calculation
-interface IComet {
-    function supply(address asset, uint256 amount) external;
-    function withdraw(address asset, uint256 amount) external;
-    function baseToken() external view returns (address);
-    function balanceOf(address account) external view returns (uint256);
-
-    struct UserBasic {
-        int104 principal;
-        uint64 baseTrackingIndex;
-    }
-    function userBasic(address) external view returns (UserBasic memory);
-    function baseSupplyIndex() external view returns (uint256);
-}
-
-interface ICometWithRates is IComet {
-    function getUtilization() external view returns (uint256);
-    function getSupplyRate(uint256 utilization) external view returns (uint256);
-}
+import "../interfaces/IComet.sol";
+import "../interfaces/ICometWithRates.sol";
 
 contract CompoundV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
