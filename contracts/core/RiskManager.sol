@@ -307,12 +307,13 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     function _realizeLossesForAllPools(address _user) internal {
         uint256[] memory allocations = underwriterAllocations[_user];
+        uint256 originalPledge = underwriterTotalPledge[_user];
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
             uint256 currentPledge = underwriterTotalPledge[_user];
             if (currentPledge == 0) break;
-            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, currentPledge);
-            if(pendingLoss > 0) {
+            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, originalPledge);
+            if (pendingLoss > 0) {
                 underwriterTotalPledge[_user] -= Math.min(currentPledge, pendingLoss);
                 capitalPool.applyLosses(_user, pendingLoss);
             }
