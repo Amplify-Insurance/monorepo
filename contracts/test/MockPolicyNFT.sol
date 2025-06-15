@@ -12,8 +12,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract MockPolicyNFT is Ownable, IPolicyNFT {
 
-    // Mimic the Policy struct from the real contract
-    struct Policy {
+    // Internal struct used for storage. Includes an extra field compared to the
+    // IPolicyNFT.Policy struct to help tests track premium payments.
+    struct PolicyInfo {
         uint256 poolId;
         uint256 coverage;
         uint256 activation;
@@ -26,7 +27,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
 
     // Counter for the next policy token id
     uint256 public nextPolicyId = 1;
-    mapping(uint256 => Policy) public policies;
+    mapping(uint256 => PolicyInfo) public policies;
     mapping(uint256 => address) private _owners; // Internal mapping to mock ownerOf
     // Address of the CoverPool contract that is allowed to mint/burn
     address public coverPoolAddress;
@@ -95,7 +96,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         uint128 premiumDeposit,
         uint128 lastDrainTime
     ) external {
-        policies[id] = Policy({
+        policies[id] = PolicyInfo({
             poolId: pid,
             coverage: coverage,
             activation: activation,
@@ -133,7 +134,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         uint128 _lastDrainTime
     ) external override onlyCoverPool returns (uint256) {
         uint256 id = nextPolicyId++;
-        policies[id] = Policy({
+        policies[id] = PolicyInfo({
             poolId: _poolId,
             coverage: _coverage,
             activation: _activation,
@@ -173,8 +174,15 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     /**
      * @notice Mocks the getPolicy view function.
      */
-    function getPolicy(uint256 id) external view returns (Policy memory) {
-        return policies[id];
+    function getPolicy(uint256 id) external view returns (IPolicyNFT.Policy memory) {
+        PolicyInfo memory p = policies[id];
+        return IPolicyNFT.Policy({
+            poolId: p.poolId,
+            coverage: p.coverage,
+            activation: p.activation,
+            premiumDeposit: p.premiumDeposit,
+            lastDrainTime: p.lastDrainTime
+        });
     }
 
     /**

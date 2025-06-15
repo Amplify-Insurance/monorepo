@@ -232,12 +232,10 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
         if (catAmount > 0) {
             IERC20 underlying = capitalPool.underlyingAsset();
 
-            // Resolution: Use the safe approval pattern. First, reset the allowance to zero,
-            // then set the new, specific allowance for the transaction.
-            // This leverages the imported SafeERC20 library's safeApprove function.
-            underlying.safeApprove(address(catPool), 0);
-            underlying.safeApprove(address(catPool), catAmount);
-            
+            // Use the OZ forceApprove helper to safely update allowances even when
+            // a non-zero allowance already exists.
+            underlying.forceApprove(address(catPool), catAmount);
+
             catPool.receiveUsdcPremium(catAmount);
         }
         
