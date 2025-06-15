@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../interfaces/IPolicyNFT.sol";
 
 // --- Local Interfaces ---
 
@@ -45,11 +46,6 @@ interface ICapitalPool {
     function sharesToValue(uint256 shares) external view returns (uint256);
 }
 
-interface IPolicyNFT {
-    function getPolicy(uint256 policyId) external view returns (uint256, uint256, uint256, uint128, uint128);
-    function ownerOf(uint256 policyId) external view returns (address);
-    function burn(uint256 policyId) external;
-}
 
 interface ICatInsurancePool {
     function drawFund(uint256 amount) external;
