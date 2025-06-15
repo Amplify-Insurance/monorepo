@@ -59,6 +59,7 @@ import {
   CapitalPoolAddressSet
 } from "../generated/AaveV3Adapter/YieldAdapter";
 import { ProposalCreated, Voted, ProposalExecuted, BondResolved, RewardClaimed } from "../generated/Committee/Committee";
+import { OwnershipTransferred as PoolRegistryOwnershipTransferred } from "../generated/PoolRegistry/PoolRegistry";
 
 function saveGeneric(event: ethereum.Event, name: string): void {
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
@@ -363,6 +364,13 @@ export function handleCapitalPoolOwnershipTransferred(
 
 export function handlePolicyNFTOwnershipTransferred(
   event: PolicyNFTOwnershipTransferred
+): void {
+  saveGeneric(event, "OwnershipTransferred");
+  saveOwner(event, event.params.newOwner);
+}
+
+export function handlePoolRegistryOwnershipTransferred(
+  event: PoolRegistryOwnershipTransferred
 ): void {
   saveGeneric(event, "OwnershipTransferred");
   saveOwner(event, event.params.newOwner);
