@@ -40,7 +40,9 @@ contract PriceOracle is Ownable {
      */
     function getLatestUsdPrice(address token) public view returns (int256 price, uint8 decimals) {
         AggregatorV3Interface agg = aggregators[token];
-        if (address(agg) == address(0)) revert NoAggregatorConfigured(token);
+        if (address(agg) == address(0)) {
+            return (0, 0);
+        }
         (, price, , , ) = agg.latestRoundData();
         decimals = agg.decimals();
     }
@@ -53,7 +55,7 @@ contract PriceOracle is Ownable {
      */
     function getUsdValue(address token, uint256 amount) external view returns (uint256 value) {
         (int256 price, uint8 feedDecimals) = getLatestUsdPrice(token);
-        require(price > 0, "Invalid price");
+        if (price <= 0) return 0;
         uint8 tokenDecimals = IERC20Metadata(token).decimals();
         uint256 scaledPrice = uint256(price) * (10 ** (18 - feedDecimals));
         value = (amount * scaledPrice) / (10 ** tokenDecimals);
