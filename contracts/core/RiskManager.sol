@@ -182,7 +182,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
     /* ───────────────────── Claim Processing ───────────────────── */
 
     function processClaim(uint256 _policyId) external nonReentrant {
-        (uint256 poolId, uint256 coverage, , ,) = policyNFT.getPolicy(_policyId);
+        IPolicyNFT.Policy memory policy = policyNFT.getPolicy(_policyId);
+        uint256 poolId = policy.poolId;
+        uint256 coverage = policy.coverage;
         (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) = poolRegistry.getPoolPayoutData(poolId);
         
         lossDistributor.distributeLoss(poolId, coverage, totalCapitalPledged);

@@ -99,7 +99,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         }
     }
 
-    function updatePoolPauseState(uint256 _poolId, bool _isPaused) external onlyRiskManager {
+    function setPauseState(uint256 _poolId, bool _isPaused) external onlyRiskManager {
         PoolData storage pool = protocolRiskPools[_poolId];
         pool.isPaused = _isPaused;
         pool.pauseTimestamp = _isPaused ? block.timestamp : 0;
