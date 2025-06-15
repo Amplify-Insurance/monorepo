@@ -1142,13 +1142,16 @@ describe("RiskManager - Loss Realization", function() {
         const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         const policyNFT = await MockPolicyNFTFactory.deploy(owner.address);
 
+        const PolicyManagerFactory = await ethers.getContractFactory("PolicyManager");
+        const policyManager = await PolicyManagerFactory.deploy(policyNFT.target, owner.address);
+
         const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
         const catPool = await MockCatPoolFactory.deploy(owner.address);
 
         const RiskManagerFactory = await ethers.getContractFactory("RiskManager", owner);
         const riskManager = await RiskManagerFactory.deploy(owner.address);
 
-        await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyNFT.target, catPool.target, lossDistributor.target);
+        await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyManager.target, catPool.target, lossDistributor.target);
         await poolRegistry.setRiskManager(riskManager.target);
         await lossDistributor.setRiskManager(riskManager.target);
 

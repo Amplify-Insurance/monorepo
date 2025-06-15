@@ -61,6 +61,10 @@ interface ILossDistributor {
     function getPendingLosses(address user, uint256 poolId, uint256 userPledge) external view returns (uint256);
 }
 
+interface IPolicyManager {
+    function policyNFT() external view returns (IPolicyNFT);
+}
+
 /**
  * @title RiskManager
  * @author Gemini
@@ -112,17 +116,17 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     function setAddresses(address _capital, address _registry, address _policy, address _cat, address _loss) external onlyOwner {
         require(
-            _capital != address(0) && 
-            _registry != address(0) && 
-            _policy != address(0) && 
-            _cat != address(0) && 
-            _loss != address(0), 
+            _capital != address(0) &&
+            _registry != address(0) &&
+            _policy != address(0) &&
+            _cat != address(0) &&
+            _loss != address(0),
             "Zero address not allowed"
         );
         capitalPool = ICapitalPool(_capital);
         poolRegistry = IPoolRegistry(_registry);
         policyManager = _policy;
-        policyNFT = IPolicyNFT(Ownable(_policy).owner());
+        policyNFT = IPolicyManager(_policy).policyNFT();
         catPool = ICatInsurancePool(_cat);
         lossDistributor = ILossDistributor(_loss);
         emit AddressesSet(_capital, _registry, _policy, _cat, _loss);
