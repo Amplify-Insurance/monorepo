@@ -7,7 +7,9 @@ The `insurance` subgraph indexes events emitted by `RiskManager`,
 `CapitalPool`, `CatInsurancePool` and `PolicyNFT`.  Each data source now has a
 `deployment` context so multiple deployments can be indexed by duplicating the
 entries in `subgraph.yaml` with different addresses and `deployment` names.
-Update the placeholder contract addresses before deployment.
+Update the placeholder contract addresses before deployment. The manifest now
+includes a second `RiskManagerV2` data source that can be pointed at the new
+RiskManager contract.
 
 Entities include a `deployment` field allowing queries to filter by the
 originating deployment.
