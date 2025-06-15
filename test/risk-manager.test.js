@@ -1116,3 +1116,66 @@ describe("RiskManager - View Functions", function() {
         expect(poolInfo.isPaused).to.be.false;
     });
 });
+
+describe("RiskManager - Loss Realization", function() {
+    async function deployLossFixture() {
+        const [owner, underwriter] = await ethers.getSigners();
+
+        const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+        const usdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
+
+        const MockCapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
+        const capitalPool = await MockCapitalPoolFactory.deploy(owner.address, usdc.target);
+
+        const PoolRegistryFactory = await ethers.getContractFactory("PoolRegistry");
+        const poolRegistry = await PoolRegistryFactory.deploy(owner.address, owner.address);
+
+        const LossDistributorFactory = await ethers.getContractFactory("LossDistributor");
+        const lossDistributor = await LossDistributorFactory.deploy(owner.address);
+
+        const MockPolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
+        const policyNFT = await MockPolicyNFTFactory.deploy(owner.address);
+
+        const MockCatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
+        const catPool = await MockCatPoolFactory.deploy(owner.address);
+
+        const RiskManagerFactory = await ethers.getContractFactory("RiskManager", owner);
+        const riskManager = await RiskManagerFactory.deploy(owner.address);
+
+        await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyNFT.target, catPool.target, lossDistributor.target);
+        await poolRegistry.setRiskManager(riskManager.target);
+        await lossDistributor.setRiskManager(riskManager.target);
+
+        return { riskManager, capitalPool, poolRegistry, lossDistributor, usdc, owner, underwriter };
+    }
+
+    it("realizes pending losses from multiple pools", async function() {
+        const { riskManager, capitalPool, poolRegistry, lossDistributor, usdc, owner, underwriter } = await loadFixture(deployLossFixture);
+
+        await riskManager.addProtocolRiskPool(usdc.target, { base:0, slope1:0, slope2:0, kink:0 }, 1);
+        await riskManager.addProtocolRiskPool(usdc.target, { base:0, slope1:0, slope2:0, kink:0 }, 2);
+
+        const depositAmount = ethers.parseUnits("100", 6);
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [capitalPool.target] });
+        await hre.network.provider.send("hardhat_setBalance", [capitalPool.target, "0x1000000000000000000"]);
+        const cpSigner = await ethers.getSigner(capitalPool.target);
+        await riskManager.connect(cpSigner).onCapitalDeposited(underwriter.address, depositAmount);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [capitalPool.target] });
+
+        await riskManager.connect(underwriter).allocateCapital([0,1]);
+
+        await lossDistributor.distributeLoss(0, ethers.parseUnits("20", 6), depositAmount);
+        await lossDistributor.distributeLoss(1, ethers.parseUnits("30", 6), depositAmount);
+
+        await hre.network.provider.request({ method: "hardhat_impersonateAccount", params: [capitalPool.target] });
+        await hre.network.provider.send("hardhat_setBalance", [capitalPool.target, "0x1000000000000000000"]);
+        const cpSigner2 = await ethers.getSigner(capitalPool.target);
+        const tx = await riskManager.connect(cpSigner2).onCapitalWithdrawn(underwriter.address, 0, false);
+        await hre.network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [capitalPool.target] });
+
+        await expect(tx).to.emit(capitalPool, "LossesAppliedCalled").withArgs(underwriter.address, ethers.parseUnits("20", 6));
+        await expect(tx).to.emit(capitalPool, "LossesAppliedCalled").withArgs(underwriter.address, ethers.parseUnits("30", 6));
+
+        expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(ethers.parseUnits("50", 6));
+    });
+});
