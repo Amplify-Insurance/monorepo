@@ -29,7 +29,8 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
 
     uint256 public idleUSDC;
     uint256 private constant INITIAL_SHARES_LOCKED = 1000;
-    uint256 public constant CAT_POOL_REWARD_ID = type(uint256).max; 
+    uint256 public constant CAT_POOL_REWARD_ID = type(uint256).max;
+    uint256 public constant MIN_USDC_AMOUNT = 1e6; // 1 USDC assuming 6 decimals
 
     event AdapterChanged(address indexed newAdapter);
     event UsdcPremiumReceived(uint256 amount);
@@ -130,7 +131,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     }
 
     function depositLiquidity(uint256 usdcAmount) external nonReentrant {
-        require(usdcAmount > 0, "CIP: Deposit amount must be positive");
+        require(usdcAmount >= MIN_USDC_AMOUNT, "CIP: Amount below minimum");
         
         uint256 sharesToMint;
         uint256 totalCatSharesSupply = catShareToken.totalSupply();
@@ -159,7 +160,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         uint256 totalCatSharesSupply = catShareToken.totalSupply();
         uint256 currentTotalValueInPool = liquidUsdc();
         uint256 usdcToWithdraw = (catShareAmountBurn * currentTotalValueInPool) / totalCatSharesSupply;
-        require(usdcToWithdraw > 0, "CIP: Calculated withdrawal amount is zero");
+        require(usdcToWithdraw >= MIN_USDC_AMOUNT, "CIP: Withdrawal amount below minimum");
 
         catShareToken.burn(msg.sender, catShareAmountBurn);
 

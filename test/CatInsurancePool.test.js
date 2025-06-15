@@ -50,6 +50,21 @@ describe("CatInsurancePool", function () {
     expect(await usdc.balanceOf(catPool.target)).to.equal(amount);
   });
 
+  it("reverts when deposit is below minimum", async function () {
+    const { catPool, user1 } = await loadFixture(deployFixture);
+    await expect(catPool.connect(user1).depositLiquidity(1))
+      .to.be.revertedWith("CIP: Amount below minimum");
+  });
+
+  it("allows depositing exactly the minimum", async function () {
+    const { catPool, user1, catShare } = await loadFixture(deployFixture);
+    const min = toWei(1, 6);
+    await expect(catPool.connect(user1).depositLiquidity(min))
+      .to.emit(catPool, "CatLiquidityDeposited")
+      .withArgs(user1.address, min, min);
+    expect(await catShare.balanceOf(user1.address)).to.equal(min);
+  });
+
   it("Second depositor receives shares based on NAV after yield", async function () {
     const { catPool, user1, user2, catShare, adapter, owner } = await loadFixture(deployFixture);
     const dep1 = toWei(1000, 6);
@@ -85,6 +100,27 @@ describe("CatInsurancePool", function () {
       .withArgs(user1.address, expectedUsdc, sharesToBurn);
     expect(await usdc.balanceOf(user1.address)).to.equal(beforeBalance + expectedUsdc);
     expect(await adapter.totalValueHeld()).to.equal(totalValue - expectedUsdc);
+  });
+
+  it("reverts when withdrawal amount is below minimum", async function () {
+    const { catPool, user1 } = await loadFixture(deployFixture);
+    const deposit = toWei(10, 6);
+    await catPool.connect(user1).depositLiquidity(deposit);
+    await expect(catPool.connect(user1).withdrawLiquidity(1))
+      .to.be.revertedWith("CIP: Withdrawal amount below minimum");
+  });
+
+  it("allows withdrawing exactly the minimum", async function () {
+    const { catPool, user1, catShare, usdc } = await loadFixture(deployFixture);
+    const deposit = toWei(10, 6);
+    await catPool.connect(user1).depositLiquidity(deposit);
+    const min = toWei(1, 6);
+    const before = await usdc.balanceOf(user1.address);
+    await expect(catPool.connect(user1).withdrawLiquidity(min))
+      .to.emit(catPool, "CatLiquidityWithdrawn")
+      .withArgs(user1.address, min, min);
+    expect(await usdc.balanceOf(user1.address)).to.equal(before + min);
+    expect(await catShare.balanceOf(user1.address)).to.equal(deposit - min);
   });
 
   it("flushToAdapter deposits idle funds", async function () {
