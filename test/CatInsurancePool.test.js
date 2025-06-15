@@ -18,7 +18,7 @@ async function deployFixture() {
   const catPool = await CatInsurancePool.deploy(usdc.target, adapter.target, owner.address);
 
   await adapter.connect(owner).setDepositor(catPool.target);
-  await catPool.connect(owner).setCoverPoolAddress(coverPoolAcc.address);
+  await catPool.connect(owner).setPolicyManagerAddress(coverPoolAcc.address);
 
   const catShare = await hardhatEthers.getContractAt("CatShare", await catPool.catShareToken());
 
