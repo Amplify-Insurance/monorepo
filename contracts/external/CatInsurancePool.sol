@@ -15,6 +15,7 @@ interface IRewardDistributor {
     function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
     function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
     function pendingRewards(address user, uint256 poolId, address rewardToken, uint256 userPledge) external view returns (uint256);
+    function setCatPool(address _catPool) external;
 }
 
 contract CatInsurancePool is Ownable, ReentrancyGuard {
@@ -94,6 +95,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     function setRewardDistributor(address _rewardDistributor) external onlyOwner {
         require(_rewardDistributor != address(0), "CIP: Address cannot be zero");
         rewardDistributor = IRewardDistributor(_rewardDistributor);
+        rewardDistributor.setCatPool(address(this));
         emit RewardDistributorSet(_rewardDistributor);
     }
 

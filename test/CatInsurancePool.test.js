@@ -38,7 +38,6 @@ async function deployFixture() {
   const RewardDistributor = await hardhatEthers.getContractFactory("RewardDistributor");
   const rewardDist = await RewardDistributor.deploy(catPool.target);
   await catPool.connect(owner).setRewardDistributor(rewardDist.target);
-  await rewardDist.connect(owner).setCatPool(catPool.target);
   await catPool.connect(owner).setRiskManagerAddress(coverPoolAcc.address);
 
   return { owner, coverPoolAcc, user1, user2, other, usdc, Proto, adapter, catPool, catShare, rewardDist };
