@@ -31,4 +31,22 @@
     "name": "ProposalExecuted",
     "type": "event"
   }
+  ,{
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "proposalId", "type": "uint256"},
+      {"indexed": false, "internalType": "bool", "name": "wasSlashed", "type": "bool"}
+    ],
+    "name": "BondResolved",
+    "type": "event"
+  },{
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "proposalId", "type": "uint256"},
+      {"indexed": true, "internalType": "address", "name": "user", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
+    ],
+    "name": "RewardClaimed",
+    "type": "event"
+  }
 ]
