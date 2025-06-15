@@ -42,6 +42,26 @@ async function main() {
   const policyNFT = await PolicyNFT.deploy(deployer.address);
   await policyNFT.waitForDeployment();
 
+  const RiskManager = await ethers.getContractFactory("RiskManager");
+  const riskManager = await RiskManager.deploy(deployer.address);
+  await riskManager.waitForDeployment();
+
+  const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
+  const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target);
+  await poolRegistry.waitForDeployment();
+
+  const LossDistributor = await ethers.getContractFactory("LossDistributor");
+  const lossDistributor = await LossDistributor.deploy(riskManager.target);
+  await lossDistributor.waitForDeployment();
+
+  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+  const rewardDistributor = await RewardDistributor.deploy(riskManager.target);
+  await rewardDistributor.waitForDeployment();
+
+  const PolicyManager = await ethers.getContractFactory("PolicyManager");
+  const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
+  await policyManager.waitForDeployment();
+
   const CatInsurancePool = await ethers.getContractFactory("CatInsurancePool");
   const catPool = await CatInsurancePool.deploy(WETH_ADDRESS, ethers.ZeroAddress, deployer.address);
   await catPool.waitForDeployment();
@@ -50,15 +70,15 @@ async function main() {
   const capitalPool = await CapitalPool.deploy(deployer.address, WETH_ADDRESS);
   await capitalPool.waitForDeployment();
 
-  const RiskManager = await ethers.getContractFactory("RiskManager");
-  const riskManager = await RiskManager.deploy(capitalPool.target, policyNFT.target, catPool.target);
-  await riskManager.waitForDeployment();
-
-  // Wiring permissions
-  // await policyNFT.setCoverPoolAddress(riskManager.target);
-  await catPool.setCoverPoolAddress(riskManager.target);
+  // Wire permissions and addresses
   await capitalPool.setRiskManager(riskManager.target);
-  await policyNFT.setRiskManager(riskManager.target);
+  await catPool.setRiskManagerAddress(riskManager.target);
+  await catPool.setCapitalPoolAddress(capitalPool.target);
+  await catPool.setPolicyManagerAddress(policyManager.target);
+  await catPool.setRewardDistributor(rewardDistributor.target);
+
+  await policyManager.setAddresses(poolRegistry.target, capitalPool.target, catPool.target, rewardDistributor.target, riskManager.target);
+  await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyManager.target, catPool.target, lossDistributor.target);
 
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
@@ -104,11 +124,15 @@ async function main() {
 
   /*──────────────────────────────── Output ──────────────────────────────*/
   const addresses = {
-    PolicyNFT:        policyNFT.target,
-    CatInsurancePool: catPool.target,
-    CapitalPool:      capitalPool.target,
-    RiskManager:      riskManager.target,
-    "Aave Adapter":   aaveAdapter.target,
+    PolicyNFT:         policyNFT.target,
+    PolicyManager:     policyManager.target,
+    PoolRegistry:      poolRegistry.target,
+    CatInsurancePool:  catPool.target,
+    CapitalPool:       capitalPool.target,
+    LossDistributor:   lossDistributor.target,
+    RewardDistributor: rewardDistributor.target,
+    RiskManager:       riskManager.target,
+    "Aave Adapter":    aaveAdapter.target,
     "Compound Adapter": compoundAdapter.target,
     "Moonwell Adapter": moonwellAdapter.target,
     "Euler Adapter":    eulerAdapter.target,
