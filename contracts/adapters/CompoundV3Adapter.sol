@@ -4,35 +4,42 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IYieldAdapter.sol";
 
 // Interfaces for Compound V3
+// CORRECTED: Expanded interface to include necessary functions for value calculation
 interface IComet {
     function supply(address asset, uint256 amount) external;
     function withdraw(address asset, uint256 amount) external;
     function baseToken() external view returns (address);
     function balanceOf(address account) external view returns (uint256);
+
+    struct UserBasic {
+        int104 principal;
+        uint64 baseTrackingIndex;
+    }
+    function userBasic(address) external view returns (UserBasic memory);
+    function baseSupplyIndex() external view returns (uint256);
 }
+
 interface ICometWithRates is IComet {
     function getUtilization() external view returns (uint256);
     function getSupplyRate(uint256 utilization) external view returns (uint256);
 }
 
-contract CompoundV3Adapter is IYieldAdapter, Ownable {
+contract CompoundV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable underlyingToken;
     IComet public immutable comet;
     uint256 private constant SECONDS_PER_YEAR = 365 days;
 
-    // --- ADDED: State variable for the CapitalPool address ---
     address public capitalPoolAddress;
 
-    // --- Events ---
     event FundsWithdrawn(address indexed to, uint256 requestedAmount, uint256 actualAmount);
     event CapitalPoolAddressSet(address indexed newCapitalPool);
 
-    // --- ADDED: Modifier to restrict calls to the CapitalPool only ---
     modifier onlyCapitalPool() {
         require(msg.sender == capitalPoolAddress, "CompoundV3Adapter: Caller is not CapitalPool");
         _;
@@ -43,11 +50,9 @@ contract CompoundV3Adapter is IYieldAdapter, Ownable {
         require(asset != address(0), "CompoundV3Adapter: invalid asset");
         underlyingToken = IERC20(asset);
         comet = _comet;
-        // The approval to the Comet contract is still necessary
         underlyingToken.approve(address(_comet), type(uint256).max);
     }
 
-    // --- ADDED: Function for the deployer to set the CapitalPool address ---
     function setCapitalPoolAddress(address _capitalPoolAddress) external onlyOwner {
         require(_capitalPoolAddress != address(0), "CompoundV3Adapter: Zero address");
         capitalPoolAddress = _capitalPoolAddress;
@@ -58,20 +63,17 @@ contract CompoundV3Adapter is IYieldAdapter, Ownable {
         return underlyingToken;
     }
 
-    // --- UPDATED: Restricted deposit function to CapitalPool only ---
-    function deposit(uint256 _amountToDeposit) external override onlyCapitalPool {
+    function deposit(uint256 _amountToDeposit) external override onlyCapitalPool nonReentrant {
         require(_amountToDeposit > 0, "CompoundV3Adapter: amount zero");
-        // This logic is correct: CapitalPool calls this, so msg.sender is CapitalPool.
-        // It transfers funds from CapitalPool to this adapter.
         underlyingToken.safeTransferFrom(msg.sender, address(this), _amountToDeposit);
         comet.supply(address(underlyingToken), _amountToDeposit);
     }
 
-    // --- UPDATED: Replaced onlyOwner with onlyCapitalPool ---
     function withdraw(uint256 _targetAmountOfUnderlyingToWithdraw, address _to)
         external
         override
         onlyCapitalPool
+        nonReentrant
         returns (uint256 actuallyWithdrawn)
     {
         require(_to != address(0), "CompoundV3Adapter: zero address");
@@ -83,7 +85,6 @@ contract CompoundV3Adapter is IYieldAdapter, Ownable {
         comet.withdraw(address(underlyingToken), _targetAmountOfUnderlyingToWithdraw);
         uint256 afterBal = underlyingToken.balanceOf(address(this));
         
-        // This check is crucial as Compound's withdraw doesn't return a value.
         actuallyWithdrawn = afterBal - beforeBal;
 
         if (actuallyWithdrawn > 0) {
@@ -93,17 +94,31 @@ contract CompoundV3Adapter is IYieldAdapter, Ownable {
         emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
     }
 
+    /**
+     * @notice CORRECTED: This function now accurately calculates the total value held by the adapter,
+     * including accrued yield from Compound v3.
+     */
     function getCurrentValueHeld() external view override returns (uint256) {
         uint256 liquid = underlyingToken.balanceOf(address(this));
-        // For Compound V3, comet.balanceOf() returns the principal amount supplied in terms of the underlying asset.
-        uint256 supplied = comet.balanceOf(address(this));
-        // This correctly represents the total value held by the adapter.
-        return liquid + supplied;
+        
+        IComet.UserBasic memory basic = comet.userBasic(address(this));
+        
+        // In Compound v3, the principal can be negative if the account has borrowed.
+        // As this adapter should only ever be a supplier, we treat negative principal as zero.
+        if (basic.principal <= 0) {
+            return liquid;
+        }
+
+        uint256 supplyIndex = comet.baseSupplyIndex();
+        
+        // The value of supplied assets is (principal * supplyIndex) / baseTrackingIndex
+        // The baseTrackingIndex is stored with 1e15 precision, so we adjust the supplyIndex.
+        // CORRECTED: Explicitly cast the signed int to a larger signed int first, then to uint256.
+        uint256 suppliedValue = (uint256(int256(basic.principal)) * supplyIndex) / (10**15);
+
+        return liquid + suppliedValue;
     }
 
-    /**
-     * @return aprWad  Current supplier APR, 1 = 1×10-18 (i.e. 1e-18-scaled)
-     */
     function currentApr() external view returns (uint256 aprWad) {
         ICometWithRates c = ICometWithRates(address(comet));
         uint256 util = c.getUtilization();

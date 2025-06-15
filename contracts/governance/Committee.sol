@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // Interfaces for other contracts
 interface IRiskManager {
@@ -16,7 +17,7 @@ interface IStakingContract {
     function governanceToken() external view returns (IERC20);
 }
 
-contract Committee is Ownable {
+contract Committee is Ownable, ReentrancyGuard {
 
     /* ───────────────────────── State Variables ──────────────────────── */
 
@@ -32,7 +33,7 @@ contract Committee is Ownable {
     uint256 public proposerFeeShareBps; // Share of fees going to the proposer (e.g., 1000 = 10%)
 
     enum ProposalType { Unpause, Pause }
-    enum VoteOption { Against, For }
+    enum VoteOption { None, Against, For } // Added None for default
     enum ProposalStatus { Pending, Active, Succeeded, Defeated, Executed, Challenged, Resolved }
 
     struct Proposal {
@@ -45,26 +46,28 @@ contract Committee is Ownable {
         uint256 forVotes;
         uint256 againstVotes;
         bool executed;
-        // Bond-specific fields
         ProposalStatus status;
         uint256 bondAmount;
         uint256 challengeDeadline;
         uint256 totalRewardFees;
-        // Mappings
-        mapping(address => bool) hasVoted;
-        mapping(address => uint256) voterRewards;
+        mapping(address => VoteOption) votes;
     }
 
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public hasClaimedReward;
     
-    // ... (Events from previous Committee contract) ...
     event ProposalCreated(uint256 indexed proposalId, address indexed proposer, uint256 poolId, ProposalType pType);
     event Voted(uint256 indexed proposalId, address indexed voter, VoteOption vote, uint256 weight);
     event ProposalExecuted(uint256 indexed proposalId);
     event BondResolved(uint256 indexed proposalId, bool wasSlashed);
     event RewardClaimed(uint256 indexed proposalId, address indexed user, uint256 amount);
 
+    /* ───────────────────────── Modifiers ───────────────────────── */
+
+    modifier onlyRiskManager() {
+        require(msg.sender == address(riskManager), "Committee: Not RiskManager");
+        _;
+    }
 
     /* ───────────────────────── Constructor ──────────────────────── */
 
@@ -116,13 +119,17 @@ contract Committee is Ownable {
         Proposal storage p = proposals[_proposalId];
         require(p.status == ProposalStatus.Active, "Proposal not active");
         require(block.timestamp < p.votingDeadline, "Voting ended");
-        require(!p.hasVoted[msg.sender], "Already voted");
+        require(p.votes[msg.sender] == VoteOption.None, "Already voted");
+        require(_vote != VoteOption.None, "Invalid vote option");
 
-        p.hasVoted[msg.sender] = true;
+        p.votes[msg.sender] = _vote;
         uint256 weight = stakingContract.stakedBalance(msg.sender);
 
-        if (_vote == VoteOption.For) p.forVotes += weight;
-        else p.againstVotes += weight;
+        if (_vote == VoteOption.For) {
+            p.forVotes += weight;
+        } else {
+            p.againstVotes += weight;
+        }
 
         emit Voted(_proposalId, msg.sender, _vote, weight);
     }
@@ -137,7 +144,6 @@ contract Committee is Ownable {
         
         if (p.forVotes + p.againstVotes < requiredQuorum || p.forVotes <= p.againstVotes) {
             p.status = ProposalStatus.Defeated;
-            // If a pause proposal is defeated, return the bond immediately.
             if (p.pType == ProposalType.Pause) {
                 governanceToken.transfer(p.proposer, p.bondAmount);
             }
@@ -160,10 +166,6 @@ contract Committee is Ownable {
         emit ProposalExecuted(_proposalId);
     }
     
-    /**
-     * @notice After a challenge period for a PAUSE proposal, anyone can call this to
-     * resolve the bond, either returning it or slashing it.
-     */
     function resolvePauseBond(uint256 _proposalId) external {
         Proposal storage p = proposals[_proposalId];
         require(p.pType == ProposalType.Pause, "Not a pause proposal");
@@ -172,36 +174,29 @@ contract Committee is Ownable {
 
         p.status = ProposalStatus.Resolved;
         
-        // This is the crucial check. If any fees were collected, the pause was legitimate.
         if (p.totalRewardFees > 0) {
-            // Return bond to proposer
             governanceToken.transfer(p.proposer, p.bondAmount);
-            emit BondResolved(_proposalId, false); // Not slashed
+            emit BondResolved(_proposalId, false);
         } else {
-            // Slash bond and transfer it for distribution
             stakingContract.slash(p.proposer, p.bondAmount);
-            // The slashed tokens are now held by this contract for distribution to 'Against' voters.
-            // A separate claim function would handle this. For now, we simplify.
-            emit BondResolved(_proposalId, true); // Slashed
+            emit BondResolved(_proposalId, true);
         }
     }
 
     /* ───────────────────── Reward Functions ───────────────────── */
 
     /**
-     * @notice Entry point for the RiskManager to send claim fees.
+     * @notice CORRECTED: Only the trusted RiskManager can forward fees to this contract.
      */
-    function receiveFees(uint256 _proposalId) external payable {
-        // This function would be called by RM, but for simplicity we allow anyone to deposit
-        // and link it to a proposal. A real implementation would secure this.
+    function receiveFees(uint256 _proposalId) external payable onlyRiskManager {
         proposals[_proposalId].totalRewardFees += msg.value;
     }
 
-    function claimReward(uint256 _proposalId) external {
+    function claimReward(uint256 _proposalId) external nonReentrant {
         Proposal storage p = proposals[_proposalId];
         require(p.status == ProposalStatus.Resolved || p.status == ProposalStatus.Executed, "Proposal not resolved");
         require(p.totalRewardFees > 0, "No rewards to claim");
-        require(p.hasVoted[msg.sender], "You did not vote"); // Simplification: must have voted For
+        require(p.votes[msg.sender] == VoteOption.For, "Must have voted 'For' to claim rewards");
         require(!hasClaimedReward[_proposalId][msg.sender], "Reward already claimed");
 
         hasClaimedReward[_proposalId][msg.sender] = true;
@@ -213,7 +208,7 @@ contract Committee is Ownable {
             userReward += proposerBonus;
         }
         
-        uint256 remainingFees = totalFees - ((totalFees * proposerFeeShareBps) / 10000);
+        uint256 remainingFees = totalFees - userReward;
         uint256 userWeight = stakingContract.stakedBalance(msg.sender);
         userReward += (remainingFees * userWeight) / p.forVotes;
 

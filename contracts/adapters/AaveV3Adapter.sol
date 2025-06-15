@@ -69,8 +69,15 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
         return underlyingToken;
     }
 
-    function deposit(uint256 _amountToDeposit) external override {
+    /**
+     * @notice CORRECTED: Added the onlyCapitalPool modifier to prevent unauthorized deposits
+     * and protect against NAV manipulation attacks.
+     */
+    function deposit(uint256 _amountToDeposit) external override onlyCapitalPool {
         require(_amountToDeposit > 0, "AaveV3Adapter: amount zero");
+        // The CapitalPool now holds the funds and calls this function.
+        // It must have approved this adapter contract to spend its funds.
+        // The safeTransferFrom will pull the funds from the CapitalPool.
         underlyingToken.safeTransferFrom(msg.sender, address(this), _amountToDeposit);
         aavePool.supply(address(underlyingToken), _amountToDeposit, address(this), 0);
     }
