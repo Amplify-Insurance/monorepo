@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getCapitalPool } from '@/lib/capitalPool'
 import { getRiskManager } from '@/lib/riskManager'
+import { getPoolRegistry } from '@/lib/poolRegistry'
 import deployments from '../../../config/deployments'
 
 export async function GET(
@@ -17,16 +18,17 @@ export async function GET(
     for (const dep of deployments) {
       const cp = getCapitalPool(dep.capitalPool, dep.name)
       const rm = getRiskManager(dep.riskManager, dep.name)
+      const pr = getPoolRegistry(dep.poolRegistry, dep.name)
 
       try {
         const account = await cp.getUnderwriterAccount(addr)
 
         let poolCount = 0n
         try {
-          poolCount = await (rm as any).protocolRiskPoolsLength()
+          poolCount = await pr.getPoolCount()
         } catch {
           while (true) {
-            try { await rm.getPoolInfo(poolCount); poolCount++ } catch { break }
+            try { await pr.getPoolData(poolCount); poolCount++ } catch { break }
           }
         }
 

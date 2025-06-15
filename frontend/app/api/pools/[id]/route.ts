@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 // import your provider and contract instances
-import { getRiskManager } from '../../../../lib/riskManager';
+import { getPoolRegistry } from '../../../../lib/poolRegistry';
 import deployments from '../../../config/deployments';
 
 export async function GET(
@@ -15,9 +15,19 @@ export async function GET(
   }
 
   for (const dep of deployments) {
-    const riskManager = getRiskManager(dep.riskManager, dep.name);
+    const poolRegistry = getPoolRegistry(dep.poolRegistry, dep.name);
     try {
-      const poolInfo = await riskManager.getPoolInfo(idNum);
+      const data = await poolRegistry.getPoolData(idNum);
+      const rate = await poolRegistry.getPoolRateModel(idNum);
+      const poolInfo = {
+        protocolTokenToCover: data[0],
+        totalCapitalPledgedToPool: data[1],
+        totalCoverageSold: data[2],
+        capitalPendingWithdrawal: data[3],
+        isPaused: data[4],
+        feeRecipient: data[5],
+        rateModel: rate,
+      };
       return NextResponse.json({ id: idNum, deployment: dep.name, poolInfo });
     } catch {}
   }

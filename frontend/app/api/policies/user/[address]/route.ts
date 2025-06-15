@@ -1,7 +1,7 @@
 // app/api/policies/user/[address]/route.ts
 import { NextResponse } from 'next/server'
 import { policyNft } from '@/lib/policyNft'
-import { getRiskManager } from '@/lib/riskManager'
+import { getPoolRegistry } from '@/lib/poolRegistry'
 import deployments from '../../../../config/deployments'
 
 export async function GET(
@@ -23,11 +23,13 @@ export async function GET(
           const p = await policyNft.getPolicy(i)
           let deployment: string | null = null
           for (const dep of deployments) {
-            const rm = getRiskManager(dep.riskManager)
+            const pr = getPoolRegistry(dep.poolRegistry)
             try {
-              await rm.getPoolInfo(p.poolId)
-              deployment = dep.name
-              break
+              const count = await pr.getPoolCount()
+              if (BigInt(p.poolId) < count) {
+                deployment = dep.name
+                break
+              }
             } catch {}
           }
           policies.push({ id: Number(i), deployment, ...p })
