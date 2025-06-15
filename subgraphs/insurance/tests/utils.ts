@@ -12,7 +12,7 @@ export function createDepositEvent(user: Address, amount: BigInt, shares: BigInt
   return event
 }
 
-import { PolicyCreated, ClaimProcessed } from '../generated/RiskManager/RiskManager'
+import { PolicyCreated, ClaimProcessed } from '../generated/RiskManagerV2/RiskManager'
 
 export function createPolicyCreatedEvent(
   user: Address,
@@ -46,7 +46,7 @@ export function createTransferEvent(
   return event
 }
 
-import { PoolAdded } from '../generated/RiskManager/RiskManager'
+import { PoolAdded } from '../generated/RiskManagerV2/RiskManager'
 
 export function createPoolAddedEvent(
   poolId: BigInt,
@@ -93,7 +93,7 @@ export function createClaimProcessedEvent(
   return event
 }
 
-import { PolicyLapsed, PremiumPaid } from '../generated/RiskManager/RiskManager'
+import { PolicyLapsed, PremiumPaid } from '../generated/RiskManagerV2/RiskManager'
 
 export function createPolicyLapsedEvent(policyId: BigInt): PolicyLapsed {
   let event = changetype<PolicyLapsed>(newMockEvent())
@@ -119,7 +119,7 @@ export function createPremiumPaidEvent(
   return event
 }
 
-import { OwnershipTransferred as RMOwnershipTransferred } from '../generated/RiskManager/RiskManager'
+import { OwnershipTransferred as RMOwnershipTransferred } from '../generated/RiskManagerV2/RiskManager'
 import { ProposalCreated, Voted, ProposalExecuted } from '../generated/Committee/Committee'
 
 export function createOwnershipTransferredEvent(

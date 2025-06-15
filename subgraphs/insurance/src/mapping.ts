@@ -15,8 +15,8 @@ import {
   CommitteeSet,
   UnderwriterLiquidated,
   OwnershipTransferred as RiskManagerOwnershipTransferred
-} from "../generated/RiskManager/RiskManager";
-import { RiskManager } from "../generated/RiskManager/RiskManager";
+} from "../generated/RiskManagerV2/RiskManager";
+import { RiskManager } from "../generated/RiskManagerV2/RiskManager";
 import {
   RiskManagerSet,
   BaseYieldAdapterSet,
