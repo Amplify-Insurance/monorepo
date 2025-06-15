@@ -20,6 +20,8 @@ if (!deployments.length) {
       poolManager: process.env.NEXT_PUBLIC_POOL_MANAGER_ADDRESS,
       priceOracle: process.env.NEXT_PUBLIC_PRICE_ORACLE_ADDRESS,
       multicallReader: process.env.NEXT_PUBLIC_MULTICALL_READER_ADDRESS,
+      lossDistributor: process.env.NEXT_PUBLIC_LOSS_DISTRIBUTOR_ADDRESS,
+      rewardDistributor: process.env.NEXT_PUBLIC_REWARD_DISTRIBUTOR_ADDRESS,
     },
   ];
 }

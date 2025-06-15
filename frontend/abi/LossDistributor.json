@@ -1,0 +1,13 @@
+[
+  {
+    "inputs": [
+      {"internalType": "address", "name": "user", "type": "address"},
+      {"internalType": "uint256", "name": "poolId", "type": "uint256"},
+      {"internalType": "uint256", "name": "userPledge", "type": "uint256"}
+    ],
+    "name": "getPendingLosses",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

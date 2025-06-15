@@ -152,6 +152,8 @@ Each deployment object supports the following keys:
 - `catPool` – `CatInsurancePool` contract address
 - `priceOracle` – `PriceOracle` contract address
 - `multicallReader` – `MulticallReader` contract address
+- `lossDistributor` – `LossDistributor` contract address
+- `rewardDistributor` – `RewardDistributor` contract address
 - `rpcUrl` – RPC endpoint for read‑only queries
 - `subgraphUrl` – GraphQL endpoint for the deployment's subgraph
 
@@ -164,6 +166,8 @@ NEXT_PUBLIC_DEPLOYMENTS='[
     "riskManager": "0xabc...",
     "capitalPool": "0xdef...",
     "catPool": "0xghi...",
+    "lossDistributor": "0xlmn...",
+    "rewardDistributor": "0xopq...",
     "priceOracle": "0xjkl...",
     "multicallReader": "0x123...",
     "rpcUrl": "https://base.publicnode.com",
@@ -174,6 +178,8 @@ NEXT_PUBLIC_DEPLOYMENTS='[
     "riskManager": "0x123...",
     "capitalPool": "0x456...",
     "catPool": "0x789...",
+    "lossDistributor": "0xuvw...",
+    "rewardDistributor": "0xyz...",
     "priceOracle": "0xabc...",
     "multicallReader": "0xdef...",
     "rpcUrl": "https://optimism.publicnode.com",
