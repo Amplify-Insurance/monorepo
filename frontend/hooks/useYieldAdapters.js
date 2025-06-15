@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { getYieldPlatformInfo } from '../app/config/yieldPlatforms';
+import { YieldPlatform, getYieldPlatformInfo } from '../app/config/yieldPlatforms';
 import { getTokenSymbol } from '../lib/erc20';
 
 export default function useYieldAdapters() {
@@ -13,15 +13,15 @@ export default function useYieldAdapters() {
         if (res.ok) {
           const data = await res.json();
           const decimalsMap = {
-            0: 27, // Aave APR returned with 27 decimals
-            1: 18, // Compound uses 18 decimals
+            [YieldPlatform.AAVE]: 27, // Aave APR returned with 27 decimals
+            [YieldPlatform.COMPOUND]: 18, // Compound uses 18 decimals
           };
 
           const list = await Promise.all(
-            (data.adapters || []).map(async (item, index) => {
+            (data.adapters || []).map(async (item) => {
               let apr = 0;
               try {
-                const decimals = decimalsMap[index] ?? 18;
+                const decimals = decimalsMap[item.id] ?? 18;
                 apr =
                   parseFloat(
                     ethers.utils.formatUnits(item.apr || '0', decimals),
@@ -34,12 +34,12 @@ export default function useYieldAdapters() {
               } catch {}
 
               return {
-                id: index,
+                id: item.id,
                 address: item.address,
                 apr,
                 asset: item.asset,
                 assetSymbol: symbol,
-                ...getYieldPlatformInfo(index),
+                ...getYieldPlatformInfo(item.id),
               };
             }),
           );
