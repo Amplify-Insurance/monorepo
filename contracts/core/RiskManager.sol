@@ -1,0 +1,297 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+
+// --- Local Interfaces ---
+
+interface IPoolRegistry {
+    enum ProtocolRiskIdentifier { NONE, PROTOCOL_A, PROTOCOL_B, LIDO_STETH, ROCKET_RETH }
+    struct RateModel {
+        uint256 base;
+        uint256 slope1;
+        uint256 slope2;
+        uint256 kink;
+    }
+    function addProtocolRiskPool(address, RateModel calldata, ProtocolRiskIdentifier) external returns (uint256);
+    function updateCapitalAllocation(uint256 poolId, address adapterAddress, uint256 pledgeAmount, bool isAllocation) external;
+    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external;
+    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
+    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
+}
+
+interface ICapitalPool {
+    struct PayoutData {
+        address claimant;
+        uint256 claimantAmount;
+        address feeRecipient;
+        uint256 feeAmount;
+        address[] adapters;
+        uint256[] capitalPerAdapter;
+        uint256 totalCapitalFromPoolLPs;
+    }
+    function applyLosses(address underwriter, uint256 principalLossAmount) external;
+    function underlyingAsset() external view returns (IERC20);
+    function executePayout(PayoutData calldata payoutData) external;
+    function getUnderwriterAdapterAddress(address underwriter) external view returns (address);
+    function getUnderwriterAccount(address underwriter) external view returns (uint256, uint8, uint256, uint256, uint256);
+    function sharesToValue(uint256 shares) external view returns (uint256);
+}
+
+interface IPolicyNFT {
+    function getPolicy(uint256 policyId) external view returns (uint256, uint256, uint256, uint128, uint128);
+    function ownerOf(uint256 policyId) external view returns (address);
+    function burn(uint256 policyId) external;
+}
+
+interface ICatInsurancePool {
+    function drawFund(uint256 amount) external;
+}
+
+interface ILossDistributor {
+    function distributeLoss(uint256 poolId, uint256 lossAmount, uint256 totalPledgeInPool) external;
+    function realizeLosses(address user, uint256 poolId, uint256 userPledge) external returns (uint256);
+    function getPendingLosses(address user, uint256 poolId, uint256 userPledge) external view returns (uint256);
+}
+
+/**
+ * @title RiskManager
+ * @author Gemini
+ * @notice A lean orchestrator for a decentralized insurance protocol. It manages capital allocation,
+ * claim processing, and liquidations by coordinating with specialized satellite contracts.
+ */
+contract RiskManager is Ownable {
+
+    /* ───────────────────────── State Variables ───────────────────────── */
+    ICapitalPool public capitalPool;
+    IPoolRegistry public poolRegistry;
+    IPolicyNFT public policyNFT;
+    ICatInsurancePool public catPool;
+    ILossDistributor public lossDistributor;
+    address public policyManager; // The only contract that can call updateCoverageSold
+    address public committee;
+
+    mapping(address => uint256) public underwriterTotalPledge;
+    mapping(uint256 => address[]) public poolSpecificUnderwriters;
+    mapping(address => uint256[]) public underwriterAllocations;
+    mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
+    mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
+    
+    uint256 public constant MAX_ALLOCATIONS_PER_UNDERWRITER = 5;
+    uint256 public constant CLAIM_FEE_BPS = 500;
+    // CORRECTED: Added missing constant declaration
+    uint256 public constant BPS = 10_000;
+
+    /* ───────────────────────── Errors & Events ───────────────────────── */
+    error NotCapitalPool();
+    error NotPolicyManager();
+    error NoCapitalToAllocate();
+    error ExceedsMaxAllocations();
+    error InvalidPoolId();
+    error AlreadyAllocated();
+    error NotAllocated();
+    error UnderwriterNotInsolvent();
+
+    event AddressesSet(address capital, address registry, address policy, address cat, address loss);
+    event CommitteeSet(address committee);
+    event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
+    event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
+    event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
+
+    /* ───────────────────── Constructor & Setup ───────────────────── */
+
+    constructor(address _initialOwner) Ownable(_initialOwner) {}
+
+    function setAddresses(address _capital, address _registry, address _policy, address _cat, address _loss) external onlyOwner {
+        capitalPool = ICapitalPool(_capital);
+        poolRegistry = IPoolRegistry(_registry);
+        policyManager = _policy;
+        policyNFT = IPolicyNFT(Ownable(_policy).owner()); // Assuming PolicyManager owns the NFT contract
+        catPool = ICatInsurancePool(_cat);
+        lossDistributor = ILossDistributor(_loss);
+        emit AddressesSet(_capital, _registry, _policy, _cat, _loss);
+    }
+
+    function setCommittee(address _committee) external onlyOwner {
+        committee = _committee;
+        emit CommitteeSet(_committee);
+    }
+    
+    /* ──────────────── Underwriter Capital Allocation ──────────────── */
+    
+    function allocateCapital(uint256[] calldata _poolIds) external {
+        uint256 totalPledge = underwriterTotalPledge[msg.sender];
+        if (totalPledge == 0) revert NoCapitalToAllocate();
+        require(_poolIds.length > 0 && _poolIds.length <= MAX_ALLOCATIONS_PER_UNDERWRITER, "Invalid number of allocations");
+
+        address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(msg.sender);
+        require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
+
+        for(uint i = 0; i < _poolIds.length; i++){
+            uint256 poolId = _poolIds[i];
+            require(poolId < 100, "Invalid poolId"); // Placeholder for actual pool count check
+            require(!isAllocatedToPool[msg.sender][poolId], "Already allocated to this pool");
+            
+            poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, totalPledge, true);
+
+            isAllocatedToPool[msg.sender][poolId] = true;
+            underwriterAllocations[msg.sender].push(poolId);
+            poolSpecificUnderwriters[poolId].push(msg.sender);
+            underwriterIndexInPoolArray[poolId][msg.sender] = poolSpecificUnderwriters[poolId].length - 1;
+            
+            emit CapitalAllocated(msg.sender, poolId, totalPledge);
+        }
+    }
+    
+    function deallocateFromPool(uint256 _poolId) external {
+        address underwriter = msg.sender;
+        _realizeLossesForAllPools(underwriter);
+        
+        uint256 totalPledge = underwriterTotalPledge[underwriter];
+        if (totalPledge == 0) revert NoCapitalToAllocate();
+        require(_poolId < 100, "Invalid poolId");
+        require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
+        
+        // Removed claim rewards logic, as it's now handled by the user via PolicyManager
+        
+        // This solvency check is now implicitly handled by the CapitalPool's withdrawal request hook
+        
+        address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
+        require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
+        
+        poolRegistry.updateCapitalAllocation(_poolId, userAdapterAddress, totalPledge, false);
+        _removeUnderwriterFromPool(underwriter, _poolId);
+
+        emit CapitalDeallocated(underwriter, _poolId, totalPledge);
+    }
+
+    /* ───────────────────── Keeper & Liquidation Functions ───────────────────── */
+
+    function liquidateInsolventUnderwriter(address _underwriter) external {
+        (,, uint256 masterShares,,) = capitalPool.getUnderwriterAccount(_underwriter);
+        if (masterShares == 0) revert UnderwriterNotInsolvent();
+
+        uint256 totalShareValue = capitalPool.sharesToValue(masterShares);
+        
+        uint256[] memory allocations = underwriterAllocations[_underwriter];
+        uint256 pledge = underwriterTotalPledge[_underwriter];
+        uint256 totalPendingLosses = 0;
+        
+        for (uint i = 0; i < allocations.length; i++) {
+            totalPendingLosses += lossDistributor.getPendingLosses(_underwriter, allocations[i], pledge);
+        }
+
+        if (totalPendingLosses < totalShareValue) revert UnderwriterNotInsolvent();
+
+        _realizeLossesForAllPools(_underwriter);
+
+        emit UnderwriterLiquidated(msg.sender, _underwriter);
+    }
+
+    /* ───────────────────── Claim Processing ───────────────────── */
+
+    function processClaim(uint256 _policyId) external {
+        // This function would be permissioned to be called by a trusted claim assessor role or the committee
+        (uint256 poolId, uint256 coverage, , ,) = policyNFT.getPolicy(_policyId);
+        (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) = poolRegistry.getPoolPayoutData(poolId);
+        
+        lossDistributor.distributeLoss(poolId, coverage, totalCapitalPledged);
+        
+        uint256 lossBorneByPool = Math.min(coverage, totalCapitalPledged);
+        uint256 shortfall = coverage > lossBorneByPool ? coverage - lossBorneByPool : 0;
+        if (shortfall > 0) {
+            catPool.drawFund(shortfall);
+        }
+        
+        uint256 claimFee = (coverage * CLAIM_FEE_BPS) / BPS;
+        
+        ICapitalPool.PayoutData memory payoutData;
+        payoutData.claimant = policyNFT.ownerOf(_policyId);
+        payoutData.claimantAmount = coverage - claimFee;
+        payoutData.feeRecipient = committee; // Simplified: fees go to committee
+        payoutData.feeAmount = claimFee;
+        payoutData.adapters = adapters;
+        payoutData.capitalPerAdapter = capitalPerAdapter;
+        payoutData.totalCapitalFromPoolLPs = totalCapitalPledged;
+        
+        capitalPool.executePayout(payoutData);
+        
+        updateCoverageSold(poolId, coverage, false);
+        policyNFT.burn(_policyId);
+    }
+    
+    /* ───────────────── Hooks & State Updaters ───────────────── */
+
+    // CORRECTED: Added missing function definition
+    function updateCoverageSold(uint256 _poolId, uint256 _amount, bool _isSale) public {
+        if(msg.sender != policyManager) revert NotPolicyManager();
+        poolRegistry.updateCoverageSold(_poolId, _amount, _isSale);
+    }
+
+    function onCapitalDeposited(address _underwriter, uint256 _amount) external {
+        if(msg.sender != address(capitalPool)) revert NotCapitalPool();
+        underwriterTotalPledge[_underwriter] += _amount;
+    }
+
+    function onWithdrawalRequested(address _underwriter, uint256 _principalComponent) external {
+        if(msg.sender != address(capitalPool)) revert NotCapitalPool();
+        uint256[] memory allocations = underwriterAllocations[_underwriter];
+        for (uint i = 0; i < allocations.length; i++) {
+            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], _principalComponent, true);
+        }
+    }
+
+    function onCapitalWithdrawn(address _underwriter, uint256 _principalComponentRemoved, bool _isFullWithdrawal) external {
+        if(msg.sender != address(capitalPool)) revert NotCapitalPool();
+        _realizeLossesForAllPools(_underwriter);
+        underwriterTotalPledge[_underwriter] -= _principalComponentRemoved;
+        
+        uint256[] memory allocations = underwriterAllocations[_underwriter];
+        for (uint i = 0; i < allocations.length; i++) {
+            uint256 poolId = allocations[i];
+            poolRegistry.updateCapitalPendingWithdrawal(poolId, _principalComponentRemoved, false);
+            if (_isFullWithdrawal) {
+                _removeUnderwriterFromPool(_underwriter, poolId);
+            }
+        }
+        if (_isFullWithdrawal) {
+            delete underwriterAllocations[_underwriter];
+        }
+    }
+    
+    /* ───────────────── Internal Functions ───────────────── */
+
+    function _realizeLossesForAllPools(address _user) internal {
+        uint256[] memory allocations = underwriterAllocations[_user];
+        uint256 pledge = underwriterTotalPledge[_user];
+        for (uint i = 0; i < allocations.length; i++) {
+            uint256 poolId = allocations[i];
+            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, pledge);
+            if(pendingLoss > 0) {
+                underwriterTotalPledge[_user] -= pendingLoss;
+                capitalPool.applyLosses(_user, pendingLoss);
+            }
+        }
+    }
+
+    function _removeUnderwriterFromPool(address _underwriter, uint256 _poolId) internal {
+        isAllocatedToPool[_underwriter][_poolId] = false;
+        uint256[] storage allocs = underwriterAllocations[_underwriter];
+        for (uint j = 0; j < allocs.length; j++) {
+            if (allocs[j] == _poolId) {
+                allocs[j] = allocs[allocs.length - 1];
+                allocs.pop();
+                break;
+            }
+        }
+        uint256 index = underwriterIndexInPoolArray[_poolId][_underwriter];
+        address[] storage underwriters = poolSpecificUnderwriters[_poolId];
+        address last = underwriters[underwriters.length - 1];
+        underwriters[index] = last;
+        underwriterIndexInPoolArray[_poolId][last] = index;
+        underwriters.pop();
+        delete underwriterIndexInPoolArray[_poolId][_underwriter];
+    }
+}
