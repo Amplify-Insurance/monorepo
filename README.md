@@ -9,7 +9,7 @@ contracts/               Solidity sources
 ├─ core/                 Core contracts
 │  ├─ CapitalPool.sol       Underwriter vault and yield adapter hooks
 │  ├─ PoolRegistry.sol      Registry of risk pools and rate models
-│  ├─ PoolManager.sol       User-facing policy lifecycle logic
+│  ├─ PolicyManager.sol     User-facing policy lifecycle logic
 │  └─ RiskManager.sol       Coordinates allocation, claims and payouts
 ├─ external/             Optional backstop modules
 │  └─ CatInsurancePool.sol  Secondary pool funded by premiums
