@@ -9,6 +9,7 @@ export default function ProposalsTable() {
   const { proposals, loading } = useProposals()
   const [expanded, setExpanded] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isClaiming, setIsClaiming] = useState(false)
   const { isConnected } = useAccount()
 
   const toggle = (id) => {
@@ -28,6 +29,20 @@ export default function ProposalsTable() {
       console.error('Vote failed', err)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleClaim = async (id) => {
+    if (!isConnected) return
+    setIsClaiming(true)
+    try {
+      const committee = await getCommitteeWithSigner()
+      const tx = await committee.claimReward(id)
+      await tx.wait()
+    } catch (err) {
+      console.error('Claim failed', err)
+    } finally {
+      setIsClaiming(false)
     }
   }
 
@@ -95,7 +110,16 @@ export default function ProposalsTable() {
                             </table>
                           </div>
                           {p.executed && (
-                            <div className="mt-3 text-sm">Result: {p.passed ? 'Passed' : 'Failed'}</div>
+                            <div className="mt-3 text-sm flex items-center gap-3">
+                              <span>Result: {p.passed ? 'Passed' : 'Failed'}</span>
+                              <button
+                                onClick={() => handleClaim(p.id)}
+                                disabled={isClaiming}
+                                className="py-1 px-3 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                              >
+                                Claim Reward
+                              </button>
+                            </div>
                           )}
                           {!p.executed && p.votingDeadline * 1000 > Date.now() && (
                             <div className="mt-3 flex gap-2">

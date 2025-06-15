@@ -7,11 +7,13 @@ import { HelpCircle, Vote, Shield, Users } from "lucide-react"
 import ProposalsTable from "../components/ProposalsTable"
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet"
 import StakeModal from "../components/StakeModal"
+import UnstakeModal from "../components/UnstakeModal"
 import BondModal from "../components/BondModal"
 
 export default function StakingPage() {
   const { isConnected } = useAccount()
   const [stakeOpen, setStakeOpen] = useState(false)
+  const [unstakeOpen, setUnstakeOpen] = useState(false)
   const [bondOpen, setBondOpen] = useState(false)
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
@@ -109,6 +111,12 @@ export default function StakingPage() {
               >
                 Stake Tokens
               </button>
+              <button
+                onClick={() => setUnstakeOpen(true)}
+                className="w-full py-4 px-6 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                Unstake Tokens
+              </button>
             </div>
           </div>
 
@@ -171,6 +179,7 @@ export default function StakingPage() {
 
         {/* Modals */}
         <StakeModal isOpen={stakeOpen} onClose={() => setStakeOpen(false)} />
+        <UnstakeModal isOpen={unstakeOpen} onClose={() => setUnstakeOpen(false)} />
         <BondModal isOpen={bondOpen} onClose={() => setBondOpen(false)} />
 
         {/* Proposals Section */}
@@ -180,6 +189,12 @@ export default function StakingPage() {
               <Vote className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Active Proposals</h2>
+            <button
+              onClick={() => setBondOpen(true)}
+              className="ml-auto py-1 px-3 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md"
+            >
+              New Proposal
+            </button>
           </div>
           <ProposalsTable />
         </div>
