@@ -47,13 +47,16 @@ package.json             Project dependencies and scripts
 ## Requirements
 
 - Node.js (>=18)
-- npm
+- npm (>=9)
+- Network access to the npm registry
 
 Install dependencies with:
 
 ```bash
 npm install
 ```
+You can also run Hardhat commands via `scripts/hardhat.sh` which
+automatically installs dependencies if `node_modules` is missing.
 
 ## Usage
 
@@ -84,7 +87,7 @@ npx hardhat run scripts/deploy-oracle.js --network base
 Then update `frontend/.env` using the printed `PriceOracle` and `MulticallReader`
 addresses so the frontend can display token prices and batch queries.
 
-The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.ts` to add or customise networks.
+The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.ts` to add or customise networks. Running scripts on a remote network requires access to the configured RPC endpoint.
 
 ## Contracts Overview
 
