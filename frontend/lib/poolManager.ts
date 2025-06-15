@@ -4,6 +4,11 @@ import { getProvider } from './provider'
 
 const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_POOL_MANAGER_ADDRESS as string
 
+if (!DEFAULT_ADDRESS) {
+  console.error('\u274C  NEXT_PUBLIC_POOL_MANAGER_ADDRESS env var is missing')
+  throw new Error('NEXT_PUBLIC_POOL_MANAGER_ADDRESS not set')
+}
+
 export function getPoolManager(address: string = DEFAULT_ADDRESS, deployment?: string) {
   return new ethers.Contract(address, PoolManager, getProvider(deployment))
 }
