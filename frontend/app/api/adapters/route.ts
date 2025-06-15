@@ -3,6 +3,7 @@ import { getCapitalPool } from '../../../lib/capitalPool';
 import { getProvider } from '../../../lib/provider';
 import { ethers } from 'ethers';
 import deployments from '../../config/deployments';
+import { YieldPlatform } from '../../config/yieldPlatforms';
 
 const ADAPTER_ABI = [
   'function currentApr() view returns (uint256)',
@@ -16,24 +17,27 @@ export async function GET(req: Request) {
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
 
     const cp = getCapitalPool(dep.capitalPool, dep.name);
+    const provider = getProvider(dep.name);
 
-    const adapters: { address: string; apr: string; asset: string }[] = [];
-    for (let i = 0; i < 20; i++) {
+    const adapters: { id: number; address: string; apr: string; asset: string }[] = [];
+
+    for (const id of [YieldPlatform.AAVE, YieldPlatform.COMPOUND, YieldPlatform.OTHER_YIELD]) {
       try {
-        const addr = await (cp as any).activeYieldAdapterAddresses(i);
-        const contract = new ethers.Contract(addr, ADAPTER_ABI, getProvider(dep.name));
-        let apr = '0';
-        let asset = ethers.constants.AddressZero;
-        try {
-          const res = await Promise.all([contract.currentApr(), contract.asset()]);
-          apr = res[0].toString();
-          asset = res[1];
-        } catch {}
-        adapters.push({ address: addr, apr, asset });
-      } catch {
-        break;
-      }
+        const addr = await (cp as any).baseYieldAdapters(id);
+        if (addr && addr !== ethers.constants.AddressZero) {
+          const contract = new ethers.Contract(addr, ADAPTER_ABI, provider);
+          let apr = '0';
+          let asset = ethers.constants.AddressZero;
+          try {
+            const res = await Promise.all([contract.currentApr(), contract.asset()]);
+            apr = res[0].toString();
+            asset = res[1];
+          } catch {}
+          adapters.push({ id, address: addr, apr, asset });
+        }
+      } catch {}
     }
+
     return NextResponse.json({ adapters });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
