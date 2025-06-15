@@ -547,4 +547,19 @@
     "stateMutability": "nonpayable",
     "type": "function"
   }
+  ,{
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "newPolicyManagerAddress", "type": "address"}
+    ],
+    "name": "PolicyManagerAddressSet",
+    "type": "event"
+  },{
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "newRewardDistributor", "type": "address"}
+    ],
+    "name": "RewardDistributorSet",
+    "type": "event"
+  }
 ]

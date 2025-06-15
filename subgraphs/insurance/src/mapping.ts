@@ -11,6 +11,9 @@ import {
   ClaimProcessed,
   PremiumRewardsClaimed,
   DistressedAssetRewardsClaimed,
+  AddressesSet,
+  CommitteeSet,
+  UnderwriterLiquidated,
   OwnershipTransferred as RiskManagerOwnershipTransferred
 } from "../generated/RiskManager/RiskManager";
 import { RiskManager } from "../generated/RiskManager/RiskManager";
@@ -35,7 +38,9 @@ import {
   OwnershipTransferred as CatInsurancePoolOwnershipTransferred,
   ProtocolAssetReceivedForDistribution,
   ProtocolAssetRewardsClaimed,
-  UsdcPremiumReceived
+  UsdcPremiumReceived,
+  PolicyManagerAddressSet,
+  RewardDistributorSet
 } from "../generated/CatInsurancePool/CatInsurancePool";
 import {
   PolicyPremiumAccountUpdated,
@@ -48,7 +53,7 @@ import {
   FundsWithdrawn,
   CapitalPoolAddressSet
 } from "../generated/AaveV3Adapter/YieldAdapter";
-import { ProposalCreated, Voted, ProposalExecuted } from "../generated/Committee/Committee";
+import { ProposalCreated, Voted, ProposalExecuted, BondResolved, RewardClaimed } from "../generated/Committee/Committee";
 
 function saveGeneric(event: ethereum.Event, name: string): void {
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
@@ -242,6 +247,9 @@ export function handleCapitalAllocated(event: CapitalAllocated): void {
   snapshotPool(rm, event, event.params.poolId);
 }
 export function handleCapitalDeallocated(event: CapitalDeallocated): void { saveGeneric(event, "CapitalDeallocated"); }
+export function handleAddressesSet(event: AddressesSet): void { saveGeneric(event, "AddressesSet"); }
+export function handleCommitteeSet(event: CommitteeSet): void { saveGeneric(event, "CommitteeSet"); }
+export function handleUnderwriterLiquidated(event: UnderwriterLiquidated): void { saveGeneric(event, "UnderwriterLiquidated"); }
 export function handlePolicyCreated(event: PolicyCreated): void {
   saveGeneric(event, "PolicyCreated");
 
@@ -435,4 +443,20 @@ export function handleProposalExecuted(event: ProposalExecuted): void {
     p.passed = event.params.passed;
     p.save();
   }
+}
+
+export function handleBondResolved(event: BondResolved): void {
+  saveGeneric(event, "BondResolved");
+}
+
+export function handleRewardClaimed(event: RewardClaimed): void {
+  saveGeneric(event, "RewardClaimed");
+}
+
+export function handlePolicyManagerAddressSet(event: PolicyManagerAddressSet): void {
+  saveGeneric(event, "PolicyManagerAddressSet");
+}
+
+export function handleRewardDistributorSet(event: RewardDistributorSet): void {
+  saveGeneric(event, "RewardDistributorSet");
 }

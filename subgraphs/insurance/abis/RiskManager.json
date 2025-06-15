@@ -1164,4 +1164,31 @@
     "stateMutability": "view",
     "type": "function"
   }
+  ,{
+    "anonymous": false,
+    "inputs": [
+      {"indexed": false, "internalType": "address", "name": "capital", "type": "address"},
+      {"indexed": false, "internalType": "address", "name": "registry", "type": "address"},
+      {"indexed": false, "internalType": "address", "name": "policy", "type": "address"},
+      {"indexed": false, "internalType": "address", "name": "cat", "type": "address"},
+      {"indexed": false, "internalType": "address", "name": "loss", "type": "address"}
+    ],
+    "name": "AddressesSet",
+    "type": "event"
+  },{
+    "anonymous": false,
+    "inputs": [
+      {"indexed": false, "internalType": "address", "name": "committee", "type": "address"}
+    ],
+    "name": "CommitteeSet",
+    "type": "event"
+  },{
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "liquidator", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "underwriter", "type": "address"}
+    ],
+    "name": "UnderwriterLiquidated",
+    "type": "event"
+  }
 ]
