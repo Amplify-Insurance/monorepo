@@ -43,6 +43,11 @@ import {
   RewardDistributorSet
 } from "../generated/CatInsurancePool/CatInsurancePool";
 import {
+  AddressesSet as PMAddressesSet,
+  CatPremiumShareSet,
+  CatPoolSet
+} from "../generated/PoolManager/PoolManager";
+import {
   PolicyPremiumAccountUpdated,
   Transfer,
   RiskManagerAddressSet,
@@ -459,4 +464,16 @@ export function handlePolicyManagerAddressSet(event: PolicyManagerAddressSet): v
 
 export function handleRewardDistributorSet(event: RewardDistributorSet): void {
   saveGeneric(event, "RewardDistributorSet");
+}
+
+export function handlePMAddressesSet(event: PMAddressesSet): void {
+  saveGeneric(event, "AddressesSet");
+}
+
+export function handleCatPremiumShareSet(event: CatPremiumShareSet): void {
+  saveGeneric(event, "CatPremiumShareSet");
+}
+
+export function handleCatPoolSet(event: CatPoolSet): void {
+  saveGeneric(event, "CatPoolSet");
 }
