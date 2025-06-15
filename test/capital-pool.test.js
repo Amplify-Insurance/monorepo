@@ -125,14 +125,13 @@ describe("CapitalPool", function () {
             ).to.be.revertedWithCustomError(capitalPool, "ZeroAddress");
         });
 
-        it("should revert if the RiskManager address is already set", async function () {
+        it("should allow updating the RiskManager address", async function () {
             const { capitalPool, owner } = await loadFixture(deployAndConfigureFixture);
             const NewMockRiskManagerFactory = await ethers.getContractFactory("MockRiskManager");
             const newMockRiskManager = await NewMockRiskManagerFactory.deploy();
 
-            await expect(
-                capitalPool.connect(owner).setRiskManager(newMockRiskManager.target)
-            ).to.be.revertedWith("CP: RiskManager already set");
+            await capitalPool.connect(owner).setRiskManager(newMockRiskManager.target);
+            expect(await capitalPool.riskManager()).to.equal(newMockRiskManager.target);
         });
     });
 

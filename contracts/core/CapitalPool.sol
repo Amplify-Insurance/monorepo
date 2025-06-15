@@ -102,7 +102,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────── Admin Functions ────────────────── */
     function setRiskManager(address _riskManager) external onlyOwner {
-        require(riskManager == address(0), "CP: RiskManager already set");
         if (_riskManager == address(0)) revert ZeroAddress();
         riskManager = _riskManager;
         emit RiskManagerSet(_riskManager);
