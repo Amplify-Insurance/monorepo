@@ -81,9 +81,8 @@ contract MoonwellAdapter is IYieldAdapter, Ownable {
 
         if (actuallyWithdrawn > 0) {
             underlyingToken.safeTransfer(_to, actuallyWithdrawn);
+            emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
         }
-
-        emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
     }
 
     /// @return Current underlying value held by this adapter (liquid + supplied).

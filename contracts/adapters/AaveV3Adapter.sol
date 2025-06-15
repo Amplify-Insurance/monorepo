@@ -97,9 +97,8 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
 
         if (actuallyWithdrawn > 0) {
             underlyingToken.safeTransfer(_to, actuallyWithdrawn);
+            emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
         }
-        
-        emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
     }
 
     // Owner can set the CapitalPool address
