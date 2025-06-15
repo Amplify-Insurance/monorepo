@@ -5,38 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IYieldAdapter.sol";
-
-interface IPoolAddressesProvider {
-    function getPool() external view returns (address);
-}
-
-interface IPool {
-    struct ReserveData {
-        ReserveConfigurationMap configuration;
-        uint128 liquidityIndex;
-        uint128 currentLiquidityRate;
-        uint128 variableBorrowIndex;
-        uint128 currentVariableBorrowRate;
-        uint128 currentStableBorrowRate;
-        uint40 lastUpdateTimestamp;
-        uint16 id;
-        address aTokenAddress;
-        address stableDebtTokenAddress;
-        address variableDebtTokenAddress;
-        address interestRateStrategyAddress;
-        uint128 accruedToTreasury;
-        uint128 unbacked;
-        uint128 isolationModeTotalDebt;
-    }
-
-    struct ReserveConfigurationMap {
-        uint256 data;
-    }
-
-    function getReserveData(address asset) external view returns (ReserveData memory);
-    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
-    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
-}
+import "../interfaces/IPoolAddressesProvider.sol";
+import "../interfaces/IPool.sol";
 
 contract AaveV3Adapter is IYieldAdapter, Ownable {
     using SafeERC20 for IERC20;

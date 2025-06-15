@@ -7,45 +7,11 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/IPolicyNFT.sol";
-
-// --- Interfaces for Protocol Contracts ---
-
-interface IPoolRegistry {
-    struct RateModel {
-        uint256 base;
-        uint256 slope1;
-        uint256 slope2;
-        uint256 kink;
-    }
-    
-    function getPoolData(uint256 _poolId) external view returns (
-        IERC20 protocolTokenToCover,
-        uint256 totalCapitalPledgedToPool,
-        uint256 totalCoverageSold,
-        uint256 capitalPendingWithdrawal,
-        bool isPaused,
-        address feeRecipient
-    );
-    function getPoolRateModel(uint256 _poolId) external view returns (RateModel memory);
-}
-
-interface ICapitalPool {
-    function underlyingAsset() external view returns (IERC20);
-}
-
-
-interface ICatInsurancePool {
-    function receiveUsdcPremium(uint256 amount) external;
-}
-
-interface IRewardDistributor {
-    function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external;
-}
-
-// A lean interface for the RiskManager
-interface IRiskManager_PM_Hook {
-    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
-}
+import "../interfaces/IPoolRegistry.sol";
+import "../interfaces/ICapitalPool.sol";
+import "../interfaces/ICatInsurancePool.sol";
+import "../interfaces/IRewardDistributor.sol";
+import "../interfaces/IRiskManager_PM_Hook.sol";
 
 
 /**

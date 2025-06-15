@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IYieldAdapter.sol";
+import "../interfaces/ICometLike.sol";
+import "../interfaces/IMorphoCore.sol";
 
 /**
  * @title MorphoAdapter
@@ -21,17 +23,6 @@ import "../interfaces/IYieldAdapter.sol";
  *         (Comet style). If the pool token lacks `baseToken()`, pass the underlying ERC‑20 directly.
  */
 
-/// @dev Partial interface for a Compound‑v3 Comet (needed only for `baseToken()`)
-interface ICometLike {
-    function baseToken() external view returns (address);
-}
-
-/// @dev Minimal Morpho core interface (Compound‑v3 style)
-interface IMorphoCore {
-    function supply(address poolToken, address onBehalf, uint256 amount) external returns (uint256); // returns shares
-    function withdraw(address poolToken, uint256 amount) external returns (uint256); // returns withdrawn assets
-    function supplyBalanceInOf(address poolToken, address user) external view returns (uint256);
-}
 
 contract MorphoAdapter is IYieldAdapter, Ownable {
     using SafeERC20 for IERC20;

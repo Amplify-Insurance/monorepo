@@ -7,14 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-
-// Interface for Yield Adapters
-interface IYieldAdapter {
-    function deposit(uint256 _amount) external;
-    function withdraw(uint256 _amount, address _to) external returns (uint256);
-    function getCurrentValueHeld() external view returns (uint256);
-    function asset() external view returns (IERC20);
-}
+import "../interfaces/IYieldAdapter.sol";
 
 /**
  * @title CapitalPool

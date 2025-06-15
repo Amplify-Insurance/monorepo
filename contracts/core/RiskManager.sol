@@ -6,60 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IPolicyNFT.sol";
-
-// --- Local Interfaces ---
-
-interface IPoolRegistry {
-    enum ProtocolRiskIdentifier { NONE, PROTOCOL_A, PROTOCOL_B, LIDO_STETH, ROCKET_RETH }
-    struct RateModel {
-        uint256 base;
-        uint256 slope1;
-        uint256 slope2;
-        uint256 kink;
-    }
-    function addProtocolRiskPool(address, RateModel calldata, ProtocolRiskIdentifier) external returns (uint256);
-    function updateCapitalAllocation(uint256 poolId, address adapterAddress, uint256 pledgeAmount, bool isAllocation) external;
-    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external;
-    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
-    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
-    function getPoolCount() external view returns (uint256);
-    // CORRECTED: Added missing governance hooks to the interface
-    function setPauseState(uint256 _poolId, bool _isPaused) external;
-    function setFeeRecipient(uint256 _poolId, address _recipient) external;
-}
-
-interface ICapitalPool {
-    struct PayoutData {
-        address claimant;
-        uint256 claimantAmount;
-        address feeRecipient;
-        uint256 feeAmount;
-        address[] adapters;
-        uint256[] capitalPerAdapter;
-        uint256 totalCapitalFromPoolLPs;
-    }
-    function applyLosses(address underwriter, uint256 principalLossAmount) external;
-    function underlyingAsset() external view returns (IERC20);
-    function executePayout(PayoutData calldata payoutData) external;
-    function getUnderwriterAdapterAddress(address underwriter) external view returns (address);
-    function getUnderwriterAccount(address underwriter) external view returns (uint256, uint8, uint256, uint256, uint256);
-    function sharesToValue(uint256 shares) external view returns (uint256);
-}
-
-
-interface ICatInsurancePool {
-    function drawFund(uint256 amount) external;
-}
-
-interface ILossDistributor {
-    function distributeLoss(uint256 poolId, uint256 lossAmount, uint256 totalPledgeInPool) external;
-    function realizeLosses(address user, uint256 poolId, uint256 userPledge) external returns (uint256);
-    function getPendingLosses(address user, uint256 poolId, uint256 userPledge) external view returns (uint256);
-}
-
-interface IPolicyManager {
-    function policyNFT() external view returns (IPolicyNFT);
-}
+import "../interfaces/IPoolRegistry.sol";
+import "../interfaces/ICapitalPool.sol";
+import "../interfaces/ICatInsurancePool.sol";
+import "../interfaces/ILossDistributor.sol";
+import "../interfaces/IPolicyManager.sol";
 
 /**
  * @title RiskManager

@@ -3,38 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-
-/**
- * @title IPoolRegistry
- * @notice The interface for the PoolRegistry contract.
- */
-interface IPoolRegistry {
-    // Re-declaring structs and enums needed in the interface
-    struct RateModel {
-        uint256 base;
-        uint256 slope1;
-        uint256 slope2;
-        uint256 kink;
-    }
-    enum ProtocolRiskIdentifier { NONE, PROTOCOL_A, PROTOCOL_B, LIDO_STETH, ROCKET_RETH }
-
-    function getPoolData(uint256 _poolId) external view returns (
-        IERC20 protocolTokenToCover,
-        uint256 totalCapitalPledgedToPool,
-        uint256 totalCoverageSold,
-        uint256 capitalPendingWithdrawal,
-        bool isPaused,
-        address feeRecipient
-    );
-
-    function getPoolRateModel(uint256 _poolId) external view returns (RateModel memory);
-    
-    // CORRECTED: Added the getPoolPayoutData function back for on-chain use by the RiskManager
-    function getPoolPayoutData(uint256 _poolId) external view returns (address[] memory, uint256[] memory, uint256);
-    
-    function getPoolActiveAdapters(uint256 _poolId) external view returns (address[] memory);
-    function getCapitalPerAdapter(uint256 _poolId, address _adapter) external view returns (uint256);
-}
+import "../interfaces/IPoolRegistry.sol";
 
 /**
  * @title PoolRegistry

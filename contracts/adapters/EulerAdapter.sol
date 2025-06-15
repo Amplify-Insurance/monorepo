@@ -5,27 +5,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IYieldAdapter.sol";
-
-/* -------------------------------------------------------------------------- */
-/*                              Euler v2 interfaces                           */
-/* -------------------------------------------------------------------------- */
-
-interface IEulerEToken is IERC20 {
-    function deposit(uint256 subAccountId, uint256 amount) external;
-    function withdraw(uint256 subAccountId, uint256 amount) external;
-    function balanceOfUnderlying(address account) external view returns (uint256);
-}
-
-interface IEulerMarkets {
-    /// per-second borrow & supply rates, 1 × 10-27 (“ray”)
-    function interestRate(address underlying) external view returns (uint256 borrowSPY, uint256 supplySPY);
-}
-
-interface IEulerVault is IERC20 {
-    /* ERC-4626 helpers (not used in APR calc here, but stored for future upgrades) */
-    function convertToAssets(uint256 shares) external view returns (uint256);
-    function totalAssets() external view returns (uint256);
-}
+import "../interfaces/IEulerEToken.sol";
+import "../interfaces/IEulerMarkets.sol";
+import "../interfaces/IEulerVault.sol";
 
 /* -------------------------------------------------------------------------- */
 /*                                Adapter                                     */

@@ -5,18 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-
-// Interfaces for other contracts
-interface IRiskManager {
-    function reportIncident(uint256 _poolId, bool _pauseState) external;
-    function setPoolFeeRecipient(uint256 _poolId, address _recipient) external;
-}
-
-interface IStakingContract {
-    function slash(address _user, uint256 _amount) external;
-    function stakedBalance(address _user) external view returns (uint256);
-    function governanceToken() external view returns (IERC20);
-}
+import "../interfaces/IRiskManager.sol";
+import "../interfaces/IStakingContract.sol";
 
 contract Committee is Ownable, ReentrancyGuard {
     using Address for address payable;
