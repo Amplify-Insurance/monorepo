@@ -32,8 +32,10 @@ describe("CatInsurancePool", function () {
 
         // --- Deploy Mocks ---
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", ethers.parseUnits("1000000", 6));
-        mockRewardToken = await MockERC20Factory.deploy("Reward Token", "RWT", ethers.parseUnits("1000000", 18));
+        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
+        await mockUsdc.mint(owner.address, ethers.parseUnits("1000000", 6));
+        mockRewardToken = await MockERC20Factory.deploy("Reward Token", "RWT", 18);
+        await mockRewardToken.mint(owner.address, ethers.parseUnits("1000000", 18));
         
         mockAdapter = await deployMock(iYieldAdapterAbi, owner);
         mockRewardDistributor = await deployMock(iRewardDistributorAbi, owner);
