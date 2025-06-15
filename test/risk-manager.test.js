@@ -203,7 +203,7 @@ describe("RiskManager - purchaseCover", function () {
             await mockCatPool.getAddress()
         );
 
-        await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
+        await mockPolicyNFT.setRiskManagerAddress(riskManager.target);
 
         const capitalAmount = ethers.parseUnits("100000", 6);
         const cpAddress = await mockCapitalPool.getAddress();
@@ -816,7 +816,7 @@ describe("RiskManager - claimPremiumRewards", function () {
             await mockCatPool.getAddress()
         );
 
-        await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
+        await mockPolicyNFT.setRiskManagerAddress(riskManager.target);
 
         // Setup Pool and Underwriter
         const capitalAmount = ethers.parseUnits("100000", 6);
@@ -976,7 +976,7 @@ describe("RiskManager - claimDistressedAssets", function () {
         // apply losses. Without this setup, any claim processing in the fixture
         // would revert when `applyLosses` is called.
         await mockCapitalPool.connect(owner).setRiskManager(riskManager.target);
-        await mockPolicyNFT.setCoverPoolAddress(riskManager.target);
+        await mockPolicyNFT.setRiskManagerAddress(riskManager.target);
 
         // --- Setup Pool, Underwriter, and Policy ---
         await riskManager.addProtocolRiskPool(distressedToken.target, { base:0, slope1:0, slope2:0, kink:0 }, 1); // Pool 0

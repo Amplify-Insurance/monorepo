@@ -74,6 +74,12 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         _;
     }
 
+    // New helper mirroring the production contract's API
+    function setRiskManagerAddress(address _riskManager) external onlyOwner {
+        require(_riskManager != address(0), "MockPolicyNFT: RM address cannot be zero");
+        coverPoolAddress = _riskManager;
+    }
+
     function setCoverPoolAddress(address _coverPool) external onlyOwner {
         require(_coverPool != address(0), "MockPolicyNFT: CoverPool address cannot be zero");
         coverPoolAddress = _coverPool;
