@@ -125,7 +125,9 @@ npm run dev
 ```
 
 Environment variables such as the RPC endpoint and deployed contract addresses can
-be configured in `.env` (see `.env.example`). Several API routes under
+be configured in `.env` (see `.env.example`). At a minimum set
+`NEXT_PUBLIC_POOL_MANAGER_ADDRESS` and `NEXT_PUBLIC_RISK_MANAGER_ADDRESS` so the
+frontend knows where the core contracts live. Several API routes under
 `app/api` demonstrate reading data from the contracts. Examples
 include:
 
