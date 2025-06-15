@@ -151,7 +151,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     /**
      * @notice Mocks the burning of a policy.
      */
-    function burn(uint256 id) external {
+    function burn(uint256 id) external override {
         require(_owners[id] != address(0), "MockPolicyNFT: Policy does not exist");
         delete policies[id];
         delete _owners[id];
@@ -163,7 +163,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     /**
      * @notice Mocks updating the lastPaidUntil timestamp.
      */
-    function updateLastPaid(uint256 id, uint256 ts) external {
+    function updateLastPaid(uint256 id, uint256 ts) external override {
         require(policies[id].coverage > 0, "MockPolicyNFT: Policy does not exist");
         policies[id].lastPaidUntil = ts;
         emit PolicyLastPaidUpdated(id, ts);
@@ -174,7 +174,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     /**
      * @notice Mocks the getPolicy view function.
      */
-    function getPolicy(uint256 id) external view returns (IPolicyNFT.Policy memory) {
+    function getPolicy(uint256 id) external view override returns (IPolicyNFT.Policy memory) {
         PolicyInfo memory p = policies[id];
         return IPolicyNFT.Policy({
             poolId: p.poolId,
@@ -188,7 +188,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     /**
      * @notice Mocks the ownerOf view function from the ERC721 standard.
      */
-    function ownerOf(uint256 id) external view returns (address) {
+    function ownerOf(uint256 id) external view override returns (address) {
         address owner = _owners[id];
         require(owner != address(0), "MockPolicyNFT: owner query for nonexistent token");
         return owner;
