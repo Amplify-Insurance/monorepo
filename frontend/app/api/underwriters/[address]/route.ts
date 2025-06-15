@@ -4,6 +4,7 @@ import { getCapitalPool } from '@/lib/capitalPool'
 import { getRiskManager } from '@/lib/riskManager'
 import { getPoolRegistry } from '@/lib/poolRegistry'
 import deployments from '../../../config/deployments'
+import { getLossDistributor } from '@/lib/lossDistributor'
 
 export async function GET(
   _req: Request,
@@ -19,6 +20,7 @@ export async function GET(
       const cp = getCapitalPool(dep.capitalPool, dep.name)
       const rm = getRiskManager(dep.riskManager, dep.name)
       const pr = getPoolRegistry(dep.poolRegistry, dep.name)
+      const ld = getLossDistributor(dep.lossDistributor, dep.name)
 
       try {
         const account = await cp.getUnderwriterAccount(addr)
@@ -33,10 +35,16 @@ export async function GET(
         }
 
         const allocatedPoolIds: number[] = []
+        const pendingLosses: Record<string, string> = {}
         for (let i = 0; i < Number(poolCount); i++) {
           try {
             const allocated = await rm.isAllocatedToPool(addr, BigInt(i))
             if (allocated) allocatedPoolIds.push(i)
+            if (allocated) {
+              const pledge = await rm.underwriterTotalPledge(addr)
+              const loss = await ld.getPendingLosses(addr, BigInt(i), pledge)
+              pendingLosses[i] = loss.toString()
+            }
           } catch {}
         }
 
@@ -48,6 +56,7 @@ export async function GET(
           withdrawalRequestTimestamp: account[3],
           withdrawalRequestShares: account[4],
           allocatedPoolIds,
+          pendingLosses,
         })
       } catch {}
     }
