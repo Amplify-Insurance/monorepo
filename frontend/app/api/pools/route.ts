@@ -1,6 +1,6 @@
 // app/api/pools/list/route.ts
 import { NextResponse } from 'next/server';
-import { riskManager } from '../../../lib/riskManager';
+import { poolRegistry } from '../../../lib/poolRegistry';
 
 export async function GET() {
   console.log('GET /api/pools/list caller');
@@ -8,12 +8,12 @@ export async function GET() {
   try {
     let count = 0n;
     try {
-      count = await (riskManager as any).protocolRiskPoolsLength();
-      console.log('protocolRiskPoolsLength:', count);
+      count = await poolRegistry.getPoolCount();
+      console.log('getPoolCount:', count);
     } catch {
       while (true) {
-        console.log('protocolRiskPoolsLength: null');
-        try { await riskManager.getPoolInfo(count); count++; } catch { break; }
+        console.log('getPoolCount: null');
+        try { await poolRegistry.getPoolData(count); count++; } catch { break; }
       }
     }
     return NextResponse.json({ count: Number(count) });

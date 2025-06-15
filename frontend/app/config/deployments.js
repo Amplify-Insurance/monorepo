@@ -16,6 +16,8 @@ if (!deployments.length) {
       riskManager: process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS,
       capitalPool: process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS,
       catPool: process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
+      poolRegistry: process.env.NEXT_PUBLIC_POOL_REGISTRY_ADDRESS,
+      poolManager: process.env.NEXT_PUBLIC_POOL_MANAGER_ADDRESS,
       priceOracle: process.env.NEXT_PUBLIC_PRICE_ORACLE_ADDRESS,
       multicallReader: process.env.NEXT_PUBLIC_MULTICALL_READER_ADDRESS,
     },

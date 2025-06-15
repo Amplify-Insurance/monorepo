@@ -1,6 +1,7 @@
 // app/api/pools/route.ts
 import { NextResponse } from 'next/server';
-import { getRiskManager } from '../../../../lib/riskManager';
+import { getPoolRegistry } from '../../../../lib/poolRegistry';
+import { getPoolManager } from '../../../../lib/poolManager';
 import { getPriceOracle } from '../../../../lib/priceOracle';
 import { getMulticallReader } from '../../../../lib/multicallReader';
 import deployments from '../../../config/deployments';
@@ -104,18 +105,19 @@ function calcPremiumRateBps(pool: any): bigint {
 export async function GET() {
   const allPools: any[] = []
   for (const dep of deployments) {
-    const riskManager = getRiskManager(dep.riskManager, dep.name)
+    const poolRegistry = getPoolRegistry(dep.poolRegistry, dep.name)
+    const poolManager = getPoolManager(dep.poolManager, dep.name)
     const priceOracle = getPriceOracle(dep.priceOracle, dep.name)
     try {
     /* 1️⃣ How many pools exist? */
     let count = 0n;
     try {
-      count = await (riskManager as any).protocolRiskPoolsLength();
+      count = await poolRegistry.getPoolCount();
     } catch {
       // Fallback: iterate until call‑revert when the length function is absent.
       while (true) {
         try {
-          await riskManager.getPoolInfo(count);
+          await poolRegistry.getPoolData(count);
           count++;
         } catch {
           break;
@@ -126,10 +128,8 @@ export async function GET() {
     /* 2️⃣ Fetch catastrophe premium bps */
     let catPremiumBps: bigint = 2000n; // default
     try {
-      if (typeof (riskManager as any).catPremiumBps === 'function') {
-        const raw = await (riskManager as any).catPremiumBps();
-        catPremiumBps = BigInt(raw.toString());
-      }
+      const raw = await poolManager.catPremiumBps();
+      catPremiumBps = BigInt(raw.toString());
     } catch {
       // ignore – fallback already set
     }
@@ -141,21 +141,39 @@ export async function GET() {
     const poolCalls = [] as { target: string; callData: string }[];
     for (let i = 0; i < Number(count); i++) {
       poolCalls.push({
-        target: dep.riskManager,
-        callData: riskManager.interface.encodeFunctionData('getPoolInfo', [i]),
+        target: dep.poolRegistry,
+        callData: poolRegistry.interface.encodeFunctionData('getPoolData', [i]),
+      });
+      poolCalls.push({
+        target: dep.poolRegistry,
+        callData: poolRegistry.interface.encodeFunctionData('getPoolRateModel', [i]),
       });
     }
 
     const poolResults = await multicall.tryAggregate(true, poolCalls);
 
-    for (let i = 0; i < poolResults.length; i++) {
-      if (!poolResults[i].success) continue;
+    for (let i = 0; i < Number(count); i++) {
+      const dataRes = poolResults[2 * i];
+      const rateRes = poolResults[2 * i + 1];
+      if (!dataRes.success || !rateRes.success) continue;
       try {
-        const decoded = riskManager.interface.decodeFunctionResult(
-          'getPoolInfo',
-          poolResults[i].returnData,
+        const dataDec = poolRegistry.interface.decodeFunctionResult(
+          'getPoolData',
+          dataRes.returnData,
         );
-        const rawInfo = decoded[0];
+        const rateDec = poolRegistry.interface.decodeFunctionResult(
+          'getPoolRateModel',
+          rateRes.returnData,
+        );
+        const rawInfo = {
+          protocolTokenToCover: dataDec.protocolTokenToCover ?? dataDec[0],
+          totalCapitalPledgedToPool: dataDec.totalCapitalPledgedToPool ?? dataDec[1],
+          totalCoverageSold: dataDec.totalCoverageSold ?? dataDec[2],
+          capitalPendingWithdrawal: dataDec.capitalPendingWithdrawal ?? dataDec[3],
+          isPaused: dataDec.isPaused ?? dataDec[4],
+          feeRecipient: dataDec.feeRecipient ?? dataDec[5],
+          rateModel: rateDec[0],
+        };
         const info = bnToString(rawInfo);
         const rate = calcPremiumRateBps(info);
         const uwYield = calcUnderwriterYieldBps(info, catPremiumBps);
