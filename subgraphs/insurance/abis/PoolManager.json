@@ -1,0 +1,29 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "registry", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "capital", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "rewards", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "rm", "type": "address" }
+    ],
+    "name": "AddressesSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "uint256", "name": "newBps", "type": "uint256" }
+    ],
+    "name": "CatPremiumShareSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "newCatPool", "type": "address" }
+    ],
+    "name": "CatPoolSet",
+    "type": "event"
+  }
+]
