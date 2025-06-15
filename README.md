@@ -1,28 +1,39 @@
 # CoverPool Contracts
 
-This repository contains a Hardhat project implementing a prototype insurance system for on‑chain assets.  The project is centred around the **CoverPool** contract which allows underwriters to provide liquidity and sell cover for specific protocol risks.  Policy positions are represented by NFTs and a separate **CatInsurancePool** acts as an additional backstop fund.
+This repository contains a Hardhat project implementing a prototype on‑chain insurance protocol.  The original monolithic **CoverPool** contract has been split into several modules.  `PolicyManager` handles policy purchases, `CapitalPool` tracks underwriter deposits, and `RiskManager` coordinates allocations and claims.  Policy positions are represented by NFTs and a separate **CatInsurancePool** still acts as an additional backstop fund.
 
 ## Directory Layout
 
 ```
 contracts/               Solidity sources
-├─ CapitalPool.sol       Vault that holds underwriter funds
-├─ RiskManager.sol       Core logic for selling policies and applying claims
-├─ CatInsurancePool.sol  Backstop pool funded by a share of premiums
+├─ core/                 Core contracts
+│  ├─ CapitalPool.sol       Underwriter vault and yield adapter hooks
+│  ├─ PoolRegistry.sol      Registry of risk pools and rate models
+│  ├─ PoolManager.sol       User-facing policy lifecycle logic
+│  └─ RiskManager.sol       Coordinates allocation, claims and payouts
+├─ external/             Optional backstop modules
+│  └─ CatInsurancePool.sol  Secondary pool funded by premiums
+├─ governance/           DAO style governance
+│  ├─ Committee.sol
+│  └─ Staking.sol
+├─ peripheral/           Loss and reward accounting helpers
+│  ├─ LossDistributor.sol
+│  └─ RewardDistributor.sol
 ├─ adapters/             Yield strategy implementations
 │  ├─ AaveV3Adapter.sol
 │  ├─ CompoundV3Adapter.sol
 │  ├─ EulerAdapter.sol
 │  ├─ MoonwellAdapter.sol
 │  └─ MorhpoAdapter.sol
-├─ tokenization/         ERC20/721 tokens used by the protocol
+├─ tokens/               ERC20/721 tokens used by the protocol
 │  ├─ CatShare.sol
 │  ├─ PolicyNFT.sol
 │  └─ oShare.sol
+├─ oracles/              Price feeds
+│  └─ PriceOracle.sol
+├─ utils/                Misc utilities
+│  └─ MulticallReader.sol
 ├─ interfaces/           Shared protocol interfaces
-│  ├─ IPolicyNFT.sol
-│  ├─ ISdai.sol
-│  └─ IYieldAdapter.sol
 └─ test/                 Mock contracts for unit tests
 
 frontend/                Next.js dApp for interacting with the contracts
@@ -77,10 +88,12 @@ The default network configuration uses Hardhat's in‑memory chain.  Modify `har
 
 ## Contracts Overview
 
-- **CoverPool** – Core contract where underwriters deposit stablecoins, allocate capital to specific risk pools and earn premium income.  Premiums are calculated using utilisation‑based rate models.  Claims burn policy NFTs and distribute losses among the relevant underwriters.  Optionally integrates with yield adapters for idle capital.
-- **CatInsurancePool** – Collects a portion of premiums from `CoverPool` and can provide extra liquidity during large claims.  Liquidity providers receive `CatShare` tokens representing their share of the pool and can claim protocol assets recovered from claims.
-- **PolicyNFT** – ERC721 that tracks each active policy.  Policies store coverage amount, associated risk pool and the timestamp of last paid premium.
-- **Yield Adapters** – Contracts implementing `IYieldAdapter` allow depositing idle funds into external protocols (e.g. an sDAI adapter or mocks for testing).
+- **CapitalPool** – Holds underwriter funds and interacts with yield adapters. Losses and withdrawals are accounted here.
+- **PolicyManager** – User entrypoint for purchasing cover. Mints and burns `PolicyNFT` tokens.
+- **RiskManager** – Coordinates pool allocations, claims processing and rewards through `LossDistributor` and `RewardDistributor`.
+- **PoolRegistry** – Stores pool parameters, rate models and active adapters for each risk pool.
+- **CatInsurancePool** – Collects a share of premiums and provides additional liquidity during large claims.
+- **Governance (Committee & Staking)** – Simple on‑chain governance used for pausing pools and slashing misbehaving stakers.
 
 ## Running a Local Node
 
@@ -94,7 +107,7 @@ In a separate terminal deploy contracts and run scripts using the `--network loc
 
 ## Further Reading
 
-The unit tests under `test/` demonstrate common interactions such as underwriting deposits, premium payments and withdrawals.  Examine `test/CoverPool.test.js` for detailed examples of calling the contracts.
+The unit tests under `test/` demonstrate common interactions such as underwriting deposits, premium payments and withdrawals.  Examine `test/risk-manager.test.js` for detailed examples of calling the contracts.
 
 
 ## Frontend
