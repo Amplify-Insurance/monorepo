@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 // Interfaces for other contracts
 interface IRiskManager {
@@ -18,6 +19,7 @@ interface IStakingContract {
 }
 
 contract Committee is Ownable, ReentrancyGuard {
+    using Address for address payable;
 
     /* ───────────────────────── State Variables ──────────────────────── */
 
@@ -215,8 +217,7 @@ contract Committee is Ownable, ReentrancyGuard {
         uint256 userWeight = p.voterWeight[msg.sender];
         userReward += (remainingFees * userWeight) / p.forVotes;
 
-        (bool sent, ) = msg.sender.call{value: userReward}("");
-        require(sent, "Failed to send reward");
+        payable(msg.sender).sendValue(userReward);
         
         emit RewardClaimed(_proposalId, msg.sender, userReward);
     }

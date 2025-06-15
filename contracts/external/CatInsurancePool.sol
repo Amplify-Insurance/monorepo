@@ -68,7 +68,9 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         
         if (address(_initialAdapter) != address(0)) {
             adapter = _initialAdapter;
-            usdc.approve(address(_initialAdapter), type(uint256).max);
+            // Grant approval to the initial adapter in a controlled manner
+            usdc.safeApprove(address(_initialAdapter), 0);
+            usdc.safeApprove(address(_initialAdapter), type(uint256).max);
         }
     }
 
@@ -106,10 +108,14 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
                 uint256 withdrawnAmount = adapter.withdraw(balanceInOldAdapter, address(this));
                 idleUSDC += withdrawnAmount;
             }
+            // Revoke allowance from the old adapter
+            usdc.safeApprove(address(adapter), 0);
         }
         adapter = IYieldAdapter(_newAdapterAddress);
         if (address(adapter) != address(0)) {
-            usdc.approve(address(adapter), type(uint256).max);
+            // Grant allowance to the new adapter safely
+            usdc.safeApprove(address(adapter), 0);
+            usdc.safeApprove(address(adapter), type(uint256).max);
         }
         emit AdapterChanged(_newAdapterAddress);
     }
