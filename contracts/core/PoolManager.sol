@@ -210,7 +210,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     
     /* ───────────────── Internal & Helper Functions ──────────────── */
 
-    function _settleAndDrainPremium(uint256 _policyId) internal {
+function _settleAndDrainPremium(uint256 _policyId) internal {
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
         if (block.timestamp <= pol.lastDrainTime) return;
 
@@ -230,7 +230,14 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         uint256 poolIncome = amountToDrain - catAmount;
 
         if (catAmount > 0) {
-            capitalPool.underlyingAsset().approve(address(catPool), catAmount);
+            IERC20 underlying = capitalPool.underlyingAsset();
+
+            // Resolution: Use the safe approval pattern. First, reset the allowance to zero,
+            // then set the new, specific allowance for the transaction.
+            // This leverages the imported SafeERC20 library's safeApprove function.
+            underlying.safeApprove(address(catPool), 0);
+            underlying.safeApprove(address(catPool), catAmount);
+            
             catPool.receiveUsdcPremium(catAmount);
         }
         
@@ -257,12 +264,23 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     
     function _getPremiumRateBpsAnnual(uint256 _poolId) internal view returns (uint256) {
         (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal, , ) = poolRegistry.getPoolData(_poolId);
-        uint256 availableCapital = totalPledged - pendingWithdrawal;
-        if (availableCapital == 0) return type(uint256).max;
+        
+        // Resolution: If pending withdrawals exceed or equal pledged capital, 
+        // there is no available capital. This check prevents an underflow revert.
+        if (pendingWithdrawal >= totalPledged) {
+            return type(uint256).max;
+        }
 
+        uint256 availableCapital = totalPledged - pendingWithdrawal;
+        
+        // Note: The original check `if (availableCapital == 0)` is now implicitly handled by the check above.
+        // However, we can leave the logic as is, since after our check, this line will never be hit
+        // unless totalPledged == pendingWithdrawal, which our check already covers.
+        // For clarity on the logic's continuation:
+        
         uint256 utilizationBps = (totalSold * BPS) / availableCapital;
         IPoolRegistry.RateModel memory model = poolRegistry.getPoolRateModel(_poolId);
-        
+         
         if (utilizationBps < model.kink) {
             return model.base + (model.slope1 * utilizationBps) / BPS;
         } else {
@@ -272,6 +290,13 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
     function _getAvailableCapital(uint256 _poolId) internal view returns (uint256) {
         (, uint256 totalPledged, , uint256 pendingWithdrawal, , ) = poolRegistry.getPoolData(_poolId);
+        
+        // Resolution: If pending withdrawals exceed or equal pledged capital, available capital is 0.
+        // This check prevents an underflow revert.
+        if (pendingWithdrawal >= totalPledged) {
+            return 0;
+        }
+        
         return totalPledged - pendingWithdrawal;
     }
 }

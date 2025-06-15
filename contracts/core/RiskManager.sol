@@ -21,8 +21,10 @@ interface IPoolRegistry {
     function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external;
     function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
     function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
-    // CORRECTED: Added function to get the total number of pools
     function getPoolCount() external view returns (uint256);
+    // CORRECTED: Added missing governance hooks to the interface
+    function setPauseState(uint256 _poolId, bool _isPaused) external;
+    function setFeeRecipient(uint256 _poolId, address _recipient) external;
 }
 
 interface ICapitalPool {
@@ -89,6 +91,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     /* ───────────────────────── Errors & Events ───────────────────────── */
     error NotCapitalPool();
     error NotPolicyManager();
+    error NotCommittee(); // CORRECTED: Added error for committee-only functions
     error NoCapitalToAllocate();
     error ExceedsMaxAllocations();
     error InvalidPoolId();
@@ -108,7 +111,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
     function setAddresses(address _capital, address _registry, address _policy, address _cat, address _loss) external onlyOwner {
-        // CORRECTED: Added zero-address checks for all critical contracts
         require(
             _capital != address(0) && 
             _registry != address(0) && 
@@ -146,7 +148,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
         for(uint i = 0; i < _poolIds.length; i++){
             uint256 poolId = _poolIds[i];
-            require(poolId < poolCount, "Invalid poolId"); // CORRECTED: Dynamic check
+            require(poolId < poolCount, "Invalid poolId");
             require(!isAllocatedToPool[msg.sender][poolId], "Already allocated to this pool");
             
             poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, totalPledge, true);
@@ -168,7 +170,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         if (totalPledge == 0) revert NoCapitalToAllocate();
         
         uint256 poolCount = poolRegistry.getPoolCount();
-        require(_poolId < poolCount, "Invalid poolId"); // CORRECTED: Dynamic check
+        require(_poolId < poolCount, "Invalid poolId");
         require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
         
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
@@ -178,6 +180,30 @@ contract RiskManager is Ownable, ReentrancyGuard {
         _removeUnderwriterFromPool(underwriter, _poolId);
 
         emit CapitalDeallocated(underwriter, _poolId, totalPledge);
+    }
+    
+    // CORRECTED: Added missing governance hook functions
+    /* ───────────────────── Governance Hooks ───────────────────── */
+
+    /**
+     * @notice Called by the Committee to pause/unpause a pool following a successful vote.
+     * @param _poolId The ID of the pool to update.
+     * @param _pauseState The new pause state (true = paused, false = unpaused).
+     */
+    function reportIncident(uint256 _poolId, bool _pauseState) external {
+        if (msg.sender != committee) revert NotCommittee();
+        poolRegistry.setPauseState(_poolId, _pauseState);
+    }
+
+    /**
+     * @notice Called by the Committee to set the fee recipient for a pool.
+     * @dev Typically used to redirect fees to the Committee contract during an incident.
+     * @param _poolId The ID of the pool to update.
+     * @param _recipient The address of the new fee recipient.
+     */
+    function setPoolFeeRecipient(uint256 _poolId, address _recipient) external {
+        if (msg.sender != committee) revert NotCommittee();
+        poolRegistry.setFeeRecipient(_poolId, _recipient);
     }
 
     /* ───────────────────── Keeper & Liquidation Functions ───────────────────── */
@@ -205,7 +231,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     /* ───────────────────── Claim Processing ───────────────────── */
 
     function processClaim(uint256 _policyId) external nonReentrant {
-        // This function would be permissioned to be called by a trusted claim assessor role or the committee
         (uint256 poolId, uint256 coverage, , ,) = policyNFT.getPolicy(_policyId);
         (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) = poolRegistry.getPoolPayoutData(poolId);
         
@@ -257,7 +282,10 @@ contract RiskManager is Ownable, ReentrancyGuard {
     function onCapitalWithdrawn(address _underwriter, uint256 _principalComponentRemoved, bool _isFullWithdrawal) external {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         _realizeLossesForAllPools(_underwriter);
-        underwriterTotalPledge[_underwriter] -= _principalComponentRemoved;
+        
+        uint256 pledgeAfterLosses = underwriterTotalPledge[_underwriter];
+        uint256 amountToSubtract = Math.min(pledgeAfterLosses, _principalComponentRemoved);
+        underwriterTotalPledge[_underwriter] -= amountToSubtract;
         
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
@@ -278,12 +306,11 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256[] memory allocations = underwriterAllocations[_user];
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
-            // CORRECTED: Read the pledge from storage inside the loop to get the updated value
             uint256 currentPledge = underwriterTotalPledge[_user];
-            if (currentPledge == 0) break; // No more pledge to realize losses against
+            if (currentPledge == 0) break;
             uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, currentPledge);
             if(pendingLoss > 0) {
-                underwriterTotalPledge[_user] -= pendingLoss;
+                underwriterTotalPledge[_user] -= Math.min(currentPledge, pendingLoss);
                 capitalPool.applyLosses(_user, pendingLoss);
             }
         }

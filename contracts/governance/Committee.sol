@@ -51,6 +51,8 @@ contract Committee is Ownable, ReentrancyGuard {
         uint256 challengeDeadline;
         uint256 totalRewardFees;
         mapping(address => VoteOption) votes;
+        // CORRECTED: Added mapping to snapshot voter weight at time of voting
+        mapping(address => uint256) voterWeight;
     }
 
     mapping(uint256 => Proposal) public proposals;
@@ -124,6 +126,9 @@ contract Committee is Ownable, ReentrancyGuard {
 
         p.votes[msg.sender] = _vote;
         uint256 weight = stakingContract.stakedBalance(msg.sender);
+        
+        // CORRECTED: Snapshot the voter's weight at the time of their vote
+        p.voterWeight[msg.sender] = weight;
 
         if (_vote == VoteOption.For) {
             p.forVotes += weight;
@@ -185,9 +190,6 @@ contract Committee is Ownable, ReentrancyGuard {
 
     /* ───────────────────── Reward Functions ───────────────────── */
 
-    /**
-     * @notice CORRECTED: Only the trusted RiskManager can forward fees to this contract.
-     */
     function receiveFees(uint256 _proposalId) external payable onlyRiskManager {
         proposals[_proposalId].totalRewardFees += msg.value;
     }
@@ -209,7 +211,8 @@ contract Committee is Ownable, ReentrancyGuard {
         }
         
         uint256 remainingFees = totalFees - userReward;
-        uint256 userWeight = stakingContract.stakedBalance(msg.sender);
+        // CORRECTED: Use the snapshotted weight, not the current balance.
+        uint256 userWeight = p.voterWeight[msg.sender];
         userReward += (remainingFees * userWeight) / p.forVotes;
 
         (bool sent, ) = msg.sender.call{value: userReward}("");
