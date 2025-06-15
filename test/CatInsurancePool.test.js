@@ -23,8 +23,8 @@ describe("CatInsurancePool", function () {
     const CAT_POOL_REWARD_ID = ethers.MaxUint256;
 
     // --- Mock ABIs ---
-    const iYieldAdapterAbi = require("../artifacts/contracts/interfaces/IYieldAdapter.json").abi;
-    const iRewardDistributorAbi = require("../artifacts/contracts/interfaces/IRewardDistributor.json").abi;
+    const iYieldAdapterAbi = require("../artifacts/contracts/interfaces/IYieldAdapter.sol/IYieldAdapter.json").abi;
+    const iRewardDistributorAbi = require("../artifacts/contracts/interfaces/IRewardDistributor.sol/IRewardDistributor.json").abi;
 
     beforeEach(async function () {
         // --- Get Signers ---
