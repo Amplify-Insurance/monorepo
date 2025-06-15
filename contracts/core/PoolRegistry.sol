@@ -29,7 +29,9 @@ interface IPoolRegistry {
 
     function getPoolRateModel(uint256 _poolId) external view returns (RateModel memory);
     
-    // CORRECTED: Replaced the gas-intensive getter with more granular functions
+    // CORRECTED: Added the getPoolPayoutData function back for on-chain use by the RiskManager
+    function getPoolPayoutData(uint256 _poolId) external view returns (address[] memory, uint256[] memory, uint256);
+    
     function getPoolActiveAdapters(uint256 _poolId) external view returns (address[] memory);
     function getCapitalPerAdapter(uint256 _poolId, address _adapter) external view returns (uint256);
 }
@@ -173,6 +175,19 @@ contract PoolRegistry is IPoolRegistry, Ownable {
 
     function getCapitalPerAdapter(uint256 _poolId, address _adapter) external view override returns (uint256) {
         return protocolRiskPools[_poolId].capitalPerAdapter[_adapter];
+    }
+    
+    /**
+     * @notice CORRECTED: This function is now implemented to serve the on-chain needs of the RiskManager.
+     */
+    function getPoolPayoutData(uint256 _poolId) external view override returns (address[] memory, uint256[] memory, uint256) {
+        PoolData storage pool = protocolRiskPools[_poolId];
+        address[] memory adapters = pool.activeAdapters;
+        uint256[] memory capitalPerAdapter = new uint256[](adapters.length);
+        for(uint i = 0; i < adapters.length; i++){
+            capitalPerAdapter[i] = pool.capitalPerAdapter[adapters[i]];
+        }
+        return (adapters, capitalPerAdapter, pool.totalCapitalPledgedToPool);
     }
     
     /* ───────────────── Internal & Helper Functions ──────────────── */

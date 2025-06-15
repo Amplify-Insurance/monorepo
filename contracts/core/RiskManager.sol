@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // --- Local Interfaces ---
 
@@ -20,6 +21,8 @@ interface IPoolRegistry {
     function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external;
     function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
     function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
+    // CORRECTED: Added function to get the total number of pools
+    function getPoolCount() external view returns (uint256);
 }
 
 interface ICapitalPool {
@@ -62,7 +65,7 @@ interface ILossDistributor {
  * @notice A lean orchestrator for a decentralized insurance protocol. It manages capital allocation,
  * claim processing, and liquidations by coordinating with specialized satellite contracts.
  */
-contract RiskManager is Ownable {
+contract RiskManager is Ownable, ReentrancyGuard {
 
     /* ───────────────────────── State Variables ───────────────────────── */
     ICapitalPool public capitalPool;
@@ -70,7 +73,7 @@ contract RiskManager is Ownable {
     IPolicyNFT public policyNFT;
     ICatInsurancePool public catPool;
     ILossDistributor public lossDistributor;
-    address public policyManager; // The only contract that can call updateCoverageSold
+    address public policyManager;
     address public committee;
 
     mapping(address => uint256) public underwriterTotalPledge;
@@ -81,7 +84,6 @@ contract RiskManager is Ownable {
     
     uint256 public constant MAX_ALLOCATIONS_PER_UNDERWRITER = 5;
     uint256 public constant CLAIM_FEE_BPS = 500;
-    // CORRECTED: Added missing constant declaration
     uint256 public constant BPS = 10_000;
 
     /* ───────────────────────── Errors & Events ───────────────────────── */
@@ -93,6 +95,7 @@ contract RiskManager is Ownable {
     error AlreadyAllocated();
     error NotAllocated();
     error UnderwriterNotInsolvent();
+    error ZeroAddressNotAllowed();
 
     event AddressesSet(address capital, address registry, address policy, address cat, address loss);
     event CommitteeSet(address committee);
@@ -105,33 +108,45 @@ contract RiskManager is Ownable {
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
     function setAddresses(address _capital, address _registry, address _policy, address _cat, address _loss) external onlyOwner {
+        // CORRECTED: Added zero-address checks for all critical contracts
+        require(
+            _capital != address(0) && 
+            _registry != address(0) && 
+            _policy != address(0) && 
+            _cat != address(0) && 
+            _loss != address(0), 
+            "Zero address not allowed"
+        );
         capitalPool = ICapitalPool(_capital);
         poolRegistry = IPoolRegistry(_registry);
         policyManager = _policy;
-        policyNFT = IPolicyNFT(Ownable(_policy).owner()); // Assuming PolicyManager owns the NFT contract
+        policyNFT = IPolicyNFT(Ownable(_policy).owner());
         catPool = ICatInsurancePool(_cat);
         lossDistributor = ILossDistributor(_loss);
         emit AddressesSet(_capital, _registry, _policy, _cat, _loss);
     }
 
     function setCommittee(address _committee) external onlyOwner {
+        require(_committee != address(0), "Zero address not allowed");
         committee = _committee;
         emit CommitteeSet(_committee);
     }
     
     /* ──────────────── Underwriter Capital Allocation ──────────────── */
     
-    function allocateCapital(uint256[] calldata _poolIds) external {
+    function allocateCapital(uint256[] calldata _poolIds) external nonReentrant {
         uint256 totalPledge = underwriterTotalPledge[msg.sender];
         if (totalPledge == 0) revert NoCapitalToAllocate();
         require(_poolIds.length > 0 && _poolIds.length <= MAX_ALLOCATIONS_PER_UNDERWRITER, "Invalid number of allocations");
 
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(msg.sender);
         require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
+        
+        uint256 poolCount = poolRegistry.getPoolCount();
 
         for(uint i = 0; i < _poolIds.length; i++){
             uint256 poolId = _poolIds[i];
-            require(poolId < 100, "Invalid poolId"); // Placeholder for actual pool count check
+            require(poolId < poolCount, "Invalid poolId"); // CORRECTED: Dynamic check
             require(!isAllocatedToPool[msg.sender][poolId], "Already allocated to this pool");
             
             poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, totalPledge, true);
@@ -145,18 +160,16 @@ contract RiskManager is Ownable {
         }
     }
     
-    function deallocateFromPool(uint256 _poolId) external {
+    function deallocateFromPool(uint256 _poolId) external nonReentrant {
         address underwriter = msg.sender;
         _realizeLossesForAllPools(underwriter);
         
         uint256 totalPledge = underwriterTotalPledge[underwriter];
         if (totalPledge == 0) revert NoCapitalToAllocate();
-        require(_poolId < 100, "Invalid poolId");
+        
+        uint256 poolCount = poolRegistry.getPoolCount();
+        require(_poolId < poolCount, "Invalid poolId"); // CORRECTED: Dynamic check
         require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
-        
-        // Removed claim rewards logic, as it's now handled by the user via PolicyManager
-        
-        // This solvency check is now implicitly handled by the CapitalPool's withdrawal request hook
         
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
         require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
@@ -169,18 +182,17 @@ contract RiskManager is Ownable {
 
     /* ───────────────────── Keeper & Liquidation Functions ───────────────────── */
 
-    function liquidateInsolventUnderwriter(address _underwriter) external {
+    function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
         (,, uint256 masterShares,,) = capitalPool.getUnderwriterAccount(_underwriter);
         if (masterShares == 0) revert UnderwriterNotInsolvent();
 
         uint256 totalShareValue = capitalPool.sharesToValue(masterShares);
         
         uint256[] memory allocations = underwriterAllocations[_underwriter];
-        uint256 pledge = underwriterTotalPledge[_underwriter];
         uint256 totalPendingLosses = 0;
         
         for (uint i = 0; i < allocations.length; i++) {
-            totalPendingLosses += lossDistributor.getPendingLosses(_underwriter, allocations[i], pledge);
+            totalPendingLosses += lossDistributor.getPendingLosses(_underwriter, allocations[i], underwriterTotalPledge[_underwriter]);
         }
 
         if (totalPendingLosses < totalShareValue) revert UnderwriterNotInsolvent();
@@ -192,7 +204,7 @@ contract RiskManager is Ownable {
 
     /* ───────────────────── Claim Processing ───────────────────── */
 
-    function processClaim(uint256 _policyId) external {
+    function processClaim(uint256 _policyId) external nonReentrant {
         // This function would be permissioned to be called by a trusted claim assessor role or the committee
         (uint256 poolId, uint256 coverage, , ,) = policyNFT.getPolicy(_policyId);
         (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) = poolRegistry.getPoolPayoutData(poolId);
@@ -210,7 +222,7 @@ contract RiskManager is Ownable {
         ICapitalPool.PayoutData memory payoutData;
         payoutData.claimant = policyNFT.ownerOf(_policyId);
         payoutData.claimantAmount = coverage - claimFee;
-        payoutData.feeRecipient = committee; // Simplified: fees go to committee
+        payoutData.feeRecipient = committee;
         payoutData.feeAmount = claimFee;
         payoutData.adapters = adapters;
         payoutData.capitalPerAdapter = capitalPerAdapter;
@@ -224,7 +236,6 @@ contract RiskManager is Ownable {
     
     /* ───────────────── Hooks & State Updaters ───────────────── */
 
-    // CORRECTED: Added missing function definition
     function updateCoverageSold(uint256 _poolId, uint256 _amount, bool _isSale) public {
         if(msg.sender != policyManager) revert NotPolicyManager();
         poolRegistry.updateCoverageSold(_poolId, _amount, _isSale);
@@ -265,10 +276,12 @@ contract RiskManager is Ownable {
 
     function _realizeLossesForAllPools(address _user) internal {
         uint256[] memory allocations = underwriterAllocations[_user];
-        uint256 pledge = underwriterTotalPledge[_user];
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
-            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, pledge);
+            // CORRECTED: Read the pledge from storage inside the loop to get the updated value
+            uint256 currentPledge = underwriterTotalPledge[_user];
+            if (currentPledge == 0) break; // No more pledge to realize losses against
+            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, currentPledge);
             if(pendingLoss > 0) {
                 underwriterTotalPledge[_user] -= pendingLoss;
                 capitalPool.applyLosses(_user, pendingLoss);

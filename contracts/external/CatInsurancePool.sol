@@ -23,7 +23,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     IYieldAdapter public adapter;
     address public riskManagerAddress;
     address public capitalPoolAddress;
-    address public policyManagerAddress; // ADDED
+    address public policyManagerAddress;
     IRewardDistributor public rewardDistributor;
     CatShare public immutable catShareToken;
 
@@ -41,7 +41,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     event ProtocolAssetRewardsClaimed(address indexed user, address indexed token, uint256 amount);
     event RiskManagerAddressSet(address indexed newRiskManagerAddress);
     event CapitalPoolAddressSet(address indexed newCapitalPoolAddress);
-    event PolicyManagerAddressSet(address indexed newPolicyManagerAddress); // ADDED
+    event PolicyManagerAddressSet(address indexed newPolicyManagerAddress);
     event RewardDistributorSet(address indexed newRewardDistributor);
 
 
@@ -50,7 +50,6 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         _;
     }
     
-    // ADDED: New modifier for the PolicyManager
     modifier onlyPolicyManager() {
         require(msg.sender == policyManagerAddress, "CIP: Caller is not the PolicyManager");
         _;
@@ -133,13 +132,19 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     function depositLiquidity(uint256 usdcAmount) external nonReentrant {
         require(usdcAmount > 0, "CIP: Deposit amount must be positive");
         
+        uint256 sharesToMint;
         uint256 totalCatSharesSupply = catShareToken.totalSupply();
         uint256 currentTotalValueInPool = liquidUsdc();
 
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
         idleUSDC += usdcAmount;
 
-        uint256 sharesToMint = (usdcAmount * totalCatSharesSupply) / currentTotalValueInPool;
+        // CORRECTED: Handles the first deposit case by checking if total value is zero.
+        if (currentTotalValueInPool == 0) {
+            sharesToMint = usdcAmount;
+        } else {
+            sharesToMint = (usdcAmount * totalCatSharesSupply) / currentTotalValueInPool;
+        }
         require(sharesToMint > 0, "CIP: No shares to mint");
         
         catShareToken.mint(msg.sender, sharesToMint);
@@ -177,9 +182,6 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
 
     /* ─────────────────── Trusted Functions ─────────────────── */
 
-    /**
-     * @notice CORRECTED: Now callable by the PolicyManager for premium collection.
-     */
     function receiveUsdcPremium(uint256 amount) external onlyPolicyManager {
         require(amount > 0, "CIP: Premium amount must be positive");
         usdc.safeTransferFrom(policyManagerAddress, address(this), amount);
@@ -187,7 +189,10 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         emit UsdcPremiumReceived(amount);
     }
 
-    function drawFund(uint256 amountToDraw) external onlyRiskManager {
+    /**
+     * @notice CORRECTED: Added nonReentrant modifier to prevent reentrancy attacks.
+     */
+    function drawFund(uint256 amountToDraw) external onlyRiskManager nonReentrant {
         require(amountToDraw > 0, "CIP: Draw amount must be positive");
         require(capitalPoolAddress != address(0), "CIP: CapitalPool address not set");
         uint256 currentPoolLiquidUsdc = liquidUsdc();
@@ -214,7 +219,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         emit DrawFromFund(amountToDraw, amountSent);
     }
 
-    function receiveProtocolAssetsForDistribution(address protocolAsset, uint256 amount) external onlyRiskManager {
+    function receiveProtocolAssetsForDistribution(address protocolAsset, uint256 amount) external onlyRiskManager nonReentrant {
         require(address(rewardDistributor) != address(0), "CIP: Reward distributor not set");
         require(protocolAsset != address(0), "CIP: Protocol asset cannot be zero address");
         require(amount > 0, "CIP: Amount of protocol asset must be positive");
