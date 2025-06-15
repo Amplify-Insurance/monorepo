@@ -95,7 +95,7 @@ The default network configuration uses Hardhat's in‑memory chain.  Modify `har
 - **PolicyManager** – User entrypoint for purchasing cover. Mints and burns `PolicyNFT` tokens.
 - **RiskManager** – Coordinates pool allocations, claims processing and rewards through `LossDistributor` and `RewardDistributor`.
 - **PoolRegistry** – Stores pool parameters, rate models and active adapters for each risk pool.
-- **CatInsurancePool** – Collects a share of premiums and provides additional liquidity during large claims.
+- **CatInsurancePool** – Collects a share of premiums and provides additional liquidity during large claims. When linking a `RewardDistributor` to the cat pool, ensure the distributor's `riskManager` is set to the cat pool contract or use the `claimForCatPool` helper function.
 - **Governance (Committee & Staking)** – Simple on‑chain governance used for pausing pools and slashing misbehaving stakers.
 
 ## Running a Local Node

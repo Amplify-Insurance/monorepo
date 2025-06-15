@@ -13,6 +13,7 @@ import "../interfaces/IYieldAdapter.sol";
 interface IRewardDistributor {
     function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external;
     function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
+    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
     function pendingRewards(address user, uint256 poolId, address rewardToken, uint256 userPledge) external view returns (uint256);
 }
 
@@ -239,7 +240,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         require(address(rewardDistributor) != address(0), "CIP: Reward distributor not set");
         uint256 userShares = catShareToken.balanceOf(msg.sender);
         
-        uint256 claimableAmount = rewardDistributor.claim(msg.sender, CAT_POOL_REWARD_ID, protocolAsset, userShares);
+        uint256 claimableAmount = rewardDistributor.claimForCatPool(msg.sender, CAT_POOL_REWARD_ID, protocolAsset, userShares);
         
         require(claimableAmount > 0, "CIP: No rewards to claim for this asset");
         emit ProtocolAssetRewardsClaimed(msg.sender, protocolAsset, claimableAmount);

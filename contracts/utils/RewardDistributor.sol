@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 interface IRewardDistributor {
     function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external;
     function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
+    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external returns (uint256);
     function updateUserState(address user, uint256 poolId, address rewardToken, uint256 userPledge) external;
     function pendingRewards(address user, uint256 poolId, address rewardToken, uint256 userPledge) external view returns (uint256);
 }
@@ -26,6 +27,9 @@ contract RewardDistributor is IRewardDistributor, Ownable {
     using SafeERC20 for IERC20;
 
     address public riskManager;
+    address public catPool;
+
+    event CatPoolSet(address indexed newCatPool);
 
     // --- Accounting Structs ---
     struct RewardTracker {
@@ -55,6 +59,11 @@ contract RewardDistributor is IRewardDistributor, Ownable {
         _;
     }
 
+    modifier onlyCatPool() {
+        require(msg.sender == catPool, "RD: Not CatPool");
+        _;
+    }
+
     error ZeroAddress();
 
     /* ───────────────────────── Constructor & Setup ──────────────────────── */
@@ -62,6 +71,12 @@ contract RewardDistributor is IRewardDistributor, Ownable {
     constructor(address _riskManagerAddress) Ownable(msg.sender) {
         if (_riskManagerAddress == address(0)) revert ZeroAddress();
         riskManager = _riskManagerAddress;
+    }
+
+    function setCatPool(address _catPool) external onlyOwner {
+        if (_catPool == address(0)) revert ZeroAddress();
+        catPool = _catPool;
+        emit CatPoolSet(_catPool);
     }
 
     function setRiskManager(address _newRiskManager) external onlyOwner {
@@ -104,6 +119,17 @@ contract RewardDistributor is IRewardDistributor, Ownable {
             RewardTracker storage tracker = poolRewardTrackers[poolId][rewardToken];
             userState.rewardDebt = (userPledge * tracker.accumulatedRewardsPerShare) / PRECISION_FACTOR;
             
+            IERC20(rewardToken).safeTransfer(user, rewards);
+        }
+        return rewards;
+    }
+
+    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyCatPool returns (uint256) {
+        uint256 rewards = pendingRewards(user, poolId, rewardToken, userPledge);
+        if (rewards > 0) {
+            UserRewardState storage userState = userRewardStates[user][poolId][rewardToken];
+            RewardTracker storage tracker = poolRewardTrackers[poolId][rewardToken];
+            userState.rewardDebt = (userPledge * tracker.accumulatedRewardsPerShare) / PRECISION_FACTOR;
             IERC20(rewardToken).safeTransfer(user, rewards);
         }
         return rewards;
