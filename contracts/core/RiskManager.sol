@@ -254,8 +254,11 @@ contract RiskManager is Ownable, ReentrancyGuard {
         payoutData.totalCapitalFromPoolLPs = totalCapitalPledged;
         
         capitalPool.executePayout(payoutData);
-        
-        updateCoverageSold(poolId, coverage, false);
+
+        // Update coverage sold directly without going through the PolicyManager
+        // hook to avoid the NotPolicyManager revert when processing claims.
+        poolRegistry.updateCoverageSold(poolId, coverage, false);
+
         policyNFT.burn(_policyId);
     }
     
