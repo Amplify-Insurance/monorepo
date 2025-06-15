@@ -41,6 +41,13 @@ const underwritingPositions = (details || [])
       const amount = Number(
         ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)
       );
+      const pendingLossStr = d.pendingLosses?.[pid] ?? '0';
+      const pendingLoss = Number(
+        ethers.utils.formatUnits(
+          pendingLossStr,
+          pool.underlyingAssetDecimals ?? 6,
+        ),
+      );
       return {
         id: `${d.deployment}-${pid}`,
         deployment: d.deployment,
@@ -50,6 +57,7 @@ const underwritingPositions = (details || [])
         poolId: pid,
         amount,
         nativeValue: amount,
+        pendingLoss,
         yield: Number(pool.underwriterYieldBps || 0) / 100,
         status:
           Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
@@ -276,6 +284,12 @@ const underwritingPositions = (details || [])
                       scope="col"
                       className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
                     >
+                      Pending Loss
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                    >
                       Status
                     </th>
                     <th
@@ -331,6 +345,9 @@ const underwritingPositions = (details || [])
                         <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
                           {formatPercentage(position.yield)}
                         </div>
+                        <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
+                          Loss: {formatCurrency(position.pendingLoss, 'USD', displayCurrency)}
+                        </div>
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
@@ -340,15 +357,20 @@ const underwritingPositions = (details || [])
                         </div>
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                          {formatPercentage(position.yield)}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                            : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
+                      <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                        {formatPercentage(position.yield)}
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {formatCurrency(position.pendingLoss, 'USD', displayCurrency)}
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
                             }`}
                         >
                           {position.status}
@@ -449,6 +471,9 @@ const underwritingPositions = (details || [])
                         </div>
                         <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
                           {unlockDays}d
+                        </div>
+                        <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
+                          Loss: {formatCurrency(position.pendingLoss, 'USD', displayCurrency)}
                         </div>
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
