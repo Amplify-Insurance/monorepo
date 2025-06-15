@@ -562,6 +562,12 @@ describe("RiskManager - processClaim", function () {
     });
 
     describe("Successful Claim - Full Coverage by LPs", function() {
+        it("executes without reverting", async function() {
+            const { riskManager, policyHolder, policyId } = await loadFixture(deployAndClaimFixture);
+            await expect(riskManager.connect(policyHolder).processClaim(policyId, "0x"))
+                .not.to.be.reverted;
+        });
+
         it("should calculate correct net payout and apply losses proportionally to underwriters", async function() {
             const { riskManager, policyHolder, mockCapitalPool, coverageAmount, u1Deposit, u2Deposit, policyId } = await loadFixture(deployAndClaimFixture);
             
