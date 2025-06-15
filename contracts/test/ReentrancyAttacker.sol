@@ -21,13 +21,16 @@ contract ReentrancyAttacker {
         riskManager.allocateCapital(poolIds);
     }
 
-    function beginAttack(uint256 poolId) external {
-        riskManager.claimPremiumRewards(poolId);
-        riskManager.claimPremiumRewards(poolId);
+    // The RiskManager contract no longer exposes reward claiming functions in
+    // the current version of the protocol. These attack helpers previously
+    // attempted to call `claimPremiumRewards` and `claimDistressedAssets` twice
+    // to verify the `nonReentrant` modifier. They are retained as no-op
+    // functions to keep older tests compiling.
+    function beginAttack(uint256 poolId) external pure {
+        revert("claimPremiumRewards removed");
     }
 
-    function beginDistressedAssetAttack(uint256 poolId) external {
-        riskManager.claimDistressedAssets(poolId);
-        riskManager.claimDistressedAssets(poolId);
+    function beginDistressedAssetAttack(uint256 poolId) external pure {
+        revert("claimDistressedAssets removed");
     }
 }
