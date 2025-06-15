@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Info, Plus, Minus } from "lucide-react";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
+import { getPoolManagerWithSigner } from "../../lib/poolManager";
 import {
   getCapitalPoolWithSigner,
   getUnderlyingAssetAddress,
@@ -75,7 +76,7 @@ export default function ManageCoverageModal({
       let tx;
       if (type === "coverage") {
         if (!policyId) throw new Error("policyId required");
-        const rm = await getRiskManagerWithSigner(depInfo.riskManager);
+        const pm = await getPoolManagerWithSigner(depInfo.poolManager);
 
         const dec = await getUnderlyingAssetDecimals(depInfo.capitalPool);
         const depositBn = ethers.utils.parseUnits(extendCost.toFixed(dec), dec);
@@ -85,17 +86,17 @@ export default function ManageCoverageModal({
         const addr = await token.signer.getAddress();
         const allowance = await token.allowance(
           addr,
-          depInfo.riskManager,
+          depInfo.poolManager,
         );
         if (allowance.lt(depositBn)) {
           const approveTx = await token.approve(
-            depInfo.riskManager,
+            depInfo.poolManager,
             depositBn,
           );
           await approveTx.wait();
         }
 
-        tx = await rm.addPremium(policyId, depositBn);
+        tx = await pm.addPremium(policyId, depositBn);
         await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
