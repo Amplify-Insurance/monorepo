@@ -63,7 +63,7 @@ async function main() {
   await policyManager.waitForDeployment();
 
   const CatInsurancePool = await ethers.getContractFactory("CatInsurancePool");
-  const catPool = await CatInsurancePool.deploy(USDC_ADDRESS, ethers.ZeroAddress, deployer.address);
+  const catPool = await CatInsurancePool.deploy(USDC_ADDRESS, "0x0000000000000000000000000000000000000000", deployer.address);
   await catPool.waitForDeployment();
 
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
