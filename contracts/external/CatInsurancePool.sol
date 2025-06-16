@@ -78,7 +78,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         require(catShareToken.owner() == address(this), "CIP: Pool must be owner of share token");
 
         _initialized = true;
-        catShareToken.mint(address(0), INITIAL_SHARES_LOCKED);
+        catShareToken.mint(address(this), INITIAL_SHARES_LOCKED);
         emit Initialized();
     }
     
