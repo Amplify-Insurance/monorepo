@@ -70,7 +70,8 @@ async function main() {
   const catPool = await CatInsurancePool.deploy(USDC_ADDRESS, catShare.target, ethers.ZeroAddress, deployer.address);
   await catPool.waitForDeployment();
 
-  await catShare.transferOwnership(catPool.target);
+  const transferTx = await catShare.transferOwnership(catPool.target);
+  await transferTx.wait();
   await catPool.initialize();
 
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
