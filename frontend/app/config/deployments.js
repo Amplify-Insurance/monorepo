@@ -10,6 +10,34 @@ if (raw) {
 }
 
 if (!deployments.length) {
+  try {
+    // Fallback to addresses written by the deploy scripts
+    const fs = require('fs');
+    const path = require('path');
+    const file = path.join(process.cwd(), '..', 'deployedAddresses.json');
+    if (fs.existsSync(file)) {
+      const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+      deployments = [
+        {
+          name: 'default',
+          riskManager: json.RiskManager,
+          capitalPool: json.CapitalPool,
+          catPool: json.CatInsurancePool,
+          poolRegistry: json.PoolRegistry,
+          poolManager: json.PolicyManager,
+          priceOracle: json.PriceOracle,
+          multicallReader: json.MulticallReader,
+          lossDistributor: json.LossDistributor,
+          rewardDistributor: json.RewardDistributor,
+        },
+      ];
+    }
+  } catch (err) {
+    console.error('Failed to load deployedAddresses.json', err);
+  }
+}
+
+if (!deployments.length) {
   deployments = [
     {
       name: 'default',
