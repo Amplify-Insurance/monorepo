@@ -60,6 +60,11 @@ import {
 } from "../generated/AaveV3Adapter/YieldAdapter";
 import { ProposalCreated, Voted, ProposalExecuted, BondResolved, RewardClaimed } from "../generated/Committee/Committee";
 import { OwnershipTransferred as PoolRegistryOwnershipTransferred } from "../generated/PoolRegistry/PoolRegistry";
+import {
+  Staked,
+  Unstaked,
+  CommitteeAddressSet
+} from "../generated/Staking/Staking";
 
 function saveGeneric(event: ethereum.Event, name: string): void {
   let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
@@ -484,4 +489,16 @@ export function handleCatPremiumShareSet(event: CatPremiumShareSet): void {
 
 export function handleCatPoolSet(event: CatPoolSet): void {
   saveGeneric(event, "CatPoolSet");
+}
+
+export function handleStaked(event: Staked): void {
+  saveGeneric(event, "Staked");
+}
+
+export function handleUnstaked(event: Unstaked): void {
+  saveGeneric(event, "Unstaked");
+}
+
+export function handleCommitteeAddressSet(event: CommitteeAddressSet): void {
+  saveGeneric(event, "CommitteeAddressSet");
 }
