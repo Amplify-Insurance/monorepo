@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getProvider } from '../../../../lib/provider';
 import { ethers } from 'ethers';
-import CatPoolAbi from '../../../../abi/CatInsurancePool.json';
+import { getCatPool } from '../../../../lib/catPool';
 import deployments from '../../../config/deployments';
 
 const APR_ABI = ['function currentApr() view returns (uint256)'];
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
 
-    const cp = new ethers.Contract(dep.catPool, CatPoolAbi, getProvider(dep.name));
+    const cp = getCatPool(dep.catPool, dep.name);
     const adapterAddr = await cp.adapter();
     let apr = '0';
     if (adapterAddr !== ethers.constants.AddressZero) {

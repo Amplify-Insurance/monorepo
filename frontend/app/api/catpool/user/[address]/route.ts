@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getProvider } from '../../../../../lib/provider';
-import CatPoolAbi from '../../../../../abi/CatInsurancePool.json';
+import { getCatPool } from '../../../../../lib/catPool';
 import ERC20 from '../../../../../abi/ERC20.json';
 import { ethers } from 'ethers';
 import deployments from '../../../../config/deployments';
@@ -10,7 +10,7 @@ export async function GET(req: Request, { params }: { params: { address: string 
     const url = new URL(req.url);
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const cp = new ethers.Contract(dep.catPool, CatPoolAbi, getProvider(dep.name));
+    const cp = getCatPool(dep.catPool, dep.name);
 
     const addr = params.address.toLowerCase();
     const catShareAddr = await cp.catShareToken();
