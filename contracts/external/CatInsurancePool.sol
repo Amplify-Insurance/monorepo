@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "../tokens/CatShare.sol";
+import "../tokens/CatShare.sol"; // Assumes CatShare.sol is in a sub-directory
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IRewardDistributor.sol";
 
@@ -14,18 +14,25 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;
+    // --- RESOLUTION: CatShare token is now passed in as an immutable address ---
+    CatShare public immutable catShareToken;
+
     IYieldAdapter public adapter;
     address public riskManagerAddress;
     address public capitalPoolAddress;
     address public policyManagerAddress;
     IRewardDistributor public rewardDistributor;
-    CatShare public immutable catShareToken;
+    
+    // --- RESOLUTION: Add a flag to ensure initialization only happens once ---
+    bool private _initialized;
 
     uint256 public idleUSDC;
     uint256 private constant INITIAL_SHARES_LOCKED = 1000;
     uint256 public constant CAT_POOL_REWARD_ID = type(uint256).max;
     uint256 public constant MIN_USDC_AMOUNT = 1e6; // 1 USDC assuming 6 decimals
 
+    // --- Events (add an Initialized event) ---
+    event Initialized();
     event AdapterChanged(address indexed newAdapter);
     event UsdcPremiumReceived(uint256 amount);
     event DepositToAdapter(uint256 amount);
@@ -38,7 +45,43 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     event CapitalPoolAddressSet(address indexed newCapitalPoolAddress);
     event PolicyManagerAddressSet(address indexed newPolicyManagerAddress);
     event RewardDistributorSet(address indexed newRewardDistributor);
+    // ... other events
+    
+    // --- RESOLUTION: The constructor is now much lighter ---
+    constructor(
+        IERC20 _usdcToken,
+        CatShare _catShareToken, // Pass the already-deployed token in
+        IYieldAdapter _initialAdapter,
+        address _initialOwner
+    ) Ownable(_initialOwner) {
+        require(address(_usdcToken) != address(0), "CIP: Invalid USDC token address");
+        require(address(_catShareToken) != address(0), "CIP: Invalid CatShare token address");
 
+        usdc = _usdcToken;
+        catShareToken = _catShareToken;
+        
+        if (address(_initialAdapter) != address(0)) {
+            adapter = _initialAdapter;
+            usdc.approve(address(_initialAdapter), 0);
+            usdc.approve(address(_initialAdapter), type(uint256).max);
+        }
+    }
+
+    // --- RESOLUTION: New one-time initializer function ---
+    /**
+     * @notice Initializes the pool by minting the initial locked shares.
+     * @dev This function can only be called once by the owner.
+     * The CatInsurancePool contract must be the owner of the CatShare token before this is called.
+     */
+    function initialize() external onlyOwner {
+        require(!_initialized, "CIP: Already initialized");
+        require(catShareToken.owner() == address(this), "CIP: Pool must be owner of share token");
+
+        _initialized = true;
+        catShareToken.mint(address(0), INITIAL_SHARES_LOCKED);
+        emit Initialized();
+    }
+    
 
     modifier onlyRiskManager() {
         require(msg.sender == riskManagerAddress, "CIP: Caller is not the RiskManager");
@@ -48,22 +91,6 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     modifier onlyPolicyManager() {
         require(msg.sender == policyManagerAddress, "CIP: Caller is not the PolicyManager");
         _;
-    }
-
-    constructor(IERC20 _usdcToken, IYieldAdapter _initialAdapter, address _initialOwner) Ownable(_initialOwner) {
-        require(address(_usdcToken) != address(0), "CIP: Invalid USDC token address");
-        usdc = _usdcToken;
-        
-        catShareToken = new CatShare(); 
-        
-        catShareToken.mint(address(0), INITIAL_SHARES_LOCKED);
-        
-        if (address(_initialAdapter) != address(0)) {
-            adapter = _initialAdapter;
-            // Grant approval to the initial adapter
-            usdc.approve(address(_initialAdapter), 0);
-            usdc.approve(address(_initialAdapter), type(uint256).max);
-        }
     }
 
     /* ───────────────────── Admin Functions ───────────────────── */
@@ -105,7 +132,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         }
         adapter = IYieldAdapter(_newAdapterAddress);
         if (address(adapter) != address(0)) {
-            // Grant allowance to the new adapter
+            // Grant allowance to the new adapter safely
             usdc.approve(address(adapter), 0);
             usdc.approve(address(adapter), type(uint256).max);
         }
