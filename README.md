@@ -125,10 +125,13 @@ npm run dev
 ```
 
 Environment variables such as the RPC endpoint and deployed contract addresses can
-be configured in `.env` (see `.env.example`). At a minimum set
+be configured in `.env` (see `.env.example`). If no addresses are provided the
+frontend attempts to read `deployedAddresses.json` at the repository root,
+written by the deployment scripts. At a minimum set
 `NEXT_PUBLIC_POOL_MANAGER_ADDRESS` and `NEXT_PUBLIC_RISK_MANAGER_ADDRESS` so the
-frontend knows where the core contracts live. Several API routes under
-`app/api` demonstrate reading data from the contracts. Examples
+frontend knows where the core contracts live when no JSON file is present.
+Several API routes under `app/api` demonstrate reading data from the contracts.
+Examples
 include:
 
 - `GET /api/pools` – number of pools
