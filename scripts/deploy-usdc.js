@@ -62,9 +62,16 @@ async function main() {
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
 
+  const CatShare = await ethers.getContractFactory("CatShare");
+  const catShare = await CatShare.deploy();
+  await catShare.waitForDeployment();
+
   const CatInsurancePool = await ethers.getContractFactory("CatInsurancePool");
-  const catPool = await CatInsurancePool.deploy(USDC_ADDRESS, "0x0000000000000000000000000000000000000000", deployer.address);
+  const catPool = await CatInsurancePool.deploy(USDC_ADDRESS, catShare.target, ethers.ZeroAddress, deployer.address);
   await catPool.waitForDeployment();
+
+  await catShare.transferOwnership(catPool.target);
+  await catPool.initialize();
 
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
   const capitalPool = await CapitalPool.deploy(deployer.address, USDC_ADDRESS);
