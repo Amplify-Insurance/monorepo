@@ -185,9 +185,8 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
         if (catAmount > 0) {
             IERC20 underlying = capitalPool.underlyingAsset();
 
-            // Use the OZ forceApprove helper to safely update allowances even when
-            // a non-zero allowance already exists.
-            underlying.forceApprove(address(catPool), catAmount);
+            // Approve the Cat Pool to pull the premium amount
+            underlying.approve(address(catPool), catAmount);
 
             catPool.receiveUsdcPremium(catAmount);
         }
