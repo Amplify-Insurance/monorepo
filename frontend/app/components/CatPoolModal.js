@@ -18,7 +18,7 @@ export default function CatPoolModal({
   onActionComplete,
 }) {
   const isDeposit = mode === "deposit"
-  const symbol = isDeposit ? assetSymbol : "CATLP"
+  const symbol = assetSymbol
   const [amount, setAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -38,14 +38,30 @@ export default function CatPoolModal({
   const loadBalance = async () => {
     try {
       let addr = tokenAddr
-      if (!isDeposit) {
-        addr = await getCatShareAddress()
+      let dec
+      let bal
+      if (isDeposit) {
+        dec = await getTokenDecimals(addr)
+        const tokenContract = await getERC20WithSigner(addr)
+        const signerAddr = await tokenContract.signer.getAddress()
+        bal = await tokenContract.balanceOf(signerAddr)
+      } else {
+        const cp = await getCatPoolWithSigner()
+        addr = await getUsdcAddress()
         setTokenAddr(addr)
+        dec = await getUsdcDecimals()
+        const shareAddr = await getCatShareAddress()
+        const shareToken = await getERC20WithSigner(shareAddr)
+        const signerAddr = await shareToken.signer.getAddress()
+        const [userShares, totalSupply, liquid] = await Promise.all([
+          shareToken.balanceOf(signerAddr),
+          shareToken.totalSupply(),
+          cp.liquidUsdc(),
+        ])
+        bal = totalSupply.eq(0)
+          ? ethers.BigNumber.from(0)
+          : userShares.mul(liquid).div(totalSupply)
       }
-      const dec = await getTokenDecimals(addr)
-      const tokenContract = await getERC20WithSigner(addr)
-      const signerAddr = await tokenContract.signer.getAddress()
-      const bal = await tokenContract.balanceOf(signerAddr)
       const human = ethers.utils.formatUnits(bal, dec)
       setBalance(human)
       return human
@@ -86,7 +102,17 @@ export default function CatPoolModal({
         const tx = await cp.depositLiquidity(amountBn)
         await tx.wait()
       } else {
-        const sharesBn = ethers.utils.parseUnits(amount, 18)
+        const dec = await getUsdcDecimals()
+        const amountBn = ethers.utils.parseUnits(amount, dec)
+        const shareAddr = await getCatShareAddress()
+        const shareToken = await getERC20WithSigner(shareAddr)
+        const [totalSupply, liquid] = await Promise.all([
+          shareToken.totalSupply(),
+          cp.liquidUsdc(),
+        ])
+        const sharesBn = liquid.eq(0)
+          ? ethers.BigNumber.from(0)
+          : amountBn.mul(totalSupply).div(liquid)
         const tx = await cp.withdrawLiquidity(sharesBn)
         await tx.wait()
       }
