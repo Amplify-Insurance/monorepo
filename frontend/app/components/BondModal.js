@@ -50,7 +50,15 @@ export default function BondModal({ isOpen, onClose }) {
     setIsSubmitting(true)
     try {
       const staking = await getStakingWithSigner()
-      const tx = await staking.depositBond(pool.id, ethers.utils.parseUnits(amount, 18))
+      const token = await getERC20WithSigner(selectedToken)
+      const value = ethers.utils.parseUnits(amount, 18)
+      const owner = await token.signer.getAddress()
+      const allowance = await token.allowance(owner, staking.address)
+      if (allowance.lt(value)) {
+        const approveTx = await token.approve(staking.address, value)
+        await approveTx.wait()
+      }
+      const tx = await staking.depositBond(pool.id, value)
       await tx.wait()
       setAmount("")
       onClose()
