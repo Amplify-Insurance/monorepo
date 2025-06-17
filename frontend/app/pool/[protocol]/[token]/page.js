@@ -417,13 +417,23 @@ export default function PoolDetailsPage() {
             <Image src={getTokenLogo(token)} alt={`${token} logo`} width={48} height={48} className="rounded-full bg-gray-200 dark:bg-gray-700" onError={(e)=>{e.currentTarget.src='/images/tokens/default.png';e.currentTarget.onerror=null}}/>
           </div>
           <div>
-            <h1 className="text-xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center flex-wrap gap-x-2">
+            <h1 className="text-xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-x-2 flex-wrap">
               <span className="inline-flex items-center">
                 <Image src={market.logo} alt={`${market.name} logo`} width={24} height={24} className="rounded-full mr-2" onError={(e)=>{e.currentTarget.style.display='none'}}/>
                 {market.name}
               </span>
-              <span>{token} Pool</span>
             </h1>
+            <p className="text-sm md:text-base text-gray-600 dark:text-gray-300 flex items-center gap-1">
+              <span className="font-mono break-all">{token}</span> Pool
+              <a
+                href={`https://etherscan.io/address/${token}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 inline-flex text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </p>
             <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm md:text-base">{market.description}</p>
           </div>
         </div>
