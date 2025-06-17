@@ -42,6 +42,14 @@ async function main() {
   addresses.PriceOracle = oracle.target
   fs.writeFileSync(addressesPath, JSON.stringify(addresses, null, 2))
   console.log(`Saved addresses to ${addressesPath}`)
+
+  const rootPath = path.join(__dirname, "..", "deployedAddresses.json")
+  let root = {}
+  if (fs.existsSync(rootPath)) {
+    root = JSON.parse(fs.readFileSync(rootPath, "utf8"))
+  }
+  fs.writeFileSync(rootPath, JSON.stringify({ ...root, ...addresses }, null, 2))
+  console.log(`Updated ${rootPath}`)
 }
 
 main().catch((err) => {
