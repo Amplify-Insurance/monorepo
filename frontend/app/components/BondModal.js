@@ -8,7 +8,17 @@ import { getStakingWithSigner } from "../../lib/staking"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
 import useTokenList from "../../hooks/useTokenList"
-import { getProtocolName, getProtocolLogo, getTokenName, getTokenLogo } from "../config/tokenNameMap"
+import {
+  getProtocolName,
+  getProtocolLogo,
+  getTokenName,
+  getTokenLogo,
+} from "../config/tokenNameMap"
+import {
+  getERC20WithSigner,
+  getTokenDecimals,
+  getTokenSymbol,
+} from "../../lib/erc20"
 
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
@@ -19,6 +29,9 @@ export default function BondModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [maxPayout, setMaxPayout] = useState("0")
+  const tokenAddress = process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS
+  const [symbol, setSymbol] = useState("")
+  const [decimals, setDecimals] = useState(18)
 
   useEffect(() => {
     if (!selectedToken && tokens && tokens.length > 0) {
@@ -32,6 +45,21 @@ export default function BondModal({ isOpen, onClose }) {
     }
   }, [pools, selectedProtocol])
 
+  useEffect(() => {
+    async function loadTokenInfo() {
+      if (!tokenAddress) return
+      try {
+        setSymbol(await getTokenSymbol(tokenAddress))
+        setDecimals(await getTokenDecimals(tokenAddress))
+      } catch (err) {
+        console.error('Failed to load staking token info', err)
+      }
+    }
+    if (isOpen) {
+      loadTokenInfo()
+    }
+  }, [isOpen, tokenAddress])
+
   // Calculate max payout (2x bond amount)
   useEffect(() => {
     if (amount && Number.parseFloat(amount) > 0) {
@@ -44,14 +72,16 @@ export default function BondModal({ isOpen, onClose }) {
   const handleSubmit = async () => {
     if (!amount || !selectedProtocol || !selectedToken) return
     const pool = pools.find(
-      (p) => String(p.id) === selectedProtocol && p.protocolTokenToCover.toLowerCase() === selectedToken.toLowerCase(),
+      (p) =>
+        String(p.id) === selectedProtocol &&
+        p.protocolTokenToCover.toLowerCase() === selectedToken.toLowerCase(),
     )
     if (!pool) return
     setIsSubmitting(true)
     try {
       const staking = await getStakingWithSigner()
-      const token = await getERC20WithSigner(selectedToken)
-      const value = ethers.utils.parseUnits(amount, 18)
+      const token = await getERC20WithSigner(tokenAddress)
+      const value = ethers.utils.parseUnits(amount, decimals)
       const owner = await token.signer.getAddress()
       const allowance = await token.allowance(owner, staking.address)
       if (allowance.lt(value)) {
@@ -69,8 +99,6 @@ export default function BondModal({ isOpen, onClose }) {
     }
   }
 
-  const selectedTokenData = tokens.find((t) => t.address === selectedToken)
-  const selectedPoolData = pools.find((p) => String(p.id) === selectedProtocol)
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Deposit Bond">
@@ -94,8 +122,8 @@ export default function BondModal({ isOpen, onClose }) {
           <div className="relative">
             <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer">
               <Image
-                src={getTokenLogo(selectedToken) || "/placeholder.svg"}
-                alt={getTokenName(selectedToken)}
+                src={getTokenLogo(tokenAddress) || "/placeholder.svg"}
+                alt={symbol}
                 width={24}
                 height={24}
                 className="rounded-full"
@@ -159,7 +187,7 @@ export default function BondModal({ isOpen, onClose }) {
               />
               <div className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {selectedTokenData ? selectedTokenData.symbol : "TOKEN"}
+                  {symbol || "TOKEN"}
                 </span>
               </div>
             </div>
@@ -174,7 +202,7 @@ export default function BondModal({ isOpen, onClose }) {
               <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Max Payout</span>
             </div>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-              {maxPayout} {selectedTokenData ? getTokenName(selectedTokenData.address) : "TOKEN"}
+              {maxPayout} {symbol || "TOKEN"}
             </span>
           </div>
         )}
