@@ -29,6 +29,10 @@ if (!deployments.length) {
           multicallReader: json.MulticallReader,
           lossDistributor: json.LossDistributor,
           rewardDistributor: json.RewardDistributor,
+          policyNft: json.PolicyNFT,
+          staking: json.StakingContract,
+          committee: json.Committee,
+          governanceToken: json.GovernanceToken,
         },
       ];
     }

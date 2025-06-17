@@ -1,8 +1,11 @@
 import { ethers } from 'ethers'
 import RewardDistributor from '../abi/RewardDistributor.json'
 import { getProvider } from './provider'
+import deployments from '../app/config/deployments'
 
-const ADDRESS = process.env.NEXT_PUBLIC_REWARD_DISTRIBUTOR_ADDRESS as string
+const ADDRESS =
+  (deployments[0] && deployments[0].rewardDistributor) ||
+  (process.env.NEXT_PUBLIC_REWARD_DISTRIBUTOR_ADDRESS as string)
 
 export function getRewardDistributor(address: string = ADDRESS, deployment?: string) {
   return new ethers.Contract(address, RewardDistributor, getProvider(deployment))

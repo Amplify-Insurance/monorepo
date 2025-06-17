@@ -2,16 +2,19 @@
 import { ethers } from 'ethers';
 import RiskManager from '../abi/RiskManager.json';
 import { getProvider, provider } from './provider';
+import deployments from '../app/config/deployments';
 
 /* ───────────────────────────────
    Validate & create read-only contract
 ────────────────────────────────── */
 
-const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS as string;
+const DEFAULT_ADDRESS =
+  (deployments[0] && deployments[0].riskManager) ||
+  (process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS as string);
 
 if (!DEFAULT_ADDRESS) {
-  console.error('❌  NEXT_PUBLIC_RISK_MANAGER_ADDRESS env var is missing');
-  throw new Error('NEXT_PUBLIC_RISK_MANAGER_ADDRESS not set');
+  console.error('❌  RiskManager address not configured');
+  throw new Error('RiskManager address not set');
 }
 
 export function getRiskManager(address: string = DEFAULT_ADDRESS, deployment?: string) {

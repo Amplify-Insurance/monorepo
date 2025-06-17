@@ -1,17 +1,19 @@
 import { ethers } from 'ethers';
 import PolicyNFT from '../abi/PolicyNFT.json';
 import { getProvider, provider } from './provider';
+import deployments from '../app/config/deployments';
 
 const rpc = process.env.NEXT_PUBLIC_RPC_URL;
 console.log('RPC URL:', rpc);
 
 
 const READ_ADDRESS =
-  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS ??
+  (deployments[0] && deployments[0].policyNft) ||
+  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS ||
   process.env.POLICY_NFT_ADDRESS;
 
 if (!READ_ADDRESS) {
-  console.error('❌  POLICY_NFT_ADDRESS env var is missing');
+  console.error('❌  PolicyNFT address not configured');
   throw new Error('POLICY_NFT_ADDRESS not set');
 }
 

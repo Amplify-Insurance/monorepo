@@ -1,13 +1,16 @@
 import { ethers } from 'ethers'
 import Staking from '../abi/Staking.json'
 import { getProvider, provider } from './provider'
+import deployments from '../app/config/deployments'
 
 // Validate presence of the staking contract address
-const ADDRESS = process.env.NEXT_PUBLIC_STAKING_ADDRESS as string
+const ADDRESS =
+  (deployments[0] && deployments[0].staking) ||
+  (process.env.NEXT_PUBLIC_STAKING_ADDRESS as string)
 
 if (!ADDRESS) {
-  console.error('❌  NEXT_PUBLIC_STAKING_ADDRESS env var is missing')
-  throw new Error('NEXT_PUBLIC_STAKING_ADDRESS not set')
+  console.error('❌  Staking address not configured')
+  throw new Error('Staking address not set')
 }
 
 export function getStaking(address: string = ADDRESS, deployment?: string) {

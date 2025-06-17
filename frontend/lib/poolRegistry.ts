@@ -1,8 +1,11 @@
 import { ethers } from 'ethers'
 import PoolRegistry from '../abi/PoolRegistry.json'
 import { getProvider } from './provider'
+import deployments from '../app/config/deployments'
 
-const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_POOL_REGISTRY_ADDRESS as string
+const DEFAULT_ADDRESS =
+  (deployments[0] && deployments[0].poolRegistry) ||
+  (process.env.NEXT_PUBLIC_POOL_REGISTRY_ADDRESS as string)
 
 export function getPoolRegistry(address: string = DEFAULT_ADDRESS, deployment?: string) {
   return new ethers.Contract(address, PoolRegistry, getProvider(deployment))
