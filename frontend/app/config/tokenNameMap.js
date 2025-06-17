@@ -49,6 +49,11 @@ export const TOKEN_LOGO_MAP = {
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": '/images/tokens/usdc.png',
 };
 
+if (process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS) {
+  TOKEN_NAME_MAP[process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS] = 'Staking Token';
+  TOKEN_LOGO_MAP[process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS] = '/images/tokens/placeholder-token.svg';
+}
+
 export function getTokenName(id) {
   return TOKEN_NAME_MAP[id] || id;
 }
