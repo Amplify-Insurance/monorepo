@@ -1,2 +1,3 @@
 npx hardhat run scripts/deploy-usdc.js --network base
+npx hardhat run scripts/deploy-governance.js --network base
 npx hardhat run scripts/deploy-oracle.js --network base
