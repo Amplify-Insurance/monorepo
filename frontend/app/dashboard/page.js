@@ -16,6 +16,7 @@ import useCatPoolRewards from "../../hooks/useCatPoolRewards"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
 import useStakingInfo from "../../hooks/useStakingInfo"
 import usePastProposals from "../../hooks/usePastProposals"
+import useActiveProposals from "../../hooks/useActiveProposals"
 import { getCommitteeWithSigner } from "../../lib/committee"
 import { ethers } from "ethers"
 
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const { stats } = useCatPoolStats()
   const { info: stakingInfo } = useStakingInfo(address)
   const { proposals: pastProposals } = usePastProposals()
+  const { proposals: activeProposals } = useActiveProposals()
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
 
   const hasActiveCoverages = (policies || []).length > 0
@@ -155,20 +157,16 @@ export default function Dashboard() {
 
         {stakingInfo && BigInt(stakingInfo.staked || '0') > 0n && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">My Staked Gov Tokens</h2>
-              <Link
-                href="/staking"
-                className="py-1 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md transition-colors"
-              >
-                Manage
-              </Link>
-            </div>
+            <h2 className="text-xl font-semibold mb-2">My Staked Gov Tokens</h2>
             <table className="min-w-full text-sm mb-4">
               <thead>
                 <tr>
                   <th className="px-2 py-1 text-left">Amount Staked</th>
                   <th className="px-2 py-1 text-left">Voting Power</th>
+                  <th className="px-2 py-1 text-left">Manage</th>
+                  {activeProposals.length > 0 && (
+                    <th className="px-2 py-1 text-left">Status</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -186,16 +184,32 @@ export default function Dashboard() {
                         ).toFixed(2)
                       : '0'}%
                   </td>
+                  <td className="px-2 py-1">
+                    <Link
+                      href="/staking"
+                      className="py-1 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md transition-colors"
+                    >
+                      Manage
+                    </Link>
+                  </td>
+                  {activeProposals.length > 0 && (
+                    <td className="px-2 py-1">Open Proposals</td>
+                  )}
                 </tr>
               </tbody>
             </table>
-            <button
-              onClick={handleClaimGovRewards}
-              disabled={isClaimingRewards}
-              className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
-            >
-              {isClaimingRewards ? 'Claiming...' : 'Claim Rewards'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClaimGovRewards}
+                disabled={isClaimingRewards}
+                className="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
+              >
+                {isClaimingRewards ? 'Claiming...' : 'Claim Rewards'}
+              </button>
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                {pastProposals.length}
+              </span>
+            </div>
           </div>
         )}
       </div>
