@@ -1,21 +1,29 @@
 import { useState, useEffect } from 'react'
+import { getRiskManager } from '../lib/riskManager'
+import { getCapitalPool } from '../lib/capitalPool'
+import deployments from '../app/config/deployments'
 
-export default function useReserveConfig() {
+export default function useReserveConfig(deployment) {
   const [config, setConfig] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/reserve-config')
-        if (res.ok) {
-          const data = await res.json()
-          setConfig({
-            coverCooldownPeriod: Number(data.coverCooldownPeriod || 0),
-            claimFeeBps: Number(data.claimFeeBps || 0),
-            underwriterNoticePeriod: Number(data.underwriterNoticePeriod || 0),
-          })
-        }
+        const dep =
+          deployments.find((d) => d.name === deployment) ?? deployments[0]
+        const rm = getRiskManager(dep.riskManager, dep.name)
+        const cp = getCapitalPool(dep.capitalPool, dep.name)
+        const [cooldown, claimFee, notice] = await Promise.all([
+          rm.COVER_COOLDOWN_PERIOD(),
+          rm.CLAIM_FEE_BPS(),
+          cp.UNDERWRITER_NOTICE_PERIOD(),
+        ])
+        setConfig({
+          coverCooldownPeriod: Number(cooldown.toString()),
+          claimFeeBps: Number(claimFee.toString()),
+          underwriterNoticePeriod: Number(notice.toString()),
+        })
       } catch (err) {
         console.error('Failed to load reserve config', err)
       } finally {
@@ -23,7 +31,7 @@ export default function useReserveConfig() {
       }
     }
     load()
-  }, [])
+  }, [deployment])
 
   return { config, loading }
 }

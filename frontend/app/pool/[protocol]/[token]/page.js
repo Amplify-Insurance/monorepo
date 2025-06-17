@@ -85,7 +85,7 @@ export default function PoolDetailsPage() {
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false)
   const [provideModalOpen, setProvideModalOpen] = useState(false)
 
-  const { config: reserveConfig } = useReserveConfig()
+  const { config: reserveConfig } = useReserveConfig(pool?.deployment)
 
   const premiumCanvasRef = useRef(null)
   const utilCanvasRef = useRef(null)
