@@ -1,8 +1,11 @@
 import { ethers } from 'ethers';
 import CapitalPool from '../abi/CapitalPool.json';
 import { getProvider, provider } from './provider';
+import deployments from '../app/config/deployments';
 
-const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS as string;
+const DEFAULT_ADDRESS =
+  (deployments[0] && deployments[0].capitalPool) ||
+  (process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS as string);
 
 export function getCapitalPool(address: string = DEFAULT_ADDRESS, deployment?: string) {
   return new ethers.Contract(address, CapitalPool, getProvider(deployment));

@@ -1,12 +1,15 @@
 import { ethers } from 'ethers'
 import Committee from '../abi/Committee.json'
 import { getProvider, provider } from './provider'
+import deployments from '../app/config/deployments'
 
-const ADDRESS = process.env.NEXT_PUBLIC_COMMITTEE_ADDRESS as string
+const ADDRESS =
+  (deployments[0] && deployments[0].committee) ||
+  (process.env.NEXT_PUBLIC_COMMITTEE_ADDRESS as string)
 
 if (!ADDRESS) {
-  console.error('❌  NEXT_PUBLIC_COMMITTEE_ADDRESS env var is missing')
-  throw new Error('NEXT_PUBLIC_COMMITTEE_ADDRESS not set')
+  console.error('❌  Committee address not configured')
+  throw new Error('Committee address not set')
 }
 
 export function getCommittee(address: string = ADDRESS, deployment?: string) {

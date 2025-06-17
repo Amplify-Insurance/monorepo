@@ -1,12 +1,15 @@
 import { ethers } from 'ethers'
 import PoolManager from '../abi/PoolManager.json'
 import { getProvider } from './provider'
+import deployments from '../app/config/deployments'
 
-const DEFAULT_ADDRESS = process.env.NEXT_PUBLIC_POOL_MANAGER_ADDRESS as string
+const DEFAULT_ADDRESS =
+  (deployments[0] && deployments[0].poolManager) ||
+  (process.env.NEXT_PUBLIC_POOL_MANAGER_ADDRESS as string)
 
 if (!DEFAULT_ADDRESS) {
-  console.error('\u274C  NEXT_PUBLIC_POOL_MANAGER_ADDRESS env var is missing')
-  throw new Error('NEXT_PUBLIC_POOL_MANAGER_ADDRESS not set')
+  console.error('❌  PoolManager address not configured')
+  throw new Error('PoolManager address not set')
 }
 
 export function getPoolManager(address: string = DEFAULT_ADDRESS, deployment?: string) {
