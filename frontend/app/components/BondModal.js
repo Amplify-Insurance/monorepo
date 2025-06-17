@@ -7,11 +7,9 @@ import { AlertTriangle, Info, DollarSign, ChevronDown } from "lucide-react"
 import { getStakingWithSigner } from "../../lib/staking"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
-import useTokenList from "../../hooks/useTokenList"
 import {
   getProtocolName,
   getProtocolLogo,
-  getTokenName,
   getTokenLogo,
 } from "../config/tokenNameMap"
 import {
@@ -22,9 +20,6 @@ import {
 
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
-  const tokens = useTokenList(pools)
-
-  const [selectedToken, setSelectedToken] = useState("")
   const [selectedProtocol, setSelectedProtocol] = useState("")
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -33,11 +28,6 @@ export default function BondModal({ isOpen, onClose }) {
   const [symbol, setSymbol] = useState("")
   const [decimals, setDecimals] = useState(18)
 
-  useEffect(() => {
-    if (!selectedToken && tokens && tokens.length > 0) {
-      setSelectedToken(tokens[0].address)
-    }
-  }, [tokens, selectedToken])
 
   useEffect(() => {
     if (!selectedProtocol && pools && pools.length > 0) {
@@ -70,12 +60,8 @@ export default function BondModal({ isOpen, onClose }) {
   }, [amount])
 
   const handleSubmit = async () => {
-    if (!amount || !selectedProtocol || !selectedToken) return
-    const pool = pools.find(
-      (p) =>
-        String(p.id) === selectedProtocol &&
-        p.protocolTokenToCover.toLowerCase() === selectedToken.toLowerCase(),
-    )
+    if (!amount || !selectedProtocol) return
+    const pool = pools.find((p) => String(p.id) === selectedProtocol)
     if (!pool) return
     setIsSubmitting(true)
     try {
@@ -116,31 +102,18 @@ export default function BondModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Asset Selection */}
+        {/* Staking Token (fixed asset) */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asset</label>
-          <div className="relative">
-            <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer">
-              <Image
-                src={getTokenLogo(tokenAddress) || "/placeholder.svg"}
-                alt={symbol}
-                width={24}
-                height={24}
-                className="rounded-full"
-              />
-              <select
-                className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none cursor-pointer appearance-none"
-                value={selectedToken}
-                onChange={(e) => setSelectedToken(e.target.value)}
-              >
-                {tokens.map((t) => (
-                  <option key={t.address} value={t.address}>
-                    {getTokenName(t.address)}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            </div>
+          <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700">
+            <Image
+              src={getTokenLogo(tokenAddress) || "/placeholder.svg"}
+              alt={symbol}
+              width={24}
+              height={24}
+              className="rounded-full"
+            />
+            <span className="text-sm font-medium text-gray-900 dark:text-white">{symbol}</span>
           </div>
         </div>
 
