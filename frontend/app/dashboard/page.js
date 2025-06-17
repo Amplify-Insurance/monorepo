@@ -14,6 +14,9 @@ import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 import { getCatPoolWithSigner } from "../../lib/catPool"
 import useCatPoolRewards from "../../hooks/useCatPoolRewards"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
+import useStakingInfo from "../../hooks/useStakingInfo"
+import usePastProposals from "../../hooks/usePastProposals"
+import { getCommitteeWithSigner } from "../../lib/committee"
 import { ethers } from "ethers"
 
 export default function Dashboard() {
@@ -24,6 +27,9 @@ export default function Dashboard() {
   const { details } = useUnderwriterDetails(address)
   const { rewards } = useCatPoolRewards(address)
   const { stats } = useCatPoolStats()
+  const { info: stakingInfo } = useStakingInfo(address)
+  const { proposals: pastProposals } = usePastProposals()
+  const [isClaimingRewards, setIsClaimingRewards] = useState(false)
 
   const hasActiveCoverages = (policies || []).length > 0
   const hasUnderwritingPositions =
@@ -42,6 +48,26 @@ export default function Dashboard() {
       console.error('Claim failed', err)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleClaimGovRewards = async () => {
+    if (!pastProposals || pastProposals.length === 0) return
+    setIsClaimingRewards(true)
+    try {
+      const committee = await getCommitteeWithSigner()
+      for (const p of pastProposals) {
+        try {
+          const tx = await committee.claimReward(p.id)
+          await tx.wait()
+        } catch (err) {
+          console.error(`Failed to claim reward for proposal ${p.id}`, err)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to claim rewards', err)
+    } finally {
+      setIsClaimingRewards(false)
     }
   }
 
@@ -100,9 +126,9 @@ export default function Dashboard() {
             </Link>
           </div>
           <CatPoolDeposits displayCurrency={displayCurrency} />
-          {rewards.length > 0 && (
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
-              <h3 className="text-lg font-medium">Claim Protocol Asset Rewards</h3>
+        {rewards.length > 0 && (
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+            <h3 className="text-lg font-medium">Claim Protocol Asset Rewards</h3>
               <div className="text-sm text-gray-500">
                 Current APR: <span className="font-medium text-green-600">{(
                   Number(ethers.utils.formatUnits(stats.apr || '0', 18)) * 100
@@ -126,6 +152,52 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {stakingInfo && BigInt(stakingInfo.staked || '0') > 0n && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">My Staked Gov Tokens</h2>
+              <Link
+                href="/staking"
+                className="py-1 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md transition-colors"
+              >
+                Manage
+              </Link>
+            </div>
+            <table className="min-w-full text-sm mb-4">
+              <thead>
+                <tr>
+                  <th className="px-2 py-1 text-left">Amount Staked</th>
+                  <th className="px-2 py-1 text-left">Voting Power</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="px-2 py-1">
+                    {Number(ethers.utils.formatUnits(stakingInfo.staked || '0', 18)).toFixed(4)}
+                  </td>
+                  <td className="px-2 py-1">
+                    {stakingInfo.totalStaked && BigInt(stakingInfo.totalStaked) > 0n
+                      ? (
+                          Number(
+                            (BigInt(stakingInfo.staked) * 10000n) /
+                              BigInt(stakingInfo.totalStaked)
+                          ) / 100
+                        ).toFixed(2)
+                      : '0'}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <button
+              onClick={handleClaimGovRewards}
+              disabled={isClaimingRewards}
+              className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
+            >
+              {isClaimingRewards ? 'Claiming...' : 'Claim Rewards'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
