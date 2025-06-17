@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getLossDistributor } from '@/lib/lossDistributor'
 import { getRiskManager } from '@/lib/riskManager'
-import deployments from '../../../../../../config/deployments'
+import deployments from '../../../../../config/deployments'
 
 export async function GET(_req: Request, { params }: { params: { address: string; poolId: string } }) {
   try {
