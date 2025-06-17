@@ -127,10 +127,10 @@ async function main() {
   const defaultRateModel = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
 
   // USDC pools across all five platforms
-  await poolRegistry.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 1);
-  await poolRegistry.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 2);
-  await poolRegistry.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 3);
-  await poolRegistry.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 4);
+  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 1);
+  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 2);
+  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 3);
+  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 4);
   // await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 5);
 
   /*──────────────────────────────── Output ──────────────────────────────*/
