@@ -76,12 +76,34 @@ export default function CoverageModal({
   }, [durationWeeks])
 
   /* Max amount depends on flow */
-  const maxAmount = type === "purchase" ? capacity : walletBalance
+  const maxAmount =
+    type === "purchase" ? Math.min(capacity, walletBalance) : walletBalance
   const tokenPrice = 1 // TODO: oracle integration
 
   /* ───── Fetch wallet balance when providing cover ───── */
   useEffect(() => {
     if (type !== "provide" || !address || !isOpen) return
+
+    const load = async () => {
+      try {
+        const dep = getDeployment(deployment)
+        const dec = await getUnderlyingAssetDecimals(dep.capitalPool)
+        const bal = await getUnderlyingAssetBalance(address, dep.capitalPool)
+        const human = Number(ethers.utils.formatUnits(bal, dec))
+        setUnderlyingDec(dec)
+        setWalletBalance(human)
+      } catch (err) {
+        console.error("Failed to fetch wallet balance", err)
+        setError("Could not fetch wallet balance.")
+      }
+    }
+
+    load()
+  }, [type, address, isOpen])
+
+  /* ───── Fetch wallet balance when purchasing cover ───── */
+  useEffect(() => {
+    if (type !== "purchase" || !address || !isOpen) return
 
     const load = async () => {
       try {
