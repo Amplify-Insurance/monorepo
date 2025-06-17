@@ -1,4 +1,5 @@
 import deployedConfig from '../../../deployedAddresses.json';
+import governanceConfig from '../../../governance_deployedAddresses.json';
 
 let deployments = [];
 
@@ -17,9 +18,9 @@ try {
     lossDistributor: item.LossDistributor,
     rewardDistributor: item.RewardDistributor,
     policyNft: item.PolicyNFT,
-    staking: item.StakingContract,
-    committee: item.Committee,
-    governanceToken: item.GovernanceToken,
+    staking: item.StakingContract || governanceConfig.StakingContract,
+    committee: item.Committee || governanceConfig.Committee,
+    governanceToken: item.GovernanceToken || governanceConfig.GovernanceToken,
     rpcUrl: item.rpcUrl,
     subgraphUrl: item.subgraphUrl,
   });
@@ -58,6 +59,9 @@ if (!deployments.length) {
       multicallReader: process.env.NEXT_PUBLIC_MULTICALL_READER_ADDRESS,
       lossDistributor: process.env.NEXT_PUBLIC_LOSS_DISTRIBUTOR_ADDRESS,
       rewardDistributor: process.env.NEXT_PUBLIC_REWARD_DISTRIBUTOR_ADDRESS,
+      staking: process.env.NEXT_PUBLIC_STAKING_ADDRESS,
+      committee: process.env.NEXT_PUBLIC_COMMITTEE_ADDRESS,
+      governanceToken: process.env.NEXT_PUBLIC_GOVERNANCE_TOKEN_ADDRESS,
     },
   ];
 }
