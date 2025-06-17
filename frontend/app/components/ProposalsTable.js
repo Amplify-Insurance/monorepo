@@ -10,7 +10,8 @@ export default function ProposalsTable() {
   const [expanded, setExpanded] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isClaiming, setIsClaiming] = useState(false)
-  const { isConnected } = useAccount()
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
+  const { isConnected, address } = useAccount()
 
   const toggle = (id) => {
     setExpanded((prev) =>
@@ -43,6 +44,20 @@ export default function ProposalsTable() {
       console.error('Claim failed', err)
     } finally {
       setIsClaiming(false)
+    }
+  }
+
+  const handleWithdrawBond = async (id) => {
+    if (!isConnected) return
+    setIsWithdrawing(true)
+    try {
+      const committee = await getCommitteeWithSigner()
+      const tx = await committee.resolvePauseBond(id)
+      await tx.wait()
+    } catch (err) {
+      console.error('Withdraw bond failed', err)
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -119,6 +134,16 @@ export default function ProposalsTable() {
                               >
                                 Claim Reward
                               </button>
+                              {p.pauseState &&
+                                p.proposer.toLowerCase() === address?.toLowerCase() && (
+                                  <button
+                                    onClick={() => handleWithdrawBond(p.id)}
+                                    disabled={isWithdrawing}
+                                    className="py-1 px-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                                  >
+                                    Withdraw Bond
+                                  </button>
+                                )}
                             </div>
                           )}
                           {!p.executed && p.votingDeadline * 1000 > Date.now() && (
