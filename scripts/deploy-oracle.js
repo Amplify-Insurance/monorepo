@@ -8,7 +8,8 @@
  *     with real values before deploying to mainnet.
  */
 
-const { ethers } = require("hardhat")
+const hre = require("hardhat")
+const { ethers } = hre
 const fs = require("fs")
 const path = require("path")
 
@@ -44,11 +45,21 @@ async function main() {
   console.log(`Saved addresses to ${addressesPath}`)
 
   const rootPath = path.join(__dirname, "..", "deployedAddresses.json")
-  let root = {}
+  const name = process.env.DEPLOYMENT_NAME || hre.network.name || "default"
+  let root = []
   if (fs.existsSync(rootPath)) {
     root = JSON.parse(fs.readFileSync(rootPath, "utf8"))
   }
-  fs.writeFileSync(rootPath, JSON.stringify({ ...root, ...addresses }, null, 2))
+  if (!Array.isArray(root)) {
+    root = [{ name: "default", ...root }]
+  }
+  let entry = root.find((d) => d.name === name)
+  if (!entry) {
+    entry = { name }
+    root.push(entry)
+  }
+  Object.assign(entry, addresses)
+  fs.writeFileSync(rootPath, JSON.stringify(root, null, 2))
   console.log(`Updated ${rootPath}`)
 }
 
