@@ -59,7 +59,9 @@ const underwritingPositions = (details || [])
         poolId: pid,
         amount,
         nativeValue: amount,
+        usdValue: amount * (pool.tokenPriceUsd ?? 1),
         pendingLoss,
+        pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
         yield: Number(pool.underwriterYieldBps || 0) / 100,
         status:
           Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
@@ -205,7 +207,15 @@ const underwritingPositions = (details || [])
     (sum, d) => sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)),
     0
   );
-  const totalUnderwritten = totalDeposited * underwritingPositions.length;
+  const totalDepositedUsd = (details || []).reduce((sum, d) => {
+    const price = pools.find((p) => p.deployment === d.deployment)?.tokenPriceUsd ?? 1;
+    return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)) * price;
+  }, 0);
+  const totalUnderwritten = underwritingPositions.reduce(
+    (sum, p) => sum + p.nativeValue,
+    0
+  );
+  const totalUnderwrittenUsd = underwritingPositions.reduce((sum, p) => sum + p.usdValue, 0);
   const baseAdapter = adapters.find((a) => a.id === Number(details?.[0]?.yieldChoice));
   const baseYieldApr = baseAdapter?.apr || 0;
   const totalApr = baseYieldApr + averageYield;
@@ -224,7 +234,11 @@ const underwritingPositions = (details || [])
         {totalDeposited > 0 ? (
           <div>
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              You have {formatCurrency(totalDeposited)} ready to allocate.
+              You have {formatCurrency(
+                displayCurrency === 'native' ? totalDeposited : totalDepositedUsd,
+                'USD',
+                displayCurrency,
+              )} ready to allocate.
             </p>
             <button
               onClick={() => setShowAllocModal(true)}
@@ -257,13 +271,21 @@ const underwritingPositions = (details || [])
           <div>
             <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Deposited</div>
             <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-              {formatCurrency(totalDeposited)}
+              {formatCurrency(
+                displayCurrency === 'native' ? totalDeposited : totalDepositedUsd,
+                'USD',
+                displayCurrency,
+              )}
             </div>
           </div>
           <div>
             <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Underwritten</div>
             <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-              {formatCurrency(totalUnderwritten)}
+              {formatCurrency(
+                displayCurrency === 'native' ? totalUnderwritten : totalUnderwrittenUsd,
+                'USD',
+                displayCurrency,
+              )}
             </div>
           </div>
           <div>
@@ -384,14 +406,20 @@ const underwritingPositions = (details || [])
                         <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
                           {displayCurrency === "native"
                             ? `${position.amount}`
-                            : formatCurrency(position.nativeValue, "USD", "usd")}
+                            : formatCurrency(position.usdValue, "USD", "usd")}
                         </div>
                         <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
                           {formatPercentage(position.yield)}
                         </div>
                         {position.pendingLoss > 0 && (
                           <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
-                            Loss: {formatCurrency(position.pendingLoss, 'USD', displayCurrency)}
+                            Loss: {formatCurrency(
+                              displayCurrency === 'native'
+                                ? position.pendingLoss
+                                : position.pendingLossUsd,
+                              'USD',
+                              displayCurrency,
+                            )}
                           </div>
                         )}
                       </td>
@@ -399,7 +427,7 @@ const underwritingPositions = (details || [])
                         <div className="text-sm text-gray-900 dark:text-white">
                           {displayCurrency === "native"
                             ? `${position.amount}`
-                            : formatCurrency(position.nativeValue, "USD", "usd")}
+                            : formatCurrency(position.usdValue, "USD", "usd")}
                         </div>
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
@@ -410,7 +438,13 @@ const underwritingPositions = (details || [])
                     {showPendingLoss && (
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {formatCurrency(position.pendingLoss, 'USD', displayCurrency)}
+                          {formatCurrency(
+                            displayCurrency === 'native'
+                              ? position.pendingLoss
+                              : position.pendingLossUsd,
+                            'USD',
+                            displayCurrency,
+                          )}
                         </div>
                       </td>
                     )}
@@ -527,20 +561,24 @@ const underwritingPositions = (details || [])
                           <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
                         </div>
                         <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
-                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.nativeValue, "USD", "usd")}
+                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.usdValue, "USD", "usd")}
                         </div>
                         <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
                           {unlockDays}d
                         </div>
                         {position.pendingLoss > 0 && (
                           <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
-                            Loss: {formatCurrency(position.pendingLoss, 'USD', displayCurrency)}
+                            Loss: {formatCurrency(
+                              displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd,
+                              'USD',
+                              displayCurrency,
+                            )}
                           </div>
                         )}
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.nativeValue, "USD", "usd")}
+                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.usdValue, "USD", "usd")}
                         </div>
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
