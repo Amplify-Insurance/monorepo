@@ -55,11 +55,19 @@ if (process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS) {
 }
 
 export function getTokenName(id) {
-  return TOKEN_NAME_MAP[id] || id;
+  if (!id) return id;
+  const key = typeof id === "string" ? id : `${id}`;
+  return TOKEN_NAME_MAP[key] || TOKEN_NAME_MAP[key.toLowerCase()] || id;
 }
 
 export function getTokenLogo(id) {
-  return TOKEN_LOGO_MAP[id] ?? "/placeholder-logo.png";
+  if (!id) return "/placeholder-logo.png";
+  const key = typeof id === "string" ? id : `${id}`;
+  return (
+    TOKEN_LOGO_MAP[key] ||
+    TOKEN_LOGO_MAP[key.toLowerCase()] ||
+    "/placeholder-logo.png"
+  );
 }
 
 
