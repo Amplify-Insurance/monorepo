@@ -445,8 +445,9 @@ export default function PoolDetailsPage() {
                 {market.name}
               </span>
             </h1>
-            <p className="text-sm md:text-base text-gray-600 dark:text-gray-300 flex items-center gap-1">
-              <span className="font-mono break-all">{token}</span> Pool
+            <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm md:text-base">{market.description}</p>
+            {/* <p className="text-sm md:text-base text-gray-600 dark:text-gray-300 flex items-center gap-1">
+              <span className="font-mono break-all">{token}</span>
               <a
                 href={`https://etherscan.io/address/${token}`}
                 target="_blank"
@@ -455,8 +456,7 @@ export default function PoolDetailsPage() {
               >
                 <ExternalLink className="h-4 w-4" />
               </a>
-            </p>
-            <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm md:text-base">{market.description}</p>
+            </p> */}
           </div>
         </div>
       </div>
