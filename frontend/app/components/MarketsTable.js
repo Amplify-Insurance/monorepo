@@ -24,7 +24,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   for (const pool of pools) {
     const name = getProtocolName(pool.id)
     // const underlyingDec = Number(pool.underlyingAssetDecimals)
-    const protoDec = Number(pool.protocolTokenDecimals)
+    const protoDec = Number(pool.protocolTokenDecimals ?? 18)
     const premium = Number(pool.premiumRateBps || 0) / 100
     const uwYield = Number(pool.underwriterYieldBps || 0) / 100
 

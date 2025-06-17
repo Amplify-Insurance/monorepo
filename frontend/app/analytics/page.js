@@ -31,7 +31,10 @@ export default function AnalyticsPage() {
       const tokenName = getTokenName(pool.protocolTokenToCover)
 
       const distressedAmount = Number(
-        ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals),
+        ethers.utils.formatUnits(
+          c.protocolTokenAmountReceived,
+          pool.protocolTokenDecimals ?? 18,
+        ),
       )
       const coverage = Number(ethers.utils.formatUnits(c.coverage, pool.underlyingAssetDecimals))
       const netPayout = Number(ethers.utils.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals))
