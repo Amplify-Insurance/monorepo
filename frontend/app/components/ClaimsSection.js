@@ -25,7 +25,10 @@ export default function ClaimsSection({ displayCurrency }) {
       const token = pool.protocolTokenToCover
       const tokenName = getTokenName(pool.protocolTokenToCover)
       const amount = Number(
-        ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals)
+        ethers.utils.formatUnits(
+          c.protocolTokenAmountReceived,
+          pool.protocolTokenDecimals ?? 18,
+        )
       )
       const value = Number(
         ethers.utils.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals)

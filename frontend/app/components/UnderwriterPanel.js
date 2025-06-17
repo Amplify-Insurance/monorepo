@@ -86,7 +86,10 @@ export default function UnderwriterPanel({ displayCurrency }) {
         premium: Number(pool.premiumRateBps || 0) / 100,
         underwriterYield: Number(pool.underwriterYieldBps || 0) / 100,
         tvl: Number(
-          ethers.utils.formatUnits(pool.totalCoverageSold, pool.protocolTokenDecimals)
+          ethers.utils.formatUnits(
+            pool.totalCoverageSold,
+            pool.protocolTokenDecimals ?? 18,
+          ),
         ),
         price: pool.tokenPriceUsd ?? 0,
       })
