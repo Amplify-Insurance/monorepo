@@ -1,43 +1,43 @@
-const raw = process.env.NEXT_PUBLIC_DEPLOYMENTS;
 let deployments = [];
 
-if (raw) {
-  try {
-    deployments = JSON.parse(raw);
-  } catch (err) {
-    console.error('Failed to parse NEXT_PUBLIC_DEPLOYMENTS', err);
+try {
+  // Primary config file written by the deploy scripts
+  const fs = require('fs');
+  const path = require('path');
+  const file = path.join(process.cwd(), '..', 'deployedAddresses.json');
+  if (fs.existsSync(file)) {
+    const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+    deployments = [
+      {
+        name: 'default',
+        riskManager: json.RiskManager,
+        capitalPool: json.CapitalPool,
+        catPool: json.CatInsurancePool,
+        poolRegistry: json.PoolRegistry,
+        poolManager: json.PolicyManager,
+        priceOracle: json.PriceOracle,
+        multicallReader: json.MulticallReader,
+        lossDistributor: json.LossDistributor,
+        rewardDistributor: json.RewardDistributor,
+        policyNft: json.PolicyNFT,
+        staking: json.StakingContract,
+        committee: json.Committee,
+        governanceToken: json.GovernanceToken,
+      },
+    ];
   }
+} catch (err) {
+  console.error('Failed to load deployedAddresses.json', err);
 }
 
 if (!deployments.length) {
-  try {
-    // Fallback to addresses written by the deploy scripts
-    const fs = require('fs');
-    const path = require('path');
-    const file = path.join(process.cwd(), '..', 'deployedAddresses.json');
-    if (fs.existsSync(file)) {
-      const json = JSON.parse(fs.readFileSync(file, 'utf8'));
-      deployments = [
-        {
-          name: 'default',
-          riskManager: json.RiskManager,
-          capitalPool: json.CapitalPool,
-          catPool: json.CatInsurancePool,
-          poolRegistry: json.PoolRegistry,
-          poolManager: json.PolicyManager,
-          priceOracle: json.PriceOracle,
-          multicallReader: json.MulticallReader,
-          lossDistributor: json.LossDistributor,
-          rewardDistributor: json.RewardDistributor,
-          policyNft: json.PolicyNFT,
-          staking: json.StakingContract,
-          committee: json.Committee,
-          governanceToken: json.GovernanceToken,
-        },
-      ];
+  const raw = process.env.NEXT_PUBLIC_DEPLOYMENTS;
+  if (raw) {
+    try {
+      deployments = JSON.parse(raw);
+    } catch (err) {
+      console.error('Failed to parse NEXT_PUBLIC_DEPLOYMENTS', err);
     }
-  } catch (err) {
-    console.error('Failed to load deployedAddresses.json', err);
   }
 }
 
