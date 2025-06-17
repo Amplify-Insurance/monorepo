@@ -11,17 +11,22 @@ import CatPoolDeposits from "../components/CatPoolDeposits"
 import CurrencyToggle from "../components/CurrencyToggle"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
+import useCatPoolRewards from "../../hooks/useCatPoolRewards"
+import { getCatPoolWithSigner } from "../lib/catPool"
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import { getTokenLogo } from "../config/tokenNameMap"
 
 export default function CatPoolPage() {
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
   const [displayCurrency, setDisplayCurrency] = useState("native")
   const [depositOpen, setDepositOpen] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const { rewards } = useCatPoolRewards(address)
 
   const adapters = useYieldAdapters()
   const [selectedAdapter, setSelectedAdapter] = useState(null)
@@ -33,6 +38,21 @@ export default function CatPoolPage() {
   }, [adapters, selectedAdapter])
 
   const { stats } = useCatPoolStats()
+
+  const handleClaim = async () => {
+    if (!rewards || rewards.length === 0) return
+    setIsSubmitting(true)
+    try {
+      const cp = await getCatPoolWithSigner()
+      const tokens = rewards.map((r) => r.token)
+      const tx = await cp.claimProtocolAssetRewards(tokens)
+      await tx.wait()
+    } catch (err) {
+      console.error('Claim failed', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   if (!isConnected) {
     return (
@@ -125,8 +145,33 @@ export default function CatPoolPage() {
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400">My Deposits</div>
               <Wallet className="w-5 h-5 text-purple-500" />
             </div>
-            <CatPoolDeposits displayCurrency={displayCurrency} refreshTrigger={refreshKey} />
-          </div>
+          <CatPoolDeposits displayCurrency={displayCurrency} refreshTrigger={refreshKey} />
+          {rewards.length > 0 && (
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4 mt-4">
+              <h3 className="text-lg font-medium">Claim Distressed Asset Rewards</h3>
+              <div className="text-sm text-gray-500">
+                Current APR: <span className="font-medium text-green-600">{(
+                  Number(ethers.utils.formatUnits(stats.apr || '0', 18)) * 100
+                ).toFixed(2)}%</span>
+              </div>
+              <ul className="text-sm space-y-1">
+                {rewards.map((r) => (
+                  <li key={r.token} className="flex justify-between">
+                    <span>{r.token}</span>
+                    <span>{(Number(r.amount) / 1e18).toFixed(4)}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={handleClaim}
+                disabled={isSubmitting}
+                className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
+              >
+                {isSubmitting ? 'Claiming...' : 'Claim'}
+              </button>
+            </div>
+          )}
+        </div>
         </div>
 
         {/* Main Action Panel */}

@@ -21,6 +21,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
+  const [isClaimingDistressed, setIsClaimingDistressed] = useState(false);
+  const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [showAllocModal, setShowAllocModal] = useState(false);
@@ -81,6 +83,10 @@ const underwritingPositions = (details || [])
     (p) => p.pendingLoss > 0
   );
 
+  const hasDistressedAssets = underwritingPositions.some(
+    (p) => p.pendingLoss > 0
+  );
+
   console.log(details, "the deets")
 
   const unlockTimestamp =
@@ -136,6 +142,43 @@ const underwritingPositions = (details || [])
       console.error("Failed to claim all rewards", err);
     } finally {
       setIsClaimingAll(false);
+    }
+  };
+
+  const handleClaimDistressed = async (position) => {
+    setIsClaimingDistressed(true);
+    try {
+      const dep = getDeployment(position.deployment);
+      const rm = await getRiskManagerWithSigner(dep.riskManager);
+      await (await rm.claimDistressedAssets(position.poolId)).wait();
+    } catch (err) {
+      console.error("Failed to claim distressed assets", err);
+    } finally {
+      setIsClaimingDistressed(false);
+    }
+  };
+
+  const handleClaimAllDistressed = async () => {
+    if (underwritingPositions.length === 0) return;
+    setIsClaimingAllDistressed(true);
+    try {
+      const grouped = underwritingPositions.reduce((acc, p) => {
+        if (p.pendingLoss > 0) {
+          (acc[p.deployment] = acc[p.deployment] || []).push(p.poolId);
+        }
+        return acc;
+      }, {});
+      for (const [depName, ids] of Object.entries(grouped)) {
+        const dep = getDeployment(depName);
+        const rm = await getRiskManagerWithSigner(dep.riskManager);
+        for (const id of ids) {
+          await (await rm.claimDistressedAssets(id)).wait();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to claim all distressed assets", err);
+    } finally {
+      setIsClaimingAllDistressed(false);
     }
   };
 
@@ -419,6 +462,18 @@ const underwritingPositions = (details || [])
                               >
                                 {isClaiming ? "Claiming..." : "Claim Rewards"}
                               </button>
+                              {position.pendingLoss > 0 && (
+                                <button
+                                  className="block px-4 py-2 text-sm w-full text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  onClick={() => {
+                                    handleClaimDistressed(position);
+                                    setOpenDropdown(null);
+                                  }}
+                                  disabled={isClaimingDistressed}
+                                >
+                                  {isClaimingDistressed ? "Claiming..." : "Claim Distressed"}
+                                </button>
+                              )}
                               {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
                                 <button
                                   className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -513,6 +568,17 @@ const underwritingPositions = (details || [])
               </table>
             </div>
           </div>
+        </div>
+      )}
+      {hasDistressedAssets && (
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={handleClaimAllDistressed}
+            disabled={isClaimingAllDistressed}
+            className="mr-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
+          >
+            {isClaimingAllDistressed ? "Claiming..." : "Claim All Distressed"}
+          </button>
         </div>
       )}
       <div className="mt-4 flex justify-end">
