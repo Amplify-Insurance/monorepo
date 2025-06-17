@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getRiskManager } from '../../../lib/riskManager'
 import { getCapitalPool } from '../../../lib/capitalPool'
 import { getMulticallReader } from '../../../lib/multicallReader'
+import { getPoolManager } from '../../../lib/poolManager'
+
 import deployments from '../../config/deployments'
 
 export async function GET(req: Request) {
@@ -11,10 +13,12 @@ export async function GET(req: Request) {
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0]
     const rm = getRiskManager(dep.riskManager, dep.name)
     const cp = getCapitalPool(dep.capitalPool, dep.name)
+    const pm = getPoolManager(dep.poolManager, dep.name)
+
     const multicall = getMulticallReader(dep.multicallReader, dep.name)
 
     const calls = [
-      { target: dep.riskManager, callData: rm.interface.encodeFunctionData('COVER_COOLDOWN_PERIOD') },
+      { target: dep.poolManager, callData: pm.interface.encodeFunctionData('COVER_COOLDOWN_PERIOD') },
       { target: dep.riskManager, callData: rm.interface.encodeFunctionData('CLAIM_FEE_BPS') },
       { target: dep.capitalPool, callData: cp.interface.encodeFunctionData('UNDERWRITER_NOTICE_PERIOD') },
     ]
@@ -22,7 +26,7 @@ export async function GET(req: Request) {
     const res = await multicall.tryAggregate(false, calls)
 
     const cooldown = res[0].success
-      ? rm.interface.decodeFunctionResult('COVER_COOLDOWN_PERIOD', res[0].returnData)[0]
+      ? pm.interface.decodeFunctionResult('COVER_COOLDOWN_PERIOD', res[0].returnData)[0]
       : 0n
     const claimFee = res[1].success
       ? rm.interface.decodeFunctionResult('CLAIM_FEE_BPS', res[1].returnData)[0]

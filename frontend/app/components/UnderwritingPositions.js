@@ -87,8 +87,6 @@ const underwritingPositions = (details || [])
     (p) => p.pendingLoss > 0
   );
 
-  console.log(details, "the deets")
-
   const unlockTimestamp =
     Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD;
   const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -97,11 +95,6 @@ const underwritingPositions = (details || [])
     Math.ceil((unlockTimestamp - currentTimestamp) / 86400)
   );
   const withdrawalReady = currentTimestamp >= unlockTimestamp;
-
-  console.log(pools, "pool details");
-
-  console.log("Underwriting positions:", underwritingPositions);
-
 
   const handleOpenModal = (position) => {
     setSelectedPosition(position);

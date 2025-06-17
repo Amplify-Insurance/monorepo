@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getRiskManager } from '../lib/riskManager'
 import { getCapitalPool } from '../lib/capitalPool'
+import { getPoolManager } from '../lib/poolManager'
 import deployments from '../app/config/deployments'
 
 export default function useReserveConfig(deployment) {
@@ -14,8 +15,9 @@ export default function useReserveConfig(deployment) {
           deployments.find((d) => d.name === deployment) ?? deployments[0]
         const rm = getRiskManager(dep.riskManager, dep.name)
         const cp = getCapitalPool(dep.capitalPool, dep.name)
+        const pm = getPoolManager(dep.poolManager, dep.name)
         const [cooldown, claimFee, notice] = await Promise.all([
-          rm.COVER_COOLDOWN_PERIOD(),
+          pm.COVER_COOLDOWN_PERIOD(),
           rm.CLAIM_FEE_BPS(),
           cp.UNDERWRITER_NOTICE_PERIOD(),
         ])
