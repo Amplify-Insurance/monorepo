@@ -129,7 +129,8 @@ configured in `.env` (see `.env.example`). Address resolution happens inside
 `frontend/app/config/deployments.js` in the following order:
 
 1. `deployedAddresses.json` – the file written by the Hardhat deploy scripts in
-   the repository root. This is loaded first when present.
+   the repository root. It now stores an array of deployments and is loaded
+   first when present.
 2. `NEXT_PUBLIC_DEPLOYMENTS` – optional environment variable containing a JSON
    array of deployments which overrides the config file.
 3. Individual address variables such as `NEXT_PUBLIC_RISK_MANAGER_ADDRESS` –

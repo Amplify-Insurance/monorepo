@@ -5,26 +5,33 @@ try {
   const fs = require('fs');
   const path = require('path');
   const file = path.join(process.cwd(), '..', 'deployedAddresses.json');
+
+  const mapItem = (item, name = 'default') => ({
+    name: item.name || name,
+    riskManager: item.RiskManager,
+    capitalPool: item.CapitalPool,
+    catPool: item.CatInsurancePool,
+    poolRegistry: item.PoolRegistry,
+    poolManager: item.PolicyManager,
+    priceOracle: item.PriceOracle,
+    multicallReader: item.MulticallReader,
+    lossDistributor: item.LossDistributor,
+    rewardDistributor: item.RewardDistributor,
+    policyNft: item.PolicyNFT,
+    staking: item.StakingContract,
+    committee: item.Committee,
+    governanceToken: item.GovernanceToken,
+    rpcUrl: item.rpcUrl,
+    subgraphUrl: item.subgraphUrl,
+  });
+
   if (fs.existsSync(file)) {
     const json = JSON.parse(fs.readFileSync(file, 'utf8'));
-    deployments = [
-      {
-        name: 'default',
-        riskManager: json.RiskManager,
-        capitalPool: json.CapitalPool,
-        catPool: json.CatInsurancePool,
-        poolRegistry: json.PoolRegistry,
-        poolManager: json.PolicyManager,
-        priceOracle: json.PriceOracle,
-        multicallReader: json.MulticallReader,
-        lossDistributor: json.LossDistributor,
-        rewardDistributor: json.RewardDistributor,
-        policyNft: json.PolicyNFT,
-        staking: json.StakingContract,
-        committee: json.Committee,
-        governanceToken: json.GovernanceToken,
-      },
-    ];
+    if (Array.isArray(json)) {
+      deployments = json.map((d, i) => mapItem(d, d.name || `deploy${i}`));
+    } else {
+      deployments = [mapItem(json)];
+    }
   }
 } catch (err) {
   console.error('Failed to load deployedAddresses.json', err);
