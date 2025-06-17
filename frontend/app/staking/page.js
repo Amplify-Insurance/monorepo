@@ -11,9 +11,7 @@ import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../.
 import StakeModal from "../components/StakeModal"
 import UnstakeModal from "../components/UnstakeModal"
 import BondModal from "../components/BondModal"
-import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
-import { getRiskManagerWithSigner } from "../../lib/riskManager"
-import { getDeployment } from "../config/deployments"
+import { getCommitteeWithSigner } from "../../lib/committee"
 
 export default function StakingPage() {
   const { address, isConnected } = useAccount()
@@ -23,26 +21,19 @@ export default function StakingPage() {
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
-  const { details } = useUnderwriterDetails(address)
   const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
   const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
 
   const handleClaimRewards = async () => {
-    if (!details || details.length === 0) return
+    if (!pastProposals || pastProposals.length === 0) return
     setIsClaimingRewards(true)
     try {
-      const grouped = details.reduce((acc, d) => {
-        d.allocatedPoolIds.forEach((pid) => {
-          ;(acc[d.deployment] = acc[d.deployment] || []).push(pid)
-        })
-        return acc
-      }, {})
-      for (const [depName, ids] of Object.entries(grouped)) {
-        const dep = getDeployment(depName)
-        const rm = await getRiskManagerWithSigner(dep.riskManager)
-        for (const id of ids) {
-          await (await rm.claimPremiumRewards(id)).wait()
-          await (await rm.claimDistressedAssets(id)).wait()
+      const committee = await getCommitteeWithSigner()
+      for (const p of pastProposals) {
+        try {
+          await (await committee.claimReward(p.id)).wait()
+        } catch (err) {
+          console.error('Claim failed', err)
         }
       }
     } catch (err) {

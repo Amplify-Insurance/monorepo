@@ -5,26 +5,36 @@ import { ethers } from "ethers"
 import Image from "next/image"
 import { AlertTriangle, Info, DollarSign, ChevronDown } from "lucide-react"
 import { getStakingWithSigner } from "../../lib/staking"
+import { getCommitteeWithSigner } from "../../lib/committee"
+import { getERC20WithSigner } from "../../lib/erc20"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
-import useTokenList from "../../hooks/useTokenList"
-import { getProtocolName, getProtocolLogo, getTokenName, getTokenLogo } from "../config/tokenNameMap"
+import { getProtocolName, getProtocolLogo } from "../config/tokenNameMap"
 
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
-  const tokens = useTokenList(pools)
+  const tokenAddress = process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS
 
-  const [selectedToken, setSelectedToken] = useState("")
+  const [symbol, setSymbol] = useState("")
+  const [decimals, setDecimals] = useState(18)
   const [selectedProtocol, setSelectedProtocol] = useState("")
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [maxPayout, setMaxPayout] = useState("0")
 
   useEffect(() => {
-    if (!selectedToken && tokens && tokens.length > 0) {
-      setSelectedToken(tokens[0].address)
+    async function load() {
+      if (!tokenAddress) return
+      try {
+        const token = await getERC20WithSigner(tokenAddress)
+        setSymbol(await token.symbol())
+        const dec = await token.decimals()
+        setDecimals(dec)
+      } catch {}
     }
-  }, [tokens, selectedToken])
+    load()
+  }, [tokenAddress])
+
 
   useEffect(() => {
     if (!selectedProtocol && pools && pools.length > 0) {
@@ -42,16 +52,14 @@ export default function BondModal({ isOpen, onClose }) {
   }, [amount])
 
   const handleSubmit = async () => {
-    if (!amount || !selectedProtocol || !selectedToken) return
-    const pool = pools.find(
-      (p) => String(p.id) === selectedProtocol && p.protocolTokenToCover.toLowerCase() === selectedToken.toLowerCase(),
-    )
+    if (!amount || !selectedProtocol) return
+    const pool = pools.find((p) => String(p.id) === selectedProtocol)
     if (!pool) return
     setIsSubmitting(true)
     try {
       const staking = await getStakingWithSigner()
-      const token = await getERC20WithSigner(selectedToken)
-      const value = ethers.utils.parseUnits(amount, 18)
+      const token = await getERC20WithSigner(tokenAddress)
+      const value = ethers.utils.parseUnits(amount, decimals)
       const owner = await token.signer.getAddress()
       const allowance = await token.allowance(owner, staking.address)
       if (allowance.lt(value)) {
@@ -60,6 +68,12 @@ export default function BondModal({ isOpen, onClose }) {
       }
       const tx = await staking.depositBond(pool.id, value)
       await tx.wait()
+      try {
+        const committee = await getCommitteeWithSigner()
+        await (await committee.createProposal(pool.id, 1)).wait()
+      } catch (err) {
+        console.error("Create proposal failed", err)
+      }
       setAmount("")
       onClose()
     } catch (err) {
@@ -69,7 +83,6 @@ export default function BondModal({ isOpen, onClose }) {
     }
   }
 
-  const selectedTokenData = tokens.find((t) => t.address === selectedToken)
   const selectedPoolData = pools.find((p) => String(p.id) === selectedProtocol)
 
   return (
@@ -88,33 +101,6 @@ export default function BondModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Asset Selection */}
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asset</label>
-          <div className="relative">
-            <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer">
-              <Image
-                src={getTokenLogo(selectedToken) || "/placeholder.svg"}
-                alt={getTokenName(selectedToken)}
-                width={24}
-                height={24}
-                className="rounded-full"
-              />
-              <select
-                className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none cursor-pointer appearance-none"
-                value={selectedToken}
-                onChange={(e) => setSelectedToken(e.target.value)}
-              >
-                {tokens.map((t) => (
-                  <option key={t.address} value={t.address}>
-                    {getTokenName(t.address)}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            </div>
-          </div>
-        </div>
 
         {/* Protocol Selection */}
         <div className="space-y-3">
@@ -159,7 +145,7 @@ export default function BondModal({ isOpen, onClose }) {
               />
               <div className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {selectedTokenData ? selectedTokenData.symbol : "TOKEN"}
+                  {symbol || "TOKEN"}
                 </span>
               </div>
             </div>
@@ -174,7 +160,7 @@ export default function BondModal({ isOpen, onClose }) {
               <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Max Payout</span>
             </div>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-              {maxPayout} {selectedTokenData ? getTokenName(selectedTokenData.address) : "TOKEN"}
+              {maxPayout} {symbol || "TOKEN"}
             </span>
           </div>
         )}
