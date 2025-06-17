@@ -10,12 +10,30 @@ import { getProtocolLogo, getProtocolName } from "../config/tokenNameMap";
 import { formatPercentage } from "../utils/formatting";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import deployments, { getDeployment } from "../config/deployments";
+import { YieldPlatform } from "../config/yieldPlatforms";
 
 export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const { pools } = usePools();
-  const poolsForDeployment = pools.filter((p) => p.deployment === deployment);
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
+
+  const YIELD_TO_PROTOCOL_MAP = {
+    [YieldPlatform.AAVE]: 0,
+    [YieldPlatform.COMPOUND]: 1,
+  };
+
+  const baseProtocolId = (() => {
+    const d = Array.isArray(details)
+      ? details.find((dt) => dt.deployment === deployment)
+      : details;
+    return d ? YIELD_TO_PROTOCOL_MAP[d.yieldChoice] : undefined;
+  })();
+
+  const poolsForDeployment = pools
+    .filter((p) => p.deployment === deployment)
+    .filter((p) =>
+      baseProtocolId === undefined ? true : Number(p.id) !== baseProtocolId
+    );
   const [selectedPools, setSelectedPools] = useState([]);
   const [initialPools, setInitialPools] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,9 +43,13 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
       const d = Array.isArray(details)
         ? details.find((dt) => dt.deployment === deployment)
         : details;
+      const baseId = d ? YIELD_TO_PROTOCOL_MAP[d.yieldChoice] : undefined;
       if (d?.allocatedPoolIds) {
-        setSelectedPools(d.allocatedPoolIds);
-        setInitialPools(d.allocatedPoolIds);
+        const filtered = d.allocatedPoolIds.filter(
+          (pid) => (baseId === undefined ? true : Number(pid) !== baseId)
+        );
+        setSelectedPools(filtered);
+        setInitialPools(filtered);
       }
     }
   }, [details, deployment]);
