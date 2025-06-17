@@ -107,15 +107,23 @@ export default function UnderwriterPanel({ displayCurrency }) {
   }
 
   // Filter markets that support the selected token and category
+  const YIELD_TO_PROTOCOL_MAP = {
+    [YieldPlatform.AAVE]: 0,
+    [YieldPlatform.COMPOUND]: 1,
+  }
+
   const filteredMarkets = selectedToken
-    ? markets.filter(
-        (market) =>
-          market.pools.some(
-            (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase(),
-          ) &&
-          (selectedCategory === "all" || market.category === selectedCategory) &&
-          (selectedYield === null || Number(market.id) !== selectedYield),
-      )
+    ? markets.filter((market) => {
+        const matchesToken = market.pools.some(
+          (p) => p.token.toLowerCase() === selectedToken?.address?.toLowerCase(),
+        )
+        const matchesCategory =
+          selectedCategory === "all" || market.category === selectedCategory
+        const selectedProtoId = YIELD_TO_PROTOCOL_MAP[selectedYield]
+        const notBaseYield =
+          selectedProtoId === undefined || Number(market.id) !== selectedProtoId
+        return matchesToken && matchesCategory && notBaseYield
+      })
     : []
 
   console.log("Filtered markets:", filteredMarkets)
@@ -325,7 +333,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-6 w-6 mr-2">
                         <Image
-                          src={getProtocolLogo(adapter.id)}
+                          src={getYieldPlatformInfo(adapter.id).logo}
                           alt={adapter.name}
                           width={24}
                           height={24}
