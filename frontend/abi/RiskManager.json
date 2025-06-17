@@ -3,44 +3,12 @@
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_capitalPoolAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_policyNFTAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_catPoolAddress",
+				"name": "_initialOwner",
 				"type": "address"
 			}
 		],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "target",
-				"type": "address"
-			}
-		],
-		"name": "AddressEmptyCode",
-		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "AddressInsufficientBalance",
-		"type": "error"
 	},
 	{
 		"inputs": [],
@@ -50,21 +18,6 @@
 	{
 		"inputs": [],
 		"name": "ExceedsMaxAllocations",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "FailedInnerCall",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InsufficientCapacity",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidAmount",
 		"type": "error"
 	},
 	{
@@ -79,12 +32,22 @@
 	},
 	{
 		"inputs": [],
-		"name": "NoRewardsToClaim",
+		"name": "NotAllocated",
 		"type": "error"
 	},
 	{
 		"inputs": [],
-		"name": "NotAllocated",
+		"name": "NotCapitalPool",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotCommittee",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotPolicyManager",
 		"type": "error"
 	},
 	{
@@ -111,34 +74,55 @@
 	},
 	{
 		"inputs": [],
-		"name": "PoolPaused",
-		"type": "error"
-	},
-	{
-		"inputs": [],
 		"name": "ReentrancyGuardReentrantCall",
 		"type": "error"
 	},
 	{
+		"inputs": [],
+		"name": "UnderwriterNotInsolvent",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ZeroAddressNotAllowed",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": false,
 				"internalType": "address",
-				"name": "token",
+				"name": "capital",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "registry",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "policy",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "cat",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "loss",
 				"type": "address"
 			}
 		],
-		"name": "SafeERC20FailedOperation",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "WithdrawalInsolvent",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "ZeroAddress",
-		"type": "error"
+		"name": "AddressesSet",
+		"type": "event"
 	},
 	{
 		"anonymous": false,
@@ -194,81 +178,13 @@
 		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "policyId",
-				"type": "uint256"
-			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "claimant",
-				"type": "address"
-			},
-			{
 				"indexed": false,
-				"internalType": "uint256",
-				"name": "netPayoutToClaimant",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "committee",
+				"type": "address"
 			}
 		],
-		"name": "ClaimProcessed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "underwriter",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "DistressedAssetRewardsClaimed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "bool",
-				"name": "paused",
-				"type": "bool"
-			}
-		],
-		"name": "IncidentReported",
+		"name": "CommitteeSet",
 		"type": "event"
 	},
 	{
@@ -296,135 +212,17 @@
 			{
 				"indexed": true,
 				"internalType": "address",
-				"name": "user",
+				"name": "liquidator",
 				"type": "address"
 			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "policyId",
-				"type": "uint256"
-			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "coverageAmount",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "premiumPaid",
-				"type": "uint256"
-			}
-		],
-		"name": "PolicyCreated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "policyId",
-				"type": "uint256"
-			}
-		],
-		"name": "PolicyLapsed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "protocolToken",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "enum RiskManager.ProtocolRiskIdentifier",
-				"name": "protocolCovered",
-				"type": "uint8"
-			}
-		],
-		"name": "PoolAdded",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "policyId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amountPaid",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "catAmount",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "poolIncome",
-				"type": "uint256"
-			}
-		],
-		"name": "PremiumPaid",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
 			{
 				"indexed": true,
 				"internalType": "address",
 				"name": "underwriter",
 				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
 			}
 		],
-		"name": "PremiumRewardsClaimed",
+		"name": "UnderwriterLiquidated",
 		"type": "event"
 	},
 	{
@@ -455,19 +253,6 @@
 	},
 	{
 		"inputs": [],
-		"name": "COVER_COOLDOWN_PERIOD",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "MAX_ALLOCATIONS_PER_UNDERWRITER",
 		"outputs": [
 			{
@@ -480,118 +265,23 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "SECS_YEAR",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "_policyId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_premiumAmount",
-				"type": "uint256"
+				"internalType": "uint256[]",
+				"name": "_poolIds",
+				"type": "uint256[]"
 			}
 		],
-		"name": "addPremium",
+		"name": "allocateCapital",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_protocolTokenToCover",
-				"type": "address"
-			},
-			{
-				"components": [
-					{
-						"internalType": "uint256",
-						"name": "base",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "slope1",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "slope2",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "kink",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct RiskManager.RateModel",
-				"name": "_rateModel",
-				"type": "tuple"
-			},
-			{
-				"internalType": "enum RiskManager.ProtocolRiskIdentifier",
-				"name": "_protocolCovered",
-				"type": "uint8"
-			}
-		],
-		"name": "addProtocolRiskPool",
+		"inputs": [],
+		"name": "capitalPool",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "poolId",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-        {
-                "inputs": [
-                        {
-                                "internalType": "uint256[]",
-                                "name": "_poolIds",
-                                "type": "uint256[]"
-                        }
-                ],
-                "name": "allocateCapital",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-        },
-        {
-                "inputs": [
-                        {
-                                "internalType": "uint256[]",
-                                "name": "_poolIds",
-                                "type": "uint256[]"
-                        }
-                ],
-                "name": "deallocateCapital",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-        },
-        {
-                "inputs": [],
-                "name": "capitalPool",
-                "outputs": [
-                        {
 				"internalType": "contract ICapitalPool",
 				"name": "",
 				"type": "address"
@@ -615,45 +305,6 @@
 	},
 	{
 		"inputs": [],
-		"name": "catPremiumBps",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_poolId",
-				"type": "uint256"
-			}
-		],
-		"name": "claimDistressedAssets",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_poolId",
-				"type": "uint256"
-			}
-		],
-		"name": "claimPremiumRewards",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "committee",
 		"outputs": [
 			{
@@ -673,79 +324,9 @@
 				"type": "uint256"
 			}
 		],
-		"name": "getPoolInfo",
-		"outputs": [
-			{
-				"components": [
-					{
-						"internalType": "contract IERC20",
-						"name": "protocolTokenToCover",
-						"type": "address"
-					},
-					{
-						"components": [
-							{
-								"internalType": "uint256",
-								"name": "base",
-								"type": "uint256"
-							},
-							{
-								"internalType": "uint256",
-								"name": "slope1",
-								"type": "uint256"
-							},
-							{
-								"internalType": "uint256",
-								"name": "slope2",
-								"type": "uint256"
-							},
-							{
-								"internalType": "uint256",
-								"name": "kink",
-								"type": "uint256"
-							}
-						],
-						"internalType": "struct RiskManager.RateModel",
-						"name": "rateModel",
-						"type": "tuple"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalCapitalPledgedToPool",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalCoverageSold",
-						"type": "uint256"
-					},
-					{
-						"internalType": "enum RiskManager.ProtocolRiskIdentifier",
-						"name": "protocolCovered",
-						"type": "uint8"
-					},
-					{
-						"internalType": "uint8",
-						"name": "protocolTokenDecimals",
-						"type": "uint8"
-					},
-					{
-						"internalType": "uint256",
-						"name": "scaleToProtocolToken",
-						"type": "uint256"
-					},
-					{
-						"internalType": "bool",
-						"name": "isPaused",
-						"type": "bool"
-					}
-				],
-				"internalType": "struct RiskManager.PoolData",
-				"name": "",
-				"type": "tuple"
-			}
-		],
-		"stateMutability": "view",
+		"name": "deallocateFromPool",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -775,33 +356,27 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "_policyId",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "_underwriter",
+				"type": "address"
 			}
 		],
-		"name": "isPolicyActive",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
+		"name": "liquidateInsolventUnderwriter",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "lossDistributor",
+		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "_policyId",
-				"type": "uint256"
+				"internalType": "contract ILossDistributor",
+				"name": "",
+				"type": "address"
 			}
 		],
-		"name": "lapsePolicy",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -860,7 +435,7 @@
 		],
 		"name": "onWithdrawalRequested",
 		"outputs": [],
-		"stateMutability": "view",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -878,10 +453,36 @@
 	},
 	{
 		"inputs": [],
+		"name": "policyManager",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "policyNFT",
 		"outputs": [
 			{
 				"internalType": "contract IPolicyNFT",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "poolRegistry",
+		"outputs": [
+			{
+				"internalType": "contract IPoolRegistry",
 				"name": "",
 				"type": "address"
 			}
@@ -919,133 +520,10 @@
 				"internalType": "uint256",
 				"name": "_policyId",
 				"type": "uint256"
-			},
-			{
-				"internalType": "bytes",
-				"name": "",
-				"type": "bytes"
 			}
 		],
 		"name": "processClaim",
 		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "protocolRiskPools",
-		"outputs": [
-			{
-				"internalType": "contract IERC20",
-				"name": "protocolTokenToCover",
-				"type": "address"
-			},
-			{
-				"components": [
-					{
-						"internalType": "uint256",
-						"name": "base",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "slope1",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "slope2",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "kink",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct RiskManager.RateModel",
-				"name": "rateModel",
-				"type": "tuple"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalCapitalPledgedToPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalCoverageSold",
-				"type": "uint256"
-			},
-			{
-				"internalType": "enum RiskManager.ProtocolRiskIdentifier",
-				"name": "protocolCovered",
-				"type": "uint8"
-			},
-			{
-				"internalType": "uint8",
-				"name": "protocolTokenDecimals",
-				"type": "uint8"
-			},
-			{
-				"internalType": "uint256",
-				"name": "scaleToProtocolToken",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "isPaused",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "protocolRiskPoolsLength",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_poolId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_coverageAmount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_initialPremiumDeposit",
-				"type": "uint256"
-			}
-		],
-		"name": "purchaseCover",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "policyId",
-				"type": "uint256"
-			}
-		],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
@@ -1060,11 +538,16 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_newBps",
+				"name": "_poolId",
 				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "_pauseState",
+				"type": "bool"
 			}
 		],
-		"name": "setCatPremiumShareBps",
+		"name": "reportIncident",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -1073,11 +556,62 @@
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_newCommittee",
+				"name": "_capital",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_registry",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_policy",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_cat",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_loss",
+				"type": "address"
+			}
+		],
+		"name": "setAddresses",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_committee",
 				"type": "address"
 			}
 		],
 		"name": "setCommittee",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_recipient",
+				"type": "address"
+			}
+		],
+		"name": "setPoolFeeRecipient",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -1146,35 +680,6 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "underwriterPoolRewards",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "pendingPremiums",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "pendingDistressedAssets",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -1189,6 +694,29 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "_isSale",
+				"type": "bool"
+			}
+		],
+		"name": "updateCoverageSold",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	}
 ]

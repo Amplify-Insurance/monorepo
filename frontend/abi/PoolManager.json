@@ -1,44 +1,515 @@
 [
-  {
-    "inputs": [],
-    "name": "catPremiumBps",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "uint256", "name": "_poolId", "type": "uint256"},
-      {"internalType": "uint256", "name": "_coverageAmount", "type": "uint256"},
-      {"internalType": "uint256", "name": "_initialPremiumDeposit", "type": "uint256"}
-    ],
-    "name": "purchaseCover",
-    "outputs": [{"internalType": "uint256", "name": "policyId", "type": "uint256"}],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_policyId", "type": "uint256"}],
-    "name": "cancelCover",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "uint256", "name": "_policyId", "type": "uint256"},
-      {"internalType": "uint256", "name": "_premiumAmount", "type": "uint256"}
-    ],
-    "name": "addPremium",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_policyId", "type": "uint256"}],
-    "name": "lapsePolicy",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_policyNFT",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_initialOwner",
+				"type": "address"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "target",
+				"type": "address"
+			}
+		],
+		"name": "AddressEmptyCode",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "AddressInsufficientBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AddressesNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CooldownActive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DepositTooLow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FailedInnerCall",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientCapacity",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidAmount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidPoolId",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotPolicyOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "OwnableInvalidOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "OwnableUnauthorizedAccount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PolicyAlreadyTerminated",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PolicyIsActive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PolicyNotActive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PoolPaused",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ReentrancyGuardReentrantCall",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			}
+		],
+		"name": "SafeERC20FailedOperation",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "registry",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "capital",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "rewards",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "rm",
+				"type": "address"
+			}
+		],
+		"name": "AddressesSet",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newCatPool",
+				"type": "address"
+			}
+		],
+		"name": "CatPoolSet",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newBps",
+				"type": "uint256"
+			}
+		],
+		"name": "CatPremiumShareSet",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "BPS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "COVER_COOLDOWN_PERIOD",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "SECS_YEAR",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_premiumAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "addPremium",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			}
+		],
+		"name": "cancelCover",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "capitalPool",
+		"outputs": [
+			{
+				"internalType": "contract ICapitalPool",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "catPool",
+		"outputs": [
+			{
+				"internalType": "contract ICatInsurancePool",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "catPremiumBps",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			}
+		],
+		"name": "isPolicyActive",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			}
+		],
+		"name": "lapsePolicy",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "policyNFT",
+		"outputs": [
+			{
+				"internalType": "contract IPolicyNFT",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "poolRegistry",
+		"outputs": [
+			{
+				"internalType": "contract IPoolRegistry",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_poolId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_coverageAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_initialPremiumDeposit",
+				"type": "uint256"
+			}
+		],
+		"name": "purchaseCover",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "policyId",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "rewardDistributor",
+		"outputs": [
+			{
+				"internalType": "contract IRewardDistributor",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "riskManager",
+		"outputs": [
+			{
+				"internalType": "contract IRiskManager_PM_Hook",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_registry",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_capital",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_cat",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_rewards",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_rm",
+				"type": "address"
+			}
+		],
+		"name": "setAddresses",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_newBps",
+				"type": "uint256"
+			}
+		],
+		"name": "setCatPremiumShareBps",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
 ]

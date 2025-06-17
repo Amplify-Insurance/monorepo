@@ -1,6 +1,112 @@
 [
-  "function aggregate((address target, bytes callData)[] calls) view returns (uint256 blockNumber, bytes[] returnData)",
-  "function tryAggregate(bool requireSuccess, (address target, bytes callData)[] calls) view returns ((bool success, bytes returnData)[] results)",
-  "function getBlockNumber() view returns (uint256)",
-  "function getCurrentBlockTimestamp() view returns (uint256)"
+	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "target",
+						"type": "address"
+					},
+					{
+						"internalType": "bytes",
+						"name": "callData",
+						"type": "bytes"
+					}
+				],
+				"internalType": "struct MulticallReader.Call[]",
+				"name": "calls",
+				"type": "tuple[]"
+			}
+		],
+		"name": "aggregate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "blockNumber",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes[]",
+				"name": "returnData",
+				"type": "bytes[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getBlockNumber",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getCurrentBlockTimestamp",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bool",
+				"name": "requireSuccess",
+				"type": "bool"
+			},
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "target",
+						"type": "address"
+					},
+					{
+						"internalType": "bytes",
+						"name": "callData",
+						"type": "bytes"
+					}
+				],
+				"internalType": "struct MulticallReader.Call[]",
+				"name": "calls",
+				"type": "tuple[]"
+			}
+		],
+		"name": "tryAggregate",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "bool",
+						"name": "success",
+						"type": "bool"
+					},
+					{
+						"internalType": "bytes",
+						"name": "returnData",
+						"type": "bytes"
+					}
+				],
+				"internalType": "struct MulticallReader.Result[]",
+				"name": "results",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
 ]

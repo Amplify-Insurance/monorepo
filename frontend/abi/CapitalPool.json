@@ -111,6 +111,11 @@
 	},
 	{
 		"inputs": [],
+		"name": "PayoutExceedsPoolLPCapital",
+		"type": "error"
+	},
+	{
+		"inputs": [],
 		"name": "ReentrancyGuardReentrantCall",
 		"type": "error"
 	},
@@ -437,6 +442,56 @@
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "claimant",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "claimantAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "feeRecipient",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "feeAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address[]",
+						"name": "adapters",
+						"type": "address[]"
+					},
+					{
+						"internalType": "uint256[]",
+						"name": "capitalPerAdapter",
+						"type": "uint256[]"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalCapitalFromPoolLPs",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct CapitalPool.PayoutData",
+				"name": "_payoutData",
+				"type": "tuple"
+			}
+		],
+		"name": "executePayout",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "executeWithdrawal",
 		"outputs": [],
@@ -477,6 +532,25 @@
 				"internalType": "uint256",
 				"name": "withdrawalRequestShares",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_underwriter",
+				"type": "address"
+			}
+		],
+		"name": "getUnderwriterAdapterAddress",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",
