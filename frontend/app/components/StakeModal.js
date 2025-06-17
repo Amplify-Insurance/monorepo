@@ -54,7 +54,15 @@ export default function StakeModal({ isOpen, onClose }) {
     setIsSubmitting(true)
     try {
       const staking = await getStakingWithSigner()
-      const tx = await staking.stake(ethers.utils.parseUnits(amount, decimals))
+      const token = await getERC20WithSigner(tokenAddress)
+      const value = ethers.utils.parseUnits(amount, decimals)
+      const owner = await token.signer.getAddress()
+      const allowance = await token.allowance(owner, staking.address)
+      if (allowance.lt(value)) {
+        const approveTx = await token.approve(staking.address, value)
+        await approveTx.wait()
+      }
+      const tx = await staking.stake(value)
       await tx.wait()
       setAmount("")
       onClose()
