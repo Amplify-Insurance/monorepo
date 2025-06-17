@@ -11,16 +11,46 @@ import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../.
 import StakeModal from "../components/StakeModal"
 import UnstakeModal from "../components/UnstakeModal"
 import BondModal from "../components/BondModal"
+import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
+import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getDeployment } from "../config/deployments"
 
 export default function StakingPage() {
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
   const [stakeOpen, setStakeOpen] = useState(false)
   const [unstakeOpen, setUnstakeOpen] = useState(false)
   const [bondOpen, setBondOpen] = useState(false)
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
+  const [isClaimingRewards, setIsClaimingRewards] = useState(false)
+  const { details } = useUnderwriterDetails(address)
   const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
   const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
+
+  const handleClaimRewards = async () => {
+    if (!details || details.length === 0) return
+    setIsClaimingRewards(true)
+    try {
+      const grouped = details.reduce((acc, d) => {
+        d.allocatedPoolIds.forEach((pid) => {
+          ;(acc[d.deployment] = acc[d.deployment] || []).push(pid)
+        })
+        return acc
+      }, {})
+      for (const [depName, ids] of Object.entries(grouped)) {
+        const dep = getDeployment(depName)
+        const rm = await getRiskManagerWithSigner(dep.riskManager)
+        for (const id of ids) {
+          await (await rm.claimPremiumRewards(id)).wait()
+          await (await rm.claimDistressedAssets(id)).wait()
+        }
+      }
+    } catch (err) {
+      console.error('Failed to claim rewards', err)
+    } finally {
+      setIsClaimingRewards(false)
+    }
+  }
 
   if (!isConnected) {
     return (
@@ -171,14 +201,21 @@ export default function StakingPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setBondOpen(true)}
-                className="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                Deposit Bond
-              </button>
+                <button
+                  onClick={() => setBondOpen(true)}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  Deposit Bond
+                </button>
+                <button
+                  onClick={handleClaimRewards}
+                  disabled={isClaimingRewards}
+                  className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                >
+                  {isClaimingRewards ? 'Claiming...' : 'Claim Rewards'}
+                </button>
+              </div>
             </div>
-          </div>
         </div>
 
         {/* Modals */}
