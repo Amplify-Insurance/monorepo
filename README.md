@@ -124,13 +124,23 @@ npm install
 npm run dev
 ```
 
-Environment variables such as the RPC endpoint and deployed contract addresses can
-be configured in `.env` (see `.env.example`). If no addresses are provided the
-frontend attempts to read `deployedAddresses.json` at the repository root,
-written by the deployment scripts. At a minimum set
-`NEXT_PUBLIC_POOL_MANAGER_ADDRESS` and `NEXT_PUBLIC_RISK_MANAGER_ADDRESS` so the
-frontend knows where the core contracts live when no JSON file is present.
-Several API routes under `app/api` demonstrate reading data from the contracts.
+Environment variables such as the RPC endpoint and contract addresses are
+configured in `.env` (see `.env.example`). Address resolution happens inside
+`frontend/app/config/deployments.js` in the following order:
+
+1. `NEXT_PUBLIC_DEPLOYMENTS` – if set, this JSON array describes one or more
+   deployments and their contract addresses.
+2. `deployedAddresses.json` – when the environment variable is missing the
+   file written by the Hardhat deploy scripts is loaded from the repository
+   root.
+3. Individual address variables such as `NEXT_PUBLIC_RISK_MANAGER_ADDRESS` –
+   used when neither of the above sources are present.
+
+The ABIs for each contract live under `frontend/abi`, so only the addresses need
+to be provided. At a minimum set `NEXT_PUBLIC_POOL_MANAGER_ADDRESS` and
+`NEXT_PUBLIC_RISK_MANAGER_ADDRESS` so the frontend knows where the core
+contracts live when no JSON file is present. Several API routes under `app/api`
+demonstrate reading data from the contracts.
 Examples
 include:
 
