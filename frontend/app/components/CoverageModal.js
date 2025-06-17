@@ -9,9 +9,7 @@ import { getRiskManagerWithSigner } from "../../lib/riskManager"
 import { getPoolManagerWithSigner } from "../../lib/poolManager"
 import {
   getCapitalPoolWithSigner,
-  getUnderlyingAssetBalance,
   getUnderlyingAssetDecimals,
-  getUnderlyingAssetAddress,
 } from "../../lib/capitalPool"
 import { getERC20WithSigner } from "../../lib/erc20"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
@@ -87,8 +85,11 @@ export default function CoverageModal({
     const load = async () => {
       try {
         const dep = getDeployment(deployment)
-        const dec = await getUnderlyingAssetDecimals(dep.capitalPool)
-        const bal = await getUnderlyingAssetBalance(address, dep.capitalPool)
+        const cp = await getCapitalPoolWithSigner(dep.capitalPool)
+        const assetAddr = await cp.underlyingAsset()
+        const tokenContract = await getERC20WithSigner(assetAddr)
+        const dec = await tokenContract.decimals()
+        const bal = await tokenContract.balanceOf(address)
         const human = Number(ethers.utils.formatUnits(bal, dec))
         setUnderlyingDec(dec)
         setWalletBalance(human)
@@ -108,8 +109,11 @@ export default function CoverageModal({
     const load = async () => {
       try {
         const dep = getDeployment(deployment)
-        const dec = await getUnderlyingAssetDecimals(dep.capitalPool)
-        const bal = await getUnderlyingAssetBalance(address, dep.capitalPool)
+        const cp = await getCapitalPoolWithSigner(dep.capitalPool)
+        const assetAddr = await cp.underlyingAsset()
+        const tokenContract = await getERC20WithSigner(assetAddr)
+        const dec = await tokenContract.decimals()
+        const bal = await tokenContract.balanceOf(address)
         const human = Number(ethers.utils.formatUnits(bal, dec))
         setUnderlyingDec(dec)
         setWalletBalance(human)
@@ -152,9 +156,10 @@ export default function CoverageModal({
       if (!window.ethereum) throw new Error("Wallet not found")
 
       const dep = getDeployment(deployment)
-      const dec = underlyingDec ?? (await getUnderlyingAssetDecimals(dep.capitalPool))
-      const assetAddr = await getUnderlyingAssetAddress(dep.capitalPool)
+      const cp = await getCapitalPoolWithSigner(dep.capitalPool)
+      const assetAddr = await cp.underlyingAsset()
       const tokenContract = await getERC20WithSigner(assetAddr)
+      const dec = underlyingDec ?? (await tokenContract.decimals())
       const signerAddress = await tokenContract.signer.getAddress()
 
       if (type === "purchase") {
