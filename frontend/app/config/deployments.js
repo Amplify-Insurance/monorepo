@@ -1,10 +1,9 @@
+import deployedConfig from '../../../deployedAddresses.json';
+
 let deployments = [];
 
 try {
   // Primary config file written by the deploy scripts
-  const fs = require('fs');
-  const path = require('path');
-  const file = path.join(process.cwd(), '..', 'deployedAddresses.json');
 
   const mapItem = (item, name = 'default') => ({
     name: item.name || name,
@@ -25,13 +24,11 @@ try {
     subgraphUrl: item.subgraphUrl,
   });
 
-  if (fs.existsSync(file)) {
-    const json = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (Array.isArray(json)) {
-      deployments = json.map((d, i) => mapItem(d, d.name || `deploy${i}`));
-    } else {
-      deployments = [mapItem(json)];
-    }
+  const json = deployedConfig;
+  if (Array.isArray(json)) {
+    deployments = json.map((d, i) => mapItem(d, d.name || `deploy${i}`));
+  } else if (json) {
+    deployments = [mapItem(json)];
   }
 } catch (err) {
   console.error('Failed to load deployedAddresses.json', err);
