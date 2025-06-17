@@ -12,6 +12,8 @@
     "Aave Adapter": "0xe3673FcaFB5fC9a1E48aF33aCbE9E1d165253C3e",
     "Compound Adapter": "0xfD9082F64f4E592663e8a3034fA154f2A211B185",
     "Moonwell Adapter": "0xCD2F109BF7acDdfCA06153443Cf5Ac260958edC7",
-    "Euler Adapter": "0x2A7360d76303A0b2ebFf91424bcc3DF75cE229B8"
+    "Euler Adapter": "0x2A7360d76303A0b2ebFf91424bcc3DF75cE229B8",
+    "PriceOracle": "0xB87B0Db841aCAb4631E27ae73f495cA711a49f9c",
+    "MulticallReader": "0x40CE9598464Ab76B928eDEd765801A4Cfd9dba80"
   }
 ]
