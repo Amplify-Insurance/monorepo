@@ -1,12 +1,14 @@
 "use client"
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import useProposals from '../../hooks/useProposals'
+// Data is provided via props so this table can display
+// either active on-chain proposals or historical ones
+// loaded from the subgraph.
 import { getCommitteeWithSigner } from '../../lib/committee'
+import { getStakingWithSigner } from '../../lib/staking'
 import { useAccount } from 'wagmi'
 
-export default function ProposalsTable() {
-  const { proposals, loading } = useProposals()
+export default function ProposalsTable({ proposals, loading }) {
   const [expanded, setExpanded] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isClaiming, setIsClaiming] = useState(false)
@@ -43,6 +45,17 @@ export default function ProposalsTable() {
       console.error('Claim failed', err)
     } finally {
       setIsClaiming(false)
+    }
+  }
+
+  const handleWithdrawBond = async (poolId) => {
+    if (!isConnected) return
+    try {
+      const staking = await getStakingWithSigner()
+      const tx = await staking.withdrawBond(poolId)
+      await tx.wait()
+    } catch (err) {
+      console.error('Withdraw bond failed', err)
     }
   }
 
@@ -118,6 +131,12 @@ export default function ProposalsTable() {
                                 className="py-1 px-3 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
                               >
                                 Claim Reward
+                              </button>
+                              <button
+                                onClick={() => handleWithdrawBond(p.poolId)}
+                                className="py-1 px-3 bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                Withdraw Bond
                               </button>
                             </div>
                           )}

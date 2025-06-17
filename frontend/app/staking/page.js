@@ -5,6 +5,8 @@ import { useAccount } from "wagmi"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { HelpCircle, Vote, Shield, Users } from "lucide-react"
 import ProposalsTable from "../components/ProposalsTable"
+import useActiveProposals from "../hooks/useActiveProposals"
+import usePastProposals from "../hooks/usePastProposals"
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet"
 import StakeModal from "../components/StakeModal"
 import UnstakeModal from "../components/UnstakeModal"
@@ -17,6 +19,8 @@ export default function StakingPage() {
   const [bondOpen, setBondOpen] = useState(false)
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
+  const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
+  const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
 
   if (!isConnected) {
     return (
@@ -196,7 +200,18 @@ export default function StakingPage() {
               New Proposal
             </button>
           </div>
-          <ProposalsTable />
+          <ProposalsTable proposals={activeProposals} loading={loadingActive} />
+        </div>
+
+        {/* Past Proposals Section */}
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+              <Vote className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Past Proposals</h2>
+          </div>
+          <ProposalsTable proposals={pastProposals} loading={loadingPast} />
         </div>
       </div>
     </div>
