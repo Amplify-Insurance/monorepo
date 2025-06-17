@@ -5,8 +5,8 @@ import { getPoolManager } from "../../../../lib/poolManager";
 import { getPriceOracle } from "../../../../lib/priceOracle";
 import { getMulticallReader } from "../../../../lib/multicallReader";
 import { getUnderlyingAssetDecimals } from "../../../../lib/capitalPool";
-import deployments from "../../../config/deployments";
 import { ethers } from "ethers";
+import deployments from "../../../config/deployments";
 
 /**
  * Basis‑points denominator (10 000) expressed as bigint for fixed‑point math.
@@ -213,6 +213,16 @@ export async function GET() {
 
       const priceResults = await multicall.tryAggregate(false, priceCalls);
 
+      // Fetch ERC20 decimals for each protocol token
+      const decInterface = new ethers.utils.Interface([
+        "function decimals() view returns (uint8)",
+      ]);
+      const decCalls = pools.map((p) => ({
+        target: p.protocolTokenToCover,
+        callData: decInterface.encodeFunctionData("decimals"),
+      }));
+      const decResults = await multicall.tryAggregate(false, decCalls);
+
       for (let i = 0; i < priceResults.length; i++) {
         if (!priceResults[i].success) continue;
         try {
@@ -224,6 +234,19 @@ export async function GET() {
             ethers.utils.formatUnits(price, dec)
           );
         } catch {}
+        // Set token decimals from ERC20 call
+        let protoDec = 18;
+        const decRes = decResults[i];
+        if (decRes && decRes.success) {
+          try {
+            const [val] = decInterface.decodeFunctionResult(
+              "decimals",
+              decRes.returnData
+            );
+            protoDec = Number(val);
+          } catch {}
+        }
+        pools[i].protocolTokenDecimals = protoDec;
       }
 
       for (const p of pools) {
