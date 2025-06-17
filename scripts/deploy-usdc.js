@@ -39,13 +39,13 @@ async function main() {
   console.log("Deploying with:", deployer.address);
 
   /*──────────────────────────── Core contracts ───────────────────────────*/
-  const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
-  const policyNFT = await PolicyNFT.deploy(deployer.address);
-  await policyNFT.waitForDeployment();
-
   const RiskManager = await ethers.getContractFactory("RiskManager");
   const riskManager = await RiskManager.deploy(deployer.address);
   await riskManager.waitForDeployment();
+
+  const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
+  const policyNFT = await PolicyNFT.deploy(deployer.address);
+  await policyNFT.waitForDeployment();
 
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
   const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target);
@@ -62,7 +62,9 @@ async function main() {
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
+  await policyNFT.setRiskManagerAddress(policyManager.target);
 
+  
   const CatShare = await ethers.getContractFactory("CatShare");
   const catShare = await CatShare.deploy();
   await catShare.waitForDeployment();
@@ -96,11 +98,13 @@ async function main() {
   const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
   const aaveAdapter = await AaveAdapter.deploy(USDC_ADDRESS, AAVE_POOL_ADDRESS, AAVE_AUSDC_ADDRESS, deployer.address);
   await aaveAdapter.waitForDeployment();
+  await aaveAdapter.setCapitalPoolAddress(capitalPool.target);
 
   // 2. Compound v3 (Comet)
   const CompoundAdapter = await ethers.getContractFactory("CompoundV3Adapter");
   const compoundAdapter = await CompoundAdapter.deploy(COMPOUND_COMET_USDC, deployer.address);
   await compoundAdapter.waitForDeployment();
+  await compoundAdapter.setCapitalPoolAddress(capitalPool.target);
 
   // 3. Moonwell (Compound‑v2)
   const MoonwellAdapter = await ethers.getContractFactory("MoonwellAdapter");

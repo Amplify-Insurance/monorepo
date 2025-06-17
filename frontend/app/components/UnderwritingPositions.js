@@ -87,6 +87,8 @@ const underwritingPositions = (details || [])
     (p) => p.pendingLoss > 0
   );
 
+  console.log(activePositions, "activePositions")
+
   const unlockTimestamp =
     Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD;
   const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -352,7 +354,7 @@ const underwritingPositions = (details || [])
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
                             <Image
-                              src={getProtocolLogo(position.id)}
+                              src={getProtocolLogo(position.poolId)}
                               alt={position.protocol}
                               width={32}
                               height={32}
@@ -360,7 +362,7 @@ const underwritingPositions = (details || [])
                             />
                           </div>
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {getProtocolName(position.id)}
+                            {getProtocolName(position.poolId)}
                           </div>
                         </div>
                       </td>

@@ -13,7 +13,7 @@ export default function useYieldAdapters() {
         if (res.ok) {
           const data = await res.json();
           const decimalsMap = {
-            [YieldPlatform.AAVE]: 27, // Aave APR returned with 27 decimals
+            [YieldPlatform.AAVE]: 18, // Aave APR returned with 27 decimals
             [YieldPlatform.COMPOUND]: 18, // Compound uses 18 decimals
           };
 
