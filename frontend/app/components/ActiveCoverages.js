@@ -68,7 +68,22 @@ export default function ActiveCoverages({ displayCurrency }) {
     const expiryHex = p.lastPaidUntil?.hex || '0x0'
 
     const activationTs = parseInt(activationHex, 16)
-    const expiryTs = parseInt(expiryHex, 16)
+    let expiryTs = parseInt(expiryHex, 16)
+
+    if (!expiryTs) {
+      const deposit = Number(
+        ethers.utils.formatUnits(p.premiumDeposit?.hex || '0', decimals),
+      )
+      const lastDrainTs = parseInt(p.lastDrainTime?.hex || '0x0', 16)
+      const rate = Number(pool.premiumRateBps || 0) / 100
+      const perSecond =
+        rate > 0
+          ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60)
+          : 0
+      if (perSecond > 0) {
+        expiryTs = Math.floor(lastDrainTs + deposit / perSecond)
+      }
+    }
 
     let status = "active"
     if (now < activationTs) status = "pending"
@@ -256,6 +271,7 @@ export default function ActiveCoverages({ displayCurrency }) {
           capacity={selectedCoverage.capacity}
           policyId={selectedCoverage.id}
           deployment={selectedCoverage.deployment}
+          expiry={selectedCoverage.expiry}
         />
       )}
     </div>
