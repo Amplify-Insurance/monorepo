@@ -84,6 +84,18 @@ contract RiskManager is Ownable, ReentrancyGuard {
         committee = _committee;
         emit CommitteeSet(_committee);
     }
+
+    /**
+     * @notice Wrapper for PoolRegistry.addProtocolRiskPool restricted to the owner.
+     * @dev Enables governance to create new pools through the RiskManager.
+     */
+    function addProtocolRiskPool(
+        address _protocolTokenToCover,
+        IPoolRegistry.RateModel calldata _rateModel,
+        IPoolRegistry.ProtocolRiskIdentifier _protocolCovered
+    ) external onlyOwner returns (uint256) {
+        return poolRegistry.addProtocolRiskPool(_protocolTokenToCover, _rateModel, _protocolCovered);
+    }
     
     /* ──────────────── Underwriter Capital Allocation ──────────────── */
     
