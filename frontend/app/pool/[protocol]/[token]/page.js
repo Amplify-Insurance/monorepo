@@ -159,6 +159,28 @@ export default function PoolDetailsPage() {
     )
   }, [processedPool, rateParams])
 
+  const timeframeDays = {
+    "1m": 30,
+    "3m": 90,
+    "1y": 365,
+  }
+
+  const filteredPremiumHistory = useMemo(() => {
+    if (!premiumHistory || premiumHistory.length === 0) return []
+    const days = timeframeDays[premiumTimeframe]
+    if (!days) return premiumHistory
+    const cutoff = Date.now() - days * 86400000
+    return premiumHistory.filter((p) => new Date(p.date).getTime() >= cutoff)
+  }, [premiumHistory, premiumTimeframe])
+
+  const filteredUtilHistory = useMemo(() => {
+    if (!utilHistory || utilHistory.length === 0) return []
+    const days = timeframeDays[utilTimeframe]
+    if (!days) return utilHistory
+    const cutoff = Date.now() - days * 86400000
+    return utilHistory.filter((p) => new Date(p.date).getTime() >= cutoff)
+  }, [utilHistory, utilTimeframe])
+
   // Drawing helpers
   const drawInterestRateChart = useCallback(
     (ctx) => {
@@ -388,10 +410,10 @@ export default function PoolDetailsPage() {
     const irCtx = irCanvasRef.current?.getContext("2d")
     irCtx && requestAnimationFrame(() => drawInterestRateChart(irCtx))
     const pCtx = premiumCanvasRef.current?.getContext("2d")
-    pCtx && requestAnimationFrame(() => drawHistoryChart(pCtx, premiumHistory, "59,130,246"))
+    pCtx && requestAnimationFrame(() => drawHistoryChart(pCtx, filteredPremiumHistory, "59,130,246"))
     const uCtx = utilCanvasRef.current?.getContext("2d")
-    uCtx && requestAnimationFrame(() => drawHistoryChart(uCtx, utilHistory, "16,185,129"))
-  }, [isClient, interestRateData, premiumHistory, utilHistory, drawInterestRateChart, drawHistoryChart])
+    uCtx && requestAnimationFrame(() => drawHistoryChart(uCtx, filteredUtilHistory, "16,185,129"))
+  }, [isClient, interestRateData, filteredPremiumHistory, filteredUtilHistory, drawInterestRateChart, drawHistoryChart])
 
   if (!isClient || poolsLoading) return <PageLoader />
   if (!market || !pool) {
@@ -461,11 +483,35 @@ export default function PoolDetailsPage() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6 flex flex-col">
-          <h2 className="text-lg md:text-xl font-semibold mb-4 text-gray-900 dark:text-white">Premium History</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">Premium History</h2>
+            <select
+              className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded-md px-1 py-0.5 focus:outline-none"
+              value={premiumTimeframe}
+              onChange={(e) => setPremiumTimeframe(e.target.value)}
+            >
+              <option value="1m">1M</option>
+              <option value="3m">3M</option>
+              <option value="1y">1Y</option>
+              <option value="all">All</option>
+            </select>
+          </div>
           <div className="h-48 bg-gray-50 dark:bg-gray-900/50 rounded-md mb-4 flex-grow relative overflow-hidden"><canvas ref={premiumCanvasRef} className="w-full h-full absolute top-0 left-0"/></div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6 flex flex-col">
-          <h2 className="text-lg md:text-xl font-semibold mb-4 text-gray-900 dark:text-white">Utilization History</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">Utilization History</h2>
+            <select
+              className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded-md px-1 py-0.5 focus:outline-none"
+              value={utilTimeframe}
+              onChange={(e) => setUtilTimeframe(e.target.value)}
+            >
+              <option value="1m">1M</option>
+              <option value="3m">3M</option>
+              <option value="1y">1Y</option>
+              <option value="all">All</option>
+            </select>
+          </div>
           <div className="h-48 bg-gray-50 dark:bg-gray-900/50 rounded-md mb-4 flex-grow relative overflow-hidden"><canvas ref={utilCanvasRef} className="w-full h-full absolute top-0 left-0"/></div>
         </div>
       </div>
