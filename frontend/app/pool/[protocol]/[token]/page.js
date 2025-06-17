@@ -9,6 +9,7 @@ import CoverageModal from "../../../components/CoverageModal"
 import usePools from "../../../../hooks/usePools"
 import useReserveConfig from "../../../../hooks/useReserveConfig"
 import usePoolHistory from "../../../../hooks/usePoolHistory"
+import PageLoader from "../../../components/PageLoader"
 import {
   getProtocolName,
   getProtocolDescription,
@@ -93,7 +94,7 @@ export default function PoolDetailsPage() {
     setIsClient(true)
   }, [])
 
-  const { pools } = usePools()
+  const { pools, loading: poolsLoading } = usePools()
 
   const pool = useMemo(
     () =>
@@ -392,7 +393,7 @@ export default function PoolDetailsPage() {
     uCtx && requestAnimationFrame(() => drawHistoryChart(uCtx, utilHistory, "16,185,129"))
   }, [isClient, interestRateData, premiumHistory, utilHistory, drawInterestRateChart, drawHistoryChart])
 
-  if (!isClient) return <div className="container mx-auto max-w-7xl p-4"><p>Loading pool details...</p></div>
+  if (!isClient || poolsLoading) return <PageLoader />
   if (!market || !pool) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
