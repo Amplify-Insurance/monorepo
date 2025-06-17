@@ -92,6 +92,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
           ),
         ),
         price: pool.tokenPriceUsd ?? 0,
+        deployment: pool.deployment,
       })
       return acc
     }, {})
@@ -497,6 +498,14 @@ export default function UnderwriterPanel({ displayCurrency }) {
           yield={totalYield}
           yieldChoice={selectedYield}
           poolIds={selectedMarkets}
+          deployment={
+            selectedMarkets.length > 0
+              ? markets
+                  .find((m) => m.id === selectedMarkets[0])
+                  ?.pools.find((p) => p.token === selectedToken?.symbol)
+                  ?.deployment
+              : undefined
+          }
           selectedMarkets={selectedMarkets.map((id) => {
             const market = markets.find((m) => m.id === id)
             const pool = market?.pools.find((p) => p.token === selectedToken?.symbol)
