@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Info, Plus, Minus } from "lucide-react";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
@@ -33,6 +33,7 @@ export default function ManageCoverageModal({
   shares,
   poolId,
   deployment,
+  expiry,
 }) {
   const [action, setAction] = useState("increase"); // increase or decrease
   const tokenName = getTokenName(token);
@@ -42,9 +43,19 @@ export default function ManageCoverageModal({
   const maxAmount = type === "coverage" ? capacity : amount;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [extendWeeks, setExtendWeeks] = useState(1);
+  const [endDate, setEndDate] = useState("");
   const weeklyPremiumCost =
     (Number(amount) * (Number(premium) / 100) * 7) / 365;
   const extendCost = weeklyPremiumCost * extendWeeks;
+
+  useEffect(() => {
+    if (!expiry) return;
+    const d = new Date(expiry * 1000);
+    d.setDate(d.getDate() + extendWeeks * 7);
+    setEndDate(
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    );
+  }, [extendWeeks, expiry]);
 
   // Calculate USD value when amount changes
   const handleAmountChange = (e) => {
@@ -182,9 +193,17 @@ export default function ManageCoverageModal({
 
         {type === "coverage" && (
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              Extend Duration
-            </label>
+            <div className="flex justify-between items-baseline mb-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Extend Duration
+              </label>
+              <div className="text-right">
+                <span className="font-semibold text-base text-gray-900 dark:text-white">
+                  {extendWeeks} {extendWeeks === 1 ? "Week" : "Weeks"}
+                </span>
+                <div className="text-xs text-gray-500 dark:text-gray-400">New End {endDate}</div>
+              </div>
+            </div>
             <div className="relative">
               <Slider
                 min={1}
@@ -202,8 +221,29 @@ export default function ManageCoverageModal({
                 <span>52W</span>
               </div>
             </div>
-            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              Additional Premium: {extendCost.toFixed(2)} {tokenName}
+          </div>
+        )}
+
+        {type === "coverage" && (
+          <div className="mt-4">
+            <h4 className="text-base font-medium text-gray-900 dark:text-white mb-3">Transaction overview</h4>
+            <div className="space-y-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-300">Premium Rate</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {formatPercentage(premium)} APY
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-300">Additional Cost ({extendWeeks}w)</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {extendCost.toFixed(2)} {tokenName}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-300">New End Date</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">{endDate}</span>
+              </div>
             </div>
           </div>
         )}
