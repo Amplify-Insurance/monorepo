@@ -116,7 +116,6 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     function setRewardDistributor(address _rewardDistributor) external onlyOwner {
         require(_rewardDistributor != address(0), "CIP: Address cannot be zero");
         rewardDistributor = IRewardDistributor(_rewardDistributor);
-        rewardDistributor.setCatPool(address(this));
         emit RewardDistributorSet(_rewardDistributor);
     }
 
