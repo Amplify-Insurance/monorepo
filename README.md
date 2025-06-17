@@ -1,6 +1,19 @@
 # CoverPool Contracts
 
-This repository contains a Hardhat project implementing a prototype on‑chain insurance protocol.  The original monolithic **CoverPool** contract has been split into several modules.  `PolicyManager` handles policy purchases, `CapitalPool` tracks underwriter deposits, and `RiskManager` coordinates allocations and claims.  Policy positions are represented by NFTs and a separate **CatInsurancePool** still acts as an additional backstop fund.
+Amplify Insurance is building a modular, open-source insurance marketplace where underwriters supply USDC liquidity, policy-holders buy cover on specific DeFi or real-world risks, and the whole life-cycle is enforced by Solidity smart-contracts. The code lives in a Hardhat monorepo; the `contracts/` package is the heart of the system, and all figures below refer to that codebase.
+
+## Amplify Insurance’s on-chain cover protocol – high-level summary
+
+### Core building blocks
+
+- **CapitalPool** – a vault that accepts underwriter deposits, sends idle funds to external “yield adapters”, and keeps an accounting of profits, losses and withdrawal queues.
+- **PolicyManager** – the single user-facing entry point: it mints an ERC-721 `PolicyNFT` for every policy sold, tracks premiums, and burns the NFT on expiry or claim.
+- **RiskManager** – orchestrates the movement of funds between pools during allocations, premium collection and claim payouts, using the `LossDistributor` and `RewardDistributor` helpers for pro-rata maths.
+- **PoolRegistry** – a registry where each “risk pool” lives with its utilisation-based premium curve, whitelist of accepted collateral and active yield adapter.
+
+### Liquidity & premium flows
+
+Underwriters deposit USDC → `CapitalPool` optionally stakes it in Aave, Compound, Euler, Moonwell or Morpho via plug-in adapters → yield flows back to the pool. When a policy-holder buys cover, `PolicyManager` pulls capital from the relevant risk pool, mints a `PolicyNFT` and streams premiums (block-by-block) back to underwriters. A small slice of every premium goes to the `CatInsurancePool` – a catastrophe back-stop fund issued as `CatShare` ERC-20 tokens. The README diagrams (“Underwriter Capital Flow” & “Distressed Capital Flow”) illustrate these paths in detail.
 
 ## Directory Layout
 
@@ -87,7 +100,7 @@ npx hardhat run scripts/deploy-oracle.js --network base
 Then update `frontend/.env` using the printed `PriceOracle` and `MulticallReader`
 addresses so the frontend can display token prices and batch queries.
 
-The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.ts` to add or customise networks. Running scripts on a remote network requires access to the configured RPC endpoint.
+The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.js` to add or customise networks. Running scripts on a remote network requires access to the configured RPC endpoint.
 
 ## Contracts Overview
 
@@ -110,7 +123,7 @@ In a separate terminal deploy contracts and run scripts using the `--network loc
 
 ## Further Reading
 
-The unit tests under `test/` demonstrate common interactions such as underwriting deposits, premium payments and withdrawals.  Examine `test/risk-manager.test.js` for detailed examples of calling the contracts.
+The unit tests under `test/` demonstrate common interactions such as underwriting deposits, premium payments and withdrawals.  Examine `test/RiskManager.test.js` for detailed examples of calling the contracts.
 
 
 ## Frontend
