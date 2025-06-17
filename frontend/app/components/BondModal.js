@@ -158,7 +158,9 @@ export default function BondModal({ isOpen, onClose }) {
                 className="w-full bg-transparent text-2xl font-semibold text-gray-900 dark:text-white outline-none placeholder-gray-400"
               />
               <div className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">ETH</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {selectedTokenData ? selectedTokenData.symbol : "TOKEN"}
+                </span>
               </div>
             </div>
           </div>
@@ -172,7 +174,7 @@ export default function BondModal({ isOpen, onClose }) {
               <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Max Payout</span>
             </div>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-              {maxPayout} {selectedTokenData ? getTokenName(selectedTokenData.address) : "ETH"}
+              {maxPayout} {selectedTokenData ? getTokenName(selectedTokenData.address) : "TOKEN"}
             </span>
           </div>
         )}
