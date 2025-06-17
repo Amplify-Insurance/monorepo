@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getProvider } from '../../../../../lib/provider';
-import { getCatPool } from '../../../../../lib/catPool';
+import { getProvider } from '../../../../../lib/provider'
+import { getCatPool } from '../../../../../lib/catPool'
+import { getMulticallReader } from '../../../../../lib/multicallReader'
 import ERC20 from '../../../../../abi/ERC20.json';
 import { ethers } from 'ethers';
 import deployments from '../../../../config/deployments';
@@ -10,16 +11,30 @@ export async function GET(req: Request, { params }: { params: { address: string 
     const url = new URL(req.url);
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const cp = getCatPool(dep.catPool, dep.name);
+    const cp = getCatPool(dep.catPool, dep.name)
 
-    const addr = params.address.toLowerCase();
-    const catShareAddr = await cp.catShareToken();
-    const token = new ethers.Contract(catShareAddr, ERC20, getProvider(dep.name));
-    const [balance, totalSupply, liquid] = await Promise.all([
-      token.balanceOf(addr),
-      token.totalSupply(),
-      cp.liquidUsdc(),
-    ]);
+    const addr = params.address.toLowerCase()
+    const catShareAddr = await cp.catShareToken()
+    const token = new ethers.Contract(catShareAddr, ERC20, getProvider(dep.name))
+    const multicall = getMulticallReader(dep.multicallReader, dep.name)
+
+    const calls = [
+      { target: catShareAddr, callData: token.interface.encodeFunctionData('balanceOf', [addr]) },
+      { target: catShareAddr, callData: token.interface.encodeFunctionData('totalSupply') },
+      { target: dep.catPool, callData: cp.interface.encodeFunctionData('liquidUsdc') },
+    ]
+
+    const res = await multicall.tryAggregate(false, calls)
+
+    const balance = res[0].success
+      ? token.interface.decodeFunctionResult('balanceOf', res[0].returnData)[0]
+      : 0n
+    const totalSupply = res[1].success
+      ? token.interface.decodeFunctionResult('totalSupply', res[1].returnData)[0]
+      : 0n
+    const liquid = res[2].success
+      ? cp.interface.decodeFunctionResult('liquidUsdc', res[2].returnData)[0]
+      : 0n
     let value = 0n;
     if (totalSupply > 0n) {
       value = (balance * liquid) / totalSupply;
