@@ -89,7 +89,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     ) external nonReentrant returns (uint256 policyId) {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
         
-        (, , uint256 totalCoverageSold, , bool isPaused, ) = poolRegistry.getPoolData(_poolId);
+        (, , uint256 totalCoverageSold, , bool isPaused, ,) = poolRegistry.getPoolData(_poolId);
         if (isPaused) revert PoolPaused();
         if (_coverageAmount == 0 || _initialPremiumDeposit == 0) revert InvalidAmount();
         if (_initialPremiumDeposit > type(uint128).max) revert InvalidAmount();
@@ -191,7 +191,7 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
             catPool.receiveUsdcPremium(catAmount);
         }
         
-        (, uint256 totalPledged, , , , ) = poolRegistry.getPoolData(pol.poolId);
+        (, uint256 totalPledged, , , , ,) = poolRegistry.getPoolData(pol.poolId);
         if (poolIncome > 0 && totalPledged > 0) {
             rewardDistributor.distribute(pol.poolId, address(capitalPool.underlyingAsset()), poolIncome, totalPledged);
         }
@@ -213,7 +213,7 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
     }
     
     function _getPremiumRateBpsAnnual(uint256 _poolId) internal view returns (uint256) {
-        (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal, , ) = poolRegistry.getPoolData(_poolId);
+        (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal, , ,) = poolRegistry.getPoolData(_poolId);
         
         // Resolution: If pending withdrawals exceed or equal pledged capital, 
         // there is no available capital. This check prevents an underflow revert.
@@ -239,7 +239,7 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
     }
 
     function _getAvailableCapital(uint256 _poolId) internal view returns (uint256) {
-        (, uint256 totalPledged, , uint256 pendingWithdrawal, , ) = poolRegistry.getPoolData(_poolId);
+        (, uint256 totalPledged, , uint256 pendingWithdrawal, , ,) = poolRegistry.getPoolData(_poolId);
         
         // Resolution: If pending withdrawals exceed or equal pledged capital, available capital is 0.
         // This check prevents an underflow revert.

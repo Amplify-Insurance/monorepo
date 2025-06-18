@@ -13,13 +13,12 @@ const CONTRACT_SET ='usdc';
 const RATE_MODEL = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
 
 // List the protocols you wish to add. Each item should contain the
-// underlying asset address and the ProtocolRiskIdentifier enum value
-// that the PoolRegistry understands.
+// underlying asset address and the claim fee in basis points.
 const PROTOCOLS_TO_ADD = [
-  // Example: add Compound (identifier 2) for USDC
+  // Example: add a pool for USDC with a 5% claim fee
   {
     asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC
-    identifier: 2, // PROTOCOL_B in the current contracts
+    claimFee: 500, // 5% fee on claims
   },
 ];
 
@@ -39,11 +38,11 @@ async function main() {
   const riskManager = await ethers.getContractAt('RiskManager', entry.RiskManager);
 
   for (const proto of PROTOCOLS_TO_ADD) {
-    console.log(`Adding protocol ${proto.identifier} for asset ${proto.asset}...`);
+    console.log(`Adding pool for asset ${proto.asset} with fee ${proto.claimFee}bps...`);
     const tx = await riskManager.addProtocolRiskPool(
       proto.asset,
       RATE_MODEL,
-      proto.identifier
+      proto.claimFee
     );
     await tx.wait();
     console.log('  Added with tx', tx.hash);

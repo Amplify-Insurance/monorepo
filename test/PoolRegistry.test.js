@@ -19,6 +19,7 @@ describe("PoolRegistry", function () {
         slope2: ethers.parseUnits("0.1", 18), // 10%
         kink: ethers.parseUnits("0.8", 18), // 80%
     };
+    const sampleClaimFee = 500; // 5%
 
     beforeEach(async function () {
         // Get signers
@@ -108,7 +109,7 @@ describe("PoolRegistry", function () {
                 await expect(poolRegistry.connect(riskManager).addProtocolRiskPool(
                     token.target,
                     sampleRateModel,
-                    1 // PROTOCOL_A
+                    sampleClaimFee
                 )).to.not.be.reverted;
 
                 expect(await poolRegistry.getPoolCount()).to.equal(1);
@@ -118,6 +119,7 @@ describe("PoolRegistry", function () {
                 expect(poolData.totalCapitalPledgedToPool).to.equal(0);
                 expect(poolData.totalCoverageSold).to.equal(0);
                 expect(poolData.isPaused).to.be.false;
+                expect(poolData.claimFeeBps).to.equal(sampleClaimFee);
 
                 const rateModel = await poolRegistry.getPoolRateModel(0);
                 expect(rateModel.base).to.equal(sampleRateModel.base);
@@ -128,16 +130,16 @@ describe("PoolRegistry", function () {
                 await expect(poolRegistry.connect(nonOwner).addProtocolRiskPool(
                     token.target,
                     sampleRateModel,
-                    1
+                    sampleClaimFee
                 )).to.be.revertedWith("PR: Not RiskManager");
             });
 
              it("Should return the correct poolId on creation", async function() {
                 // First pool should have ID 0
-                await poolRegistry.connect(riskManager).addProtocolRiskPool(token.target, sampleRateModel, 1);
+                await poolRegistry.connect(riskManager).addProtocolRiskPool(token.target, sampleRateModel, sampleClaimFee);
                 
                 // Second pool should have ID 1
-                await poolRegistry.connect(riskManager).addProtocolRiskPool(token.target, sampleRateModel, 2);
+                await poolRegistry.connect(riskManager).addProtocolRiskPool(token.target, sampleRateModel, sampleClaimFee);
 
                 expect(await poolRegistry.getPoolCount()).to.equal(2);
                 // Check if we can get data for pool 1
@@ -151,7 +153,7 @@ describe("PoolRegistry", function () {
             await poolRegistry.connect(riskManager).addProtocolRiskPool(
                 token.target,
                 sampleRateModel,
-                1 // PROTOCOL_A
+                sampleClaimFee
             );
         });
 
@@ -343,13 +345,13 @@ describe("PoolRegistry", function () {
             await poolRegistry.connect(riskManager).addProtocolRiskPool(
                 token.target,
                 sampleRateModel,
-                1 // PROTOCOL_A
+                sampleClaimFee
             );
              // Add pool 1
             await poolRegistry.connect(riskManager).addProtocolRiskPool(
                 owner.address, // Using another address as a mock token
                 sampleRateModel,
-                2 // PROTOCOL_B
+                sampleClaimFee
             );
 
             // Add capital to pool 0
@@ -421,7 +423,7 @@ describe("PoolRegistry", function () {
             await poolRegistry.connect(riskManager).addProtocolRiskPool(
                 token.target,
                 sampleRateModel,
-                1 // PROTOCOL_A
+                sampleClaimFee
             );
         });
 
@@ -471,7 +473,7 @@ describe("PoolRegistry", function () {
             await poolRegistry.connect(riskManager).addProtocolRiskPool(
                 token.target,
                 sampleRateModel,
-                1 // PROTOCOL_A
+                sampleClaimFee
             );
         });
 
@@ -482,6 +484,7 @@ describe("PoolRegistry", function () {
             expect(poolData.capitalPendingWithdrawal).to.equal(0);
             expect(poolData.isPaused).to.be.false;
             expect(poolData.feeRecipient).to.equal(ethers.ZeroAddress);
+            expect(poolData.claimFeeBps).to.equal(sampleClaimFee);
         });
 
         it("getPoolActiveAdapters should return an empty array for a new pool", async function() {
