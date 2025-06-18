@@ -18,14 +18,15 @@ interface IPoolRegistry {
         uint256 totalCoverageSold,
         uint256 capitalPendingWithdrawal,
         bool isPaused,
-        address feeRecipient
+        address feeRecipient,
+        uint256 claimFeeBps
     );
 
     function getPoolRateModel(uint256 _poolId) external view returns (RateModel memory);
     function getPoolPayoutData(uint256 _poolId) external view returns (address[] memory, uint256[] memory, uint256);
     function getPoolActiveAdapters(uint256 _poolId) external view returns (address[] memory);
     function getCapitalPerAdapter(uint256 _poolId, address _adapter) external view returns (uint256);
-    function addProtocolRiskPool(address, RateModel calldata, ProtocolRiskIdentifier) external returns (uint256);
+    function addProtocolRiskPool(address, RateModel calldata, uint256) external returns (uint256);
     function updateCapitalAllocation(uint256 poolId, address adapterAddress, uint256 pledgeAmount, bool isAllocation) external;
     function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external;
     function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;

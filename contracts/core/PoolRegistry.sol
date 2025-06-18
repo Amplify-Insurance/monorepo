@@ -19,7 +19,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         uint256 totalCapitalPledgedToPool;
         uint256 capitalPendingWithdrawal;
         uint256 totalCoverageSold;
-        ProtocolRiskIdentifier protocolCovered;
+        uint256 claimFeeBps;
         bool isPaused;
         uint256 pauseTimestamp;
         address feeRecipient;
@@ -51,14 +51,14 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     function addProtocolRiskPool(
         address _protocolTokenToCover,
         RateModel calldata _rateModel,
-        ProtocolRiskIdentifier _protocolCovered
+        uint256 _claimFeeBps
     ) external onlyRiskManager returns (uint256) {
         uint256 poolId = protocolRiskPools.length;
         protocolRiskPools.push();
         PoolData storage pool = protocolRiskPools[poolId];
         pool.protocolTokenToCover = IERC20(_protocolTokenToCover);
         pool.rateModel = _rateModel;
-        pool.protocolCovered = _protocolCovered;
+        pool.claimFeeBps = _claimFeeBps;
         return poolId;
     }
 
@@ -121,7 +121,8 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         uint256 totalCoverageSold,
         uint256 capitalPendingWithdrawal,
         bool isPaused,
-        address feeRecipient
+        address feeRecipient,
+        uint256 claimFeeBps
     ) {
         PoolData storage pool = protocolRiskPools[_poolId];
         return (
@@ -130,7 +131,8 @@ contract PoolRegistry is IPoolRegistry, Ownable {
             pool.totalCoverageSold,
             pool.capitalPendingWithdrawal,
             pool.isPaused,
-            pool.feeRecipient
+            pool.feeRecipient,
+            pool.claimFeeBps
         );
     }
     

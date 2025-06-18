@@ -217,7 +217,7 @@ describe("RiskManager", function () {
                 await mockProtocolToken.connect(owner).mint(claimant.address, COVERAGE_AMOUNT);
                 await mockPolicyNFT.mock.getPolicy.withArgs(POLICY_ID).returns(POOL_ID_1, COVERAGE_AMOUNT, 0, 0, 0);
                 await mockPoolRegistry.mock.getPoolPayoutData.withArgs(POOL_ID_1).returns([nonParty.address], [TOTAL_PLEDGED], TOTAL_PLEDGED);
-                await mockPoolRegistry.mock.getPoolData.withArgs(POOL_ID_1).returns(mockProtocolToken.target, TOTAL_PLEDGED, 0, 0, false, committee.address);
+                await mockPoolRegistry.mock.getPoolData.withArgs(POOL_ID_1).returns(mockProtocolToken.target, TOTAL_PLEDGED, 0, 0, false, committee.address, 500);
                 await mockLossDistributor.mock.distributeLoss.returns();
                 await mockRewardDistributor.mock.distribute.returns();
                 await mockCapitalPool.mock.executePayout.returns();

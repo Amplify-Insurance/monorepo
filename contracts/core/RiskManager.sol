@@ -98,9 +98,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
     function addProtocolRiskPool(
         address _protocolTokenToCover,
         IPoolRegistry.RateModel calldata _rateModel,
-        IPoolRegistry.ProtocolRiskIdentifier _protocolCovered
+        uint256 _claimFeeBps
     ) external onlyOwner returns (uint256) {
-        return poolRegistry.addProtocolRiskPool(_protocolTokenToCover, _rateModel, _protocolCovered);
+        return poolRegistry.addProtocolRiskPool(_protocolTokenToCover, _rateModel, _claimFeeBps);
     }
     
     /* ──────────────── Underwriter Capital Allocation ──────────────── */
@@ -205,7 +205,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256 coverage = policy.coverage;
         (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) = poolRegistry.getPoolPayoutData(poolId);
 
-        (IERC20 protocolToken,, , , , ) = poolRegistry.getPoolData(poolId);
+        (IERC20 protocolToken,, , , , , uint256 poolClaimFeeBps) = poolRegistry.getPoolData(poolId);
         address claimant = policyNFT.ownerOf(_policyId);
         if (coverage > 0) {
             protocolToken.safeTransferFrom(claimant, address(rewardDistributor), coverage);
@@ -220,7 +220,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
             catPool.drawFund(shortfall);
         }
         
-        uint256 claimFee = (coverage * CLAIM_FEE_BPS) / BPS;
+        uint256 claimFee = (coverage * poolClaimFeeBps) / BPS;
         
         ICapitalPool.PayoutData memory payoutData;
         payoutData.claimant = policyNFT.ownerOf(_policyId);
