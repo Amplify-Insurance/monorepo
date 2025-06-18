@@ -14,7 +14,7 @@ import { getERC20WithSigner } from "../../lib/erc20";
 import useUsdPrice from "../../hooks/useUsdPrice";
 import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
-import { getTokenName, getTokenLogo, getProtocolLogo } from "../config/tokenNameMap";
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
 import { Slider } from "../../components/ui/slider";
 import { formatPercentage } from "../utils/formatting";
 import deployments, { getDeployment } from "../config/deployments";
@@ -164,7 +164,7 @@ export default function ManageCoverageModal({
       isOpen={isOpen}
       onClose={onClose}
       title={`Manage ${type === "coverage" ? "Coverage" : "Position"
-        } - ${protocol} ${tokenName}`}
+        } - ${getProtocolName(protocol)} ${tokenName}`}
     >
       <div className="space-y-6">
         {/* Current position */}
