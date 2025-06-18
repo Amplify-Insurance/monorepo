@@ -1,5 +1,5 @@
-import deployedConfig from '../../../deployedAddresses.json';
-import governanceConfig from '../../../governance_deployedAddresses.json';
+import deployedConfig from '../../../deployments/deployedAddresses.json';
+import governanceConfig from '../../../deployments/governance_deployedAddresses.json';
 
 let deployments = [];
 
