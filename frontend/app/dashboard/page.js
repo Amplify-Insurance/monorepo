@@ -158,57 +158,66 @@ export default function Dashboard() {
         {stakingInfo && BigInt(stakingInfo.staked || '0') > 0n && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
             <h2 className="text-xl font-semibold mb-2">My Staked Gov Tokens</h2>
-            <table className="min-w-full text-sm mb-4">
-              <thead>
-                <tr>
-                  <th className="px-2 py-1 text-left">Amount Staked</th>
-                  <th className="px-2 py-1 text-left">Voting Power</th>
-                  <th className="px-2 py-1 text-left">Manage</th>
-                  {activeProposals.length > 0 && (
-                    <th className="px-2 py-1 text-left">Status</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="px-2 py-1">
-                    {Number(ethers.utils.formatUnits(stakingInfo.staked || '0', 18)).toFixed(4)}
-                  </td>
-                  <td className="px-2 py-1">
-                    {stakingInfo.totalStaked && BigInt(stakingInfo.totalStaked) > 0n
-                      ? (
-                          Number(
-                            (BigInt(stakingInfo.staked) * 10000n) /
-                              BigInt(stakingInfo.totalStaked)
-                          ) / 100
-                        ).toFixed(2)
-                      : '0'}%
-                  </td>
-                  <td className="px-2 py-1">
-                    <Link
-                      href="/staking"
-                      className="py-1 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md transition-colors"
-                    >
-                      Manage
-                    </Link>
-                  </td>
-                  {activeProposals.length > 0 && (
-                    <td className="px-2 py-1">Open Proposals</td>
-                  )}
-                </tr>
-              </tbody>
-            </table>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleClaimGovRewards}
-                disabled={isClaimingRewards}
-                className="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
-              >
-                {isClaimingRewards ? 'Claiming...' : 'Claim Rewards'}
-              </button>
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {pastProposals.length}
-              </span>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm mb-4">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount Staked</th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Voting Power</th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Manage</th>
+                        <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rewards</th>
+                        {activeProposals.length > 0 && (
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      <tr>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          {Number(ethers.utils.formatUnits(stakingInfo.staked || '0', 18)).toFixed(4)}
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          {stakingInfo.totalStaked && BigInt(stakingInfo.totalStaked) > 0n
+                            ? (
+                                Number(
+                                  (BigInt(stakingInfo.staked) * 10000n) /
+                                    BigInt(stakingInfo.totalStaked)
+                                ) / 100
+                              ).toFixed(2)
+                            : '0'}%
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          <Link
+                            href="/staking"
+                            className="py-1 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md transition-colors"
+                          >
+                            Manage
+                          </Link>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={handleClaimGovRewards}
+                              disabled={isClaimingRewards}
+                              className="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
+                            >
+                              {isClaimingRewards ? 'Claiming...' : 'Claim'}
+                            </button>
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                              {pastProposals.length}
+                            </span>
+                          </div>
+                        </td>
+                        {activeProposals.length > 0 && (
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap">Open Proposals</td>
+                        )}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         )}
