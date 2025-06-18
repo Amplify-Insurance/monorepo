@@ -7,6 +7,8 @@ dataSources:
   - kind: ethereum/contract
     name: RiskManagerV2
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with new deployed address
       abi: RiskManager
@@ -56,8 +58,473 @@ dataSources:
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
+    name: RiskManagerV2Eth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111" # replace with new deployed address
+      abi: RiskManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - PoolUtilizationSnapshot
+        - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
+      abis:
+        - name: RiskManager
+          file: ./abis/RiskManager.json
+      eventHandlers:
+        - event: PoolAdded(indexed uint256,indexed address,uint8)
+          handler: handlePoolAdded
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocated
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocated
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaid
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256)
+          handler: handleClaimProcessed
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreated
+        - event: IncidentReported(indexed uint256,bool)
+          handler: handleIncidentReported
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsed
+        - event: PremiumRewardsClaimed(indexed address,indexed uint256,uint256)
+          handler: handlePremiumRewardsClaimed
+        - event: DistressedAssetRewardsClaimed(indexed address,indexed uint256,indexed address,uint256)
+          handler: handleDistressedAssetRewardsClaimed
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleRiskManagerOwnershipTransferred
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: StakingEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: Staking
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: Staking
+          file: ./abis/Staking.json
+      eventHandlers:
+        - event: Staked(indexed address,uint256)
+          handler: handleStaked
+        - event: Unstaked(indexed address,uint256)
+          handler: handleUnstaked
+        - event: CommitteeAddressSet(indexed address)
+          handler: handleCommitteeAddressSet
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: CommitteeEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: Committee
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - GovernanceProposal
+        - GovernanceVote
+      abis:
+        - name: Committee
+          file: ./abis/Committee.json
+      eventHandlers:
+        - event: ProposalCreated(indexed uint256,indexed address,uint256,bool,uint256)
+          handler: handleProposalCreated
+        - event: Voted(indexed uint256,indexed address,uint8,uint256)
+          handler: handleVoted
+        - event: ProposalExecuted(indexed uint256,bool)
+          handler: handleProposalExecuted
+        - event: BondResolved(indexed uint256,bool)
+          handler: handleBondResolved
+        - event: RewardClaimed(indexed uint256,indexed address,uint256)
+          handler: handleRewardClaimed
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: SdaiAdapterEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: MorhpoAdapterEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: MoonwellAdapterEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: EulerAdapterEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: CompoundV3AdapterEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+        - event: CapitalPoolAddressSet(indexed address)
+          handler: handleCapitalPoolAddressSet
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: AaveV3AdapterEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111"
+      abi: YieldAdapter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+      abis:
+        - name: YieldAdapter
+          file: ./abis/YieldAdapter.json
+      eventHandlers:
+        - event: FundsWithdrawn(indexed address,uint256,uint256)
+          handler: handleFundsWithdrawn
+        - event: CapitalPoolAddressSet(indexed address)
+          handler: handleCapitalPoolAddressSet
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: PolicyNFTEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      abi: PolicyNFT
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
+      abis:
+        - name: PolicyNFT
+          file: ./abis/PolicyNFT.json
+      eventHandlers:
+        - event: PolicyPremiumAccountUpdated(indexed uint256,uint128,uint128)
+          handler: handlePolicyPremiumAccountUpdated
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
+        - event: RiskManagerAddressSet(indexed address)
+          handler: handleRiskManagerAddressSet
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handlePolicyNFTOwnershipTransferred
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: PoolManagerEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      abi: PoolManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
+      abis:
+        - name: PoolManager
+          file: ./abis/PoolManager.json
+      eventHandlers:
+        - event: AddressesSet(indexed address,indexed address,indexed address,address)
+          handler: handlePMAddressesSet
+        - event: CatPremiumShareSet(uint256)
+          handler: handleCatPremiumShareSet
+        - event: CatPoolSet(indexed address)
+          handler: handleCatPoolSet
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: CatInsurancePoolEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      abi: CatInsurancePool
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
+      abis:
+        - name: CatInsurancePool
+          file: ./abis/CatInsurancePool.json
+      eventHandlers:
+        - event: AdapterChanged(indexed address)
+          handler: handleAdapterChanged
+        - event: CatLiquidityDeposited(indexed address,uint256,uint256)
+          handler: handleCatLiquidityDeposited
+        - event: CatLiquidityWithdrawn(indexed address,uint256,uint256)
+          handler: handleCatLiquidityWithdrawn
+        - event: CoverPoolAddressSet(indexed address)
+          handler: handleCoverPoolAddressSet
+        - event: DepositToAdapter(uint256)
+          handler: handleDepositToAdapter
+        - event: DrawFromFund(uint256,uint256)
+          handler: handleDrawFromFund
+        - event: ProtocolAssetReceivedForDistribution(indexed address,uint256)
+          handler: handleProtocolAssetReceivedForDistribution
+        - event: ProtocolAssetRewardsClaimed(indexed address,indexed address,uint256)
+          handler: handleProtocolAssetRewardsClaimed
+        - event: UsdcPremiumReceived(uint256)
+          handler: handleUsdcPremiumReceived
+        - event: PolicyManagerAddressSet(indexed address)
+          handler: handlePolicyManagerAddressSet
+        - event: RewardDistributorSet(indexed address)
+          handler: handleRewardDistributorSet
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleCatInsurancePoolOwnershipTransferred
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: PoolRegistryEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      abi: PoolRegistry
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
+      abis:
+        - name: PoolRegistry
+          file: ./abis/PoolRegistry.json
+      eventHandlers:
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handlePoolRegistryOwnershipTransferred
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: CapitalPoolEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      abi: CapitalPool
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - Claim
+        - PolicyCreatedEvent
+        - PolicyLapsedEvent
+        - PremiumPaidEvent
+      abis:
+        - name: CapitalPool
+          file: ./abis/CapitalPool.json
+      eventHandlers:
+        - event: Deposit(indexed address,uint256,uint256,uint8)
+          handler: handleDeposit
+        - event: WithdrawalRequested(indexed address,uint256,uint256)
+          handler: handleWithdrawalRequested
+        - event: WithdrawalExecuted(indexed address,uint256,uint256)
+          handler: handleWithdrawalExecuted
+        - event: LossesApplied(indexed address,uint256,bool)
+          handler: handleLossesApplied
+        - event: SystemValueSynced(uint256,uint256)
+          handler: handleSystemValueSynced
+        - event: AdapterCallFailed(indexed address,string,string)
+          handler: handleAdapterCallFailed
+        - event: RiskManagerSet(indexed address)
+          handler: handleRiskManagerSet
+        - event: BaseYieldAdapterSet(indexed uint8,indexed address)
+          handler: handleBaseYieldAdapterSet
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleCapitalPoolOwnershipTransferred
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
     name: CapitalPool
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with deployed address
       abi: CapitalPool
@@ -104,6 +571,8 @@ dataSources:
   - kind: ethereum/contract
     name: PoolRegistry
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with deployed address
       abi: PoolRegistry
@@ -133,6 +602,8 @@ dataSources:
   - kind: ethereum/contract
     name: CatInsurancePool
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with deployed address
       abi: CatInsurancePool
@@ -185,6 +656,8 @@ dataSources:
   - kind: ethereum/contract
     name: PoolManager
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with deployed address
       abi: PoolManager
@@ -219,6 +692,8 @@ dataSources:
   - kind: ethereum/contract
     name: PolicyNFT
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with deployed address
       abi: PolicyNFT
@@ -255,6 +730,8 @@ dataSources:
   - kind: ethereum/contract
     name: AaveV3Adapter
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: YieldAdapter
@@ -278,6 +755,8 @@ dataSources:
   - kind: ethereum/contract
     name: CompoundV3Adapter
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: YieldAdapter
@@ -301,6 +780,8 @@ dataSources:
   - kind: ethereum/contract
     name: EulerAdapter
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: YieldAdapter
@@ -322,6 +803,8 @@ dataSources:
   - kind: ethereum/contract
     name: MoonwellAdapter
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: YieldAdapter
@@ -343,6 +826,8 @@ dataSources:
   - kind: ethereum/contract
     name: MorhpoAdapter
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: YieldAdapter
@@ -364,6 +849,8 @@ dataSources:
   - kind: ethereum/contract
     name: SdaiAdapter
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: YieldAdapter
@@ -384,6 +871,8 @@ dataSources:
   - kind: ethereum/contract
     name: Committee
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: Committee
@@ -414,6 +903,8 @@ dataSources:
   - kind: ethereum/contract
     name: Staking
     network: mainnet
+    context:
+      deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000"
       abi: Staking
