@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IPolicyNFT.sol";
 import "../interfaces/IPoolRegistry.sol";
 import "../interfaces/ICapitalPool.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../interfaces/ICatInsurancePool.sol";
 import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IPolicyManager.sol";
@@ -215,8 +216,11 @@ contract RiskManager is Ownable, ReentrancyGuard {
         (IERC20 protocolToken,, , , , , uint256 poolClaimFeeBps) = poolRegistry.getPoolData(poolId);
         address claimant = policyNFT.ownerOf(_policyId);
         if (coverage > 0) {
-            protocolToken.safeTransferFrom(claimant, address(rewardDistributor), coverage);
-            rewardDistributor.distribute(poolId, address(protocolToken), coverage, totalCapitalPledged);
+            uint8 protocolDecimals = IERC20Metadata(address(protocolToken)).decimals();
+            uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
+            uint256 protocolCoverage = _scaleAmount(coverage, underlyingDecimals, protocolDecimals);
+            protocolToken.safeTransferFrom(claimant, address(rewardDistributor), protocolCoverage);
+            rewardDistributor.distribute(poolId, address(protocolToken), protocolCoverage, totalCapitalPledged);
         }
 
         lossDistributor.distributeLoss(poolId, coverage, totalCapitalPledged);
@@ -289,6 +293,15 @@ contract RiskManager is Ownable, ReentrancyGuard {
     }
     
     /* ───────────────── Internal Functions ───────────────── */
+
+    function _scaleAmount(uint256 amount, uint8 fromDecimals, uint8 toDecimals) internal pure returns (uint256) {
+        if (toDecimals > fromDecimals) {
+            return amount * (10 ** (toDecimals - fromDecimals));
+        } else if (toDecimals < fromDecimals) {
+            return amount / (10 ** (fromDecimals - toDecimals));
+        }
+        return amount;
+    }
 
     function _realizeLossesForAllPools(address _user) internal {
         uint256[] memory allocations = underwriterAllocations[_user];

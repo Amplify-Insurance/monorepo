@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract PolicyNFT is ERC721URIStorage, Ownable {
     // --- CORRECTED: Updated Policy struct ---
     struct Policy {
-        uint256 coverage;        // Liability in USDC
+        uint256 coverage;        // Liability in the underlying asset
         uint256 poolId;          // RiskManager's protocolRiskPools index
         uint256 start;           // Timestamp of minting
         uint256 activation;      // Timestamp when cover becomes active
