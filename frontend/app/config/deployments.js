@@ -4,7 +4,6 @@ import governanceConfig from '../../../governance_deployedAddresses.json';
 let deployments = [];
 
 try {
-  // Primary config file written by the deploy scripts
 
   const mapItem = (item, name = 'default') => ({
     name: item.name || name,
