@@ -141,8 +141,8 @@ Environment variables such as the RPC endpoint and contract addresses are
 configured in `.env` (see `.env.example`). Address resolution happens inside
 `frontend/app/config/deployments.js` in the following order:
 
-1. `deployedAddresses.json` – the file written by the Hardhat deploy scripts in
-   the repository root. It now stores an array of deployments and is loaded
+1. `deployments/deployedAddresses.json` – the file written by the Hardhat deploy scripts
+   in the `deployments` directory. It now stores an array of deployments and is loaded
    first when present.
 2. `NEXT_PUBLIC_DEPLOYMENTS` – optional environment variable containing a JSON
    array of deployments which overrides the config file.

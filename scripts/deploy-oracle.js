@@ -35,7 +35,7 @@ async function main() {
   await oracle.setAggregator(WETH_ADDRESS, WETH_USD_FEED)
 
   // Persist address to deployedAddresses.json
-  const addressesPath = path.join(__dirname, "..", "oracle_deployedAddresses.json")
+  const addressesPath = path.join(__dirname, "..", "deployments", "oracle_deployedAddresses.json")
   let addresses = {}
   if (fs.existsSync(addressesPath)) {
     addresses = JSON.parse(fs.readFileSync(addressesPath, "utf8"))
@@ -44,7 +44,7 @@ async function main() {
   fs.writeFileSync(addressesPath, JSON.stringify(addresses, null, 2))
   console.log(`Saved addresses to ${addressesPath}`)
 
-  const rootPath = path.join(__dirname, "..", "deployedAddresses.json")
+  const rootPath = path.join(__dirname, "..", "deployments", "deployedAddresses.json")
   const name = process.env.DEPLOYMENT_NAME || hre.network.name || "default"
   let root = []
   if (fs.existsSync(rootPath)) {

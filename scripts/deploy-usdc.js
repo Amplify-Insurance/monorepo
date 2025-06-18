@@ -156,11 +156,11 @@ async function main() {
 
   console.table(addresses);
 
-  const outPath = path.join(__dirname, "..", "usdc_deployedAddresses.json");
+  const outPath = path.join(__dirname, "..", "deployments", "usdc_deployedAddresses.json");
   fs.writeFileSync(outPath, JSON.stringify(addresses, null, 2));
   console.log(`Saved addresses to ${outPath}`);
 
-  const rootPath = path.join(__dirname, "..", "deployedAddresses.json");
+  const rootPath = path.join(__dirname, "..", "deployments", "deployedAddresses.json");
   const name = process.env.DEPLOYMENT_NAME || hre.network.name || "default";
   let root = [];
   if (fs.existsSync(rootPath)) {
