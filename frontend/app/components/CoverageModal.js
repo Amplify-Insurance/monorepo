@@ -14,6 +14,7 @@ import {
 import { getERC20WithSigner } from "../../lib/erc20"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import { getDeployment } from "../config/deployments"
+import useUsdPrice from "../../hooks/useUsdPrice"
 import Modal from "./Modal"
 import { Slider } from "../../components/ui/slider"
 import { formatPercentage } from "../utils/formatting"
@@ -76,7 +77,7 @@ export default function CoverageModal({
   /* Max amount depends on flow */
   const maxAmount =
     type === "purchase" ? Math.min(capacity, walletBalance) : walletBalance
-  const tokenPrice = 1 // TODO: oracle integration
+  const tokenPrice = useUsdPrice(token) || 0
 
   /* ───── Fetch wallet balance when providing cover ───── */
   useEffect(() => {
