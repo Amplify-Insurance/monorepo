@@ -37,8 +37,13 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const { isConnected } = useAccount()
   const { pools, loading } = usePools()
   const tokens = useTokenList(pools)
-  const adapters = useYieldAdapters()
   const [selectedToken, setSelectedToken] = useState(null)
+  const tokenDeploymentMap = Object.fromEntries(
+    pools.map((p) => [p.protocolTokenToCover.toLowerCase(), p.deployment]),
+  )
+  const selectedDeployment =
+    selectedToken && tokenDeploymentMap[selectedToken.address.toLowerCase()]
+  const adapters = useYieldAdapters(selectedDeployment)
   const [tokenDropdownOpen, setTokenDropdownOpen] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
