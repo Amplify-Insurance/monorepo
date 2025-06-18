@@ -11,6 +11,7 @@ import {
   getUnderlyingAssetDecimals,
 } from "../../lib/capitalPool";
 import { getERC20WithSigner } from "../../lib/erc20";
+import useUsdPrice from "../../hooks/useUsdPrice";
 import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
@@ -39,7 +40,7 @@ export default function ManageCoverageModal({
   const tokenName = getTokenName(token);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [usdValue, setUsdValue] = useState("0");
-  const tokenPrice = 1;
+  const tokenPrice = useUsdPrice(token) || 0;
   const maxAmount = type === "coverage" ? capacity : amount;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [extendWeeks, setExtendWeeks] = useState(1);
