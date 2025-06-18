@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IPolicyNFT.sol";
@@ -11,6 +12,7 @@ import "../interfaces/ICapitalPool.sol";
 import "../interfaces/ICatInsurancePool.sol";
 import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IPolicyManager.sol";
+import "../interfaces/IRewardDistributor.sol";
 
 /**
  * @title RiskManager
@@ -19,6 +21,7 @@ import "../interfaces/IPolicyManager.sol";
  * claim processing, and liquidations by coordinating with specialized satellite contracts.
  */
 contract RiskManager is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
 
     /* ───────────────────────── State Variables ───────────────────────── */
     ICapitalPool public capitalPool;
@@ -26,6 +29,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     IPolicyNFT public policyNFT;
     ICatInsurancePool public catPool;
     ILossDistributor public lossDistributor;
+    IRewardDistributor public rewardDistributor;
     address public policyManager;
     address public committee;
 
@@ -51,7 +55,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     error UnderwriterNotInsolvent();
     error ZeroAddressNotAllowed();
 
-    event AddressesSet(address capital, address registry, address policy, address cat, address loss);
+    event AddressesSet(address capital, address registry, address policy, address cat, address loss, address rewards);
     event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
     event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
@@ -61,13 +65,14 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
-    function setAddresses(address _capital, address _registry, address _policy, address _cat, address _loss) external onlyOwner {
+    function setAddresses(address _capital, address _registry, address _policy, address _cat, address _loss, address _rewards) external onlyOwner {
         require(
             _capital != address(0) &&
             _registry != address(0) &&
             _policy != address(0) &&
             _cat != address(0) &&
-            _loss != address(0),
+            _loss != address(0) &&
+            _rewards != address(0),
             "Zero address not allowed"
         );
         capitalPool = ICapitalPool(_capital);
@@ -76,7 +81,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
         policyNFT = IPolicyManager(_policy).policyNFT();
         catPool = ICatInsurancePool(_cat);
         lossDistributor = ILossDistributor(_loss);
-        emit AddressesSet(_capital, _registry, _policy, _cat, _loss);
+        rewardDistributor = IRewardDistributor(_rewards);
+        emit AddressesSet(_capital, _registry, _policy, _cat, _loss, _rewards);
     }
 
     function setCommittee(address _committee) external onlyOwner {
@@ -198,7 +204,14 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256 poolId = policy.poolId;
         uint256 coverage = policy.coverage;
         (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) = poolRegistry.getPoolPayoutData(poolId);
-        
+
+        (IERC20 protocolToken,, , , , ) = poolRegistry.getPoolData(poolId);
+        address claimant = policyNFT.ownerOf(_policyId);
+        if (coverage > 0) {
+            protocolToken.safeTransferFrom(claimant, address(rewardDistributor), coverage);
+            rewardDistributor.distribute(poolId, address(protocolToken), coverage, totalCapitalPledged);
+        }
+
         lossDistributor.distributeLoss(poolId, coverage, totalCapitalPledged);
         
         uint256 lossBorneByPool = Math.min(coverage, totalCapitalPledged);
