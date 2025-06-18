@@ -5,8 +5,10 @@ import { ethers } from "ethers"
 import Image from "next/image"
 import { AlertTriangle, Info, DollarSign, ChevronDown } from "lucide-react"
 import { getStakingWithSigner } from "../../lib/staking"
+import { getCommittee } from "../../lib/committee"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
+import useClaims from "../../hooks/useClaims"
 import {
   getProtocolName,
   getProtocolLogo,
@@ -20,6 +22,7 @@ import {
 
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
+  const { claims } = useClaims()
   const [selectedProtocol, setSelectedProtocol] = useState("")
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -27,6 +30,20 @@ export default function BondModal({ isOpen, onClose }) {
   const tokenAddress = process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS
   const [symbol, setSymbol] = useState("")
   const [decimals, setDecimals] = useState(18)
+  const [balance, setBalance] = useState("0")
+  const [assetSymbol, setAssetSymbol] = useState("")
+  const [feeShareBps, setFeeShareBps] = useState(0)
+
+  const handleAmountChange = (e) => {
+    const value = e.target.value
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      setAmount(value)
+    }
+  }
+
+  const handleSetMax = () => {
+    setAmount(balance)
+  }
 
 
   useEffect(() => {
@@ -39,28 +56,69 @@ export default function BondModal({ isOpen, onClose }) {
     async function loadTokenInfo() {
       if (!tokenAddress) return
       try {
+        const token = await getERC20WithSigner(tokenAddress)
+        const addr = await token.signer.getAddress()
+        const dec = await getTokenDecimals(tokenAddress)
+        const bal = await token.balanceOf(addr)
+        setBalance(ethers.utils.formatUnits(bal, dec))
         setSymbol(await getTokenSymbol(tokenAddress))
-        setDecimals(await getTokenDecimals(tokenAddress))
+        setDecimals(dec)
       } catch (err) {
         console.error('Failed to load staking token info', err)
       }
     }
+
+    async function loadFeeShare() {
+      try {
+        const c = getCommittee()
+        const bps = await c.proposerFeeShareBps()
+        setFeeShareBps(Number(bps.toString()))
+      } catch (err) {
+        console.error('Failed to load proposer fee share', err)
+      }
+    }
+
     if (isOpen) {
       loadTokenInfo()
+      loadFeeShare()
     }
   }, [isOpen, tokenAddress])
 
-  // Calculate max payout (2x bond amount)
   useEffect(() => {
-    if (amount && Number.parseFloat(amount) > 0) {
-      setMaxPayout((Number.parseFloat(amount) * 2).toFixed(4))
-    } else {
-      setMaxPayout("0")
-    }
-  }, [amount])
+    if (!selectedProtocol) return
+    const pool = pools.find((p) => String(p.id) === selectedProtocol)
+    if (!pool) return
+    getTokenSymbol(pool.protocolTokenToCover)
+      .then(setAssetSymbol)
+      .catch(() => setAssetSymbol(""))
+  }, [selectedProtocol, pools])
+
+  // Calculate max payout based on claim fees for the selected pool
+  useEffect(() => {
+    const pool = pools.find((p) => String(p.id) === selectedProtocol)
+    if (!pool) return setMaxPayout("0")
+
+    const dec = pool.underlyingAssetDecimals ?? 18
+    const totalFees = claims
+      .filter((c) => Number(c.poolId) === Number(selectedProtocol))
+      .reduce((sum, c) => {
+        try {
+          return (
+            sum +
+            Number(ethers.utils.formatUnits(c.claimFee, dec))
+          )
+        } catch {
+          return sum
+        }
+      }, 0)
+
+    const payout = (totalFees * feeShareBps) / 10000
+    setMaxPayout(payout.toFixed(4))
+  }, [selectedProtocol, claims, pools, feeShareBps])
 
   const handleSubmit = async () => {
     if (!amount || !selectedProtocol) return
+    if (Number(amount) < 1000) return
     const pool = pools.find((p) => String(p.id) === selectedProtocol)
     if (!pool) return
     setIsSubmitting(true)
@@ -102,18 +160,18 @@ export default function BondModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Staking Token (fixed asset) */}
+        {/* Asset being covered */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asset</label>
           <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700">
             <Image
-              src={getTokenLogo(tokenAddress) || "/placeholder.svg"}
-              alt={symbol}
+              src={getTokenLogo(pools.find((p) => String(p.id) === selectedProtocol)?.protocolTokenToCover) || "/placeholder.svg"}
+              alt={assetSymbol}
               width={24}
               height={24}
               className="rounded-full"
             />
-            <span className="text-sm font-medium text-gray-900 dark:text-white">{symbol}</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">{assetSymbol}</span>
           </div>
         </div>
 
@@ -147,21 +205,35 @@ export default function BondModal({ isOpen, onClose }) {
 
         {/* Bond Amount Input */}
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Bond Amount</label>
+          <div className="flex justify-between items-center">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Bond Amount</label>
+            <div className="text-xs text-gray-500 dark:text-gray-400">Balance: {Number.parseFloat(balance).toFixed(4)} {symbol}</div>
+          </div>
 
           <div className="relative">
             <div className="flex items-center justify-between p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20">
-              <input
-                type="text"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full bg-transparent text-2xl font-semibold text-gray-900 dark:text-white outline-none placeholder-gray-400"
-              />
-              <div className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {symbol || "TOKEN"}
-                </span>
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  placeholder="0.00"
+                  className="w-full bg-transparent text-2xl font-semibold text-gray-900 dark:text-white outline-none placeholder-gray-400"
+                />
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={handleSetMax}
+                  className="px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-md transition-colors"
+                >
+                  MAX
+                </button>
+                <div className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {symbol || "TOKEN"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -175,7 +247,7 @@ export default function BondModal({ isOpen, onClose }) {
               <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Max Payout</span>
             </div>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-              {maxPayout} {symbol || "TOKEN"}
+              {maxPayout} {assetSymbol}
             </span>
           </div>
         )}
@@ -197,7 +269,11 @@ export default function BondModal({ isOpen, onClose }) {
         {/* Action Button */}
         <button
           onClick={handleSubmit}
-          disabled={isSubmitting || !amount || Number.parseFloat(amount) <= 0}
+          disabled={
+            isSubmitting ||
+            !amount ||
+            Number.parseFloat(amount) < 1000
+          }
           className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
         >
           {isSubmitting ? (
