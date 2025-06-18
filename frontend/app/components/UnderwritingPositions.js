@@ -223,7 +223,6 @@ const underwritingPositions = (details || [])
     (sum, p) => sum + p.nativeValue,
     0
   );
-  console.log(totalDepositedUsd, "totalDepositedUsd")
 
   const totalUnderwrittenUsd = underwritingPositions.reduce((sum, p) => sum + p.usdValue, 0);
   const baseAdapter = adapters.find((a) => a.id === Number(details?.[0]?.yieldChoice));

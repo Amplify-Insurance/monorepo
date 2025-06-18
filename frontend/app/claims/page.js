@@ -8,7 +8,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatCurrency } from "../utils/formatting"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
-import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo, getProtocolName} from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
 import {
@@ -29,30 +29,51 @@ export default function ClaimsPage() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [claimInfoOpen, setClaimInfoOpen] = useState(false)
 
+
   const coverages = policies
-    .map((p) => {
-      const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
-      if (!pool) return null
-      const coverageAmount = Number(
-        ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals),
-      )
-      const activationTs = Number(p.activation || p.start)
-      return {
-        id: p.id,
-        protocol: getTokenName(pool.protocolTokenToCover),
-        pool: pool.protocolTokenToCover,
-        poolName: getTokenName(pool.protocolTokenToCover),
-        coverageAmount,
-        premium: Number(pool.premiumRateBps || 0) / 100,
-        startDate: new Date(activationTs * 1000).toISOString(),
-        endDate: new Date(Number(p.lastPaidUntil) * 1000).toISOString(),
-        isActive: Date.now() / 1000 >= activationTs,
-      }
-    })
-    .filter(Boolean)
+  .map((p) => {
+    // 1. Create a real BigNumber from the object, then get the number
+    const poolIdAsNumber = ethers.BigNumber.from(p.poolId).toNumber();
+    
+    // 2. Find the pool using the correct number
+    const pool = pools.find(
+      (pl) => Number(pl.id) === poolIdAsNumber
+    );
+
+    if (!pool) return null;
+
+    console.log(pool, "this is pool")
+
+    // 3. Do the same for all other BigNumber-like objects
+    const coverageAmount = Number(
+      ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
+    );
+    
+    // Use .from() and .toNumber() for these as well
+    const activationTs = ethers.BigNumber.from(p.activation || p.start).toNumber();
+    const lastPaidUntilTs = p.lastPaidUntil 
+      ? ethers.BigNumber.from(p.lastPaidUntil).toNumber() 
+      : 0;
+
+    return {
+      // The id is likely a plain number already, but if it's an object, convert it too
+      id: typeof p.id === 'object' ? ethers.BigNumber.from(p.id).toNumber() : p.id,
+      protocol: getProtocolName(pool.id),
+      pool: pool.protocolTokenToCover,
+      poolName: getTokenName(pool.protocolTokenToCover),
+      coverageAmount,
+      premium: Number(pool.premiumRateBps || 0) / 100,
+      startDate: new Date(activationTs * 1000).toISOString(),
+      endDate: new Date(lastPaidUntilTs * 1000).toISOString(),
+      isActive: Date.now() / 1000 >= activationTs,
+    };
+  })
+  .filter(Boolean);
 
   const activeCoverages = coverages.filter((c) => c.isActive)
   const pendingCoverages = coverages.filter((c) => !c.isActive)
+
+  console.log(pendingCoverages, "coverages")
 
   // Filter coverages based on search term
   const filteredCoverages = activeCoverages.filter(
@@ -161,7 +182,7 @@ export default function ClaimsPage() {
                       <div className="flex items-center mb-2">
                         <div className="flex-shrink-0 h-8 w-8 mr-3">
                           <Image
-                            src={getTokenLogo(coverage.protocol)}
+                            src={getTokenLogo(coverage.pool)}
                             alt={coverage.protocol}
                             width={32}
                             height={32}
@@ -203,7 +224,7 @@ export default function ClaimsPage() {
                       <div className="flex items-center mb-2">
                         <div className="flex-shrink-0 h-8 w-8 mr-3">
                           <Image
-                            src={getTokenLogo(coverage.protocol)}
+                            src={getTokenLogo(coverage.pool)}
                             alt={coverage.protocol}
                             width={32}
                             height={32}
@@ -285,7 +306,7 @@ export default function ClaimsPage() {
                         <div className="flex items-center mb-3">
                           <div className="flex-shrink-0 h-10 w-10 mr-3">
                             <Image
-                              src={getTokenLogo(selectedCoverage.protocol)}
+                              src={getTokenLogo(selectedCoverage.pool)}
                               alt={selectedCoverage.protocol}
                               width={40}
                               height={40}
