@@ -99,6 +99,15 @@ contract CompoundV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
         return liquid + suppliedValue;
     }
 
+    function emergencyTransfer(address _to, uint256 _amount) external onlyCapitalPool returns (uint256) {
+        uint256 bal = IERC20(address(comet)).balanceOf(address(this));
+        uint256 amt = _amount < bal ? _amount : bal;
+        if (amt > 0) {
+            IERC20(address(comet)).safeTransfer(_to, amt);
+        }
+        return amt;
+    }
+
     function currentApr() external view returns (uint256 aprWad) {
         ICometWithRates c = ICometWithRates(address(comet));
         uint256 util = c.getUtilization();
