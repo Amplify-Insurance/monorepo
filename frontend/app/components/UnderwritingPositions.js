@@ -209,12 +209,16 @@ const underwritingPositions = (details || [])
   );
   const totalDepositedUsd = (details || []).reduce((sum, d) => {
     const price = pools.find((p) => p.deployment === d.deployment)?.tokenPriceUsd ?? 1;
+    console.log(price, sum, d.totalDepositedAssetPrincipal, "price totalDepositedUsd")
+
     return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)) * price;
   }, 0);
   const totalUnderwritten = underwritingPositions.reduce(
     (sum, p) => sum + p.nativeValue,
     0
   );
+  console.log(totalDepositedUsd, "totalDepositedUsd")
+
   const totalUnderwrittenUsd = underwritingPositions.reduce((sum, p) => sum + p.usdValue, 0);
   const baseAdapter = adapters.find((a) => a.id === Number(details?.[0]?.yieldChoice));
   const baseYieldApr = baseAdapter?.apr || 0;
