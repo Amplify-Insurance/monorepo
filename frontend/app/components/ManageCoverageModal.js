@@ -14,7 +14,7 @@ import { getERC20WithSigner } from "../../lib/erc20";
 import useUsdPrice from "../../hooks/useUsdPrice";
 import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
-import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
+import { getTokenName, getTokenLogo, getProtocolLogo } from "../config/tokenNameMap";
 import { Slider } from "../../components/ui/slider";
 import { formatPercentage } from "../utils/formatting";
 import deployments, { getDeployment } from "../config/deployments";
@@ -38,6 +38,11 @@ export default function ManageCoverageModal({
 }) {
   const [action, setAction] = useState("increase"); // increase or decrease
   const tokenName = getTokenName(token);
+  const tokenLogoRaw = getTokenLogo(token);
+  const tokenLogo =
+    tokenLogoRaw === "/placeholder-logo.png"
+      ? getProtocolLogo(protocol)
+      : tokenLogoRaw;
   const [adjustAmount, setAdjustAmount] = useState("");
   const [usdValue, setUsdValue] = useState("0");
   const tokenPrice = useUsdPrice(token) || 0;
@@ -171,7 +176,7 @@ export default function ManageCoverageModal({
             <div className="flex items-center">
               <div className="h-8 w-8 mr-2">
                 <Image
-                  src={getTokenLogo(token)}
+                  src={tokenLogo}
                   alt={tokenName}
                   width={32}
                   height={32}
@@ -304,7 +309,7 @@ export default function ManageCoverageModal({
               <div className="flex items-center ml-2">
                 <div className="h-6 w-6 sm:h-8 sm:w-8 mr-2">
                   <Image
-                    src={getTokenLogo(token)}
+                    src={tokenLogo}
                     alt={tokenName}
                     width={32}
                     height={32}

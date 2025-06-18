@@ -10,6 +10,8 @@ import usePools from "../../hooks/usePools"
 import { ethers } from "ethers"
 import { getUnderlyingAssetDecimals } from "../../lib/capitalPool"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName} from "../config/tokenNameMap"
+import { getPoolManagerWithSigner } from "../../lib/poolManager"
+import deployments, { getDeployment } from "../config/deployments"
 
 
 export default function ActiveCoverages({ displayCurrency }) {
@@ -111,6 +113,20 @@ export default function ActiveCoverages({ displayCurrency }) {
   const handleOpenModal = (coverage) => {
     setSelectedCoverage(coverage)
     setModalOpen(true)
+  }
+
+  const handleCancelCoverage = async (coverage) => {
+    if (!coverage) return
+    if (!window.confirm('Cancel this coverage early?')) return
+    try {
+      const dep = getDeployment(coverage.deployment)
+      const pm = await getPoolManagerWithSigner(dep.poolManager)
+      const tx = await pm.cancelCover(coverage.id)
+      await tx.wait()
+      window.location.reload()
+    } catch (err) {
+      console.error('Failed to cancel coverage', err)
+    }
   }
 
   if (activeCoverages.length === 0) {
@@ -245,12 +261,18 @@ export default function ActiveCoverages({ displayCurrency }) {
                   {coverage.status}
                 </span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                 <button
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                   onClick={() => handleOpenModal(coverage)}
                 >
                   Manage
+                </button>
+                <button
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                  onClick={() => handleCancelCoverage(coverage)}
+                >
+                  Cancel
                 </button>
               </td>
             </tr>
