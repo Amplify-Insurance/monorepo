@@ -506,7 +506,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
           protocol={
             selectedMarkets.length > 1 ? "Multiple Protocols" : markets.find((m) => m.id === selectedMarkets[0])?.name
           }
-          token={selectedToken?.symbol || ''}
+          token={selectedToken?.address || ''}
           premium={0} // Not relevant for providing coverage
           yield={totalYield}
           yieldChoice={selectedYield}
@@ -515,13 +515,21 @@ export default function UnderwriterPanel({ displayCurrency }) {
             selectedMarkets.length > 0
               ? markets
                   .find((m) => m.id === selectedMarkets[0])
-                  ?.pools.find((p) => p.token === selectedToken?.symbol)
+                  ?.pools.find(
+                    (p) =>
+                      p.token.toLowerCase() ===
+                      selectedToken?.address?.toLowerCase(),
+                  )
                   ?.deployment
               : undefined
           }
           selectedMarkets={selectedMarkets.map((id) => {
             const market = markets.find((m) => m.id === id)
-            const pool = market?.pools.find((p) => p.token === selectedToken?.symbol)
+            const pool = market?.pools.find(
+              (p) =>
+                p.token.toLowerCase() ===
+                selectedToken?.address?.toLowerCase(),
+            )
             return {
               name: market?.name || "",
               yield: pool?.underwriterYield || 0,
