@@ -62,6 +62,7 @@ async function main() {
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
+  await policyNFT.setRiskManagerAddress(policyManager.target);
 
   const CatShare = await ethers.getContractFactory("CatShare");
   const catShare = await CatShare.deploy();
@@ -71,7 +72,8 @@ async function main() {
   const catPool = await CatInsurancePool.deploy(WETH_ADDRESS, catShare.target, ethers.ZeroAddress, deployer.address);
   await catPool.waitForDeployment();
 
-  await catShare.transferOwnership(catPool.target);
+  const transferTx = await catShare.transferOwnership(catPool.target);
+  await transferTx.wait();
   await catPool.initialize();
 
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
@@ -84,6 +86,7 @@ async function main() {
   await catPool.setCapitalPoolAddress(capitalPool.target);
   await catPool.setPolicyManagerAddress(policyManager.target);
   await catPool.setRewardDistributor(rewardDistributor.target);
+  await rewardDistributor.setCatPool(catPool.target);
 
   await policyManager.setAddresses(poolRegistry.target, capitalPool.target, catPool.target, rewardDistributor.target, riskManager.target);
   await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyManager.target, catPool.target, lossDistributor.target);
@@ -93,11 +96,13 @@ async function main() {
   const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
   const aaveAdapter = await AaveAdapter.deploy(WETH_ADDRESS, AAVE_POOL_ADDRESS, AAVE_AWETH_ADDRESS, deployer.address);
   await aaveAdapter.waitForDeployment();
+  await aaveAdapter.setCapitalPoolAddress(capitalPool.target);
 
   // 2. Compound v3 (Comet)
   const CompoundAdapter = await ethers.getContractFactory("CompoundV3Adapter");
   const compoundAdapter = await CompoundAdapter.deploy(COMPOUND_COMET_WETH, deployer.address);
   await compoundAdapter.waitForDeployment();
+  await compoundAdapter.setCapitalPoolAddress(capitalPool.target);
 
   // 3. Moonwell (Compound‑v2)
   const MoonwellAdapter = await ethers.getContractFactory("MoonwellAdapter");
