@@ -10,7 +10,8 @@
     "deploy:weth": "hardhat run scripts/deploy-weth.js --network base",
     "deploy:governance": "hardhat run scripts/deploy-governance.js --network base",
     "deploy:oracle": "hardhat run scripts/deploy-oracle.js --network base",
-    "deploy": "npm run deploy:usdc && npm run deploy:weth && npm run deploy:governance && npm run deploy:oracle"
+    "deploy": "npm run deploy:usdc && npm run deploy:weth && npm run deploy:governance && npm run deploy:oracle",
+    "configure:params": "hardhat run scripts/configure-parameters.js --network base"
   },
   "keywords": [],
   "author": "",
