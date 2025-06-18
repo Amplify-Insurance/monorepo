@@ -16,6 +16,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const { pools } = usePools();
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
+  const [selectedDeployment, setSelectedDeployment] = useState(deployment);
 
   const YIELD_TO_PROTOCOL_MAP = {
     [YieldPlatform.AAVE]: 0,
@@ -24,13 +25,13 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
 
   const baseProtocolId = (() => {
     const d = Array.isArray(details)
-      ? details.find((dt) => dt.deployment === deployment)
+      ? details.find((dt) => dt.deployment === selectedDeployment)
       : details;
     return d ? YIELD_TO_PROTOCOL_MAP[d.yieldChoice] : undefined;
   })();
 
   const poolsForDeployment = pools
-    .filter((p) => p.deployment === deployment)
+    .filter((p) => p.deployment === selectedDeployment)
     .filter((p) =>
       baseProtocolId === undefined ? true : Number(p.id) !== baseProtocolId
     );
@@ -41,7 +42,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   useEffect(() => {
     if (details) {
       const d = Array.isArray(details)
-        ? details.find((dt) => dt.deployment === deployment)
+        ? details.find((dt) => dt.deployment === selectedDeployment)
         : details;
       const baseId = d ? YIELD_TO_PROTOCOL_MAP[d.yieldChoice] : undefined;
       if (d?.allocatedPoolIds) {
@@ -50,9 +51,12 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
         );
         setSelectedPools(filtered);
         setInitialPools(filtered);
+      } else {
+        setSelectedPools([]);
+        setInitialPools([]);
       }
     }
-  }, [details, deployment]);
+  }, [details, selectedDeployment]);
 
   const togglePool = (id) => {
     setSelectedPools((prev) =>
@@ -63,7 +67,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const dep = getDeployment(deployment);
+      const dep = getDeployment(selectedDeployment);
       const rm = await getRiskManagerWithSigner(dep.riskManager);
       const toAllocate = selectedPools.filter((p) => !initialPools.includes(p));
       const toDeallocate = initialPools.filter((p) => !selectedPools.includes(p));
@@ -86,8 +90,32 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
     }
   };
 
+  const availableDeployments = Array.isArray(details)
+    ? details.map((d) => d.deployment)
+    : deployment
+    ? [deployment]
+    : [];
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Manage Protocol Allocation">
+      {availableDeployments.length > 1 && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Asset
+          </label>
+          <select
+            className="mt-1 block w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700"
+            value={selectedDeployment}
+            onChange={(e) => setSelectedDeployment(e.target.value)}
+          >
+            {availableDeployments.map((dep) => (
+              <option key={dep} value={dep}>
+                {dep.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="space-y-4">
         {poolsForDeployment.map((pool) => {
           const yieldRate = Number(pool.underwriterYieldBps || 0) / 100;
