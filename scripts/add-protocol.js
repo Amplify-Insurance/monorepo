@@ -7,7 +7,7 @@
  * 'default' or 'eth'.
  */
 
-const CONTRACT_SET = process.env.CONTRACTS || 'default';
+const CONTRACT_SET ='usdc';
 
 // Example rate model used for all new pools
 const RATE_MODEL = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
