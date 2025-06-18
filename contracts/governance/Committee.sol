@@ -21,8 +21,12 @@ contract Committee is Ownable, ReentrancyGuard {
     uint256 public votingPeriod;
     uint256 public challengePeriod; // e.g., 7 days
     uint256 public quorumBps;
-    uint256 public proposalBondAmount; // Amount of governance tokens for a pause proposal
-    uint256 public proposerFeeShareBps; // Share of fees going to the proposer (e.g., 1000 = 10%)
+    uint256 public minBondAmount = 1000 ether;
+    uint256 public maxBondAmount = 2500 ether;
+    uint256 public minProposerFeeBps = 1000; // 10%
+    uint256 public maxProposerFeeBps = 2500; // 25%
+
+    uint256 public slashPercentageBps;
 
     enum ProposalType { Unpause, Pause }
     enum VoteOption { None, Against, For } // Added None for default
@@ -40,6 +44,7 @@ contract Committee is Ownable, ReentrancyGuard {
         bool executed;
         ProposalStatus status;
         uint256 bondAmount;
+        uint256 proposerFeeShareBps;
         uint256 challengeDeadline;
         uint256 totalRewardFees;
         mapping(address => VoteOption) votes;
@@ -49,6 +54,7 @@ contract Committee is Ownable, ReentrancyGuard {
 
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public hasClaimedReward;
+    mapping(uint256 => bool) public activeProposalForPool;
     
     event ProposalCreated(uint256 indexed proposalId, address indexed proposer, uint256 poolId, ProposalType pType);
     event Voted(uint256 indexed proposalId, address indexed voter, VoteOption vote, uint256 weight);
@@ -71,8 +77,7 @@ contract Committee is Ownable, ReentrancyGuard {
         uint256 _votingPeriod,
         uint256 _challengePeriod,
         uint256 _quorumBps,
-        uint256 _proposalBond,
-        uint256 _proposerFeeShare
+        uint256 _slashPercentageBps
     ) Ownable(msg.sender) {
         riskManager = IRiskManager(_riskManagerAddress);
         stakingContract = IStakingContract(_stakingContractAddress);
@@ -80,14 +85,32 @@ contract Committee is Ownable, ReentrancyGuard {
         votingPeriod = _votingPeriod;
         challengePeriod = _challengePeriod;
         quorumBps = _quorumBps;
-        proposalBondAmount = _proposalBond;
-        proposerFeeShareBps = _proposerFeeShare;
+        require(_slashPercentageBps <= 10000, "Invalid slash bps");
+        slashPercentageBps = _slashPercentageBps;
+    }
+
+    /* ───────────────────── Admin Functions ───────────────────── */
+
+    function setBondParameters(
+        uint256 _minBondAmount,
+        uint256 _maxBondAmount,
+        uint256 _minProposerFeeBps,
+        uint256 _maxProposerFeeBps
+    ) external onlyOwner {
+        require(_minBondAmount <= _maxBondAmount, "Invalid bond range");
+        require(_maxProposerFeeBps <= 10000, "Invalid fee bps");
+        require(_minProposerFeeBps <= _maxProposerFeeBps, "Invalid fee range");
+        minBondAmount = _minBondAmount;
+        maxBondAmount = _maxBondAmount;
+        minProposerFeeBps = _minProposerFeeBps;
+        maxProposerFeeBps = _maxProposerFeeBps;
     }
 
     /* ─────────────────── Governance Core Functions ─────────────────── */
 
-    function createProposal(uint256 _poolId, ProposalType _pType) external returns (uint256) {
+    function createProposal(uint256 _poolId, ProposalType _pType, uint256 _bondAmount) external returns (uint256) {
         require(stakingContract.stakedBalance(msg.sender) > 0, "Must be a staker");
+        require(!activeProposalForPool[_poolId], "Proposal already exists");
 
         uint256 proposalId = ++proposalCounter;
         Proposal storage p = proposals[proposalId];
@@ -99,10 +122,16 @@ contract Committee is Ownable, ReentrancyGuard {
         p.creationTime = block.timestamp;
         p.votingDeadline = block.timestamp + votingPeriod;
         p.status = ProposalStatus.Active;
+        activeProposalForPool[_poolId] = true;
 
         if (_pType == ProposalType.Pause) {
-            p.bondAmount = proposalBondAmount;
-            governanceToken.transferFrom(msg.sender, address(this), proposalBondAmount);
+            require(_bondAmount >= minBondAmount && _bondAmount <= maxBondAmount, "Invalid bond");
+            p.bondAmount = _bondAmount;
+            p.proposerFeeShareBps = _calculateFeeShare(_bondAmount);
+            governanceToken.transferFrom(msg.sender, address(this), _bondAmount);
+        } else {
+            require(_bondAmount == 0, "No bond for unpause");
+            p.proposerFeeShareBps = 0;
         }
 
         emit ProposalCreated(proposalId, msg.sender, _poolId, _pType);
@@ -141,8 +170,13 @@ contract Committee is Ownable, ReentrancyGuard {
         
         if (p.forVotes + p.againstVotes < requiredQuorum || p.forVotes <= p.againstVotes) {
             p.status = ProposalStatus.Defeated;
+            activeProposalForPool[p.poolId] = false;
             if (p.pType == ProposalType.Pause) {
-                governanceToken.transfer(p.proposer, p.bondAmount);
+                uint256 slashAmount = (p.bondAmount * slashPercentageBps) / 10000;
+                uint256 refund = p.bondAmount - slashAmount;
+                if (refund > 0) {
+                    governanceToken.transfer(p.proposer, refund);
+                }
             }
             return;
         }
@@ -158,6 +192,7 @@ contract Committee is Ownable, ReentrancyGuard {
         } else { // Unpause
             riskManager.reportIncident(p.poolId, false);
             p.status = ProposalStatus.Executed;
+            activeProposalForPool[p.poolId] = false;
         }
         
         emit ProposalExecuted(_proposalId);
@@ -170,12 +205,13 @@ contract Committee is Ownable, ReentrancyGuard {
         require(block.timestamp >= p.challengeDeadline, "Challenge period not over");
 
         p.status = ProposalStatus.Resolved;
-        
+        activeProposalForPool[p.poolId] = false;
+
         if (p.totalRewardFees > 0) {
             governanceToken.transfer(p.proposer, p.bondAmount);
             emit BondResolved(_proposalId, false);
         } else {
-            stakingContract.slash(p.proposer, p.bondAmount);
+            // entire bond is slashed and kept in the contract
             emit BondResolved(_proposalId, true);
         }
     }
@@ -198,7 +234,7 @@ contract Committee is Ownable, ReentrancyGuard {
         uint256 totalFees = p.totalRewardFees;
 
         if (msg.sender == p.proposer) {
-            uint256 proposerBonus = (totalFees * proposerFeeShareBps) / 10000;
+            uint256 proposerBonus = (totalFees * p.proposerFeeShareBps) / 10000;
             userReward += proposerBonus;
         }
         
@@ -210,5 +246,17 @@ contract Committee is Ownable, ReentrancyGuard {
         payable(msg.sender).sendValue(userReward);
         
         emit RewardClaimed(_proposalId, msg.sender, userReward);
+    }
+
+    function _calculateFeeShare(uint256 _bondAmount) internal view returns (uint256) {
+        if (_bondAmount <= minBondAmount) {
+            return minProposerFeeBps;
+        }
+        if (_bondAmount >= maxBondAmount) {
+            return maxProposerFeeBps;
+        }
+        uint256 span = maxBondAmount - minBondAmount;
+        uint256 bpsSpan = maxProposerFeeBps - minProposerFeeBps;
+        return minProposerFeeBps + ((_bondAmount - minBondAmount) * bpsSpan) / span;
     }
 }
