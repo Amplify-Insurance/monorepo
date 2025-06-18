@@ -18,21 +18,21 @@ export async function GET(req: Request) {
     const multicall = getMulticallReader(dep.multicallReader, dep.name)
 
     const calls = [
-      { target: dep.poolManager, callData: pm.interface.encodeFunctionData('COVER_COOLDOWN_PERIOD') },
+      { target: dep.poolManager, callData: pm.interface.encodeFunctionData('coverCooldownPeriod') },
       { target: dep.riskManager, callData: rm.interface.encodeFunctionData('CLAIM_FEE_BPS') },
-      { target: dep.capitalPool, callData: cp.interface.encodeFunctionData('UNDERWRITER_NOTICE_PERIOD') },
+      { target: dep.capitalPool, callData: cp.interface.encodeFunctionData('underwriterNoticePeriod') },
     ]
 
     const res = await multicall.tryAggregate(false, calls)
 
     const cooldown = res[0].success
-      ? pm.interface.decodeFunctionResult('COVER_COOLDOWN_PERIOD', res[0].returnData)[0]
+      ? pm.interface.decodeFunctionResult('coverCooldownPeriod', res[0].returnData)[0]
       : 0n
     const claimFee = res[1].success
       ? rm.interface.decodeFunctionResult('CLAIM_FEE_BPS', res[1].returnData)[0]
       : 0n
     const notice = res[2].success
-      ? cp.interface.decodeFunctionResult('UNDERWRITER_NOTICE_PERIOD', res[2].returnData)[0]
+      ? cp.interface.decodeFunctionResult('underwriterNoticePeriod', res[2].returnData)[0]
       : 0n
     return NextResponse.json({
       coverCooldownPeriod: cooldown.toString(),

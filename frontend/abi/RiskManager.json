@@ -253,7 +253,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "MAX_ALLOCATIONS_PER_UNDERWRITER",
+                "name": "maxAllocationsPerUnderwriter",
 		"outputs": [
 			{
 				"internalType": "uint256",

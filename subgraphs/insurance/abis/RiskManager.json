@@ -428,7 +428,7 @@
   },
   {
     "inputs": [],
-    "name": "COVER_COOLDOWN_PERIOD",
+  "name": "coverCooldownPeriod",
     "outputs": [
       {
         "internalType": "uint256",
@@ -441,7 +441,7 @@
   },
   {
     "inputs": [],
-    "name": "MAX_ALLOCATIONS_PER_UNDERWRITER",
+  "name": "maxAllocationsPerUnderwriter",
     "outputs": [
       {
         "internalType": "uint256",

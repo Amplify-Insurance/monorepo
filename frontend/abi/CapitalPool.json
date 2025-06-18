@@ -356,7 +356,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "UNDERWRITER_NOTICE_PERIOD",
+                "name": "underwriterNoticePeriod",
 		"outputs": [
 			{
 				"internalType": "uint256",

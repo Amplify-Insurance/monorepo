@@ -226,7 +226,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "COVER_COOLDOWN_PERIOD",
+                "name": "coverCooldownPeriod",
 		"outputs": [
 			{
 				"internalType": "uint256",

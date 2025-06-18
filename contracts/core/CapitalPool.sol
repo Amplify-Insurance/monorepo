@@ -22,7 +22,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────────── Constants ───────────────────────── */
     uint256 public constant BPS = 10_000;
-    uint256 public constant UNDERWRITER_NOTICE_PERIOD = 0 days;
+    uint256 public underwriterNoticePeriod = 0;
     uint256 private constant INITIAL_SHARES_LOCKED = 1000;
 
     /* ───────────────────────── State Variables ───────────────────────── */
@@ -86,6 +86,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     event LossesApplied(address indexed underwriter, uint256 principalLossAmount, bool wipedOut);
     event SystemValueSynced(uint256 newTotalSystemValue, uint256 oldTotalSystemValue);
     event AdapterCallFailed(address indexed adapterAddress, string functionCalled, string reason);
+    event UnderwriterNoticePeriodSet(uint256 newPeriod);
 
 
     /* ───────────────────── Constructor ─────────────────────────── */
@@ -101,6 +102,11 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (_riskManager == address(0)) revert ZeroAddress();
         riskManager = _riskManager;
         emit RiskManagerSet(_riskManager);
+    }
+
+    function setUnderwriterNoticePeriod(uint256 _newPeriod) external onlyOwner {
+        underwriterNoticePeriod = _newPeriod;
+        emit UnderwriterNoticePeriodSet(_newPeriod);
     }
 
     function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external onlyOwner {
@@ -168,7 +174,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
         uint256 sharesToBurn = account.withdrawalRequestShares;
         if (sharesToBurn == 0) revert NoWithdrawalRequest();
-        if (block.timestamp < account.withdrawalRequestTimestamp + UNDERWRITER_NOTICE_PERIOD) revert NoticePeriodActive();
+        if (block.timestamp < account.withdrawalRequestTimestamp + underwriterNoticePeriod) revert NoticePeriodActive();
         if (sharesToBurn > account.masterShares) revert InconsistentState();
         uint256 amountToReceiveBasedOnNAV = sharesToValue(sharesToBurn);
         uint256 assetsActuallyWithdrawn = 0;
