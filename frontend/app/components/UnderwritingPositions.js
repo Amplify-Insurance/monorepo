@@ -307,14 +307,6 @@ const underwritingPositions = (details || [])
             </div>
           </div>
         </div>
-        <div className="mt-4 text-right">
-          <button
-            onClick={() => setShowAllocModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-          >
-            Edit Allocation
-          </button>
-        </div>
       </div>
 
       {activePositions.length > 0 && (
@@ -619,6 +611,12 @@ const underwritingPositions = (details || [])
         </div>
       )}
       <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => setShowAllocModal(true)}
+          className="mr-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+        >
+          Edit Allocation
+        </button>
         <button
           onClick={handleClaimAllRewards}
           disabled={isClaimingAll}
