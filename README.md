@@ -160,12 +160,33 @@ include:
 - `GET /api/pools` – number of pools
 - `GET /api/pools/list` – detailed info for all pools
 - `GET /api/pools/[id]` – info and underwriters for a specific pool
+- `GET /api/pools/[id]/history` – utilisation snapshots for a pool
 - `GET /api/underwriters/[address]` – account details for an underwriter
 - `GET /api/adapters` – active yield adapter addresses
 - `GET /api/underwriters/[address]/allocated/[poolId]` – check an underwriter's pool allocation
+- `GET /api/underwriters/[address]/losses/[poolId]` – pending losses for a pool
 - `GET /api/catpool/liquidusdc` – CatInsurancePool liquid USDC value
+- `GET /api/catpool/apr` – CatInsurancePool adapter APR
+- `GET /api/catpool/user/[address]` – CatInsurancePool account details
 - `GET /api/catpool/rewards/[address]/[token]` – claimable distressed asset rewards
+- `GET /api/analytics` – protocol usage metrics
+- `GET /api/claims` – list of processed claims
+- `GET /api/prices/[token]` – latest token price
+- `GET /api/reserve-config` – protocol configuration values
+- `GET /api/staking/user/[address]` – staking info for an address
 - `GET /api/policies/[id]` – fetch details for a Policy NFT
+- `GET /api/policies/user/[address]` – Policy NFTs owned by an address
+
+State‑changing routes use **POST** requests:
+- `POST /api/catpool/deposit` – add USDC liquidity to the catastrophe pool
+- `POST /api/catpool/withdraw` – withdraw USDC from the catastrophe pool
+- `POST /api/catpool/claim` – claim protocol asset rewards
+- `POST /api/coverpool/deposit` – underwriter deposit and allocation
+- `POST /api/coverpool/request-withdrawal` – initiate a capital withdrawal
+- `POST /api/coverpool/execute-withdrawal` – finalise a pending withdrawal
+- `POST /api/coverpool/purchase` – purchase cover from a pool
+- `POST /api/coverpool/claim` – process a claim
+- `POST /api/coverpool/settle` – settle outstanding premiums
 
 ### Multiple Deployments
 
