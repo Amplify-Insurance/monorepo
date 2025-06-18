@@ -41,7 +41,10 @@ const underwritingPositions = (details || [])
       if (!pool) return null;
       const protocol = getTokenName(pool.id);
       const amount = Number(
-        ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)
+        ethers.utils.formatUnits(
+          d.totalDepositedAssetPrincipal,
+          pool.underlyingAssetDecimals ?? 6,
+        )
       );
       const pendingLossStr = d.pendingLosses?.[pid] ?? '0';
       const pendingLoss = Number(
@@ -203,15 +206,18 @@ const underwritingPositions = (details || [])
   );
   const averageYield = totalValue > 0 ? weightedYield / totalValue : 0;
 
-  const totalDeposited = (details || []).reduce(
-    (sum, d) => sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)),
-    0
-  );
+  const totalDeposited = (details || []).reduce((sum, d) => {
+    const dec =
+      pools.find((p) => p.deployment === d.deployment)?.underlyingAssetDecimals ?? 6;
+    return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, dec));
+  }, 0);
   const totalDepositedUsd = (details || []).reduce((sum, d) => {
-    const price = pools.find((p) => p.deployment === d.deployment)?.tokenPriceUsd ?? 1;
-    console.log(price, sum, d.totalDepositedAssetPrincipal, "price totalDepositedUsd")
+    const pool = pools.find((p) => p.deployment === d.deployment);
+    const price = pool?.tokenPriceUsd ?? 1;
+    const dec = pool?.underlyingAssetDecimals ?? 6;
+    console.log(price, sum, d.totalDepositedAssetPrincipal, "price totalDepositedUsd");
 
-    return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, 6)) * price;
+    return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, dec)) * price;
   }, 0);
   const totalUnderwritten = underwritingPositions.reduce(
     (sum, p) => sum + p.nativeValue,
