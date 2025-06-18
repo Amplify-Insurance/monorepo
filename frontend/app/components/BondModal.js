@@ -8,6 +8,7 @@ import { getStakingWithSigner } from "../../lib/staking"
 import { getCommittee } from "../../lib/committee"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
+import useTokenList from "../../hooks/useTokenList"
 import useClaims from "../../hooks/useClaims"
 import {
   getProtocolName,
@@ -23,6 +24,8 @@ import {
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
   const { claims } = useClaims()
+  const tokens = useTokenList(pools)
+  const [selectedAsset, setSelectedAsset] = useState("")
   const [selectedProtocol, setSelectedProtocol] = useState("")
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -47,10 +50,24 @@ export default function BondModal({ isOpen, onClose }) {
 
 
   useEffect(() => {
-    if (!selectedProtocol && pools && pools.length > 0) {
-      setSelectedProtocol(String(pools[0].id))
+    if (!selectedAsset && tokens && tokens.length > 0) {
+      setSelectedAsset(tokens[0].address)
     }
-  }, [pools, selectedProtocol])
+  }, [tokens, selectedAsset])
+
+  useEffect(() => {
+    if (!selectedAsset) return
+    const first = pools.find((p) => p.protocolTokenToCover === selectedAsset)
+    if (first) setSelectedProtocol(String(first.id))
+    else setSelectedProtocol("")
+  }, [selectedAsset, pools])
+
+  useEffect(() => {
+    if (!selectedProtocol && pools && pools.length > 0) {
+      const first = pools.find((p) => p.protocolTokenToCover === selectedAsset)
+      if (first) setSelectedProtocol(String(first.id))
+    }
+  }, [pools, selectedProtocol, selectedAsset])
 
   useEffect(() => {
     async function loadTokenInfo() {
@@ -85,13 +102,11 @@ export default function BondModal({ isOpen, onClose }) {
   }, [isOpen, tokenAddress])
 
   useEffect(() => {
-    if (!selectedProtocol) return
-    const pool = pools.find((p) => String(p.id) === selectedProtocol)
-    if (!pool) return
-    getTokenSymbol(pool.protocolTokenToCover)
+    if (!selectedAsset) return
+    getTokenSymbol(selectedAsset)
       .then(setAssetSymbol)
       .catch(() => setAssetSymbol(""))
-  }, [selectedProtocol, pools])
+  }, [selectedAsset])
 
   // Calculate max payout based on claim fees for the selected pool
   useEffect(() => {
@@ -163,15 +178,28 @@ export default function BondModal({ isOpen, onClose }) {
         {/* Asset being covered */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asset</label>
-          <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700">
-            <Image
-              src={getTokenLogo(pools.find((p) => String(p.id) === selectedProtocol)?.protocolTokenToCover) || "/placeholder.svg"}
-              alt={assetSymbol}
-              width={24}
-              height={24}
-              className="rounded-full"
-            />
-            <span className="text-sm font-medium text-gray-900 dark:text-white">{assetSymbol}</span>
+          <div className="relative">
+            <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer">
+              <Image
+                src={getTokenLogo(selectedAsset) || "/placeholder.svg"}
+                alt={assetSymbol}
+                width={24}
+                height={24}
+                className="rounded-full"
+              />
+              <select
+                className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none cursor-pointer appearance-none"
+                value={selectedAsset}
+                onChange={(e) => setSelectedAsset(e.target.value)}
+              >
+                {tokens.map((t) => (
+                  <option key={t.address} value={t.address}>
+                    {t.symbol}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            </div>
           </div>
         </div>
 
@@ -192,11 +220,13 @@ export default function BondModal({ isOpen, onClose }) {
                 value={selectedProtocol}
                 onChange={(e) => setSelectedProtocol(e.target.value)}
               >
-                {pools.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {getProtocolName(p.id)}
-                  </option>
-                ))}
+                {pools
+                  .filter((p) => p.protocolTokenToCover === selectedAsset)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {getProtocolName(p.id)}
+                    </option>
+                  ))}
               </select>
               <ChevronDown className="w-5 h-5 text-gray-400" />
             </div>
