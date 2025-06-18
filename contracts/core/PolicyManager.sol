@@ -26,7 +26,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     /* ───────────────────────── Constants ───────────────────────── */
     uint256 public constant BPS = 10_000;
     uint256 public constant SECS_YEAR = 365 days;
-    uint256 public constant COVER_COOLDOWN_PERIOD = 5 days;
+    uint256 public coverCooldownPeriod = 5 days;
 
     /* ───────────────────────── State Variables ───────────────────────── */
     IPoolRegistry public poolRegistry;
@@ -56,6 +56,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     event AddressesSet(address indexed registry, address indexed capital, address indexed rewards, address rm);
     event CatPremiumShareSet(uint256 newBps);
     event CatPoolSet(address indexed newCatPool);
+    event CoverCooldownPeriodSet(uint256 newPeriod);
 
     /* ───────────────────────── Constructor ───────────────────────── */
     constructor(address _policyNFT, address _initialOwner) Ownable(_initialOwner) {
@@ -78,6 +79,11 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         require(_newBps <= 5000, "PM: Max share is 50%");
         catPremiumBps = _newBps;
         emit CatPremiumShareSet(_newBps);
+    }
+
+    function setCoverCooldownPeriod(uint256 _newPeriod) external onlyOwner {
+        coverCooldownPeriod = _newPeriod;
+        emit CoverCooldownPeriodSet(_newPeriod);
     }
 
     /* ───────────────────── Policy Management Functions ───────────────────── */
@@ -103,7 +109,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
         capitalPool.underlyingAsset().safeTransferFrom(msg.sender, address(this), _initialPremiumDeposit);
 
-        uint256 activationTimestamp = block.timestamp + COVER_COOLDOWN_PERIOD;
+        uint256 activationTimestamp = block.timestamp + coverCooldownPeriod;
         policyId = policyNFT.mint(
             msg.sender, _poolId, _coverageAmount, activationTimestamp,
             uint128(_initialPremiumDeposit), uint128(activationTimestamp)

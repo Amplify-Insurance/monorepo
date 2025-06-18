@@ -17,9 +17,9 @@ export default function useReserveConfig(deployment) {
         const cp = getCapitalPool(dep.capitalPool, dep.name)
         const pm = getPoolManager(dep.poolManager, dep.name)
         const [cooldown, claimFee, notice] = await Promise.all([
-          pm.COVER_COOLDOWN_PERIOD(),
+          pm.coverCooldownPeriod(),
           rm.CLAIM_FEE_BPS(),
-          cp.UNDERWRITER_NOTICE_PERIOD(),
+          cp.underwriterNoticePeriod(),
         ])
         setConfig({
           coverCooldownPeriod: Number(cooldown.toString()),

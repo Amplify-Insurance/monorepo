@@ -43,16 +43,8 @@ describe("CapitalPool", function () {
 
         // --- Deploy CapitalPool ---
         CapitalPoolFactory = await ethers.getContractFactory("CapitalPool");
-
-        // We override the contract's constant for testing purposes by deploying a modified version
-        const originalBytecode = CapitalPoolFactory.bytecode;
-        const noticePeriodHex = ethers.toBeHex(NOTICE_PERIOD, 32);
-        const modifiedBytecode = originalBytecode.replace(
-            "0000000000000000000000000000000000000000000000000000000000000000", // Placeholder for 0 days
-            noticePeriodHex.slice(2)
-        );
-        const CapitalPoolModifiedFactory = new ethers.ContractFactory(CapitalPoolFactory.interface, modifiedBytecode, owner);
-        capitalPool = await CapitalPoolModifiedFactory.deploy(owner.address, mockUsdc.target);
+        capitalPool = await CapitalPoolFactory.deploy(owner.address, mockUsdc.target);
+        await capitalPool.setUnderwriterNoticePeriod(NOTICE_PERIOD);
 
         // --- Initial Setup ---
         await mockUsdc.transfer(user1.address, ethers.parseUnits("10000", 6));

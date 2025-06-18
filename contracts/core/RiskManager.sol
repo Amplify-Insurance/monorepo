@@ -39,7 +39,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
     mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
     
-    uint256 public constant MAX_ALLOCATIONS_PER_UNDERWRITER = 5;
+    uint256 public maxAllocationsPerUnderwriter = 5;
     uint256 public constant CLAIM_FEE_BPS = 500;
     uint256 public constant BPS = 10_000;
 
@@ -60,6 +60,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
     event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
     event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
+    event MaxAllocationsPerUnderwriterSet(uint256 newMax);
 
     /* ───────────────────── Constructor & Setup ───────────────────── */
 
@@ -91,6 +92,12 @@ contract RiskManager is Ownable, ReentrancyGuard {
         emit CommitteeSet(_committee);
     }
 
+    function setMaxAllocationsPerUnderwriter(uint256 _newMax) external onlyOwner {
+        require(_newMax > 0, "Invalid max");
+        maxAllocationsPerUnderwriter = _newMax;
+        emit MaxAllocationsPerUnderwriterSet(_newMax);
+    }
+
     /**
      * @notice Wrapper for PoolRegistry.addProtocolRiskPool restricted to the owner.
      * @dev Enables governance to create new pools through the RiskManager.
@@ -108,7 +115,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     function allocateCapital(uint256[] calldata _poolIds) external nonReentrant {
         uint256 totalPledge = underwriterTotalPledge[msg.sender];
         if (totalPledge == 0) revert NoCapitalToAllocate();
-        require(_poolIds.length > 0 && _poolIds.length <= MAX_ALLOCATIONS_PER_UNDERWRITER, "Invalid number of allocations");
+        require(_poolIds.length > 0 && _poolIds.length <= maxAllocationsPerUnderwriter, "Invalid number of allocations");
 
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(msg.sender);
         require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
