@@ -168,6 +168,7 @@ export default function Dashboard() {
                         <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Voting Power</th>
                         <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Manage</th>
                         <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rewards</th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Claim Rewards</th>
                         {activeProposals.length > 0 && (
                           <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                         )}
@@ -197,18 +198,16 @@ export default function Dashboard() {
                           </Link>
                         </td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={handleClaimGovRewards}
-                              disabled={isClaimingRewards}
-                              className="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
-                            >
-                              {isClaimingRewards ? 'Claiming...' : 'Claim'}
-                            </button>
-                            <span className="text-sm text-gray-600 dark:text-gray-300">
-                              {pastProposals.length}
-                            </span>
-                          </div>
+                          {pastProposals.length}
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={handleClaimGovRewards}
+                            disabled={isClaimingRewards}
+                            className="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-50"
+                          >
+                            {isClaimingRewards ? 'Claiming...' : 'Claim'}
+                          </button>
                         </td>
                         {activeProposals.length > 0 && (
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap">Open Proposals</td>
