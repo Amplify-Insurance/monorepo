@@ -1,25 +1,30 @@
 {
-    "name": "coverpool",
-    "version": "1.0.0",
-    "description": "",
-    "main": "index.js",
-    "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "slither": "hardhat slither"
-    },
-    "keywords": [],
-    "author": "",
-    "license": "BUSL-1.1",
-    "devDependencies": {
-        "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-        "dotenv": "^16.5.0",
-        "hardhat": "^2.24.1",
-        "hardhat-slither": "^1.0.4",
-        "solc": "^0.8.20"
-    },
-    "dependencies": {
-        "@chainlink/contracts": "^0.6.1",
-        "@openzeppelin/contracts": "^5.3.0",
-        "ethers": "^6.14.3"
-    }
+  "name": "coverpool",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "slither": "hardhat slither",
+    "deploy:usdc": "hardhat run scripts/deploy-usdc.js --network base",
+    "deploy:weth": "hardhat run scripts/deploy-weth.js --network base",
+    "deploy:governance": "hardhat run scripts/deploy-governance.js --network base",
+    "deploy:oracle": "hardhat run scripts/deploy-oracle.js --network base",
+    "deploy": "npm run deploy:usdc && npm run deploy:weth && npm run deploy:governance && npm run deploy:oracle"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "BUSL-1.1",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.5.0",
+    "hardhat": "^2.24.1",
+    "hardhat-slither": "^1.0.4",
+    "solc": "^0.8.20"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^0.6.1",
+    "@openzeppelin/contracts": "^5.3.0",
+    "ethers": "^6.14.3"
+  }
 }
