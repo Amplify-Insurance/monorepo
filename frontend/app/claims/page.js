@@ -29,7 +29,7 @@ export default function ClaimsPage() {
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [claimInfoOpen, setClaimInfoOpen] = useState(false)
 
-  const activeCoverages = policies
+  const coverages = policies
     .map((p) => {
       const pool = pools.find((pl) => Number(pl.id) === Number(p.poolId))
       if (!pool) return null
@@ -51,8 +51,17 @@ export default function ClaimsPage() {
     })
     .filter(Boolean)
 
+  const activeCoverages = coverages.filter((c) => c.isActive)
+  const pendingCoverages = coverages.filter((c) => !c.isActive)
+
   // Filter coverages based on search term
   const filteredCoverages = activeCoverages.filter(
+    (coverage) =>
+      coverage.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      coverage.pool.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  const filteredPendingCoverages = pendingCoverages.filter(
     (coverage) =>
       coverage.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
       coverage.pool.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -119,7 +128,7 @@ export default function ClaimsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-1">
+          <div className="md:col-span-1 space-y-6">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
               <h2 className="text-lg font-semibold mb-4">Your Active Coverages</h2>
 
@@ -167,6 +176,46 @@ export default function ClaimsPage() {
                             {coverage.isActive
                               ? `Expires: ${new Date(coverage.endDate).toLocaleDateString()}`
                               : `Activates: ${new Date(coverage.startDate).toLocaleDateString()}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        Coverage: {formatCurrency(coverage.coverageAmount)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+              <h2 className="text-lg font-semibold mb-4">Your Pending Cover</h2>
+
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {filteredPendingCoverages.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">No pending coverages found</div>
+                ) : (
+                  filteredPendingCoverages.map((coverage) => (
+                    <div
+                      key={coverage.id}
+                      className="p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center mb-2">
+                        <div className="flex-shrink-0 h-8 w-8 mr-3">
+                          <Image
+                            src={getTokenLogo(coverage.protocol)}
+                            alt={coverage.protocol}
+                            width={32}
+                            height={32}
+                            className="rounded-full"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {coverage.protocol} {coverage.poolName}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Activates: {new Date(coverage.startDate).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
