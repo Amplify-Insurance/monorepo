@@ -29,8 +29,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
   const { pools } = usePools();
-  const adapters = useYieldAdapters();
   const defaultDeployment = details?.[0]?.deployment;
+  const adapters = useYieldAdapters(defaultDeployment);
 
 const underwritingPositions = (details || [])
   .flatMap((d) =>

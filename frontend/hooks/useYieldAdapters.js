@@ -3,13 +3,14 @@ import { ethers } from 'ethers';
 import { YieldPlatform, getYieldPlatformInfo } from '../app/config/yieldPlatforms';
 import { getTokenSymbol } from '../lib/erc20';
 
-export default function useYieldAdapters() {
+export default function useYieldAdapters(deployment) {
   const [adapters, setAdapters] = useState([]);
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/adapters');
+        const url = deployment ? `/api/adapters?deployment=${deployment}` : '/api/adapters';
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           const decimalsMap = {
@@ -53,7 +54,7 @@ export default function useYieldAdapters() {
       }
     }
     load();
-  }, []);
+  }, [deployment]);
 
   return adapters;
 }
