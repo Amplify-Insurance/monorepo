@@ -41,3 +41,31 @@ npm run deploy -- --product hosted-service <GITHUB_USER>/<SUBGRAPH_NAME>
 
 Refer to [The Graph documentation](https://thegraph.com/docs/en/deploying/subgra
 phs/) for details on obtaining an access token and creating a subgraph.
+
+## Running Locally
+
+You can test the subgraph against a local Graph Node using Docker. The official
+image exposes GraphQL on port **8000** and an admin API on **8020**:
+
+```bash
+docker run -p 8000:8000 -p 8020:8020 -p 8030:8030 -p 8040:8040 \
+  ghcr.io/graphprotocol/graph-node:latest
+```
+
+Deploy the mappings to the local node:
+
+```bash
+cd subgraphs/insurance
+npm run deploy -- --node http://localhost:8020/ --ipfs http://localhost:5001 \
+  <SUBGRAPH_NAME>
+```
+
+Point the frontend at your local index by setting the following in
+`frontend/.env`:
+
+```bash
+NEXT_PUBLIC_SUBGRAPH_URL=http://localhost:8000/subgraphs/name/<SUBGRAPH_NAME>
+SUBGRAPH_URL=http://localhost:8000/subgraphs/name/<SUBGRAPH_NAME>
+```
+
+The UI will now query the locally indexed data instead of the hosted service.
