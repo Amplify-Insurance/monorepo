@@ -16,7 +16,7 @@ describe("RiskManager", function () {
 
     // --- Contracts ---
     let riskManager;
-    let mockPoolRegistry, mockCapitalPool, mockPolicyNFT, mockCatPool, mockLossDistributor, mockPolicyManager, mockUsdc;
+    let mockPoolRegistry, mockCapitalPool, mockPolicyNFT, mockCatPool, mockLossDistributor, mockPolicyManager, mockRewardDistributor, mockUsdc;
 
     // --- Constants ---
     const POOL_ID_1 = 0;
@@ -30,6 +30,7 @@ describe("RiskManager", function () {
     const iCatInsurancePoolAbi = require("../artifacts/contracts/RiskManager.sol/ICatInsurancePool.json").abi;
     const iLossDistributorAbi = require("../artifacts/contracts/RiskManager.sol/ILossDistributor.json").abi;
     const iPolicyManagerAbi = require("../artifacts/contracts/RiskManager.sol/IPolicyManager.json").abi;
+    const iRewardDistributorAbi = require("../artifacts/contracts/RiskManager.sol/IRewardDistributor.json").abi;
 
 
     beforeEach(async function () {
@@ -43,6 +44,7 @@ describe("RiskManager", function () {
         mockCatPool = await deployMock(iCatInsurancePoolAbi, owner);
         mockLossDistributor = await deployMock(iLossDistributorAbi, owner);
         mockPolicyManager = await deployMock(iPolicyManagerAbi, owner);
+        mockRewardDistributor = await deployMock(iRewardDistributorAbi, owner);
 
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", ethers.parseUnits("1000000", 6));
@@ -62,7 +64,8 @@ describe("RiskManager", function () {
                 mockPoolRegistry.target,
                 mockPolicyManager.target,
                 mockCatPool.target,
-                mockLossDistributor.target
+                mockLossDistributor.target,
+                mockRewardDistributor.target
             )).to.emit(riskManager, "AddressesSet");
 
             expect(await riskManager.capitalPool()).to.equal(mockCapitalPool.target);
@@ -71,11 +74,12 @@ describe("RiskManager", function () {
             expect(await riskManager.policyNFT()).to.equal(mockPolicyNFT.target);
             expect(await riskManager.catPool()).to.equal(mockCatPool.target);
             expect(await riskManager.lossDistributor()).to.equal(mockLossDistributor.target);
+            expect(await riskManager.rewardDistributor()).to.equal(mockRewardDistributor.target);
         });
 
         it("Should prevent non-owner from setting addresses", async function () {
             await expect(riskManager.connect(nonParty).setAddresses(
-                mockCapitalPool.target, mockPoolRegistry.target, mockPolicyManager.target, mockCatPool.target, mockLossDistributor.target
+                mockCapitalPool.target, mockPoolRegistry.target, mockPolicyManager.target, mockCatPool.target, mockLossDistributor.target, mockRewardDistributor.target
             )).to.be.revertedWithCustomError(riskManager, "OwnableUnauthorizedAccount");
         });
 
@@ -98,7 +102,8 @@ describe("RiskManager", function () {
                 mockPoolRegistry.target,
                 mockPolicyManager.target,
                 mockCatPool.target,
-                mockLossDistributor.target
+                mockLossDistributor.target,
+                mockRewardDistributor.target
             );
             await riskManager.connect(owner).setCommittee(committee.address);
         });
@@ -204,15 +209,22 @@ describe("RiskManager", function () {
             const POLICY_ID = 123;
             const COVERAGE_AMOUNT = ethers.parseUnits("50000", 6);
             const TOTAL_PLEDGED = ethers.parseUnits("100000", 6);
+            let mockProtocolToken;
 
             beforeEach(async function() {
+                const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+                mockProtocolToken = await MockERC20Factory.deploy("aToken", "aTKN", 6);
+                await mockProtocolToken.connect(owner).mint(claimant.address, COVERAGE_AMOUNT);
                 await mockPolicyNFT.mock.getPolicy.withArgs(POLICY_ID).returns(POOL_ID_1, COVERAGE_AMOUNT, 0, 0, 0);
                 await mockPoolRegistry.mock.getPoolPayoutData.withArgs(POOL_ID_1).returns([nonParty.address], [TOTAL_PLEDGED], TOTAL_PLEDGED);
+                await mockPoolRegistry.mock.getPoolData.withArgs(POOL_ID_1).returns(mockProtocolToken.target, TOTAL_PLEDGED, 0, 0, false, committee.address);
                 await mockLossDistributor.mock.distributeLoss.returns();
+                await mockRewardDistributor.mock.distribute.returns();
                 await mockCapitalPool.mock.executePayout.returns();
                 await mockPoolRegistry.mock.updateCoverageSold.returns();
                 await mockPolicyNFT.mock.burn.returns();
                 await mockPolicyNFT.mock.ownerOf.withArgs(POLICY_ID).returns(claimant.address);
+                await mockProtocolToken.connect(claimant).approve(riskManager.target, COVERAGE_AMOUNT);
             });
 
             it("Should process a claim fully covered by the pool", async function() {
@@ -223,6 +235,10 @@ describe("RiskManager", function () {
                 expect(payoutData.claimantAmount).to.equal(COVERAGE_AMOUNT - expectedFee);
                 expect(payoutData.feeRecipient).to.equal(committee.address);
                 expect(payoutData.feeAmount).to.equal(expectedFee);
+                const distCall = mockRewardDistributor.mock.distribute.getCall(0);
+                expect(distCall.args[0]).to.equal(POOL_ID_1);
+                expect(distCall.args[1]).to.equal(mockProtocolToken.target);
+                expect(distCall.args[2]).to.equal(COVERAGE_AMOUNT);
             });
             
             it("Should draw from the CAT pool if there is a shortfall", async function() {
@@ -230,9 +246,14 @@ describe("RiskManager", function () {
                 const SHORTFALL = HIGH_COVERAGE - TOTAL_PLEDGED;
                 await mockPolicyNFT.mock.getPolicy.withArgs(POLICY_ID).returns(POOL_ID_1, HIGH_COVERAGE, 0, 0, 0);
                 await mockCatPool.mock.drawFund.withArgs(SHORTFALL).returns();
+                await mockProtocolToken.connect(owner).mint(claimant.address, HIGH_COVERAGE);
+                await mockProtocolToken.connect(claimant).approve(riskManager.target, HIGH_COVERAGE);
+                await mockRewardDistributor.mock.distribute.returns();
 
                 await expect(riskManager.connect(nonParty).processClaim(POLICY_ID)).to.not.be.reverted;
                 expect(mockCatPool.mock.drawFund.callCount).to.equal(1);
+                const distCall2 = mockRewardDistributor.mock.distribute.getCall(0);
+                expect(distCall2.args[2]).to.equal(HIGH_COVERAGE);
             });
         });
 
@@ -319,7 +340,12 @@ describe("RiskManager", function () {
 
                 // Replace the mock with our malicious contract
                 await riskManager.connect(owner).setAddresses(
-                    mockCapitalPool.target, maliciousPoolRegistry.target, mockPolicyManager.target, mockCatPool.target, mockLossDistributor.target
+                    mockCapitalPool.target,
+                    maliciousPoolRegistry.target,
+                    mockPolicyManager.target,
+                    mockCatPool.target,
+                    mockLossDistributor.target,
+                    mockRewardDistributor.target
                 );
 
                 const PLEDGE_AMOUNT = ethers.parseUnits("10000", 6);

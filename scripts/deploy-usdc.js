@@ -91,7 +91,7 @@ async function main() {
 
 
   await policyManager.setAddresses(poolRegistry.target, capitalPool.target, catPool.target, rewardDistributor.target, riskManager.target);
-  await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyManager.target, catPool.target, lossDistributor.target);
+  await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyManager.target, catPool.target, lossDistributor.target, rewardDistributor.target);
 
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
