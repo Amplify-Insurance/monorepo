@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IPoolAddressesProvider.sol";
 import "../interfaces/IPool.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract AaveV3Adapter is IYieldAdapter, Ownable {
     using SafeERC20 for IERC20;
@@ -86,6 +87,15 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
         uint256 liquid = underlyingToken.balanceOf(address(this));
         uint256 aTokenBal = aToken.balanceOf(address(this));
         return liquid + aTokenBal;
+    }
+
+    function emergencyTransfer(address _to, uint256 _amount) external onlyCapitalPool returns (uint256) {
+        uint256 bal = aToken.balanceOf(address(this));
+        uint256 amt = Math.min(_amount, bal);
+        if (amt > 0) {
+            aToken.safeTransfer(_to, amt);
+        }
+        return amt;
     }
 
     // Get current APR for the underlying token
