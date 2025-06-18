@@ -23,8 +23,8 @@ describe("Committee", function () {
     const VOTING_PERIOD = 7 * 24 * 60 * 60; // 7 days
     const CHALLENGE_PERIOD = 7 * 24 * 60 * 60; // 7 days
     const QUORUM_BPS = 4000; // 40%
-    const PROPOSAL_BOND = ethers.parseEther("100");
-    const PROPOSER_FEE_SHARE_BPS = 1000; // 10%
+    const PROPOSAL_BOND = ethers.parseEther("1000");
+    const SLASH_BPS = 500; // 5%
 
     // --- Mock ABIs ---
     const iRiskManagerAbi = require("../artifacts/contracts/Committee.sol/IRiskManager.json").abi;
@@ -49,8 +49,7 @@ describe("Committee", function () {
             VOTING_PERIOD,
             CHALLENGE_PERIOD,
             QUORUM_BPS,
-            PROPOSAL_BOND,
-            PROPOSER_FEE_SHARE_BPS
+            SLASH_BPS
         );
 
         // --- Initial Setup ---
@@ -87,15 +86,14 @@ describe("Committee", function () {
                 VOTING_PERIOD,
                 CHALLENGE_PERIOD,
                 QUORUM_BPS,
-                PROPOSAL_BOND,
-                PROPOSER_FEE_SHARE_BPS
+                SLASH_BPS
             )).to.be.reverted; // Reverts without a specific message due to interface call on zero address
         });
     });
 
     describe("Proposal Creation", function () {
         it("Should create a 'Pause' proposal correctly, taking a bond", async function() {
-            await expect(committee.connect(proposer).createProposal(POOL_ID, 1 /* Pause */))
+            await expect(committee.connect(proposer).createProposal(POOL_ID, 1 /* Pause */, PROPOSAL_BOND))
                 .to.emit(committee, "ProposalCreated").withArgs(1, proposer.address, POOL_ID, 1);
 
             const proposal = await committee.proposals(1);
@@ -105,7 +103,7 @@ describe("Committee", function () {
         });
 
         it("Should create an 'Unpause' proposal correctly, without a bond", async function() {
-            await expect(committee.connect(proposer).createProposal(POOL_ID, 0 /* Unpause */))
+            await expect(committee.connect(proposer).createProposal(POOL_ID, 0 /* Unpause */, 0))
                 .to.emit(committee, "ProposalCreated").withArgs(1, proposer.address, POOL_ID, 0);
 
             const proposal = await committee.proposals(1);
@@ -113,14 +111,14 @@ describe("Committee", function () {
         });
 
         it("Should revert if a non-staker tries to create a proposal", async function() {
-            await expect(committee.connect(nonStaker).createProposal(POOL_ID, 1))
+            await expect(committee.connect(nonStaker).createProposal(POOL_ID, 1, PROPOSAL_BOND))
                 .to.be.revertedWith("Must be a staker");
         });
     });
 
     describe("Voting", function() {
         beforeEach(async function() {
-            await committee.connect(proposer).createProposal(POOL_ID, 1); // Proposal 1
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND); // Proposal 1
         });
 
         it("Should allow stakers to vote and update proposal state correctly", async function() {
@@ -160,7 +158,7 @@ describe("Committee", function () {
 
     describe("Proposal Execution & Bond Resolution", function() {
         beforeEach(async function() {
-            await committee.connect(proposer).createProposal(POOL_ID, 1); // Proposal 1 (Pause)
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND); // Proposal 1 (Pause)
             // Voter 1 has 500 weight, Voter 2 has 300
             await committee.connect(voter1).vote(1, 2); // For
             await committee.connect(voter2).vote(1, 1); // Against
@@ -179,10 +177,18 @@ describe("Committee", function () {
         });
         
         it("Should execute a successful 'Unpause' proposal", async function() {
-            await committee.connect(proposer).createProposal(POOL_ID, 0); // Proposal 2 (Unpause)
-            await committee.connect(proposer).vote(2, 2); // Vote for it
+            await mockRiskManager.mock.reportIncident.withArgs(POOL_ID, true).returns();
+            await mockRiskManager.mock.setPoolFeeRecipient.withArgs(POOL_ID, committee.target).returns();
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await committee.connect(riskManager).receiveFees(1, { value: ethers.parseEther("1") });
+            await time.increase(CHALLENGE_PERIOD + 1);
+            await committee.resolvePauseBond(1);
+
+            await committee.connect(proposer).createProposal(POOL_ID, 0, 0);
+            await committee.connect(proposer).vote(2, 2);
             await mockRiskManager.mock.reportIncident.withArgs(POOL_ID, false).returns();
-            
+
             await time.increase(VOTING_PERIOD + 1);
             await committee.executeProposal(2);
 
@@ -191,7 +197,7 @@ describe("Committee", function () {
         });
 
         it("Should defeat a proposal if quorum is not met", async function() {
-            await committee.connect(proposer).createProposal(POOL_ID, 1); // Proposal 2
+            await committee.connect(proposer).createProposal(2, 1, PROPOSAL_BOND); // Proposal 2
             await committee.connect(voter2).vote(2, 2);
             
             await time.increase(VOTING_PERIOD + 1);
@@ -203,7 +209,7 @@ describe("Committee", function () {
 
         it("Should defeat a proposal if votes are tied", async function() {
             await mockStakingContract.mock.stakedBalance.withArgs(voter1.address).returns(ethers.parseEther("300"));
-            await committee.connect(proposer).createProposal(POOL_ID, 1); // Proposal 2
+            await committee.connect(proposer).createProposal(2, 1, PROPOSAL_BOND); // Proposal 2
             await committee.connect(voter1).vote(2, 2); // For (300)
             await committee.connect(voter2).vote(2, 1); // Against (300)
 
@@ -242,8 +248,6 @@ describe("Committee", function () {
             await time.increase(VOTING_PERIOD + 1);
             await committee.executeProposal(1);
             
-            await mockStakingContract.mock.slash.withArgs(proposer.address, PROPOSAL_BOND).returns();
-
             await time.increase(CHALLENGE_PERIOD + 1);
             await expect(committee.connect(owner).resolvePauseBond(1))
                 .to.emit(committee, "BondResolved").withArgs(1, true);
@@ -264,7 +268,7 @@ describe("Committee", function () {
         const REWARD_AMOUNT = ethers.parseEther("10");
 
         beforeEach(async function() {
-            await committee.connect(proposer).createProposal(POOL_ID, 1);
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
             await committee.connect(proposer).vote(1, 2);
             await committee.connect(voter1).vote(1, 2);
             await committee.connect(voter2).vote(1, 1); // Voter2 votes against
@@ -286,9 +290,9 @@ describe("Committee", function () {
             const gasUsed = receipt.gasUsed * tx.gasPrice;
             const proposerFinalBalance = await ethers.provider.getBalance(proposer.address);
 
-            const proposerBonus = (REWARD_AMOUNT * BigInt(PROPOSER_FEE_SHARE_BPS)) / 10000n;
-            const remainingFees = REWARD_AMOUNT - proposerBonus;
             const proposal = await committee.proposals(1);
+            const proposerBonus = (REWARD_AMOUNT * BigInt(proposal.proposerFeeShareBps)) / 10000n;
+            const remainingFees = REWARD_AMOUNT - proposerBonus;
             const proposerWeight = proposal.voterWeight(proposer.address);
             const proposerShare = (remainingFees * proposerWeight) / proposal.forVotes;
             const expectedReward = proposerBonus + proposerShare;
@@ -303,9 +307,9 @@ describe("Committee", function () {
             const gasUsed = receipt.gasUsed * tx.gasPrice;
             const voterFinalBalance = await ethers.provider.getBalance(voter1.address);
 
-            const proposerBonus = (REWARD_AMOUNT * BigInt(PROPOSER_FEE_SHARE_BPS)) / 10000n;
-            const remainingFees = REWARD_AMOUNT - proposerBonus;
             const proposal = await committee.proposals(1);
+            const proposerBonus = (REWARD_AMOUNT * BigInt(proposal.proposerFeeShareBps)) / 10000n;
+            const remainingFees = REWARD_AMOUNT - proposerBonus;
             const voterWeight = proposal.voterWeight(voter1.address);
             const expectedReward = (remainingFees * voterWeight) / proposal.forVotes;
             
@@ -324,7 +328,7 @@ describe("Committee", function () {
         });
         
         it("Should revert if trying to claim when there are no rewards", async function() {
-            await committee.connect(proposer).createProposal(POOL_ID, 0); // Proposal 2, no fees
+            await committee.connect(proposer).createProposal(POOL_ID, 0, 0); // Proposal 2, no fees
             await committee.connect(proposer).vote(2, 2);
             await time.increase(VOTING_PERIOD + 1);
             await mockRiskManager.mock.reportIncident.returns();
@@ -342,7 +346,7 @@ describe("Committee", function () {
         });
 
         it("Should prevent re-entrancy on claimReward", async function() {
-            await committee.connect(proposer).createProposal(POOL_ID, 1);
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
             await committee.connect(proposer).vote(1, 2);
             await time.increase(VOTING_PERIOD + 1);
             await mockRiskManager.mock.reportIncident.returns();
