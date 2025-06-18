@@ -60,7 +60,7 @@ export default function CoverageModal({
     }
 
     loadDecimals()
-  }, [isOpen])
+  }, [isOpen, deployment])
 
   // Coverage duration state
   const [durationWeeks, setDurationWeeks] = useState(4) // Default to a more common duration
@@ -100,7 +100,7 @@ export default function CoverageModal({
     }
 
     load()
-  }, [type, address, isOpen])
+  }, [type, address, isOpen, deployment])
 
   /* ───── Fetch wallet balance when purchasing cover ───── */
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function CoverageModal({
     }
 
     load()
-  }, [type, address, isOpen])
+  }, [type, address, isOpen, deployment])
 
   /* ───── Handlers ───── */
   const handleAmountChange = (e) => {
