@@ -8,6 +8,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/IYieldAdapter.sol";
+import "../interfaces/IYieldAdapterEmergency.sol";
+import "../interfaces/IRiskManagerWithCat.sol";
 
 /**
  * @title CapitalPool
@@ -73,6 +75,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     error AdapterNotConfigured();
     error NoActiveDeposit();
     error PayoutExceedsPoolLPCapital();
+    error AdapterDrained();
 
     /* ───────────────────────── Events ──────────────────────────── */
     event RiskManagerSet(address indexed newRiskManager);
@@ -199,6 +202,8 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (totalPayoutAmount == 0) return;
         if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
         
+        ICatInsurancePool catPool = IRiskManagerWithCat(riskManager).catPool();
+
         if (_payoutData.totalCapitalFromPoolLPs > 0) {
             for (uint i = 0; i < _payoutData.adapters.length; i++) {
                 IYieldAdapter adapter = IYieldAdapter(_payoutData.adapters[i]);
@@ -206,7 +211,17 @@ contract CapitalPool is ReentrancyGuard, Ownable {
                 if (adapterCapitalShare > 0) {
                     uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
                     if(amountToWithdraw > 0) {
-                        adapter.withdraw(amountToWithdraw, address(this));
+                        try adapter.withdraw(amountToWithdraw, address(this)) {
+                        } catch {
+                            emit AdapterCallFailed(_payoutData.adapters[i], "withdraw", "withdraw failed");
+                            uint256 sent;
+                            try IYieldAdapterEmergency(_payoutData.adapters[i]).emergencyTransfer(_payoutData.claimant, amountToWithdraw) returns (uint256 v) {
+                                sent = v;
+                            } catch {}
+                            if (sent == 0) {
+                                catPool.drawFund(amountToWithdraw);
+                            }
+                        }
                     }
                 }
             }

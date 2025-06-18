@@ -20,8 +20,15 @@ contract MoonwellAdapter is IYieldAdapter, Ownable {
 
     IERC20 public immutable underlyingToken;
     IMToken public immutable mToken;
+    address public capitalPoolAddress;
 
     event FundsWithdrawn(address indexed to, uint256 requestedAmount, uint256 actualAmount);
+    event CapitalPoolAddressSet(address indexed newCapitalPool);
+
+    modifier onlyCapitalPool() {
+        require(msg.sender == capitalPoolAddress, "MoonwellAdapter: Caller is not CapitalPool");
+        _;
+    }
 
     uint256 private constant BLOCKS_PER_YEAR = 2_102_400; // 12-sec block ≈ 365 days
     uint256 private constant WAD            = 1e18;       // Compound mantissa scale
@@ -40,6 +47,12 @@ contract MoonwellAdapter is IYieldAdapter, Ownable {
         _asset.approve(address(_mToken), type(uint256).max);
     }
 
+    function setCapitalPoolAddress(address _capitalPoolAddress) external onlyOwner {
+        require(_capitalPoolAddress != address(0), "MoonwellAdapter: zero address");
+        capitalPoolAddress = _capitalPoolAddress;
+        emit CapitalPoolAddressSet(_capitalPoolAddress);
+    }
+
     /*───────────────────────────  IYieldAdapter  ───────────────────────────*/
 
     /// @return The ERC‑20 token that this adapter accepts.
@@ -55,11 +68,11 @@ contract MoonwellAdapter is IYieldAdapter, Ownable {
         require(err == 0, "MoonwellAdapter: mint failed");
     }
 
-    /// @notice Withdraws up to `_targetAmountOfUnderlyingToWithdraw` to `_to` (owner only).
+    /// @notice Withdraws up to `_targetAmountOfUnderlyingToWithdraw` to `_to`.
     function withdraw(uint256 _targetAmountOfUnderlyingToWithdraw, address _to)
         external
         override
-        onlyOwner
+        onlyCapitalPool
         returns (uint256 actuallyWithdrawn)
     {
         require(_to != address(0), "MoonwellAdapter: zero address");
@@ -88,6 +101,15 @@ contract MoonwellAdapter is IYieldAdapter, Ownable {
             supplied = 0;
         }
         return liquid + supplied;
+    }
+
+    function emergencyTransfer(address _to, uint256 _amount) external onlyCapitalPool returns (uint256) {
+        uint256 bal = mToken.balanceOf(address(this));
+        uint256 amt = _amount < bal ? _amount : bal;
+        if (amt > 0) {
+            mToken.transfer(_to, amt);
+        }
+        return amt;
     }
 
         function currentApr() external view returns (uint256 aprWad) {
