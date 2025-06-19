@@ -250,12 +250,32 @@ describe("CatInsurancePool", function () {
             const depositAmount = ethers.parseUnits("1000", 6);
             await catPool.connect(lp1).depositLiquidity(depositAmount);
             const drawAmount = ethers.parseUnits("100", 6);
-            
+
             await expect(catPool.connect(riskManager).drawFund(drawAmount))
                 .to.emit(catPool, "DrawFromFund");
-            
+
             expect(await mockUsdc.balanceOf(capitalPool.address)).to.equal(drawAmount);
             expect(await catPool.idleUSDC()).to.equal(depositAmount - drawAmount);
+        });
+
+        it("drawFund should withdraw from adapter when idle funds are insufficient", async function() {
+            const depositAmount = ethers.parseUnits("1000", 6);
+            await catPool.connect(lp1).depositLiquidity(depositAmount);
+            const flushAmount = ethers.parseUnits("800", 6);
+
+            // Move most funds to the adapter
+            await catPool.connect(owner).flushToAdapter(flushAmount);
+            expect(await catPool.idleUSDC()).to.equal(depositAmount - flushAmount);
+
+            const drawAmount = ethers.parseUnits("600", 6); // more than idle
+            await mockAdapter.setTotalValueHeld(flushAmount);
+
+            await expect(catPool.connect(riskManager).drawFund(drawAmount))
+                .to.emit(catPool, "DrawFromFund").withArgs(drawAmount, drawAmount);
+
+            expect(await mockUsdc.balanceOf(capitalPool.address)).to.equal(drawAmount);
+            expect(await catPool.idleUSDC()).to.equal(0);
+            expect(await mockAdapter.totalValueHeld()).to.equal(flushAmount - (drawAmount - (depositAmount - flushAmount)));
         });
         
         it("receiveProtocolAssetsForDistribution should call the RewardDistributor", async function() {
