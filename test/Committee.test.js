@@ -215,6 +215,19 @@ describe("Committee", function () {
             const proposal = await committee.proposals(2);
             expect(proposal.status).to.equal(3); // Defeated
         });
+
+        it("Should defeat an 'Unpause' proposal when majority votes against", async function() {
+            const UNPAUSE_POOL = POOL_ID + 1;
+            await committee.connect(proposer).createProposal(UNPAUSE_POOL, 0, 0); // Proposal 2 (Unpause)
+            await committee.connect(proposer).vote(2, 2); // For by proposer (1000)
+            await mockStakingContract.setBalance(voter1.address, ethers.parseEther("2000"));
+            await committee.connect(voter1).vote(2, 1); // Against with greater weight
+
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(2);
+            const proposal = await committee.proposals(2);
+            expect(proposal.status).to.equal(3); // Defeated
+        });
         
         it("Should revert if trying to execute a proposal twice", async function() {
             await time.increase(VOTING_PERIOD + 1);
