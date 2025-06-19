@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TrendingUp, MoreHorizontal } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { formatCurrency, formatPercentage } from "../utils/formatting";
 import ManageCoverageModal from "./ManageCoverageModal";
 import ManageAllocationModal from "./ManageAllocationModal";
@@ -32,6 +33,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [showAllocModal, setShowAllocModal] = useState(false);
+  const [rewardsMap, setRewardsMap] = useState({});
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
   const { pools } = usePools();
@@ -83,6 +85,27 @@ const underwritingPositions = (details || [])
     })
   )
   .filter(Boolean);
+
+  useEffect(() => {
+    async function loadRewards() {
+      if (!address) return;
+      const map = {};
+      for (const pos of underwritingPositions) {
+        try {
+          const res = await fetch(`/api/underwriters/${address}/rewards/${pos.poolId}?deployment=${pos.deployment}`);
+          if (res.ok) {
+            const data = await res.json();
+            const item = (data.rewards || []).find((r) => r.deployment === pos.deployment);
+            map[pos.id] = item ? item.pending : '0';
+          }
+        } catch (err) {
+          console.error('Failed to load pending rewards', err);
+        }
+      }
+      setRewardsMap(map);
+    }
+    loadRewards();
+  }, [address, underwritingPositions]);
 
   const protocolPositions = underwritingPositions.filter(
     (p) => p.type === 'protocol'
@@ -334,12 +357,18 @@ const underwritingPositions = (details || [])
                           {openDropdown === position.id && (
                             <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
                               <div className="py-1" role="menu" aria-orientation="vertical">
-                                <button className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleOpenModal(position); setOpenDropdown(null); }}>
-                                  Manage
-                                </button>
+                                <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                                  Pending Rewards: {((Number(rewardsMap[position.id] || 0) / 1e18).toFixed(4))}
+                                </div>
                                 <button className="block px-4 py-2 text-sm w-full text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleClaimRewards(position); setOpenDropdown(null); }} disabled={isClaiming}>
                                   {isClaiming ? 'Claiming...' : 'Claim Rewards'}
                                 </button>
+                                <button className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleOpenModal(position); setOpenDropdown(null); }}>
+                                  Manage
+                                </button>
+                                <Link href={`/pool/${position.poolId}/${position.pool}`} className="block px-4 py-2 text-sm w-full text-left text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                  Pool Page
+                                </Link>
                                 {position.pendingLoss > 0 && (
                                   <button className="block px-4 py-2 text-sm w-full text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleClaimDistressed(position); setOpenDropdown(null); }} disabled={isClaimingDistressed}>
                                     {isClaimingDistressed ? 'Claiming...' : 'Claim Distressed'}
