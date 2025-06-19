@@ -43,6 +43,21 @@ describe("PolicyNFT", function () {
       await expect(policyNFT.connect(owner).setRiskManagerAddress(ethers.ZeroAddress))
         .to.be.revertedWith("PolicyNFT: Address cannot be zero");
     });
+
+    it("Allows owner to change risk manager and restricts access to new one", async function () {
+      const { owner, riskManager, other, user, policyNFT } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await expect(policyNFT.connect(owner).setRiskManagerAddress(other.address))
+        .to.emit(policyNFT, "RiskManagerAddressSet")
+        .withArgs(other.address);
+
+      await expect(
+        policyNFT.connect(riskManager).mint(user.address, 1, 1000, 0, 0, 0)
+      ).to.be.revertedWith("PolicyNFT: Caller is not the authorized RiskManager");
+
+      await policyNFT.connect(other).mint(user.address, 1, 1000, 0, 0, 0);
+      expect(await policyNFT.ownerOf(1)).to.equal(user.address);
+    });
   });
 
   describe("mint", function () {
