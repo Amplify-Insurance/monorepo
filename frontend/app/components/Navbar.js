@@ -36,8 +36,9 @@ export default function Navbar() {
         <div className="flex h-16 justify-between">
           <div className="flex">
             <div className="flex flex-shrink-0 items-center">
-              <Link href="/" className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                DeFi Shield
+              <Link href="/" className="flex items-center text-xl font-bold text-blue-600 dark:text-blue-400">
+                <img src="/layercover-logo.svg" alt="LayerCover logo" className="h-8 w-8 mr-2" />
+                <span>LayerCover</span>
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">

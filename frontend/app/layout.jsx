@@ -9,7 +9,7 @@ import Sidebar from "./components/Sidebar"; // Ensure paths are correct
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "DeFi Insurance Platform",
+  title: "LayerCover",
   description: "Insurance coverage for DeFi protocols",
 };
 
