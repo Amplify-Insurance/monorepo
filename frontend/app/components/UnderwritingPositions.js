@@ -10,9 +10,16 @@ import useUnderwriterDetails from "../../hooks/useUnderwriterDetails";
 import usePools from "../../hooks/usePools";
 import useYieldAdapters from "../../hooks/useYieldAdapters";
 import { ethers } from "ethers";
+import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
 import { getRewardDistributorWithSigner } from "../../lib/rewardDistributor";
-import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName } from "../config/tokenNameMap";
+import {
+  getTokenName,
+  getTokenLogo,
+  getProtocolLogo,
+  getProtocolName,
+  getProtocolType,
+} from "../config/tokenNameMap";
 import deployments, { getDeployment } from "../config/deployments";
 
 export default function UnderwritingPositions({ displayCurrency }) {
@@ -21,10 +28,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState(null);
   const [isClaimingDistressed, setIsClaimingDistressed] = useState(false);
   const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
   const [showAllocModal, setShowAllocModal] = useState(false);
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
@@ -57,6 +64,7 @@ const underwritingPositions = (details || [])
         id: `${d.deployment}-${pid}`,
         deployment: d.deployment,
         protocol,
+        type: getProtocolType(pool.id),
         pool: pool.protocolTokenToCover,
         poolName: getTokenName(pool.id),
         poolId: pid,
@@ -77,6 +85,13 @@ const underwritingPositions = (details || [])
     })
   )
   .filter(Boolean);
+
+  const protocolPositions = underwritingPositions.filter(
+    (p) => p.type === 'protocol'
+  );
+  const stablecoinPositions = underwritingPositions.filter(
+    (p) => p.type === 'stablecoin'
+  );
 
   const activePositions = underwritingPositions.filter(
     (p) => p.status === "active"
@@ -118,7 +133,9 @@ const underwritingPositions = (details || [])
         position.amount.toString(),
         position.decimals,
       );
-      await (await rd.claim(address, position.poolId, position.pool, pledge)).wait();
+      await (
+        await rd.claim(address, position.poolId, position.pool, pledge)
+      ).wait();
     } catch (err) {
       console.error("Failed to claim rewards", err);
     } finally {
@@ -142,7 +159,9 @@ const underwritingPositions = (details || [])
             pos.amount.toString(),
             pos.decimals,
           );
-          await (await rd.claim(address, pos.poolId, pos.pool, pledge)).wait();
+          await (
+            await rd.claim(address, pos.poolId, pos.pool, pledge)
+          ).wait();
         }
       }
     } catch (err) {
@@ -236,6 +255,182 @@ const underwritingPositions = (details || [])
   const baseYieldApr = baseAdapter?.apr || 0;
   const totalApr = baseYieldApr + averageYield;
 
+  const renderTables = (positions, title) => {
+    const active = positions.filter((p) => p.status === 'active');
+    const withdrawal = positions.filter((p) => p.status === 'requested withdrawal');
+    return (
+      <div className="mt-6">
+        <h3 className="text-lg font-medium mb-2">{title}</h3>
+        {active.length > 0 && (
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pool</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">{displayCurrency === 'native' ? 'Amount' : 'Value'}</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Yield APY</th>
+                      {showPendingLoss && (
+                        <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Pending Loss</th>
+                      )}
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Status</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {active.map((position) => (
+                      <tr key={position.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
+                              <Image src={getProtocolLogo(position.poolId)} alt={position.protocol} width={32} height={32} className="rounded-full" />
+                            </div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{getProtocolName(position.poolId)}</div>
+                          </div>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-6 w-6 mr-2">
+                              <Image src={getTokenLogo(position.pool)} alt={position.poolName} width={24} height={24} className="rounded-full" />
+                            </div>
+                            <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
+                          </div>
+                          <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
+                            {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
+                          </div>
+                          <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
+                            {formatPercentage(position.yield)}
+                          </div>
+                          {position.pendingLoss > 0 && (
+                            <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
+                              Loss: {formatCurrency(displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd, 'USD', displayCurrency)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
+                          </div>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <div className="text-sm font-medium text-green-600 dark:text-green-400">{formatPercentage(position.yield)}</div>
+                        </td>
+                        {showPendingLoss && (
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {formatCurrency(displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd, 'USD', displayCurrency)}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'}`}>{position.status}</span>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                          <button onClick={() => setOpenDropdown(openDropdown === position.id ? null : position.id)} className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">
+                            <MoreHorizontal className="w-5 h-5" />
+                          </button>
+                          {openDropdown === position.id && (
+                            <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                              <div className="py-1" role="menu" aria-orientation="vertical">
+                                <button className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleOpenModal(position); setOpenDropdown(null); }}>
+                                  Manage
+                                </button>
+                                <button className="block px-4 py-2 text-sm w-full text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleClaimRewards(position); setOpenDropdown(null); }} disabled={isClaiming}>
+                                  {isClaiming ? 'Claiming...' : 'Claim Rewards'}
+                                </button>
+                                {position.pendingLoss > 0 && (
+                                  <button className="block px-4 py-2 text-sm w-full text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleClaimDistressed(position); setOpenDropdown(null); }} disabled={isClaimingDistressed}>
+                                    {isClaimingDistressed ? 'Claiming...' : 'Claim Distressed'}
+                                  </button>
+                                )}
+                                {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
+                                  <button className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleExecuteWithdrawal(); setOpenDropdown(null); }} disabled={isExecuting}>
+                                    {isExecuting ? 'Executing...' : 'Execute Withdrawal'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+        {withdrawal.length > 0 && (
+          <div className="mt-8 overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pool</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">{displayCurrency === 'native' ? 'Amount' : 'Value'}</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Unlock</th>
+                      <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {withdrawal.map((position) => (
+                      <tr key={position.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
+                              <Image src={getProtocolLogo(position.id)} alt={position.protocol} width={32} height={32} className="rounded-full" />
+                            </div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{getProtocolName(position.id)}</div>
+                          </div>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-6 w-6 mr-2">
+                              <Image src={getTokenLogo(position.pool)} alt={position.poolName} width={24} height={24} className="rounded-full" />
+                            </div>
+                            <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
+                          </div>
+                          <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
+                            {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
+                          </div>
+                          <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">{unlockDays}d</div>
+                          {position.pendingLoss > 0 && (
+                            <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
+                              Loss: {formatCurrency(displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd, 'USD', displayCurrency)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
+                          </div>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <div className="text-sm font-medium text-green-600 dark:text-green-400">{unlockDays}d</div>
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {withdrawalReady && (
+                            <button onClick={handleExecuteWithdrawal} disabled={isExecuting} className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 disabled:opacity-50">
+                              {isExecuting ? 'Executing...' : 'Withdraw'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (underwritingPositions.length === 0) {
     return (
       <div className="text-center py-8">
@@ -320,297 +515,8 @@ const underwritingPositions = (details || [])
           </div>
         </div>
       </div>
-
-      {activePositions.length > 0 && (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <div className="inline-block min-w-full align-middle">
-            <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                    >
-                      Protocol
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                    >
-                      Pool
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                    >
-                      {displayCurrency === "native" ? "Amount" : "Value"}
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                    >
-                      Yield APY
-                    </th>
-                    {showPendingLoss && (
-                      <th
-                        scope="col"
-                        className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                      >
-                        Pending Loss
-                      </th>
-                    )}
-                    <th
-                      scope="col"
-                      className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                    >
-                      Status
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {activePositions.map((position) => (
-                    <tr
-                      key={position.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-750"
-                    >
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
-                            <Image
-                              src={getProtocolLogo(position.poolId)}
-                              alt={position.protocol}
-                              width={32}
-                              height={32}
-                              className="rounded-full"
-                            />
-                          </div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {getProtocolName(position.poolId)}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-6 w-6 mr-2">
-                            <Image
-                              src={getTokenLogo(position.pool)}
-                              alt={position.poolName}
-                              width={24}
-                              height={24}
-                              className="rounded-full"
-                            />
-                          </div>
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {getTokenName(position.pool)}
-                          </div>
-                        </div>
-                        <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
-                          {displayCurrency === "native"
-                            ? `${position.amount}`
-                            : formatCurrency(position.usdValue, "USD", "usd")}
-                        </div>
-                        <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
-                          {formatPercentage(position.yield)}
-                        </div>
-                        {position.pendingLoss > 0 && (
-                          <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
-                            Loss: {formatCurrency(
-                              displayCurrency === 'native'
-                                ? position.pendingLoss
-                                : position.pendingLossUsd,
-                              'USD',
-                              displayCurrency,
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {displayCurrency === "native"
-                            ? `${position.amount}`
-                            : formatCurrency(position.usdValue, "USD", "usd")}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                        {formatPercentage(position.yield)}
-                      </div>
-                    </td>
-                    {showPendingLoss && (
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {formatCurrency(
-                            displayCurrency === 'native'
-                              ? position.pendingLoss
-                              : position.pendingLossUsd,
-                            'USD',
-                            displayCurrency,
-                          )}
-                        </div>
-                      </td>
-                    )}
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
-                            }`}
-                        >
-                          {position.status}
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                        <button
-                          onClick={() =>
-                            setOpenDropdown(
-                              openDropdown === position.id ? null : position.id
-                            )
-                          }
-                          className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
-                        >
-                          <MoreHorizontal className="w-5 h-5" />
-                        </button>
-                        {openDropdown === position.id && (
-                          <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
-                            <div className="py-1" role="menu" aria-orientation="vertical">
-                              <button
-                                className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                onClick={() => {
-                                  handleOpenModal(position);
-                                  setOpenDropdown(null);
-                                }}
-                              >
-                                Manage
-                              </button>
-                              <button
-                                className="block px-4 py-2 text-sm w-full text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                onClick={() => {
-                                  handleClaimRewards(position);
-                                  setOpenDropdown(null);
-                                }}
-                                disabled={isClaiming}
-                              >
-                                {isClaiming ? "Claiming..." : "Claim Rewards"}
-                              </button>
-                              {position.pendingLoss > 0 && (
-                                <button
-                                  className="block px-4 py-2 text-sm w-full text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                  onClick={() => {
-                                    handleClaimDistressed(position);
-                                    setOpenDropdown(null);
-                                  }}
-                                  disabled={isClaimingDistressed}
-                                >
-                                  {isClaimingDistressed ? "Claiming..." : "Claim Distressed"}
-                                </button>
-                              )}
-                              {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
-                                <button
-                                  className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                  onClick={() => {
-                                    handleExecuteWithdrawal();
-                                    setOpenDropdown(null);
-                                  }}
-                                  disabled={isExecuting}
-                                >
-                                  {isExecuting ? "Executing..." : "Execute Withdrawal"}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {withdrawalPositions.length > 0 && (
-        <div className="mt-8 overflow-x-auto -mx-4 sm:mx-0">
-          <div className="inline-block min-w-full align-middle">
-            <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
-                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pool</th>
-                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">{displayCurrency === "native" ? "Amount" : "Value"}</th>
-                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Unlock</th>
-                    <th scope="col" className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {withdrawalPositions.map((position) => (
-                    <tr key={position.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
-                            <Image src={getProtocolLogo(position.id)} alt={position.protocol} width={32} height={32} className="rounded-full" />
-                          </div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{getProtocolName(position.id)}</div>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-6 w-6 mr-2">
-                            <Image src={getTokenLogo(position.pool)} alt={position.poolName} width={24} height={24} className="rounded-full" />
-                          </div>
-                          <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
-                        </div>
-                        <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
-                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.usdValue, "USD", "usd")}
-                        </div>
-                        <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
-                          {unlockDays}d
-                        </div>
-                        {position.pendingLoss > 0 && (
-                          <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
-                            Loss: {formatCurrency(
-                              displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd,
-                              'USD',
-                              displayCurrency,
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {displayCurrency === "native" ? `${position.amount}` : formatCurrency(position.usdValue, "USD", "usd")}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <div className="text-sm font-medium text-green-600 dark:text-green-400">{unlockDays}d</div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {withdrawalReady && (
-                          <button
-                            onClick={handleExecuteWithdrawal}
-                            disabled={isExecuting}
-                            className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 disabled:opacity-50"
-                          >
-                            {isExecuting ? "Executing..." : "Withdraw"}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderTables(protocolPositions, "Protocol Cover")}
+      {renderTables(stablecoinPositions, "Stablecoin Cover")}
       {hasDistressedAssets && (
         <div className="mt-4 flex justify-end">
           <button
