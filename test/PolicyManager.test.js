@@ -354,6 +354,33 @@ describe("PolicyManager", function () {
                 await expect(policyManager.connect(user1).cancelCover(terminatedPolicyId))
                     .to.be.revertedWithCustomError(policyManager, "PolicyAlreadyTerminated");
             });
+
+            it("Should cancel even if no premium deposit remains", async function() {
+                // Drain premium by advancing time
+                const rateModel = { base: 100, slope1: 0, slope2: 0, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await mockPoolRegistry.setPoolData(POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    COVERAGE_AMOUNT,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+
+                // Fund the contract with enough USDC for premium distribution
+                await mockUsdc.mint(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
+
+                // Fast forward enough for premium to run out completely
+                await time.increase(COOLDOWN_PERIOD + SECS_YEAR + 1);
+
+                // Cancel should succeed without refund
+                const userBalBefore = await mockUsdc.balanceOf(user1.address);
+                await policyManager.connect(user1).cancelCover(POLICY_ID);
+                const userBalAfter = await mockUsdc.balanceOf(user1.address);
+                expect(userBalAfter).to.equal(userBalBefore);
+            });
             it("Should distribute premiums and emit event on cancel", async function () {
                 await mockPoolRegistry.setPoolData(POOL_ID,
                     mockUsdc.target,
@@ -431,6 +458,17 @@ describe("PolicyManager", function () {
 
                 const info = await mockPolicyNFT.policies(POLICY_ID);
                 expect(info.premiumDeposit).to.be.gt(INITIAL_PREMIUM_DEPOSIT);
+            });
+
+            it("Should correctly account for accrued premium when adding", async function() {
+                await time.increase(7 * 24 * 60 * 60); // 1 week to accrue costs
+
+                const before = await mockPolicyNFT.policies(POLICY_ID);
+                await policyManager.connect(user1).addPremium(POLICY_ID, PREMIUM_TO_ADD);
+                const after = await mockPolicyNFT.policies(POLICY_ID);
+
+                expect(after.premiumDeposit).to.be.below(before.premiumDeposit + PREMIUM_TO_ADD);
+                expect(after.lastDrainTime).to.be.gt(before.lastDrainTime);
             });
 
             it("Should revert if premium amount is zero", async function() {
@@ -574,6 +612,38 @@ describe("PolicyManager", function () {
 
                 await time.increase(30 * 24 * 60 * 60); // 30 days should be enough to deplete it
                 expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.false;
+            });
+
+            it("Should return false when addresses are unset", async function() {
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    0,
+                    await time.latest(),
+                    INITIAL_PREMIUM_DEPOSIT,
+                    await time.latest()
+                );
+                // Addresses intentionally not set for PolicyManager
+                const freshPMFactory = await ethers.getContractFactory("PolicyManager");
+                const freshPM = await freshPMFactory.deploy(mockPolicyNFT.target, owner.address);
+                expect(await freshPM.isPolicyActive(POLICY_ID)).to.be.false;
+            });
+
+            it("Should return true when lastDrainTime is in the future", async function() {
+                const now = await time.latest();
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    now + 1,
+                    now + 86400,
+                    INITIAL_PREMIUM_DEPOSIT,
+                    now + 86400
+                );
+                expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.true;
             });
         });
 
