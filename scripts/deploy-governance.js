@@ -56,6 +56,7 @@ async function main() {
 
   // Wire committee address in staking contract
   await staking.setCommitteeAddress(committee.target);
+  await riskManager.setCommittee(committee.target)
 
   /*──────────────────────────── Output ────────────────────────────────*/
   const addresses = {

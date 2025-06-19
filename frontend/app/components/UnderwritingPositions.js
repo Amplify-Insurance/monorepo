@@ -45,51 +45,51 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const defaultDeployment = details?.[0]?.deployment;
   const adapters = useYieldAdapters(defaultDeployment);
 
-const underwritingPositions = (details || [])
-  .flatMap((d) =>
-    d.allocatedPoolIds.map((pid) => {
-      const pool = pools.find(
-        (pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid)
-      );
-      if (!pool) return null;
-      const protocol = getTokenName(pool.id);
-      const amount = Number(
-        ethers.utils.formatUnits(
-          d.totalDepositedAssetPrincipal,
-          pool.underlyingAssetDecimals ?? 6,
-        )
-      );
-      const pendingLossStr = d.pendingLosses?.[pid] ?? '0';
-      const pendingLoss = Number(
-        ethers.utils.formatUnits(
-          pendingLossStr,
-          pool.underlyingAssetDecimals ?? 6,
-        ),
-      );
-      return {
-        id: `${d.deployment}-${pid}`,
-        deployment: d.deployment,
-        protocol,
-        type: getProtocolType(pool.id),
-        pool: pool.protocolTokenToCover,
-        poolName: getTokenName(pool.id),
-        poolId: pid,
-        amount,
-        nativeValue: amount,
-        usdValue: amount * (pool.tokenPriceUsd ?? 1),
-        pendingLoss,
-        pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
-        yield: Number(pool.underwriterYieldBps || 0) / 100,
-        status:
-          Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
-            ? 'requested withdrawal'
-            : 'active',
-        shares: d.masterShares,
-        yieldChoice: d.yieldChoice,
-      };
-    })
-  )
-  .filter(Boolean);
+  const underwritingPositions = (details || [])
+    .flatMap((d) =>
+      d.allocatedPoolIds.map((pid) => {
+        const pool = pools.find(
+          (pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid)
+        );
+        if (!pool) return null;
+        const protocol = getTokenName(pool.id);
+        const amount = Number(
+          ethers.utils.formatUnits(
+            d.totalDepositedAssetPrincipal,
+            pool.underlyingAssetDecimals ?? 6,
+          )
+        );
+        const pendingLossStr = d.pendingLosses?.[pid] ?? '0';
+        const pendingLoss = Number(
+          ethers.utils.formatUnits(
+            pendingLossStr,
+            pool.underlyingAssetDecimals ?? 6,
+          ),
+        );
+        return {
+          id: `${d.deployment}-${pid}`,
+          deployment: d.deployment,
+          protocol,
+          type: getProtocolType(pool.id),
+          pool: pool.protocolTokenToCover,
+          poolName: getTokenName(pool.id),
+          poolId: pid,
+          amount,
+          nativeValue: amount,
+          usdValue: amount * (pool.tokenPriceUsd ?? 1),
+          pendingLoss,
+          pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
+          yield: Number(pool.underwriterYieldBps || 0) / 100,
+          status:
+            Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
+              ? 'requested withdrawal'
+              : 'active',
+          shares: d.masterShares,
+          yieldChoice: d.yieldChoice,
+        };
+      })
+    )
+    .filter(Boolean);
 
   useEffect(() => {
     async function loadRewards() {
@@ -286,10 +286,13 @@ const underwritingPositions = (details || [])
   const renderTables = (positions, title) => {
     const active = positions.filter((p) => p.status === 'active');
     const withdrawal = positions.filter((p) => p.status === 'requested withdrawal');
+    const baseColumnCount = 6;
+    const columnCount = showPendingLoss ? baseColumnCount + 1 : baseColumnCount;
+  
     return (
       <div className="mt-6">
         <h3 className="text-lg font-medium mb-2">{title}</h3>
-        {active.length > 0 && (
+        {positions.length > 0 && (
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="inline-block min-w-full align-middle">
               <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
@@ -308,118 +311,120 @@ const underwritingPositions = (details || [])
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {active.map((position) => (
+                    {positions.map((position) => (
                       <Fragment key={position.id}>
                         <tr className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
-                              <Image src={getProtocolLogo(position.poolId)} alt={position.protocol} width={32} height={32} className="rounded-full" />
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
+                                <Image src={getProtocolLogo(position.poolId)} alt={getProtocolName(position.poolId)} width={32} height={32} className="rounded-full" />
+                              </div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{getProtocolName(position.poolId)}</div>
                             </div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{getProtocolName(position.poolId)}</div>
-                          </div>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-6 w-6 mr-2">
-                              <Image src={getTokenLogo(position.pool)} alt={position.poolName} width={24} height={24} className="rounded-full" />
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-6 w-6 mr-2">
+                                <Image src={getTokenLogo(position.pool)} alt={getTokenName(position.pool)} width={24} height={24} className="rounded-full" />
+                              </div>
+                              <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
                             </div>
-                            <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
-                          </div>
-                          <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
-                            {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
-                          </div>
-                          <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
-                            {formatPercentage(position.yield)}
-                          </div>
-                          {position.pendingLoss > 0 && (
-                            <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
-                              Loss: {formatCurrency(displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd, 'USD', displayCurrency)}
+                            <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
+                              {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
-                          </div>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                          <div className="text-sm font-medium text-green-600 dark:text-green-400">{formatPercentage(position.yield)}</div>
-                        </td>
-                        {showPendingLoss && (
+                            <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
+                              {formatPercentage(position.yield)}
+                            </div>
+                            {position.pendingLoss > 0 && (
+                              <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
+                                Loss: {formatCurrency(displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd, 'USD', displayCurrency)}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                             <div className="text-sm text-gray-900 dark:text-white">
-                              {formatCurrency(displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd, 'USD', displayCurrency)}
+                              {displayCurrency === 'native' ? `${position.amount}` : formatCurrency(position.usdValue, 'USD', 'usd')}
                             </div>
                           </td>
-                        )}
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'}`}>{position.status}</span>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => toggleRow(position.id)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
-                          >
-                            <span className="hidden sm:inline">
-                              {expandedRows.includes(position.id) ? 'Hide' : 'Actions'}
-                            </span>
-                            {expandedRows.includes(position.id) ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedRows.includes(position.id) && (
-                        <tr>
-                          <td colSpan={showPendingLoss ? 7 : 6} className="px-3 sm:px-6 py-4">
-                            <div className="flex flex-wrap gap-3 items-center">
-                              <div className="text-sm text-gray-700 dark:text-gray-200">
-                                Pending Rewards: {((Number(rewardsMap[position.id] || 0) / 1e18).toFixed(4))}
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                            <div className="text-sm font-medium text-green-600 dark:text-green-400">{formatPercentage(position.yield)}</div>
+                          </td>
+                          {showPendingLoss && (
+                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                              <div className="text-sm text-gray-900 dark:text-white">
+                                {formatCurrency(displayCurrency === 'native' ? position.pendingLoss : position.pendingLossUsd, 'USD', displayCurrency)}
                               </div>
-                              <button
-                                className="py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
-                                onClick={() => handleClaimRewards(position)}
-                                disabled={isClaiming}
-                              >
-                                {isClaiming ? 'Claiming...' : 'Claim Rewards'}
-                              </button>
-                              <button
-                                className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
-                                onClick={() => handleOpenModal(position)}
-                              >
-                                Manage
-                              </button>
-                              <Link
-                                href={`/pool/${position.poolId}/${position.pool}`}
-                                className="py-2 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 rounded-md text-sm"
-                              >
-                                Pool Page
-                              </Link>
-                              {position.pendingLoss > 0 && (
-                                <button
-                                  className="py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
-                                  onClick={() => handleClaimDistressed(position)}
-                                  disabled={isClaimingDistressed}
-                                >
-                                  {isClaimingDistressed ? 'Claiming...' : 'Claim Distressed'}
-                                </button>
+                            </td>
+                          )}
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'}`}>{position.status}</span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              onClick={() => toggleRow(position.id)}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
+                            >
+                              <span className="hidden sm:inline">
+                                {expandedRows.includes(position.id) ? 'Hide' : 'Actions'}
+                              </span>
+                              {expandedRows.includes(position.id) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
                               )}
-                              {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
-                                <button
-                                  className="py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm"
-                                  onClick={handleExecuteWithdrawal}
-                                  disabled={isExecuting}
-                                >
-                                  {isExecuting ? 'Executing...' : 'Execute Withdrawal'}
-                                </button>
-                              )}
-                            </div>
+                            </button>
                           </td>
                         </tr>
-                      )}
+                        {expandedRows.includes(position.id) && (
+                          <tr>
+                            {/* Use the dynamically calculated columnCount for colSpan */}
+                            <td colSpan={columnCount} className="px-3 sm:px-6 py-4">
+                              <div className="flex flex-wrap gap-3 items-center">
+                                <div className="text-sm text-gray-700 dark:text-gray-200">
+                                  Pending Rewards: {((Number(rewardsMap[position.id] || 0) / 1e18).toFixed(4))}
+                                </div>
+                                <button
+                                  className="py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+                                  onClick={() => handleClaimRewards(position)}
+                                  disabled={isClaiming}
+                                >
+                                  {isClaiming ? 'Claiming...' : 'Claim Rewards'}
+                                </button>
+                                <button
+                                  className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
+                                  onClick={() => handleOpenModal(position)}
+                                >
+                                  Manage
+                                </button>
+                                <Link
+                                  href={`/pool/${position.poolId}/${position.pool}`}
+                                  className="py-2 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 rounded-md text-sm"
+                                >
+                                  Pool Page
+                                </Link>
+                                {position.pendingLoss > 0 && (
+                                  <button
+                                    className="py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
+                                    onClick={() => handleClaimDistressed(position)}
+                                    disabled={isClaimingDistressed}
+                                  >
+                                    {isClaimingDistressed ? 'Claiming...' : 'Claim Distressed'}
+                                  </button>
+                                )}
+                                {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
+                                  <button
+                                    className="py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm"
+                                    onClick={handleExecuteWithdrawal}
+                                    disabled={isExecuting}
+                                  >
+                                    {isExecuting ? 'Executing...' : 'Execute Withdrawal'}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
