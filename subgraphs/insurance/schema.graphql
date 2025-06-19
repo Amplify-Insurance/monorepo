@@ -1,4 +1,4 @@
-type GenericEvent @entity {
+type GenericEvent @entity(immutable: false) {
   id: ID!
   deployment: String!
   blockNumber: BigInt!
@@ -9,7 +9,7 @@ type GenericEvent @entity {
 }
 
 # New entities with minimal fields for the demo
-type Pool @entity {
+type Pool @entity(immutable: false) {
   id: ID!
   deployment: String!
   underlyingAsset: Bytes!
@@ -17,14 +17,14 @@ type Pool @entity {
   protocolCovered: Int!
 }
 
-type Underwriter @entity {
+type Underwriter @entity(immutable: false) {
   id: ID!
   deployment: String!
   totalDeposited: BigInt!
   masterShares: BigInt!
 }
 
-type Policy @entity {
+type Policy @entity(immutable: false) {
   id: ID!
   deployment: String!
   owner: Bytes!
@@ -34,13 +34,13 @@ type Policy @entity {
   premiumRateBps: BigInt!
 }
 
-type ContractOwner @entity {
+type ContractOwner @entity(immutable: false) {
   id: ID!
   deployment: String!
   owner: Bytes!
 }
 
-type PoolUtilizationSnapshot @entity {
+type PoolUtilizationSnapshot @entity(immutable: false) {
   id: ID!
   deployment: String!
   pool: Pool!
@@ -50,7 +50,7 @@ type PoolUtilizationSnapshot @entity {
   premiumRateBps: BigInt!
 }
 
-type Claim @entity {
+type Claim @entity(immutable: false) {
   id: ID!
   deployment: String!
   policyId: BigInt!
@@ -64,7 +64,7 @@ type Claim @entity {
   transactionHash: Bytes!
 }
 
-type PolicyCreatedEvent @entity {
+type PolicyCreatedEvent @entity(immutable: false) {
   id: ID!
   deployment: String!
   policyId: BigInt!
@@ -75,7 +75,7 @@ type PolicyCreatedEvent @entity {
   transactionHash: Bytes!
 }
 
-type PolicyLapsedEvent @entity {
+type PolicyLapsedEvent @entity(immutable: false) {
   id: ID!
   deployment: String!
   policyId: BigInt!
@@ -83,7 +83,7 @@ type PolicyLapsedEvent @entity {
   transactionHash: Bytes!
 }
 
-type PremiumPaidEvent @entity {
+type PremiumPaidEvent @entity(immutable: false) {
   id: ID!
   deployment: String!
   policyId: BigInt!
@@ -95,7 +95,7 @@ type PremiumPaidEvent @entity {
   transactionHash: Bytes!
 }
 
-type GovernanceProposal @entity {
+type GovernanceProposal @entity(immutable: false) {
   id: ID!
   deployment: String!
   proposer: Bytes!
@@ -110,7 +110,7 @@ type GovernanceProposal @entity {
   votes: [GovernanceVote!] @derivedFrom(field: "proposal")
 }
 
-type GovernanceVote @entity {
+type GovernanceVote @entity(immutable: false) {
   id: ID!
   deployment: String!
   proposal: GovernanceProposal!
