@@ -17,6 +17,7 @@ import deployments, { getDeployment } from "../config/deployments"
 export default function ActiveCoverages({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCoverage, setSelectedCoverage] = useState(null)
+  const [cancellingId, setCancellingId] = useState(null)
   const { address } = useAccount()
   const { policies } = useUserPolicies(address)
   const { pools } = usePools()
@@ -119,6 +120,7 @@ export default function ActiveCoverages({ displayCurrency }) {
     if (!coverage) return
     if (!window.confirm('Cancel this coverage early?')) return
     try {
+      setCancellingId(coverage.id)
       const dep = getDeployment(coverage.deployment)
       const pm = await getPoolManagerWithSigner(dep.poolManager)
       const tx = await pm.cancelCover(coverage.id)
@@ -126,6 +128,9 @@ export default function ActiveCoverages({ displayCurrency }) {
       window.location.reload()
     } catch (err) {
       console.error('Failed to cancel coverage', err)
+    } 
+    finally {
+      setCancellingId(null)
     }
   }
 
@@ -269,10 +274,11 @@ export default function ActiveCoverages({ displayCurrency }) {
                   Manage
                 </button>
                 <button
-                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50"
                   onClick={() => handleCancelCoverage(coverage)}
+                  disabled={cancellingId === coverage.id}
                 >
-                  Cancel
+                  {cancellingId === coverage.id ? 'Cancelling...' : 'Cancel'}
                 </button>
               </td>
             </tr>
