@@ -249,6 +249,21 @@ describe("RewardDistributor", function () {
       expect(pending).to.equal(0n);
     });
 
+    it("allows claiming again after further distributions", async function () {
+      const { riskManager, user, rd, token } = await setupDistribution();
+      await rd.connect(riskManager).claim(user.address, poolId, token.target, userPledge);
+      const balAfterFirst = await token.balanceOf(user.address);
+
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge);
+
+      await rd.connect(riskManager).claim(user.address, poolId, token.target, userPledge);
+      const balAfterSecond = await token.balanceOf(user.address);
+      const pending = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
+
+      expect(balAfterSecond - balAfterFirst).to.equal(ethers.parseEther("10"));
+      expect(pending).to.equal(0n);
+    });
+
     it("new risk manager controls privileged functions", async function () {
       const { owner, riskManager, other, rd, token } = await deployFixture();
       await rd.connect(owner).setRiskManager(other.address);
