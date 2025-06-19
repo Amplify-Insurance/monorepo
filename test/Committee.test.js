@@ -174,11 +174,23 @@ describe("Committee", function () {
         it("Should execute a successful 'Pause' proposal", async function() {
 
             await time.increase(VOTING_PERIOD + 1);
-            await expect(committee.connect(owner).executeProposal(1))
-                .to.emit(committee, "ProposalExecuted").withArgs(1);
-            
+            const tx = await committee.connect(owner).executeProposal(1);
+            await expect(tx).to.emit(committee, "ProposalExecuted").withArgs(1);
+
             const proposal = await committee.proposals(1);
             expect(proposal.status).to.equal(5); // Challenged
+        });
+
+        it("Should interact with RiskManager and set challenge deadline on pause", async function() {
+            await time.increase(VOTING_PERIOD + 1);
+            const tx = await committee.executeProposal(1);
+            await expect(tx).to.emit(mockRiskManager, "IncidentReported").withArgs(POOL_ID, true);
+            await expect(tx).to.emit(mockRiskManager, "FeeRecipientSet").withArgs(POOL_ID, committee.target);
+
+            const block = await ethers.provider.getBlock(tx.blockNumber);
+            const proposal = await committee.proposals(1);
+            expect(proposal.challengeDeadline).to.equal(block.timestamp + CHALLENGE_PERIOD);
+            expect(await committee.activeProposalForPool(POOL_ID)).to.equal(true);
         });
         
         it("Should execute a successful 'Unpause' proposal", async function() {
