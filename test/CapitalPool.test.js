@@ -76,6 +76,38 @@ describe("CapitalPool", function () {
         .withArgs(3600);
       expect(await capitalPool.underwriterNoticePeriod()).to.equal(3600);
     });
+
+    it("setRiskManager reverts for zero address", async () => {
+      await expect(capitalPool.connect(owner).setRiskManager(ethers.ZeroAddress))
+        .to.be.revertedWithCustomError(capitalPool, "ZeroAddress");
+    });
+
+    it("setRiskManager restricted to owner", async () => {
+      await expect(capitalPool.connect(user1).setRiskManager(riskManager.address))
+        .to.be.revertedWithCustomError(capitalPool, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
+    });
+
+    it("setBaseYieldAdapter reverts for NONE platform", async () => {
+      await expect(capitalPool.connect(owner).setBaseYieldAdapter(0, mockAdapter1.target))
+        .to.be.revertedWith("CP: Cannot set for NONE platform");
+    });
+
+    it("setBaseYieldAdapter reverts for zero address", async () => {
+      await expect(capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, ethers.ZeroAddress))
+        .to.be.revertedWithCustomError(capitalPool, "ZeroAddress");
+    });
+
+    it("setBaseYieldAdapter requires contract address", async () => {
+      await expect(capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, user1.address))
+        .to.be.revertedWith("CP: Adapter address is not a contract");
+    });
+
+    it("setUnderwriterNoticePeriod restricted to owner", async () => {
+      await expect(capitalPool.connect(user1).setUnderwriterNoticePeriod(1))
+        .to.be.revertedWithCustomError(capitalPool, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
+    });
   });
 
   describe("Edge Cases Without RiskManager", () => {
@@ -146,6 +178,16 @@ describe("CapitalPool", function () {
       it("Should revert if adapter is not configured", async () => {
         await expect(capitalPool.connect(user1).deposit(DEPOSIT_AMOUNT, 3))
           .to.be.revertedWithCustomError(capitalPool, "AdapterNotConfigured");
+      });
+
+      it("Should revert if yield platform is NONE", async () => {
+        await expect(capitalPool.connect(user1).deposit(DEPOSIT_AMOUNT, 0))
+          .to.be.revertedWithCustomError(capitalPool, "AdapterNotConfigured");
+      });
+
+      it("requestWithdrawal reverts when no deposit", async () => {
+        await expect(capitalPool.connect(user1).requestWithdrawal(1))
+          .to.be.revertedWithCustomError(capitalPool, "InsufficientShares");
       });
     });
 
@@ -362,6 +404,12 @@ describe("CapitalPool", function () {
     describe("Access Control and Security", () => {
       it("should revert if a non-RiskManager calls applyLosses", async () => {
         await expect(capitalPool.connect(nonParty).applyLosses(user1.address, 1))
+          .to.be.revertedWith("CP: Caller is not the RiskManager");
+      });
+
+      it("should revert if a non-RiskManager calls executePayout", async () => {
+        const payoutData = { claimant: claimant.address, claimantAmount: 0, feeRecipient: ethers.ZeroAddress, feeAmount: 0, adapters: [], capitalPerAdapter: [], totalCapitalFromPoolLPs: 0 };
+        await expect(capitalPool.connect(nonParty).executePayout(payoutData))
           .to.be.revertedWith("CP: Caller is not the RiskManager");
       });
 
