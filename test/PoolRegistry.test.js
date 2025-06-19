@@ -78,6 +78,28 @@ describe("PoolRegistry", function () {
                 await expect(poolRegistry.connect(owner).setRiskManager(ethers.ZeroAddress))
                     .to.be.revertedWith("PR: Zero address");
             });
+
+            it("New risk manager should gain permissions and old one lose them", async function () {
+                await poolRegistry.connect(owner).setRiskManager(nonOwner.address);
+
+                // New risk manager can create a pool
+                await expect(
+                    poolRegistry.connect(nonOwner).addProtocolRiskPool(
+                        token.target,
+                        sampleRateModel,
+                        sampleClaimFee
+                    )
+                ).to.not.be.reverted;
+
+                // Old risk manager can no longer perform privileged actions
+                await expect(
+                    poolRegistry.connect(riskManager).addProtocolRiskPool(
+                        token.target,
+                        sampleRateModel,
+                        sampleClaimFee
+                    )
+                ).to.be.revertedWith("PR: Not RiskManager");
+            });
         });
     });
 
@@ -219,6 +241,19 @@ describe("PoolRegistry", function () {
                 
                 const poolData = await poolRegistry.getPoolData(0);
                 expect(poolData.totalCapitalPledgedToPool).to.equal(pledgeAmount * 2n);
+            });
+
+            it("Should handle removing the last remaining adapter", async function () {
+                // Add one adapter then remove it
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, pledgeAmount, true);
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, pledgeAmount, false);
+
+                const activeAdapters = await poolRegistry.getPoolActiveAdapters(0);
+                expect(activeAdapters).to.have.lengthOf(0);
+                expect(await poolRegistry.getCapitalPerAdapter(0, adapter1.address)).to.equal(0);
+
+                const poolData = await poolRegistry.getPoolData(0);
+                expect(poolData.totalCapitalPledgedToPool).to.equal(0);
             });
 
             it("Should prevent non-risk managers from updating capital allocation", async function () {
@@ -503,6 +538,40 @@ describe("PoolRegistry", function () {
             expect(adapters).to.be.an('array').that.is.empty;
             expect(capitalPerAdapter).to.be.an('array').that.is.empty;
             expect(totalCapital).to.equal(0);
+        });
+    });
+
+    describe("Multiple Pools Interactions", function () {
+        beforeEach(async function () {
+            await poolRegistry.connect(riskManager).addProtocolRiskPool(
+                token.target,
+                sampleRateModel,
+                sampleClaimFee
+            );
+            await poolRegistry.connect(riskManager).addProtocolRiskPool(
+                owner.address,
+                sampleRateModel,
+                sampleClaimFee
+            );
+        });
+
+        it("Operations on one pool should not affect another", async function () {
+            const amount0 = ethers.parseUnits("1000", 18);
+            const amount1 = ethers.parseUnits("500", 18);
+
+            await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, amount0, true);
+            await poolRegistry.connect(riskManager).updateCoverageSold(0, amount0, true);
+
+            await poolRegistry.connect(riskManager).updateCapitalAllocation(1, adapter2.address, amount1, true);
+            await poolRegistry.connect(riskManager).updateCoverageSold(1, amount1, true);
+
+            const pool0 = await poolRegistry.getPoolData(0);
+            expect(pool0.totalCapitalPledgedToPool).to.equal(amount0);
+            expect(pool0.totalCoverageSold).to.equal(amount0);
+
+            const pool1 = await poolRegistry.getPoolData(1);
+            expect(pool1.totalCapitalPledgedToPool).to.equal(amount1);
+            expect(pool1.totalCoverageSold).to.equal(amount1);
         });
     });
 });
