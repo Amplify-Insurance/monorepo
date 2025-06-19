@@ -10,8 +10,8 @@ import useUnderwriterDetails from "../../hooks/useUnderwriterDetails";
 import usePools from "../../hooks/usePools";
 import useYieldAdapters from "../../hooks/useYieldAdapters";
 import { ethers } from "ethers";
-import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool";
+import { getRewardDistributorWithSigner } from "../../lib/rewardDistributor";
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName } from "../config/tokenNameMap";
 import deployments, { getDeployment } from "../config/deployments";
 
@@ -21,10 +21,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
-  const [isClaimingDistressed, setIsClaimingDistressed] = useState(false);
-  const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [isClaimingDistressed, setIsClaimingDistressed] = useState(false);
+  const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false);
   const [showAllocModal, setShowAllocModal] = useState(false);
   const { address } = useAccount();
   const { details } = useUnderwriterDetails(address);
@@ -60,6 +60,7 @@ const underwritingPositions = (details || [])
         pool: pool.protocolTokenToCover,
         poolName: getTokenName(pool.id),
         poolId: pid,
+        decimals: pool.underlyingAssetDecimals ?? 6,
         amount,
         nativeValue: amount,
         usdValue: amount * (pool.tokenPriceUsd ?? 1),
@@ -112,9 +113,12 @@ const underwritingPositions = (details || [])
     setIsClaiming(true);
     try {
       const dep = getDeployment(position.deployment);
-      const rm = await getRiskManagerWithSigner(dep.riskManager);
-      await (await rm.claimPremiumRewards(position.poolId)).wait();
-      await (await rm.claimDistressedAssets(position.poolId)).wait();
+      const rd = await getRewardDistributorWithSigner(dep.rewardDistributor);
+      const pledge = ethers.utils.parseUnits(
+        position.amount.toString(),
+        position.decimals,
+      );
+      await (await rd.claim(address, position.poolId, position.pool, pledge)).wait();
     } catch (err) {
       console.error("Failed to claim rewards", err);
     } finally {
@@ -127,15 +131,18 @@ const underwritingPositions = (details || [])
     setIsClaimingAll(true);
     try {
       const grouped = underwritingPositions.reduce((acc, p) => {
-        (acc[p.deployment] = acc[p.deployment] || []).push(p.poolId);
+        (acc[p.deployment] = acc[p.deployment] || []).push(p);
         return acc;
       }, {});
-      for (const [depName, ids] of Object.entries(grouped)) {
+      for (const [depName, positions] of Object.entries(grouped)) {
         const dep = getDeployment(depName);
-        const rm = await getRiskManagerWithSigner(dep.riskManager);
-        for (const id of ids) {
-          await (await rm.claimPremiumRewards(id)).wait();
-          await (await rm.claimDistressedAssets(id)).wait();
+        const rd = await getRewardDistributorWithSigner(dep.rewardDistributor);
+        for (const pos of positions) {
+          const pledge = ethers.utils.parseUnits(
+            pos.amount.toString(),
+            pos.decimals,
+          );
+          await (await rd.claim(address, pos.poolId, pos.pool, pledge)).wait();
         }
       }
     } catch (err) {
