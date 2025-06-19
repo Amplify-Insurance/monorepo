@@ -1,0 +1,170 @@
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+const PRECISION = 10n ** 18n;
+
+async function deployFixture() {
+  const [owner, riskManager, catPool, user, other] = await ethers.getSigners();
+
+  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+  const rd = await RewardDistributor.deploy(riskManager.address);
+
+  const MockERC20 = await ethers.getContractFactory("MockERC20");
+  const token = await MockERC20.deploy("Reward", "RWD", 18);
+  await token.mint(rd.target, ethers.parseEther("1000"));
+
+  return { owner, riskManager, catPool, user, other, rd, token };
+}
+
+describe("RewardDistributor", function () {
+  describe("Deployment", function () {
+    it("sets the initial riskManager", async function () {
+      const { riskManager, rd } = await deployFixture();
+      expect(await rd.riskManager()).to.equal(riskManager.address);
+    });
+
+    it("reverts if riskManager is zero", async function () {
+      const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+      await expect(RewardDistributor.deploy(ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        RewardDistributor, "ZeroAddress"
+      );
+    });
+  });
+
+  describe("Admin functions", function () {
+    it("owner can set catPool", async function () {
+      const { owner, catPool, rd } = await deployFixture();
+      await expect(rd.connect(owner).setCatPool(catPool.address))
+        .to.emit(rd, "CatPoolSet")
+        .withArgs(catPool.address);
+      expect(await rd.catPool()).to.equal(catPool.address);
+    });
+
+    it("non-owner cannot set catPool", async function () {
+      const { catPool, rd, other } = await deployFixture();
+      await expect(rd.connect(other).setCatPool(catPool.address)).to.be.revertedWithCustomError(
+        rd,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+
+    it("owner can set riskManager", async function () {
+      const { owner, other, rd } = await deployFixture();
+      await expect(rd.connect(owner).setRiskManager(other.address)).to.not.be.reverted;
+      expect(await rd.riskManager()).to.equal(other.address);
+    });
+
+    it("non-owner cannot set riskManager", async function () {
+      const { other, rd } = await deployFixture();
+      await expect(rd.connect(other).setRiskManager(other.address)).to.be.revertedWithCustomError(
+        rd,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+
+    it("reverts when setting riskManager to zero", async function () {
+      const { owner, rd } = await deployFixture();
+      await expect(rd.connect(owner).setRiskManager(ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        rd,
+        "ZeroAddress"
+      );
+    });
+  });
+
+  describe("Reward logic", function () {
+    const poolId = 1;
+    const totalPledge = ethers.parseEther("1000");
+    const rewardAmount = ethers.parseEther("100");
+    const userPledge = ethers.parseEther("100");
+
+    async function setupDistribution() {
+      const { owner, riskManager, catPool, user, other, rd, token } = await deployFixture();
+      await rd.connect(owner).setCatPool(catPool.address);
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge);
+      await rd.connect(riskManager).updateUserState(user.address, poolId, token.target, userPledge);
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge);
+      return { owner, riskManager, catPool, user, other, rd, token };
+    }
+
+    it("distribute updates accumulatedRewardsPerShare", async function () {
+      const { riskManager, rd, token } = await deployFixture();
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge);
+      const tracker = await rd.poolRewardTrackers(poolId, token.target);
+      const expected = (rewardAmount * PRECISION) / totalPledge;
+      expect(tracker).to.equal(expected);
+    });
+
+    it("distribute ignores zero values", async function () {
+      const { riskManager, rd, token } = await deployFixture();
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge);
+      const before = await rd.poolRewardTrackers(poolId, token.target);
+      await rd.connect(riskManager).distribute(poolId, token.target, 0, totalPledge);
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, 0);
+      const after = await rd.poolRewardTrackers(poolId, token.target);
+      expect(after).to.equal(before);
+    });
+
+    it("only risk manager can distribute", async function () {
+      const { rd, token, other } = await deployFixture();
+      await expect(
+        rd.connect(other).distribute(poolId, token.target, rewardAmount, totalPledge)
+      ).to.be.revertedWith("RD: Not RiskManager");
+    });
+
+    it("claim pays out rewards and updates state", async function () {
+      const { riskManager, user, rd, token } = await setupDistribution();
+      const pending = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
+      const beforeBal = await token.balanceOf(user.address);
+      await rd.connect(riskManager).claim(user.address, poolId, token.target, userPledge);
+      const afterBal = await token.balanceOf(user.address);
+      const userDebt = await rd.userRewardStates(user.address, poolId, token.target);
+      const tracker = await rd.poolRewardTrackers(poolId, token.target);
+      expect(afterBal - beforeBal).to.equal(pending);
+      expect(userDebt).to.equal((userPledge * tracker) / PRECISION);
+    });
+
+    it("claim returns zero when nothing pending", async function () {
+      const { riskManager, user, rd, token } = await deployFixture();
+      await rd.connect(riskManager).updateUserState(user.address, poolId, token.target, userPledge);
+      await expect(rd.connect(riskManager).claim(user.address, poolId, token.target, userPledge)).to.not.be
+        .reverted;
+      expect(await token.balanceOf(user.address)).to.equal(0);
+    });
+
+    it("only risk manager can call claim", async function () {
+      const { rd, user, token, other } = await deployFixture();
+      await expect(
+        rd.connect(other).claim(user.address, poolId, token.target, userPledge)
+      ).to.be.revertedWith("RD: Not RiskManager");
+    });
+
+    it("claimForCatPool can be called by catPool", async function () {
+      const { catPool, user, rd, token, riskManager } = await setupDistribution();
+      const pending = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
+      const beforeBal = await token.balanceOf(user.address);
+      await rd.connect(catPool).claimForCatPool(user.address, poolId, token.target, userPledge);
+      const afterBal = await token.balanceOf(user.address);
+      expect(afterBal - beforeBal).to.equal(pending);
+    });
+
+    it("reverts if non-catPool calls claimForCatPool", async function () {
+      const { rd, user, token, other } = await setupDistribution();
+      await expect(
+        rd.connect(other).claimForCatPool(user.address, poolId, token.target, userPledge)
+      ).to.be.revertedWith("RD: Not CatPool");
+    });
+
+    it("updateUserState only risk manager", async function () {
+      const { rd, token, other } = await deployFixture();
+      await expect(
+        rd.connect(other).updateUserState(other.address, poolId, token.target, userPledge)
+      ).to.be.revertedWith("RD: Not RiskManager");
+    });
+
+    it("pendingRewards returns correct amount", async function () {
+      const { user, rd, token } = await setupDistribution();
+      const pending = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
+      expect(pending).to.equal(ethers.parseEther("10"));
+    });
+  });
+});
