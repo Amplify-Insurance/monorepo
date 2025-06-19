@@ -421,7 +421,7 @@ export default function PoolDetailsPage() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Pool Not Found</h2>
         <p className="text-gray-600 dark:text-gray-400 mb-6">The requested pool ({protocol}/{token}) could not be found.</p>
-        <Link href="/markets" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"><ArrowLeft className="mr-2 h-4 w-4"/> Back to Markets</Link>
+        <Link href="/markets" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"><ArrowLeft className="mr-2 h-4 w-4"/> Back</Link>
       </div>
     )
   }
@@ -433,7 +433,7 @@ export default function PoolDetailsPage() {
           onClick={() => router.back()}
           className="inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
         >
-          <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Markets
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
         </button>
       </div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">

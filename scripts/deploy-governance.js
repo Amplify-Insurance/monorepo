@@ -16,7 +16,7 @@ const fs = require("fs");
 const path = require("path");
 
 // TODO: set this to the deployed RiskManager address
-const RISK_MANAGER_ADDRESS = "0x9A995a909749D4E9b6023596377eda613d9ea197";
+const RISK_MANAGER_ADDRESS = "0xD1c640f4C9ff53ba46B42959ECB9a76f2dB9Cb2b";
 
 const VOTING_PERIOD = 7 * 24 * 60 * 60;       // 7 days
 const CHALLENGE_PERIOD = 7 * 24 * 60 * 60;    // 7 days
@@ -32,7 +32,7 @@ async function main() {
     "RiskManager",
     RISK_MANAGER_ADDRESS
   );
-  
+
   /*───────────────────────── Governance token ─────────────────────────*/
   const MockERC20 = await ethers.getContractFactory("MockERC20");
   const govToken = await MockERC20.deploy("Governance Token", "GOV", 18);

@@ -26,7 +26,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     /* ───────────────────────── Constants ───────────────────────── */
     uint256 public constant BPS = 10_000;
     uint256 public constant SECS_YEAR = 365 days;
-    uint256 public coverCooldownPeriod = 5 days;
+    uint256 public coverCooldownPeriod = 0 days;
 
     /* ───────────────────────── State Variables ───────────────────────── */
     IPoolRegistry public poolRegistry;

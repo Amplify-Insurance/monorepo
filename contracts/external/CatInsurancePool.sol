@@ -29,7 +29,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     uint256 public idleUSDC;
     uint256 private constant INITIAL_SHARES_LOCKED = 1000;
     uint256 public constant CAT_POOL_REWARD_ID = type(uint256).max;
-    uint256 public constant MIN_USDC_AMOUNT = 1e6; // 1 USDC assuming 6 decimals
+    uint256 public constant MIN_USDC_AMOUNT = 1e3; // 1 USDC assuming 6 decimals
 
     // --- Events (add an Initialized event) ---
     event Initialized();

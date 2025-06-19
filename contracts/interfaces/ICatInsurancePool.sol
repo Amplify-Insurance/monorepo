@@ -4,4 +4,6 @@ pragma solidity ^0.8.20;
 interface ICatInsurancePool {
     function drawFund(uint256 amount) external;
     function receiveUsdcPremium(uint256 amount) external;
+    function claimProtocolAssetRewards(address protocolToken) external;
 }
+
