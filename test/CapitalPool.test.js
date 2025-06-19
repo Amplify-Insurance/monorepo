@@ -103,6 +103,12 @@ describe("CapitalPool", function () {
         .to.be.revertedWith("CP: Adapter address is not a contract");
     });
 
+    it("setBaseYieldAdapter restricted to owner", async () => {
+      await expect(capitalPool.connect(user1).setBaseYieldAdapter(YIELD_PLATFORM_1, mockAdapter1.target))
+        .to.be.revertedWithCustomError(capitalPool, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
+    });
+
     it("setUnderwriterNoticePeriod restricted to owner", async () => {
       await expect(capitalPool.connect(user1).setUnderwriterNoticePeriod(1))
         .to.be.revertedWithCustomError(capitalPool, "OwnableUnauthorizedAccount")
