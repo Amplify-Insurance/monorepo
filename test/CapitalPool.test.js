@@ -349,6 +349,67 @@ describe("CapitalPool", function () {
           .to.be.revertedWith("CP: Payout failed, insufficient funds gathered");
       });
 
+      it("executePayout uses emergencyTransfer when withdraw reverts", async () => {
+        const RevertingAdapter = await ethers.getContractFactory("RevertingAdapter");
+        const revAdapter = await RevertingAdapter.deploy(mockUsdc.target);
+        await capitalPool.connect(owner).setBaseYieldAdapter(3, revAdapter.target);
+
+        const payoutAmount = ethers.parseUnits("500", 6);
+        const payoutData = {
+          claimant: claimant.address,
+          claimantAmount: payoutAmount,
+          feeRecipient: ethers.ZeroAddress,
+          feeAmount: 0,
+          adapters: [revAdapter.target],
+          capitalPerAdapter: [payoutAmount],
+          totalCapitalFromPoolLPs: payoutAmount,
+        };
+
+        await mockUsdc.connect(owner).mint(revAdapter.target, payoutAmount);
+        await mockUsdc.connect(owner).mint(capitalPool.target, payoutAmount);
+
+        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const catPool = await MockCatPool.deploy(owner.address);
+        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        const rm = await RM.deploy(catPool.target);
+        await catPool.setCoverPoolAddress(capitalPool.target);
+        await capitalPool.connect(owner).setRiskManager(rm.target);
+
+        await rm.executePayout(capitalPool.target, payoutData);
+        expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount * 2n);
+        expect(await catPool.drawFundCallCount()).to.equal(0);
+      });
+
+      it("executePayout calls drawFund if emergencyTransfer sends zero", async () => {
+        const AdapterNoTransfer = await ethers.getContractFactory("RevertingAdapterNoTransfer");
+        const noSendAdapter = await AdapterNoTransfer.deploy(mockUsdc.target);
+        await capitalPool.connect(owner).setBaseYieldAdapter(3, noSendAdapter.target);
+
+        const payoutAmount = ethers.parseUnits("500", 6);
+        const payoutData = {
+          claimant: claimant.address,
+          claimantAmount: payoutAmount,
+          feeRecipient: ethers.ZeroAddress,
+          feeAmount: 0,
+          adapters: [noSendAdapter.target],
+          capitalPerAdapter: [payoutAmount],
+          totalCapitalFromPoolLPs: payoutAmount,
+        };
+
+        await mockUsdc.connect(owner).mint(capitalPool.target, payoutAmount);
+
+        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const catPool = await MockCatPool.deploy(owner.address);
+        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        const rm = await RM.deploy(catPool.target);
+        await catPool.setCoverPoolAddress(capitalPool.target);
+        await capitalPool.connect(owner).setRiskManager(rm.target);
+
+        await rm.executePayout(capitalPool.target, payoutData);
+        expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount);
+        expect(await catPool.drawFundCallCount()).to.equal(1);
+      });
+
       it("applyLosses should burn shares and reduce principal", async () => {
         const lossAmount = ethers.parseUnits("1000", 6);
         const initialAccount = await capitalPool.getUnderwriterAccount(user1.address);
