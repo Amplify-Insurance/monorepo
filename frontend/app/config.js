@@ -44,7 +44,7 @@ const baseMainnet = {
 
 // 4. Use getDefaultConfig to create wagmi/RainbowKit config
 export const config = getDefaultConfig({
-  appName: 'DeFi Insurance Platform',
+  appName: 'LayerCover',
   projectId: projectId || 'DEFAULT_PROJECT_ID_IF_MISSING',
   chains: [baseMainnet],
   transports: {
