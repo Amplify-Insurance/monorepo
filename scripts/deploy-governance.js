@@ -28,6 +28,11 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying governance contracts with:", deployer.address);
 
+  const riskManager = await ethers.getContractAt(
+    "RiskManager",
+    RISK_MANAGER_ADDRESS
+  );
+  
   /*───────────────────────── Governance token ─────────────────────────*/
   const MockERC20 = await ethers.getContractFactory("MockERC20");
   const govToken = await MockERC20.deploy("Governance Token", "GOV", 18);
