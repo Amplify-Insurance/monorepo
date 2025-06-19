@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -70,6 +70,7 @@ const generateInterestRateModelData = (optimalUtilization, baseRate, slope1, slo
 export default function PoolDetailsPage() {
   const params = useParams()
   const { protocol, token } = params
+  const router = useRouter()
   const [isClient, setIsClient] = useState(false)
   const [premiumTimeframe, setPremiumTimeframe] = useState("1m")
   const [utilTimeframe, setUtilTimeframe] = useState("1m")
@@ -429,9 +430,12 @@ export default function PoolDetailsPage() {
   return (
     <div className="container mx-auto max-w-7xl p-4 md:p-6 lg:p-8 font-sans">
       <div className="mb-6">
-        <Link href="/markets" className="inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
-          <ArrowLeft className="mr-1.5 h-4 w-4"/> Back to Markets
-        </Link>
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+        >
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Markets
+        </button>
       </div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div className="flex items-center">
