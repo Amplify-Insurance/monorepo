@@ -303,6 +303,28 @@ describe("PoolRegistry", function () {
                 expect(await poolRegistry.getCapitalPerAdapter(0, adapter1.address)).to.equal(0);
             });
 
+            it("Should add an adapter when allocating zero capital", async function () {
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, 0, true);
+
+                const activeAdapters = await poolRegistry.getPoolActiveAdapters(0);
+                expect(activeAdapters).to.deep.equal([adapter1.address]);
+                const poolData = await poolRegistry.getPoolData(0);
+                expect(poolData.totalCapitalPledgedToPool).to.equal(0);
+                expect(await poolRegistry.getCapitalPerAdapter(0, adapter1.address)).to.equal(0);
+            });
+
+            it("Should not remove an adapter when de-allocating zero capital", async function () {
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, pledgeAmount, true);
+
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, 0, false);
+
+                const activeAdapters = await poolRegistry.getPoolActiveAdapters(0);
+                expect(activeAdapters).to.deep.equal([adapter1.address]);
+                const poolData = await poolRegistry.getPoolData(0);
+                expect(poolData.totalCapitalPledgedToPool).to.equal(pledgeAmount);
+                expect(await poolRegistry.getCapitalPerAdapter(0, adapter1.address)).to.equal(pledgeAmount);
+            });
+
             it("Should prevent non-risk managers from updating capital allocation", async function () {
                  await expect(poolRegistry.connect(nonOwner).updateCapitalAllocation(0, adapter1.address, pledgeAmount, true))
                     .to.be.revertedWith("PR: Not RiskManager");
