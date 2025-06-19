@@ -234,6 +234,33 @@ describe("PolicyManager", function () {
                 await expect(policyManager.connect(user1).purchaseCover(POOL_ID, ethers.parseUnits("6000", 6), INITIAL_PREMIUM_DEPOSIT))
                     .to.be.revertedWithCustomError(policyManager, "InsufficientCapacity");
             });
+            it("Should revert when pending withdrawals exceed total capital", async function () {
+                await mockPoolRegistry.setPoolData(POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    0,
+                    ethers.parseUnits("200000", 6),
+                    false,
+                    owner.address,
+                    0
+                );
+                await expect(policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, INITIAL_PREMIUM_DEPOSIT))
+                    .to.be.revertedWithCustomError(policyManager, "InsufficientCapacity");
+            });
+
+            it("Should emit CoverageUpdated on successful purchase", async function () {
+                await expect(policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, INITIAL_PREMIUM_DEPOSIT))
+                    .to.emit(mockRiskManager, "CoverageUpdated")
+                    .withArgs(POOL_ID, COVERAGE_AMOUNT, true);
+            });
+
+            it("Should revert if premium deposit exceeds uint128 max", async function () {
+                const hugeDeposit = 1n << 128n; // uint128 max + 1
+                await mockUsdc.connect(owner).mint(user1.address, hugeDeposit);
+                await mockUsdc.connect(user1).approve(policyManager.target, hugeDeposit);
+                await expect(policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, hugeDeposit))
+                    .to.be.revertedWithCustomError(policyManager, "InvalidAmount");
+            });
         });
 
         describe("cancelCover()", function() {
@@ -326,6 +353,36 @@ describe("PolicyManager", function () {
 
                 await expect(policyManager.connect(user1).cancelCover(terminatedPolicyId))
                     .to.be.revertedWithCustomError(policyManager, "PolicyAlreadyTerminated");
+            });
+            it("Should distribute premiums and emit event on cancel", async function () {
+                await mockPoolRegistry.setPoolData(POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    COVERAGE_AMOUNT,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+                const rateModel = { base: 100, slope1: 0, slope2: 0, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await mockUsdc.mint(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
+                await time.increase(COOLDOWN_PERIOD + 30 * 24 * 60 * 60 + 1);
+
+                const polInfoBefore = await mockPolicyNFT.policies(POLICY_ID);
+                await expect(policyManager.connect(user1).cancelCover(POLICY_ID))
+                    .to.emit(mockRiskManager, "CoverageUpdated")
+                    .withArgs(POOL_ID, COVERAGE_AMOUNT, false);
+
+                const annualRateBps = 100n;
+                const latest = BigInt(await time.latest());
+                const timeElapsed = latest - BigInt(polInfoBefore.lastDrainTime);
+                const accrued = (COVERAGE_AMOUNT * annualRateBps * timeElapsed) / (BigInt(SECS_YEAR) * BigInt(BPS));
+                const catAmount = (accrued * BigInt(await policyManager.catPremiumBps())) / BigInt(BPS);
+                const poolIncome = accrued - catAmount;
+
+                expect(await mockCatPool.last_premiumReceived()).to.equal(catAmount);
+                expect(await mockRewardDistributor.totalRewards(POOL_ID, mockUsdc.target)).to.equal(poolIncome);
             });
         });
 
@@ -589,6 +646,21 @@ describe("PolicyManager", function () {
                     policyManager,
                     "PolicyAlreadyTerminated"
                 );
+            });
+            it("Should emit CoverageUpdated when lapsing policy", async function () {
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    0,
+                    0,
+                    0,
+                    0
+                );
+                await expect(policyManager.connect(user1).lapsePolicy(POLICY_ID))
+                    .to.emit(mockRiskManager, "CoverageUpdated")
+                    .withArgs(POOL_ID, COVERAGE_AMOUNT, false);
             });
         });
 
