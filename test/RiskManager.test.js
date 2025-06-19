@@ -6,7 +6,9 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 // Helper function to create mock contracts from an ABI
 async function deployMock(abi, signer) {
-    const factory = new ethers.ContractFactory(abi, `0x${'6080604052348015600f57600080fd5b50600080fdfe'}`, signer);
+    // Minimal runtime code that simply reverts for any call but deploys cleanly
+    const minimalBytecode = '0x600a600c600039600a6000f3fe';
+    const factory = new ethers.ContractFactory(abi, minimalBytecode, signer);
     return await factory.deploy();
 }
 
@@ -24,13 +26,13 @@ describe("RiskManager", function () {
     const MAX_ALLOCATIONS = 5;
 
     // --- Mock ABIs (assuming they are generated in the artifacts folder) ---
-    const iPoolRegistryAbi = require("../artifacts/contracts/RiskManager.sol/IPoolRegistry.json").abi;
-    const iCapitalPoolAbi = require("../artifacts/contracts/RiskManager.sol/ICapitalPool.json").abi;
-    const iPolicyNFTAbi = require("../artifacts/contracts/RiskManager.sol/IPolicyNFT.json").abi;
-    const iCatInsurancePoolAbi = require("../artifacts/contracts/RiskManager.sol/ICatInsurancePool.json").abi;
-    const iLossDistributorAbi = require("../artifacts/contracts/RiskManager.sol/ILossDistributor.json").abi;
-    const iPolicyManagerAbi = require("../artifacts/contracts/RiskManager.sol/IPolicyManager.json").abi;
-    const iRewardDistributorAbi = require("../artifacts/contracts/RiskManager.sol/IRewardDistributor.json").abi;
+    const iPoolRegistryAbi = require("../artifacts/contracts/interfaces/IPoolRegistry.sol/IPoolRegistry.json").abi;
+    const iCapitalPoolAbi = require("../artifacts/contracts/interfaces/ICapitalPool.sol/ICapitalPool.json").abi;
+    const iPolicyNFTAbi = require("../artifacts/contracts/interfaces/IPolicyNFT.sol/IPolicyNFT.json").abi;
+    const iCatInsurancePoolAbi = require("../artifacts/contracts/interfaces/ICatInsurancePool.sol/ICatInsurancePool.json").abi;
+    const iLossDistributorAbi = require("../artifacts/contracts/interfaces/ILossDistributor.sol/ILossDistributor.json").abi;
+    const iPolicyManagerAbi = require("../artifacts/contracts/interfaces/IPolicyManager.sol/IPolicyManager.json").abi;
+    const iRewardDistributorAbi = require("../artifacts/contracts/interfaces/IRewardDistributor.sol/IRewardDistributor.json").abi;
 
 
     beforeEach(async function () {
