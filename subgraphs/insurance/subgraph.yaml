@@ -25,34 +25,14 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: RiskManager
           file: ./abis/RiskManager.json
       eventHandlers:
-        - event: PoolAdded(indexed uint256,indexed address,uint8)
-          handler: handlePoolAdded
         - event: CapitalAllocated(indexed address,indexed uint256,uint256)
           handler: handleCapitalAllocated
         - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
           handler: handleCapitalDeallocated
-        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
-          handler: handlePremiumPaid
-        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256)
-          handler: handleClaimProcessed
-        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
-          handler: handlePolicyCreated
-        - event: IncidentReported(indexed uint256,bool)
-          handler: handleIncidentReported
-        - event: PolicyLapsed(indexed uint256)
-          handler: handlePolicyLapsed
-        - event: PremiumRewardsClaimed(indexed address,indexed uint256,uint256)
-          handler: handlePremiumRewardsClaimed
-        - event: DistressedAssetRewardsClaimed(indexed address,indexed uint256,indexed address,uint256)
-          handler: handleDistressedAssetRewardsClaimed
         - event: OwnershipTransferred(indexed address,indexed address)
           handler: handleRiskManagerOwnershipTransferred
       file: ./src/mapping.ts
@@ -78,34 +58,14 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: RiskManager
           file: ./abis/RiskManager.json
       eventHandlers:
-        - event: PoolAdded(indexed uint256,indexed address,uint8)
-          handler: handlePoolAdded
         - event: CapitalAllocated(indexed address,indexed uint256,uint256)
           handler: handleCapitalAllocated
         - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
           handler: handleCapitalDeallocated
-        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
-          handler: handlePremiumPaid
-        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256)
-          handler: handleClaimProcessed
-        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
-          handler: handlePolicyCreated
-        - event: IncidentReported(indexed uint256,bool)
-          handler: handleIncidentReported
-        - event: PolicyLapsed(indexed uint256)
-          handler: handlePolicyLapsed
-        - event: PremiumRewardsClaimed(indexed address,indexed uint256,uint256)
-          handler: handlePremiumRewardsClaimed
-        - event: DistressedAssetRewardsClaimed(indexed address,indexed uint256,indexed address,uint256)
-          handler: handleDistressedAssetRewardsClaimed
         - event: OwnershipTransferred(indexed address,indexed address)
           handler: handleRiskManagerOwnershipTransferred
       file: ./src/mapping.ts
@@ -332,10 +292,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: PolicyNFT
           file: ./abis/PolicyNFT.json
@@ -370,10 +326,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: PoolManager
           file: ./abis/PoolManager.json
@@ -406,10 +358,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: CatInsurancePool
           file: ./abis/CatInsurancePool.json
@@ -460,10 +408,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: PoolRegistry
           file: ./abis/PoolRegistry.json
@@ -492,10 +436,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: CapitalPool
           file: ./abis/CapitalPool.json
@@ -540,10 +480,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: CapitalPool
           file: ./abis/CapitalPool.json
@@ -588,10 +524,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: PoolRegistry
           file: ./abis/PoolRegistry.json
@@ -619,10 +551,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: CatInsurancePool
           file: ./abis/CatInsurancePool.json
@@ -673,10 +601,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: PoolManager
           file: ./abis/PoolManager.json
@@ -709,10 +633,6 @@ dataSources:
         - Policy
         - ContractOwner
         - PoolUtilizationSnapshot
-        - Claim
-        - PolicyCreatedEvent
-        - PolicyLapsedEvent
-        - PremiumPaidEvent
       abis:
         - name: PolicyNFT
           file: ./abis/PolicyNFT.json
