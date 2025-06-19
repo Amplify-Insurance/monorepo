@@ -528,6 +528,67 @@ describe("PolicyManager", function () {
                 await expect(policyManager.connect(user1).addPremium(POLICY_ID, 0))
                     .to.be.revertedWithCustomError(policyManager, "InvalidAmount");
             });
+
+            it("Should distribute accrued premium when adding more", async function() {
+                await mockUsdc.connect(user1).transfer(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
+                await time.increase(30 * 24 * 60 * 60);
+
+                const before = await mockPolicyNFT.policies(POLICY_ID);
+                await policyManager.connect(user1).addPremium(POLICY_ID, PREMIUM_TO_ADD);
+                const after = await mockPolicyNFT.policies(POLICY_ID);
+
+                const timeElapsed = BigInt(after.lastDrainTime) - BigInt(before.lastDrainTime);
+                const utilizationBps = (COVERAGE_AMOUNT * BigInt(BPS)) / ethers.parseUnits("100000", 6);
+                const rateBps = BigInt(100) + (BigInt(200) * utilizationBps) / BigInt(BPS);
+                const accrued = (COVERAGE_AMOUNT * rateBps * timeElapsed) / (BigInt(SECS_YEAR) * BigInt(BPS));
+                const expectedCat = (accrued * BigInt(await policyManager.catPremiumBps())) / BigInt(BPS);
+                const expectedPool = accrued - expectedCat;
+
+                expect(await mockCatPool.last_premiumReceived()).to.equal(expectedCat);
+                expect(await mockRewardDistributor.totalRewards(POOL_ID, mockUsdc.target)).to.equal(expectedPool);
+            });
+
+            it("Should prevent re-entrancy during addPremium", async function() {
+                const MaliciousCatFactory = await ethers.getContractFactory("MaliciousCatReentrant");
+                const maliciousCat = await MaliciousCatFactory.deploy();
+                await maliciousCat.setTargets(policyManager.target, POLICY_ID);
+
+                await policyManager.connect(owner).setAddresses(
+                    mockPoolRegistry.target,
+                    mockCapitalPool.target,
+                    maliciousCat.target,
+                    mockRewardDistributor.target,
+                    mockRiskManager.target
+                );
+
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    await time.latest(),
+                    await time.latest(),
+                    INITIAL_PREMIUM_DEPOSIT,
+                    await time.latest()
+                );
+
+                await mockUsdc.mint(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
+                const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await mockPoolRegistry.setPoolData(
+                    POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    COVERAGE_AMOUNT,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+
+                await expect(policyManager.connect(user1).addPremium(POLICY_ID, PREMIUM_TO_ADD))
+                    .to.be.revertedWithCustomError(policyManager, "ReentrancyGuardReentrantCall");
+            });
         });
 
         describe("Premium Rate Calculation", function() {
