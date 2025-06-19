@@ -70,3 +70,19 @@ export default deployments;
 export function getDeployment(name) {
   return deployments.find((d) => d.name === name) || deployments[0];
 }
+
+export const STAKING_TOKEN_ADDRESS =
+  (deployments[0] && deployments[0].governanceToken) ||
+  process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS;
+
+export const COMMITTEE_ADDRESS =
+  (deployments[0] && deployments[0].committee) ||
+  process.env.NEXT_PUBLIC_COMMITTEE_ADDRESS;
+
+export const PRICE_ORACLE_ADDRESS =
+  (deployments[0] && deployments[0].priceOracle) ||
+  process.env.NEXT_PUBLIC_PRICE_ORACLE_ADDRESS;
+
+export const MULTICALL_READER_ADDRESS =
+  (deployments[0] && deployments[0].multicallReader) ||
+  process.env.NEXT_PUBLIC_MULTICALL_READER_ADDRESS;

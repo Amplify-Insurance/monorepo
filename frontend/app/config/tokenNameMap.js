@@ -1,4 +1,5 @@
 import { IdCard } from "lucide-react";
+import { STAKING_TOKEN_ADDRESS } from "./deployments";
 
 export const PROTOCOL_NAME_MAP = {
   0: 'Aave V3',
@@ -71,9 +72,9 @@ export const TOKEN_LOGO_MAP = {
   "0xB79DD08EA68A908A97220C76d19A6aA9cBDE4376": '/images/stablecoins/dai.svg'
 };
 
-if (process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS) {
-  TOKEN_NAME_MAP[process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS] = 'Staking Token';
-  TOKEN_LOGO_MAP[process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS] = '/images/tokens/placeholder-token.svg';
+if (STAKING_TOKEN_ADDRESS) {
+  TOKEN_NAME_MAP[STAKING_TOKEN_ADDRESS] = 'Staking Token';
+  TOKEN_LOGO_MAP[STAKING_TOKEN_ADDRESS] = '/images/tokens/placeholder-token.svg';
 }
 
 export function getProtocolType(id) {
