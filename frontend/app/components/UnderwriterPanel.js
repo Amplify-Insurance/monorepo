@@ -36,10 +36,17 @@ const protocolCategories = [
 export default function UnderwriterPanel({ displayCurrency }) {
   const { isConnected } = useAccount()
   const { pools, loading } = usePools()
-  const tokens = useTokenList(pools)
+  const tokens = useTokenList(
+    pools.map((p) => ({
+      protocolTokenToCover: p.underlyingAsset || p.protocolTokenToCover,
+    })),
+  )
   const [selectedToken, setSelectedToken] = useState(null)
   const tokenDeploymentMap = Object.fromEntries(
-    pools.map((p) => [p.protocolTokenToCover.toLowerCase(), p.deployment]),
+    pools.map((p) => [
+      (p.underlyingAsset || p.protocolTokenToCover).toLowerCase(),
+      p.deployment,
+    ]),
   )
   const selectedDeployment =
     selectedToken && tokenDeploymentMap[selectedToken.address.toLowerCase()]
@@ -87,7 +94,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
         }
       }
       acc[id].pools.push({
-        token: pool.protocolTokenToCover,
+        token: pool.underlyingAsset,
+        coveredToken: pool.protocolTokenToCover,
         premium: Number(pool.premiumRateBps || 0) / 100,
         underwriterYield: Number(pool.underwriterYieldBps || 0) / 100,
         tvl: Number(
