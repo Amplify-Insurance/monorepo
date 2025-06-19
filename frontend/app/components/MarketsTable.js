@@ -11,7 +11,7 @@ import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
 import { utils as ethersUtils, BigNumber, ethers } from 'ethers';
 // import { formatUnits } from 'ethers';
-import { getTokenName, getTokenDescription, getTokenLogo, getProtocolName, getProtocolLogo, getProtocolDescription} from "../config/tokenNameMap";
+import { getTokenName, getTokenDescription, getTokenLogo, getProtocolName, getProtocolLogo, getProtocolDescription, getProtocolType } from "../config/tokenNameMap";
 
 export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const { isConnected } = useAccount()
@@ -19,6 +19,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
+  const [typeFilter, setTypeFilter] = useState('all') // 'all', 'protocol', 'stablecoin'
 
   const grouped = {}
   for (const pool of pools) {
@@ -68,6 +69,11 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   }
 
   const markets = Object.values(grouped)
+  const filteredMarkets = markets.filter((m) => {
+    const type = getProtocolType(m.id)
+    if (typeFilter === 'all') return true
+    return type === typeFilter
+  })
 
   const toggleMarket = (marketId) => {
     setExpandedMarkets((prev) => (prev.includes(marketId) ? prev.filter((id) => id !== marketId) : [...prev, marketId]))
@@ -119,6 +125,26 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
         </div>
       )}
 
+      {/* Market type filter */}
+      <div className="mb-4 inline-flex rounded-md shadow-sm">
+        {['all', 'protocol', 'stablecoin'].map((type, idx) => (
+          <button
+            key={type}
+            type="button"
+            className={`px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 focus:z-10 ${
+              idx === 0 ? 'rounded-l-md' : idx === 2 ? 'rounded-r-md -ml-px' : '-ml-px'
+            } ${
+              typeFilter === type
+                ? 'bg-blue-600 text-white'
+                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
+            }`}
+            onClick={() => setTypeFilter(type)}
+          >
+            {type === 'all' ? 'All' : type === 'protocol' ? 'Protocol' : 'Stablecoin'}
+          </button>
+        ))}
+      </div>
+
       <div className="overflow-x-auto -mx-4 sm:mx-0">
         <div className="inline-block min-w-full align-middle">
           <div className="overflow-hidden shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
@@ -153,7 +179,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
               </thead>
 
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {markets.map((market) => (
+                {filteredMarkets.map((market) => (
                   <React.Fragment key={market.id}>
 
                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-750">
