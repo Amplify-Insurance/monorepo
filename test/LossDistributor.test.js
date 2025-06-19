@@ -324,5 +324,78 @@ describe("LossDistributor", function () {
         await lossDistributor.userLossStates(user.address, poolId)
       ).to.equal(0n);
     });
+
+    it("New risk manager controls realizeLosses", async function () {
+      const { owner, riskManager, other, user, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      await lossDistributor.connect(owner).setRiskManager(other.address);
+      await expect(
+        lossDistributor
+          .connect(riskManager)
+          .realizeLosses(user.address, poolId, pledge)
+      ).to.be.revertedWith("LD: Not RiskManager");
+      await expect(
+        lossDistributor.connect(other).realizeLosses(user.address, poolId, pledge)
+      ).to.not.be.reverted;
+    });
+
+    it("Preserves state when risk manager changes", async function () {
+      const { owner, riskManager, other, user, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolId, 100n, pledge);
+      await lossDistributor
+        .connect(riskManager)
+        .realizeLosses(user.address, poolId, pledge);
+      await lossDistributor.connect(owner).setRiskManager(other.address);
+      await lossDistributor
+        .connect(other)
+        .distributeLoss(poolId, 100n, pledge);
+      expect(
+        await lossDistributor.getPendingLosses(user.address, poolId, pledge)
+      ).to.equal(100n);
+      await lossDistributor
+        .connect(other)
+        .realizeLosses(user.address, poolId, pledge);
+      expect(
+        await lossDistributor.getPendingLosses(user.address, poolId, pledge)
+      ).to.equal(0n);
+    });
+
+    it("Realizing one user's losses does not affect others", async function () {
+      const { riskManager, user, other, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      const totalPledge = 2000n;
+      const each = 1000n;
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolId, 100n, totalPledge);
+      await lossDistributor
+        .connect(riskManager)
+        .realizeLosses(user.address, poolId, each);
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolId, 100n, totalPledge);
+      expect(
+        await lossDistributor.getPendingLosses(user.address, poolId, each)
+      ).to.equal(50n);
+      expect(
+        await lossDistributor.getPendingLosses(other.address, poolId, each)
+      ).to.equal(100n);
+    });
+
+    it("Handles very large loss amounts", async function () {
+      const { riskManager, lossDistributor } = await loadFixture(deployFixture);
+      const bigLoss = 1n << 128n;
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolId, bigLoss, 1n);
+      const expected = bigLoss * 10n ** 18n;
+      expect(await lossDistributor.poolLossTrackers(poolId)).to.equal(expected);
+    });
   });
 });
