@@ -299,5 +299,30 @@ describe("LossDistributor", function () {
         )
       ).to.equal(50n);
     });
+
+    it("Handles zero pledge when realizing losses", async function () {
+      const { riskManager, user, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolId, 100n, pledge);
+
+      const pending = await lossDistributor
+        .connect(riskManager)
+        .getFunction("realizeLosses")
+        .staticCall(user.address, poolId, 0);
+      expect(pending).to.equal(0n);
+
+      await (
+        await lossDistributor
+          .connect(riskManager)
+          .realizeLosses(user.address, poolId, 0)
+      ).wait();
+
+      expect(
+        await lossDistributor.userLossStates(user.address, poolId)
+      ).to.equal(0n);
+    });
   });
 });
