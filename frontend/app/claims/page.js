@@ -49,12 +49,27 @@ export default function ClaimsPage() {
     const coverageAmount = Number(
       ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
     );
-    
-    // Use .from() and .toNumber() for these as well
-    const activationTs = ethers.BigNumber.from(p.activation || p.start).toNumber();
-    const lastPaidUntilTs = p.lastPaidUntil 
-      ? ethers.BigNumber.from(p.lastPaidUntil).toNumber() 
-      : 0;
+
+    const activationHex = p.activation?.hex || p.start?.hex || "0x0";
+    const expiryHex = p.lastPaidUntil?.hex || "0x0";
+
+    const activationTs = parseInt(activationHex, 16);
+    let expiryTs = parseInt(expiryHex, 16);
+    if (!expiryTs) {
+      const deposit = Number(
+        ethers.utils.formatUnits(
+          p.premiumDeposit?.hex || "0",
+          pool.underlyingAssetDecimals
+        )
+      );
+      const lastDrainTs = parseInt(p.lastDrainTime?.hex || "0x0", 16);
+      const rate = Number(pool.premiumRateBps || 0) / 100;
+      const perSecond =
+        rate > 0 ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0;
+      if (perSecond > 0) {
+        expiryTs = Math.floor(lastDrainTs + deposit / perSecond);
+      }
+    }
 
     return {
       id: typeof p.id === 'object' ? ethers.BigNumber.from(p.id).toNumber() : p.id,
@@ -63,8 +78,9 @@ export default function ClaimsPage() {
       poolName: getTokenName(pool.protocolTokenToCover),
       coverageAmount,
       premium: Number(pool.premiumRateBps || 0) / 100,
+      claimFeeBps: Number(pool.claimFeeBps || 0),
       startDate: new Date(activationTs * 1000).toISOString(),
-      endDate: new Date(lastPaidUntilTs * 1000).toISOString(),
+      endDate: expiryTs ? new Date(expiryTs * 1000).toISOString() : null,
       isActive: Date.now() / 1000 >= activationTs,
       protocolTokenDecimals: Number(pool.protocolTokenDecimals ?? 18),
       underlyingAssetDecimals: Number(pool.underlyingAssetDecimals ?? 18),
@@ -336,7 +352,7 @@ export default function ClaimsPage() {
                         </h3>
                         <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
                           <p>
-                            Making a claim will incur a 5% fee on the claim value. This fee is non-refundable.
+                            {`Making a claim will incur a ${selectedCoverage.claimFeeBps / 100}% fee on the claim value. This fee is non-refundable.`}
                           </p>
                         </div>
                       </div>
@@ -363,7 +379,7 @@ export default function ClaimsPage() {
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               Coverage Period: {new Date(selectedCoverage.startDate).toLocaleDateString()} -{" "}
-                              {new Date(selectedCoverage.endDate).toLocaleDateString()}
+                              {selectedCoverage.endDate ? new Date(selectedCoverage.endDate).toLocaleDateString() : "N/A"}
                             </div>
                           </div>
                         </div>
@@ -376,9 +392,9 @@ export default function ClaimsPage() {
                             </div>
                           </div>
                           <div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">Claim Fee (5%)</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{`Claim Fee (${selectedCoverage.claimFeeBps / 100}%)`}</div>
                             <div className="text-lg font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(selectedCoverage.coverageAmount * 0.05)}
+                              {formatCurrency(selectedCoverage.coverageAmount * (selectedCoverage.claimFeeBps / 10000))}
                             </div>
                           </div>
                         </div>
