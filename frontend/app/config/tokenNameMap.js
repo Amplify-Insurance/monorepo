@@ -41,8 +41,11 @@ export const PROTOCOL_TYPE_MAP = {
 
 
 export const UNDERLYING_TOKEN_MAP = {
-  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 'USDC',
-  "0x4200000000000000000000000000000000000006": "WETH"
+  "usdc": 'USDC',
+}
+
+export const UNDERLYING_TOKEN_LOGO_MAP = {
+  "usdc": '/images/tokens/usdc.png',
 }
 
 export const TOKEN_NAME_MAP = {
@@ -85,6 +88,12 @@ export function getTokenName(id) {
 
 
 export function getUnderlyingTokenName(id) {
+  if (!id) return id;
+  const key = typeof id === "string" ? id : `${id}`;
+  return UNDERLYING_TOKEN_MAP[key] || UNDERLYING_TOKEN_MAP[key.toLowerCase()] || id;
+}
+
+export function getUnderlyingTokenLogo(id) {
   if (!id) return id;
   const key = typeof id === "string" ? id : `${id}`;
   return UNDERLYING_TOKEN_MAP[key] || UNDERLYING_TOKEN_MAP[key.toLowerCase()] || id;

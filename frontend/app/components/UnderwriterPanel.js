@@ -13,6 +13,7 @@ import {
   UNDERLYING_TOKEN_MAP,
   getTokenName,
   getUnderlyingTokenName,
+  getUnderlyingTokenLogo
 } from "../config/tokenNameMap"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { YieldPlatform, getYieldPlatformInfo } from "../config/yieldPlatforms"
@@ -46,7 +47,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   // actual deposit assets only.
   const tokens = pools
     ? Array.from(
-        new Set(pools.map((p) => p.underlyingAsset.toLowerCase())),
+        new Set(pools.map((p) => p.deployment.toLowerCase())),
       ).map((address) => ({
         address,
         symbol: getUnderlyingTokenName(address),
@@ -60,6 +61,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
       p.deployment,
     ]),
   )
+
+  console.log(pools, "selectedToken")
 
 
   const selectedDeployment =
@@ -233,7 +236,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
               <div className="flex items-center">
                 <div className="flex-shrink-0 h-6 w-6 mr-2">
                   <Image
-                    src={getTokenLogo(selectedToken?.address)}
+                    src={getUnderlyingTokenLogo(selectedToken.address)}
                     alt={selectedToken?.name || ''}
                     width={24}
                     height={24}
@@ -268,7 +271,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-6 w-6 mr-2">
                       <Image
-                        src={getTokenLogo(token.address)}
+                        src={getUnderlyingTokenLogo(token.address)}
                         alt={token.name}
                         width={24}
                         height={24}
