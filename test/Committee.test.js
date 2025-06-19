@@ -27,8 +27,8 @@ describe("Committee", function () {
     const SLASH_BPS = 500; // 5%
 
     // --- Mock ABIs ---
-    const iRiskManagerAbi = require("../artifacts/contracts/Committee.sol/IRiskManager.json").abi;
-    const iStakingContractAbi = require("../artifacts/contracts/Committee.sol/IStakingContract.json").abi;
+    const iRiskManagerAbi = require("../artifacts/contracts/interfaces/IRiskManager.sol/IRiskManager.json").abi;
+    const iStakingContractAbi = require("../artifacts/contracts/interfaces/IStakingContract.sol/IStakingContract.json").abi;
     const erc20Abi = require("@openzeppelin/contracts/build/contracts/ERC20.json").abi;
 
 

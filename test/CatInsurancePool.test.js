@@ -4,11 +4,9 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-// Helper function to create mock contracts from an ABI
-async function deployMock(abi, signer) {
-    const factory = new ethers.ContractFactory(abi, `0x${'6080604052348015600f57600080fd5b50600080fdfe'}`, signer);
-    return await factory.deploy();
-}
+// Instead of using waffle style mocks (which are incompatible with
+// the current hardhat/ethers setup) we deploy simple Solidity based
+// mock contracts from the `contracts/test` directory.
 
 describe("CatInsurancePool", function () {
     // --- Signers ---
@@ -22,9 +20,6 @@ describe("CatInsurancePool", function () {
     const MIN_USDC_AMOUNT = 1_000_000; // 1 USDC with 6 decimals
     const CAT_POOL_REWARD_ID = ethers.MaxUint256;
 
-    // --- Mock ABIs ---
-    const iYieldAdapterAbi = require("../artifacts/contracts/interfaces/IYieldAdapter.sol/IYieldAdapter.json").abi;
-    const iRewardDistributorAbi = require("../artifacts/contracts/interfaces/IRewardDistributor.sol/IRewardDistributor.json").abi;
 
     beforeEach(async function () {
         // --- Get Signers ---
@@ -37,17 +32,21 @@ describe("CatInsurancePool", function () {
         mockRewardToken = await MockERC20Factory.deploy("Reward Token", "RWT", 18);
         await mockRewardToken.mint(owner.address, ethers.parseUnits("1000000", 18));
         
-        mockAdapter = await deployMock(iYieldAdapterAbi, owner);
-        mockRewardDistributor = await deployMock(iRewardDistributorAbi, owner);
+        const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
+        mockAdapter = await MockYieldAdapter.deploy(mockUsdc.target, ethers.ZeroAddress, owner.address);
+
+        const MockRewardDistributor = await ethers.getContractFactory("MockRewardDistributor");
+        mockRewardDistributor = await MockRewardDistributor.deploy();
         
         // --- Deploy CatInsurancePool ---
-        const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
-        catPool = await CatPoolFactory.deploy(mockUsdc.target, mockAdapter.target, owner.address);
-
-        // --- Get deployed CatShare token ---
-        const catShareAddress = await catPool.catShareToken();
         const CatShareFactory = await ethers.getContractFactory("CatShare");
-        catShareToken = CatShareFactory.attach(catShareAddress);
+        catShareToken = await CatShareFactory.deploy();
+
+        const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+        catPool = await CatPoolFactory.deploy(mockUsdc.target, catShareToken.target, mockAdapter.target, owner.address);
+
+        await catShareToken.transferOwnership(catPool.target);
+        await catPool.initialize();
 
         // --- Initial Setup ---
         // Mint tokens to LPs and approve the CatPool
@@ -62,8 +61,10 @@ describe("CatInsurancePool", function () {
         await catPool.connect(owner).setCapitalPoolAddress(capitalPool.address);
         await catPool.connect(owner).setRewardDistributor(mockRewardDistributor.target);
 
-        // Mock adapter behavior
-        await mockAdapter.mock.getCurrentValueHeld.returns(0);
+        // Configure mocks
+        await mockRewardDistributor.setCatPool(catPool.target);
+        await mockAdapter.setDepositor(catPool.target);
+        await mockAdapter.setTotalValueHeld(0);
     });
 
     describe("Admin Functions", function () {
@@ -82,18 +83,16 @@ describe("CatInsurancePool", function () {
         it("Should allow owner to set a new adapter and flush funds from the old one", async function() {
             // Deposit some funds and flush to the adapter
             const depositAmount = ethers.parseUnits("100", 6);
-            await catPool.connect(owner).flushToAdapter(0); // Mock call to satisfy chai-solidity-mock for some reason
-            await mockAdapter.mock.deposit.withArgs(depositAmount).returns();
-            await catPool.connect(owner).receiveUsdcPremium(0); // mock call
-            await mockUsdc.connect(owner).transfer(catPool.target, depositAmount); // manually transfer
+            await mockUsdc.connect(owner).approve(catPool.target, depositAmount);
             await catPool.connect(owner).setPolicyManagerAddress(owner.address); // Temporarily set to owner for test
             await catPool.connect(owner).receiveUsdcPremium(depositAmount);
             await catPool.connect(owner).flushToAdapter(depositAmount);
             
             // Set up mocks for the switch
-            const newAdapter = await deployMock(iYieldAdapterAbi, owner);
-            await mockAdapter.mock.getCurrentValueHeld.returns(depositAmount);
-            await mockAdapter.mock.withdraw.withArgs(depositAmount, catPool.target).returns(depositAmount);
+            const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
+            const newAdapter = await MockYieldAdapter.deploy(mockUsdc.target, ethers.ZeroAddress, owner.address);
+            await mockAdapter.setTotalValueHeld(depositAmount);
+            await mockAdapter.setDepositor(catPool.target);
 
             await expect(catPool.connect(owner).setAdapter(newAdapter.target))
                 .to.emit(catPool, "AdapterChanged").withArgs(newAdapter.target);
@@ -120,7 +119,7 @@ describe("CatInsurancePool", function () {
             await catPool.connect(lp1).depositLiquidity(DEPOSIT_AMOUNT);
 
             // Simulate yield gain of 10%
-            await mockAdapter.mock.getCurrentValueHeld.returns(DEPOSIT_AMOUNT * 110n / 100n);
+            await mockAdapter.setTotalValueHeld(DEPOSIT_AMOUNT * 110n / 100n);
 
             // LP2 deposits the same amount of USDC
             const totalShares = await catShareToken.totalSupply();
@@ -138,30 +137,34 @@ describe("CatInsurancePool", function () {
         it("Should allow withdrawing liquidity, pulling from idleUSDC first", async function() {
             await catPool.connect(lp1).depositLiquidity(DEPOSIT_AMOUNT);
             const sharesToBurn = await catShareToken.balanceOf(lp1.address) / 2n;
-            const usdcToWithdraw = await catPool.liquidUsdc() / 2n;
+            const totalShares = await catShareToken.totalSupply();
+            const usdcToWithdraw = (sharesToBurn * (await catPool.liquidUsdc())) / totalShares;
 
             await expect(catPool.connect(lp1).withdrawLiquidity(sharesToBurn))
                 .to.emit(catPool, "CatLiquidityWithdrawn")
                 .withArgs(lp1.address, usdcToWithdraw, sharesToBurn);
-            
-            expect(await mockUsdc.balanceOf(lp1.address)).to.contain(usdcToWithdraw);
+
+            const finalBalance = await mockUsdc.balanceOf(lp1.address);
+            const expectedBalance = ethers.parseUnits("10000", 6) - DEPOSIT_AMOUNT + usdcToWithdraw;
+            expect(finalBalance).to.equal(expectedBalance);
         });
         
         it("Should allow withdrawing liquidity, pulling from adapter if idle is insufficient", async function() {
             // LP1 deposits, and funds are moved to adapter
             await catPool.connect(lp1).depositLiquidity(DEPOSIT_AMOUNT);
-            await mockAdapter.mock.deposit.withArgs(DEPOSIT_AMOUNT).returns();
             await catPool.connect(owner).flushToAdapter(DEPOSIT_AMOUNT);
             expect(await catPool.idleUSDC()).to.equal(0);
             
             // Setup mocks for withdrawal
             const sharesToBurn = await catShareToken.balanceOf(lp1.address);
-            await mockAdapter.mock.getCurrentValueHeld.returns(DEPOSIT_AMOUNT);
-            await mockAdapter.mock.withdraw.withArgs(DEPOSIT_AMOUNT, catPool.target).returns(DEPOSIT_AMOUNT);
+            await mockAdapter.setTotalValueHeld(DEPOSIT_AMOUNT);
 
             await catPool.connect(lp1).withdrawLiquidity(sharesToBurn);
 
-            expect(await mockUsdc.balanceOf(lp1.address)).to.contain(DEPOSIT_AMOUNT);
+            const finalBalance = await mockUsdc.balanceOf(lp1.address);
+            const expectedBalance = ethers.parseUnits("10000", 6) - DEPOSIT_AMOUNT +
+                (sharesToBurn * DEPOSIT_AMOUNT) / (sharesToBurn + 1000n);
+            expect(finalBalance).to.equal(expectedBalance);
         });
     });
 
@@ -195,10 +198,16 @@ describe("CatInsurancePool", function () {
             await mockRewardToken.connect(riskManager).approve(catPool.target, rewardAmount);
             const totalShares = await catShareToken.totalSupply();
 
-            await mockRewardDistributor.mock.distribute.withArgs(CAT_POOL_REWARD_ID, mockRewardToken.target, rewardAmount, totalShares).returns();
+            await expect(
+                catPool.connect(riskManager).receiveProtocolAssetsForDistribution(
+                    mockRewardToken.target,
+                    rewardAmount
+                )
+            ).to.emit(catPool, "ProtocolAssetReceivedForDistribution");
 
-            await expect(catPool.connect(riskManager).receiveProtocolAssetsForDistribution(mockRewardToken.target, rewardAmount))
-                .to.emit(catPool, "ProtocolAssetReceivedForDistribution");
+            expect(
+                await mockRewardDistributor.totalRewards(CAT_POOL_REWARD_ID, mockRewardToken.target)
+            ).to.equal(rewardAmount);
         });
     });
 
@@ -207,15 +216,19 @@ describe("CatInsurancePool", function () {
             const rewardAmount = ethers.parseUnits("50", 18);
             await catPool.connect(lp1).depositLiquidity(ethers.parseUnits("1000", 6));
             const userShares = await catShareToken.balanceOf(lp1.address);
+            // Distribute rewards first
+            await mockRewardToken.connect(owner).transfer(riskManager.address, rewardAmount);
+            await mockRewardToken.connect(riskManager).approve(catPool.target, rewardAmount);
+            await catPool.connect(riskManager).receiveProtocolAssetsForDistribution(mockRewardToken.target, rewardAmount);
 
-            // Mock the claim function to return a value
-            await mockRewardDistributor.mock.claimForCatPool
-                .withArgs(lp1.address, CAT_POOL_REWARD_ID, mockRewardToken.target, userShares)
-                .returns(rewardAmount);
-            
-            await expect(catPool.connect(lp1).claimProtocolAssetRewards(mockRewardToken.target))
+            const totalSharesAfter = await catShareToken.totalSupply();
+            const expectedReward = (rewardAmount * userShares) / totalSharesAfter;
+
+            await expect(
+                catPool.connect(lp1).claimProtocolAssetRewards(mockRewardToken.target)
+            )
                 .to.emit(catPool, "ProtocolAssetRewardsClaimed")
-                .withArgs(lp1.address, mockRewardToken.target, rewardAmount);
+                .withArgs(lp1.address, mockRewardToken.target, expectedReward);
         });
     });
 
@@ -242,11 +255,11 @@ describe("CatInsurancePool", function () {
             await catPool.connect(owner).setAdapter(maliciousAdapter.target);
             
             // Move funds to the malicious adapter
-            await mockAdapter.mock.getCurrentValueHeld.returns(0); // Old adapter is empty
+            await mockAdapter.setTotalValueHeld(0); // Old adapter is empty
             await catPool.connect(owner).flushToAdapter(depositAmount);
 
             await expect(catPool.connect(lp1).withdrawLiquidity(sharesToBurn))
-                .to.be.revertedWith("ReentrancyGuard: reentrant call");
+                .to.be.revertedWithCustomError(catPool, "ReentrancyGuardReentrantCall");
         });
     });
 });
@@ -328,12 +341,14 @@ contract MaliciousAdapter {
     function setWithdrawArgs(uint256 _shares) external {
         sharesToBurn = _shares;
     }
-    function deposit(uint256) external {}
+    function deposit(uint256 amount) external {
+        asset.transferFrom(msg.sender, address(this), amount);
+    }
     function withdraw(uint256, address) external returns (uint256) {
         catPool.withdrawLiquidity(sharesToBurn);
         return 0;
     }
-    function getCurrentValueHeld() external view returns (uint256) { return 0;}
+    function getCurrentValueHeld() external view returns (uint256) { return asset.balanceOf(address(this)); }
 }
 `;
 fs.writeFileSync(path.join(__dirname, "..", "contracts", "MaliciousAdapter.sol"), maliciousAdapterSource);
