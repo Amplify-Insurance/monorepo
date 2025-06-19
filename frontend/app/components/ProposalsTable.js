@@ -7,7 +7,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { getCommitteeWithSigner } from '../../lib/committee'
 import { getStakingWithSigner } from '../../lib/staking'
 import { useAccount } from 'wagmi'
-import { notifyTx } from '../utils/explorer'
 
 export default function ProposalsTable({ proposals, loading }) {
   const [expanded, setExpanded] = useState([])
@@ -27,7 +26,6 @@ export default function ProposalsTable({ proposals, loading }) {
     try {
       const committee = await getCommitteeWithSigner()
       const tx = await committee.vote(id, vote)
-      notifyTx(tx.hash)
       await tx.wait()
     } catch (err) {
       console.error('Vote failed', err)
@@ -42,7 +40,6 @@ export default function ProposalsTable({ proposals, loading }) {
     try {
       const committee = await getCommitteeWithSigner()
       const tx = await committee.claimReward(id)
-      notifyTx(tx.hash)
       await tx.wait()
     } catch (err) {
       console.error('Claim failed', err)
@@ -56,7 +53,6 @@ export default function ProposalsTable({ proposals, loading }) {
     try {
       const staking = await getStakingWithSigner()
       const tx = await staking.withdrawBond(poolId)
-      notifyTx(tx.hash)
       await tx.wait()
     } catch (err) {
       console.error('Withdraw bond failed', err)

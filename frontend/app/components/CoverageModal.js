@@ -18,7 +18,7 @@ import useUsdPrice from "../../hooks/useUsdPrice"
 import Modal from "./Modal"
 import { Slider } from "../../components/ui/slider"
 import { formatPercentage } from "../utils/formatting"
-import { notifyTx } from "../utils/explorer"
+import { getTxExplorerUrl } from "../utils/explorer"
 
 export default function CoverageModal({
   isOpen,
@@ -45,6 +45,7 @@ export default function CoverageModal({
   const [walletBalance, setWalletBalance] = useState(0)
   const [underlyingDec, setUnderlyingDec] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [txHash, setTxHash] = useState("")
   const [error, setError] = useState("")
 
   // Fetch underlying asset decimals whenever the modal opens
@@ -184,7 +185,7 @@ export default function CoverageModal({
         }
 
         const tx = await pm.purchaseCover(poolId, amountBn, depositBn)
-        notifyTx(tx.hash)
+        setTxHash(tx.hash)
         await tx.wait()
       } else {
         // "provide" flow
@@ -202,12 +203,12 @@ export default function CoverageModal({
         }
 
         const tx = await cp.deposit(amountBn, yieldChoice)
-        notifyTx(tx.hash)
+        setTxHash(tx.hash)
         await tx.wait()
 
         if (ids.length) {
           const tx2 = await rm.allocateCapital(ids)
-          notifyTx(tx2.hash)
+          setTxHash(tx2.hash)
           await tx2.wait()
         }
       }
@@ -405,6 +406,19 @@ export default function CoverageModal({
         >
           {isSubmitting ? "Submitting..." : "Confirm Transaction"}
         </button>
+        {txHash && (
+          <p className="text-xs text-center mt-2">
+            Transaction submitted.{' '}
+            <a
+              href={getTxExplorerUrl(txHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on block explorer
+            </a>
+          </p>
+        )}
       </div>
     </Modal>
   )

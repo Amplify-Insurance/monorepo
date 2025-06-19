@@ -9,11 +9,12 @@ import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/
 import { getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
 import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
-import { notifyTx } from "../utils/explorer"
+import { getTxExplorerUrl } from "../utils/explorer"
 
 export default function StakeModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [txHash, setTxHash] = useState("")
   const [balance, setBalance] = useState("0")
   const [symbol, setSymbol] = useState("")
   const [decimals, setDecimals] = useState(18)
@@ -65,7 +66,7 @@ export default function StakeModal({ isOpen, onClose }) {
         await approveTx.wait()
       }
       const tx = await staking.stake(value)
-      notifyTx(tx.hash)
+      setTxHash(tx.hash)
       await tx.wait()
       setAmount("")
       onClose()
@@ -163,6 +164,19 @@ export default function StakeModal({ isOpen, onClose }) {
             "Stake Tokens"
           )}
         </button>
+        {txHash && (
+          <p className="text-xs text-center mt-2">
+            Transaction submitted.{' '}
+            <a
+              href={getTxExplorerUrl(txHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on block explorer
+            </a>
+          </p>
+        )}
       </div>
     </Modal>
   )

@@ -13,7 +13,7 @@ import usePools from "../../hooks/usePools"
 // the Insurance Markets page so only unique underlying assets show up in the
 // dropdown.
 import { getUnderlyingTokenLogo, getUnderlyingTokenName } from "../config/tokenNameMap"
-import { notifyTx } from "../utils/explorer"
+import { getTxExplorerUrl } from "../utils/explorer"
 import useClaims from "../../hooks/useClaims"
 import {
   getProtocolName,
@@ -44,6 +44,7 @@ export default function BondModal({ isOpen, onClose }) {
   const [selectedProtocol, setSelectedProtocol] = useState("")
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [txHash, setTxHash] = useState("")
   const [maxPayout, setMaxPayout] = useState("0")
   const tokenAddress = STAKING_TOKEN_ADDRESS
   const [symbol, setSymbol] = useState("")
@@ -161,7 +162,7 @@ export default function BondModal({ isOpen, onClose }) {
         await approveTx.wait()
       }
       const tx = await staking.depositBond(pool.id, selectedAsset, value)
-      notifyTx(tx.hash)
+      setTxHash(tx.hash)
       await tx.wait()
       setAmount("")
       onClose()
@@ -331,6 +332,19 @@ export default function BondModal({ isOpen, onClose }) {
             "Deposit Bond"
           )}
         </button>
+        {txHash && (
+          <p className="text-xs text-center mt-2">
+            Transaction submitted.{' '}
+            <a
+              href={getTxExplorerUrl(txHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on block explorer
+            </a>
+          </p>
+        )}
       </div>
     </Modal>
   )

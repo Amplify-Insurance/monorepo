@@ -10,10 +10,11 @@ import {
   getTokenName,
 } from "../config/tokenNameMap";
 import { getPoolManagerWithSigner } from "../../lib/poolManager";
-import { notifyTx } from "../utils/explorer";
+import { getTxExplorerUrl } from "../utils/explorer";
 
 export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [txHash, setTxHash] = useState("");
 
   if (!coverage) return null;
 
@@ -27,7 +28,7 @@ export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
       const dep = getDeployment(coverage.deployment);
       const pm = await getPoolManagerWithSigner(dep.poolManager);
       const tx = await pm.cancelCover(coverage.id, { gasLimit: 500000 });
-      notifyTx(tx.hash);
+      setTxHash(tx.hash);
       await tx.wait();
       onClose(true);
     } catch (err) {
@@ -78,6 +79,19 @@ export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
           >
             {isSubmitting ? "Cancelling..." : "Confirm"}
           </button>
+          {txHash && (
+            <p className="text-xs text-center mt-2 w-full">
+              Transaction submitted.{' '}
+              <a
+                href={getTxExplorerUrl(txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                View on block explorer
+              </a>
+            </p>
+          )}
         </div>
       </div>
     </Modal>
