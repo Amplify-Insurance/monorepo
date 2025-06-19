@@ -716,7 +716,33 @@
 		],
 		"name": "updateCoverageSold",
 		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	}
+  "stateMutability": "nonpayable",
+  "type": "function"
+        },
+        {
+                "inputs": [
+                        {
+                                "internalType": "uint256",
+                                "name": "_poolId",
+                                "type": "uint256"
+                        }
+                ],
+                "name": "claimPremiumRewards",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+        },
+        {
+                "inputs": [
+                        {
+                                "internalType": "uint256",
+                                "name": "_poolId",
+                                "type": "uint256"
+                        }
+                ],
+                "name": "claimDistressedAssets",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+        }
 ]
