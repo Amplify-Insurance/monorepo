@@ -48,6 +48,14 @@ describe("RewardDistributor", function () {
       );
     });
 
+    it("reverts when setting catPool to zero", async function () {
+      const { owner, rd } = await deployFixture();
+      await expect(rd.connect(owner).setCatPool(ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        rd,
+        "ZeroAddress"
+      );
+    });
+
     it("owner can set riskManager", async function () {
       const { owner, other, rd } = await deployFixture();
       await expect(rd.connect(owner).setRiskManager(other.address)).to.not.be.reverted;
@@ -154,6 +162,15 @@ describe("RewardDistributor", function () {
       ).to.be.revertedWith("RD: Not CatPool");
     });
 
+    it("claimForCatPool returns zero when nothing pending", async function () {
+      const { owner, catPool, user, rd, token } = await deployFixture();
+      await rd.connect(owner).setCatPool(catPool.address);
+      await expect(
+        rd.connect(catPool).claimForCatPool(user.address, poolId, token.target, userPledge)
+      ).to.not.be.reverted;
+      expect(await token.balanceOf(user.address)).to.equal(0);
+    });
+
     it("updateUserState only risk manager", async function () {
       const { rd, token, other } = await deployFixture();
       await expect(
@@ -161,10 +178,27 @@ describe("RewardDistributor", function () {
       ).to.be.revertedWith("RD: Not RiskManager");
     });
 
+    it("updateUserState records reward debt", async function () {
+      const { riskManager, user, rd, token } = await setupDistribution();
+      const tracker = await rd.poolRewardTrackers(poolId, token.target);
+      await rd
+        .connect(riskManager)
+        .updateUserState(user.address, poolId, token.target, userPledge);
+      const userDebt = await rd.userRewardStates(user.address, poolId, token.target);
+      expect(userDebt).to.equal((userPledge * tracker) / PRECISION);
+    });
+
     it("pendingRewards returns correct amount", async function () {
       const { user, rd, token } = await setupDistribution();
       const pending = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
       expect(pending).to.equal(ethers.parseEther("10"));
+    });
+
+    it("pendingRewards is zero after claim", async function () {
+      const { riskManager, user, rd, token } = await setupDistribution();
+      await rd.connect(riskManager).claim(user.address, poolId, token.target, userPledge);
+      const pending = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
+      expect(pending).to.equal(0n);
     });
   });
 });
