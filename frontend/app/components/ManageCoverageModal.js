@@ -14,7 +14,7 @@ import { getERC20WithSigner } from "../../lib/erc20";
 import useUsdPrice from "../../hooks/useUsdPrice";
 import { ethers } from "ethers"; // v5 namespace import
 import Modal from "./Modal";
-import { getTokenName, getTokenLogo } from "../config/tokenNameMap";
+import { getTokenName, getTokenLogo, getProtocolName } from "../config/tokenNameMap";
 import { Slider } from "../../components/ui/slider";
 import { formatPercentage } from "../utils/formatting";
 import deployments, { getDeployment } from "../config/deployments";
