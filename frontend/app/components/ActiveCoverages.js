@@ -1,159 +1,145 @@
-"use client"
-import { useState, useEffect } from "react"
-import { Shield, ChevronDown, ChevronUp } from "lucide-react"
-import Image from "next/image"
-import { formatCurrency, formatPercentage } from "../utils/formatting"
-import ManageCoverageModal from "./ManageCoverageModal"
-import { useAccount } from "wagmi"
-import useUserPolicies from "../../hooks/useUserPolicies"
-import usePools from "../../hooks/usePools"
-import { ethers } from "ethers"
-import { getUnderlyingAssetDecimals } from "../../lib/capitalPool"
+"use client";
+import { useState, useEffect, Fragment } from "react";
+import { Shield, ChevronDown, ChevronUp } from "lucide-react";
+import Image from "next/image";
+import { formatCurrency, formatPercentage } from "../utils/formatting";
+import ManageCoverageModal from "./ManageCoverageModal";
+import CancelCoverageModal from "./CancelCoverageModal";
+import { useAccount } from "wagmi";
+import useUserPolicies from "../../hooks/useUserPolicies";
+import usePools from "../../hooks/usePools";
+import { ethers } from "ethers";
+import { getUnderlyingAssetDecimals } from "../../lib/capitalPool";
 import {
   getTokenName,
   getTokenLogo,
   getProtocolLogo,
   getProtocolName,
   getProtocolType,
-} from "../config/tokenNameMap"
-import { getPoolManagerWithSigner } from "../../lib/poolManager"
-import deployments, { getDeployment } from "../config/deployments"
-
+} from "../config/tokenNameMap";
 
 export default function ActiveCoverages({ displayCurrency }) {
-  const [modalOpen, setModalOpen] = useState(false)
-  const [selectedCoverage, setSelectedCoverage] = useState(null)
-  const [cancellingId, setCancellingId] = useState(null)
-  const { address } = useAccount()
-  const { policies } = useUserPolicies(address)
-  const { pools } = usePools()
-  const [underlyingDec, setUnderlyingDec] = useState(6)
-  const [expandedRows, setExpandedRows] = useState([])
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedCoverage, setSelectedCoverage] = useState(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [coverageToCancel, setCoverageToCancel] = useState(null);
+  const { address } = useAccount();
+  const { policies } = useUserPolicies(address);
+  const { pools } = usePools();
+  const [underlyingDec, setUnderlyingDec] = useState(6);
+  const [expandedRows, setExpandedRows] = useState([]);
 
   const toggleRow = (id) => {
     setExpandedRows((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
-  }
+    );
+  };
 
   useEffect(() => {
     async function loadDec() {
       try {
-        const dec = await getUnderlyingAssetDecimals()
-        setUnderlyingDec(Number(dec))
+        const dec = await getUnderlyingAssetDecimals();
+        setUnderlyingDec(Number(dec));
       } catch (err) {
-        console.error('Failed to fetch asset decimals', err)
+        console.error("Failed to fetch asset decimals", err);
       }
     }
-    loadDec()
-  }, [])
+    loadDec();
+  }, []);
 
-  console.log("ActiveCoverages - raw policies:", policies) // For debugging the raw data
+  console.log("ActiveCoverages - raw policies:", policies); // For debugging the raw data
 
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000);
 
-  const activeCoverages = policies.map((p) => {
-    // Convert poolId from hex to a number for comparison
-    const policyPoolId = p.poolId?.hex ? parseInt(p.poolId.hex, 16) : null
-    if (policyPoolId === null) return null
+  const activeCoverages = policies
+    .map((p) => {
+      // Convert poolId from hex to a number for comparison
+      const policyPoolId = p.poolId?.hex ? parseInt(p.poolId.hex, 16) : null;
+      if (policyPoolId === null) return null;
 
-    const pool = pools.find(
-      (pl) => pl.deployment === p.deployment && Number(pl.id) === policyPoolId
-    )
-    if (!pool) return null
+      const pool = pools.find(
+        (pl) => pl.deployment === p.deployment && Number(pl.id) === policyPoolId
+      );
+      if (!pool) return null;
 
-    const protocol = getProtocolName(pool.id)
-    const protocolLogo = getProtocolLogo(pool.id)
+      const protocol = getProtocolName(pool.id);
+      const protocolLogo = getProtocolLogo(pool.id);
 
-    // ethers.utils.formatUnits can often handle BigNumber objects directly,
-    // but it's safer to pass the hex value.
-    const decimals = pool.underlyingAssetDecimals ?? underlyingDec
-    const coverageAmount = Number(
-      ethers.utils.formatUnits(p.coverage.hex, decimals)
-    )
+      // ethers.utils.formatUnits can often handle BigNumber objects directly,
+      // but it's safer to pass the hex value.
+      const decimals = pool.underlyingAssetDecimals ?? underlyingDec;
+      const coverageAmount = Number(
+        ethers.utils.formatUnits(p.coverage.hex, decimals)
+      );
 
-    const capacity = Number(
-      ethers.utils.formatUnits(
-        BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold),
-        decimals
-      )
-    )
+      const capacity = Number(
+        ethers.utils.formatUnits(
+          BigInt(pool.totalCapitalPledgedToPool) -
+            BigInt(pool.totalCoverageSold),
+          decimals
+        )
+      );
 
-    // Convert timestamps from hex to numbers
-    const activationHex = p.activation?.hex || p.start?.hex || '0x0'
-    const expiryHex = p.lastPaidUntil?.hex || '0x0'
+      // Convert timestamps from hex to numbers
+      const activationHex = p.activation?.hex || p.start?.hex || "0x0";
+      const expiryHex = p.lastPaidUntil?.hex || "0x0";
 
-    const activationTs = parseInt(activationHex, 16)
-    let expiryTs = parseInt(expiryHex, 16)
+      const activationTs = parseInt(activationHex, 16);
+      let expiryTs = parseInt(expiryHex, 16);
 
-    if (!expiryTs) {
-      const deposit = Number(
-        ethers.utils.formatUnits(p.premiumDeposit?.hex || '0', decimals),
-      )
-      const lastDrainTs = parseInt(p.lastDrainTime?.hex || '0x0', 16)
-      const rate = Number(pool.premiumRateBps || 0) / 100
-      const perSecond =
-        rate > 0
-          ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60)
-          : 0
-      if (perSecond > 0) {
-        expiryTs = Math.floor(lastDrainTs + deposit / perSecond)
+      if (!expiryTs) {
+        const deposit = Number(
+          ethers.utils.formatUnits(p.premiumDeposit?.hex || "0", decimals)
+        );
+        const lastDrainTs = parseInt(p.lastDrainTime?.hex || "0x0", 16);
+        const rate = Number(pool.premiumRateBps || 0) / 100;
+        const perSecond =
+          rate > 0 ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0;
+        if (perSecond > 0) {
+          expiryTs = Math.floor(lastDrainTs + deposit / perSecond);
+        }
       }
-    }
 
-    let status = "active"
-    if (now < activationTs) status = "pending"
-    else if (expiryTs && now > expiryTs) status = "expired"
+      let status = "active";
+      if (now < activationTs) status = "pending";
+      else if (expiryTs && now > expiryTs) status = "expired";
 
-    return {
-      id: p.id,
-      deployment: p.deployment,
-      protocol,
-      protocolLogo,
-      type: getProtocolType(pool.id),
-      pool: pool.protocolTokenToCover,
-      poolName: getTokenName(pool.protocolTokenToCover),
-      coverageAmount,
-      premium: Number(pool.premiumRateBps || 0) / 100,
-      status,
-      capacity,
-      activation: activationTs,
-      expiry: expiryTs,
-    }
-  }).filter(Boolean)
+      return {
+        id: p.id,
+        deployment: p.deployment,
+        protocol,
+        protocolLogo,
+        type: getProtocolType(pool.id),
+        pool: pool.protocolTokenToCover,
+        poolName: getTokenName(pool.protocolTokenToCover),
+        coverageAmount,
+        premium: Number(pool.premiumRateBps || 0) / 100,
+        status,
+        capacity,
+        activation: activationTs,
+        expiry: expiryTs,
+      };
+    })
+    .filter(Boolean);
 
-  console.log("Processed Coverage data:", activeCoverages) // For debugging the processed data
+  console.log("Processed Coverage data:", activeCoverages); // For debugging the processed data
 
   const protocolCoverages = activeCoverages.filter(
-    (c) => c.type === 'protocol'
-  )
+    (c) => c.type === "protocol"
+  );
   const stablecoinCoverages = activeCoverages.filter(
-    (c) => c.type === 'stablecoin'
-  )
-
+    (c) => c.type === "stablecoin"
+  );
 
   const handleOpenModal = (coverage) => {
-    setSelectedCoverage(coverage)
-    setModalOpen(true)
-  }
+    setSelectedCoverage(coverage);
+    setModalOpen(true);
+  };
 
-  const handleCancelCoverage = async (coverage) => {
-    if (!coverage) return
-    if (!window.confirm('Cancel this coverage early?')) return
-    try {
-      setCancellingId(coverage.id)
-      const dep = getDeployment(coverage.deployment)
-      const pm = await getPoolManagerWithSigner(dep.poolManager)
-      const tx = await pm.cancelCover(coverage.id)
-      await tx.wait()
-      window.location.reload()
-    } catch (err) {
-      console.error('Failed to cancel coverage', err)
-    } 
-    finally {
-      setCancellingId(null)
-    }
-  }
+  const openCancelModal = (coverage) => {
+    setCoverageToCancel(coverage);
+    setCancelModalOpen(true);
+  };
 
   if (activeCoverages.length === 0) {
     return (
@@ -161,12 +147,15 @@ export default function ActiveCoverages({ displayCurrency }) {
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
           <Shield className="h-6 w-6 text-gray-500 dark:text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No coverages</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+          No coverages
+        </h3>
         <p className="text-gray-500 dark:text-gray-400">
-          You don't have any insurance coverages. Visit the markets page to purchase coverage.
+          You don't have any insurance coverages. Visit the markets page to
+          purchase coverage.
         </p>
       </div>
-    )
+    );
   }
 
   const renderTable = (covers) => (
@@ -226,108 +215,117 @@ export default function ActiveCoverages({ displayCurrency }) {
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           {covers.map((coverage) => (
-            <tr key={coverage.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 h-8 w-8 mr-3">
-                    <Image
-                      src={coverage.protocolLogo}
-                      alt={coverage.protocol}
-                      width={32}
-                      height={32}
-                      className="rounded-full"
-                    />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">{coverage.protocol}</div>
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 h-6 w-6 mr-2">
-                    <Image
-                      src={getTokenLogo(coverage.pool)}
-                      alt={getProtocolName(coverage.poolName)}
-                      width={24}
-                      height={24}
-                      className="rounded-full"
-                    />
-                  </div>
-                  <div className="text-sm text-gray-900 dark:text-white">{coverage.poolName}</div>
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900 dark:text-white">
-                  {formatCurrency(
-                    coverage.coverageAmount,
-                    'USD',
-                    displayCurrency
-                  )}
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900 dark:text-white">{formatPercentage(coverage.premium)}</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900 dark:text-white">
-                  {coverage.activation
-                    ? new Date(coverage.activation * 1000).toLocaleDateString()
-                    : "-"}
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900 dark:text-white">
-                  {coverage.expiry
-                    ? new Date(coverage.expiry * 1000).toLocaleDateString()
-                    : "-"}
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
-                  {coverage.status}
-                </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button
-                  onClick={() => toggleRow(coverage.id)}
-                  className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
-                >
-                  <span className="hidden sm:inline">
-                    {expandedRows.includes(coverage.id) ? 'Hide' : 'Actions'}
-                  </span>
-                  {expandedRows.includes(coverage.id) ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </button>
-              </td>
-            </tr>
-            {expandedRows.includes(coverage.id) && (
-              <tr>
-                <td colSpan={8} className="px-6 py-4">
-                  <div className="flex gap-3">
-                    <button
-                      className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
-                      onClick={() => handleOpenModal(coverage)}
-                    >
-                      Manage
-                    </button>
-                    <button
-                      className="py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm disabled:opacity-50"
-                      onClick={() => handleCancelCoverage(coverage)}
-                      disabled={cancellingId === coverage.id}
-                    >
-                      {cancellingId === coverage.id ? 'Cancelling...' : 'Cancel'}
-                    </button>
+            <Fragment key={coverage.id}>
+              <tr className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-8 w-8 mr-3">
+                      <Image
+                        src={coverage.protocolLogo}
+                        alt={coverage.protocol}
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                      />
+                    </div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {coverage.protocol}
+                    </div>
                   </div>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-6 w-6 mr-2">
+                      <Image
+                        src={getTokenLogo(coverage.pool)}
+                        alt={getProtocolName(coverage.poolName)}
+                        width={24}
+                        height={24}
+                        className="rounded-full"
+                      />
+                    </div>
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {coverage.poolName}
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {formatCurrency(
+                      coverage.coverageAmount,
+                      "USD",
+                      displayCurrency
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {formatPercentage(coverage.premium)}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {coverage.activation
+                      ? new Date(
+                          coverage.activation * 1000
+                        ).toLocaleDateString()
+                      : "-"}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {coverage.expiry
+                      ? new Date(coverage.expiry * 1000).toLocaleDateString()
+                      : "-"}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
+                    {coverage.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => toggleRow(coverage.id)}
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
+                  >
+                    <span className="hidden sm:inline">
+                      {expandedRows.includes(coverage.id) ? "Hide" : "Actions"}
+                    </span>
+                    {expandedRows.includes(coverage.id) ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </button>
+                </td>
               </tr>
-            )}
+              {expandedRows.includes(coverage.id) && (
+                <tr>
+                  <td colSpan={8} className="px-6 py-4">
+                    <div className="flex gap-3">
+                      <button
+                        className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
+                        onClick={() => handleOpenModal(coverage)}
+                      >
+                        Manage
+                      </button>
+                      <button
+                        className="py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
+                        onClick={() => openCancelModal(coverage)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
     </div>
-  )
+  );
 
   return (
     <div className="space-y-6">
@@ -360,6 +358,17 @@ export default function ActiveCoverages({ displayCurrency }) {
           expiry={selectedCoverage.expiry}
         />
       )}
+      {coverageToCancel && (
+        <CancelCoverageModal
+          isOpen={cancelModalOpen}
+          onClose={(reload) => {
+            setCancelModalOpen(false);
+            setCoverageToCancel(null);
+            if (reload) window.location.reload();
+          }}
+          coverage={coverageToCancel}
+        />
+      )}
     </div>
-  )
+  );
 }
