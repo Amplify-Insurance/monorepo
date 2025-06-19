@@ -24,13 +24,13 @@ describe("RiskManager", function () {
     const MAX_ALLOCATIONS = 5;
 
     // --- Mock ABIs (assuming they are generated in the artifacts folder) ---
-    const iPoolRegistryAbi = require("../artifacts/contracts/RiskManager.sol/IPoolRegistry.json").abi;
-    const iCapitalPoolAbi = require("../artifacts/contracts/RiskManager.sol/ICapitalPool.json").abi;
-    const iPolicyNFTAbi = require("../artifacts/contracts/RiskManager.sol/IPolicyNFT.json").abi;
-    const iCatInsurancePoolAbi = require("../artifacts/contracts/RiskManager.sol/ICatInsurancePool.json").abi;
-    const iLossDistributorAbi = require("../artifacts/contracts/RiskManager.sol/ILossDistributor.json").abi;
-    const iPolicyManagerAbi = require("../artifacts/contracts/RiskManager.sol/IPolicyManager.json").abi;
-    const iRewardDistributorAbi = require("../artifacts/contracts/RiskManager.sol/IRewardDistributor.json").abi;
+    const iPoolRegistryAbi = require("../artifacts/contracts/interfaces/IPoolRegistry.sol/IPoolRegistry.json").abi;
+    const iCapitalPoolAbi = require("../artifacts/contracts/interfaces/ICapitalPool.sol/ICapitalPool.json").abi;
+    const iPolicyNFTAbi = require("../artifacts/contracts/interfaces/IPolicyNFT.sol/IPolicyNFT.json").abi;
+    const iCatInsurancePoolAbi = require("../artifacts/contracts/interfaces/ICatInsurancePool.sol/ICatInsurancePool.json").abi;
+    const iLossDistributorAbi = require("../artifacts/contracts/interfaces/ILossDistributor.sol/ILossDistributor.json").abi;
+    const iPolicyManagerAbi = require("../artifacts/contracts/interfaces/IPolicyManager.sol/IPolicyManager.json").abi;
+    const iRewardDistributorAbi = require("../artifacts/contracts/interfaces/IRewardDistributor.sol/IRewardDistributor.json").abi;
 
 
     beforeEach(async function () {
