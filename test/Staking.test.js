@@ -147,6 +147,20 @@ describe("StakingContract", function () {
         });
     });
 
+    describe("Slashing Without Committee", function() {
+        const STAKE_AMOUNT = ethers.parseEther("100");
+        const SLASH_AMOUNT = ethers.parseEther("40");
+
+        beforeEach(async function() {
+            await stakingContract.connect(staker1).stake(STAKE_AMOUNT);
+        });
+
+        it("Should revert if slash is attempted before committee is set", async function() {
+            await expect(stakingContract.connect(committee).slash(staker1.address, SLASH_AMOUNT))
+                .to.be.revertedWithCustomError(stakingContract, "NotCommittee");
+        });
+    });
+
     describe("Slashing", function() {
         const STAKE_AMOUNT = ethers.parseEther("100");
         const SLASH_AMOUNT = ethers.parseEther("40");
@@ -224,6 +238,20 @@ describe("StakingContract", function () {
             await stakingContract.connect(staker1).unstake(balanceAfterSlash);
             expect(await stakingContract.stakedBalance(staker1.address)).to.equal(0);
             expect(await stakingContract.totalStaked()).to.equal(0);
+        });
+    });
+
+    describe("Multiple Stakers", function() {
+        const STAKE_1 = ethers.parseEther("80");
+        const STAKE_2 = ethers.parseEther("120");
+
+        it("Should track balances and total across different stakers", async function() {
+            await stakingContract.connect(staker1).stake(STAKE_1);
+            await stakingContract.connect(staker2).stake(STAKE_2);
+
+            expect(await stakingContract.stakedBalance(staker1.address)).to.equal(STAKE_1);
+            expect(await stakingContract.stakedBalance(staker2.address)).to.equal(STAKE_2);
+            expect(await stakingContract.totalStaked()).to.equal(STAKE_1 + STAKE_2);
         });
     });
 
