@@ -271,6 +271,20 @@ describe("PolicyManager", function () {
                 await expect(policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, hugeDeposit))
                     .to.be.revertedWithCustomError(policyManager, "InvalidAmount");
             });
+
+            it("Should apply updated cooldown period to activation timestamp", async function () {
+                const NEW_PERIOD = 10 * 24 * 60 * 60; // 10 days
+                await policyManager.connect(owner).setCoverCooldownPeriod(NEW_PERIOD);
+
+                const nextIdBefore = await mockPolicyNFT.nextPolicyId();
+                const tx = await policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, INITIAL_PREMIUM_DEPOSIT);
+                const receipt = await tx.wait();
+                const block = await ethers.provider.getBlock(receipt.blockNumber);
+                const nextIdAfter = await mockPolicyNFT.nextPolicyId();
+                expect(nextIdAfter).to.equal(nextIdBefore + 1n);
+                const pol = await mockPolicyNFT.policies(nextIdAfter - 1n);
+                expect(pol.activation).to.equal(block.timestamp + NEW_PERIOD);
+            });
         });
 
         describe("cancelCover()", function() {
@@ -420,6 +434,35 @@ describe("PolicyManager", function () {
 
                 expect(await mockCatPool.last_premiumReceived()).to.equal(catAmount);
                 expect(await mockRewardDistributor.totalRewards(POOL_ID, mockUsdc.target)).to.equal(poolIncome);
+            });
+
+            it("Should respect updated cat premium share during distribution", async function () {
+                await policyManager.connect(owner).setCatPremiumShareBps(3000);
+                await mockPoolRegistry.setPoolData(POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    COVERAGE_AMOUNT,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+                const rateModel = { base: 100, slope1: 0, slope2: 0, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await mockUsdc.mint(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
+                await time.increase(COOLDOWN_PERIOD + 30 * 24 * 60 * 60 + 1);
+
+                const info = await mockPolicyNFT.policies(POLICY_ID);
+                await policyManager.connect(user1).cancelCover(POLICY_ID);
+
+                const latest = BigInt(await time.latest());
+                const timeElapsed = latest - BigInt(info.lastDrainTime);
+                const accrued = (COVERAGE_AMOUNT * 100n * timeElapsed) / (BigInt(SECS_YEAR) * BigInt(BPS));
+                const expectedCat = (accrued * 3000n) / BigInt(BPS);
+                const expectedPool = accrued - expectedCat;
+
+                expect(await mockCatPool.last_premiumReceived()).to.equal(expectedCat);
+                expect(await mockRewardDistributor.totalRewards(POOL_ID, mockUsdc.target)).to.equal(expectedPool);
             });
         });
 
