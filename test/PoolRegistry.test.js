@@ -27,7 +27,7 @@ describe("PoolRegistry", function () {
 
         // Deploy a mock ERC20 token for testing
         const MockERC20 = await ethers.getContractFactory("MockERC20");
-        token = await MockERC20.deploy("Mock Token", "MTK", ethers.parseUnits("1000000", 18));
+        token = await MockERC20.deploy("Mock Token", "MTK", 18);
         await token.waitForDeployment();
 
 
@@ -148,16 +148,16 @@ describe("PoolRegistry", function () {
             });
         });
 
-        // Create a pool before running tests that require one
-        beforeEach(async function () {
-            await poolRegistry.connect(riskManager).addProtocolRiskPool(
-                token.target,
-                sampleRateModel,
-                sampleClaimFee
-            );
-        });
+
 
         describe("updateCapitalAllocation()", function () {
+            beforeEach(async function () {
+                await poolRegistry.connect(riskManager).addProtocolRiskPool(
+                    token.target,
+                    sampleRateModel,
+                    sampleClaimFee
+                );
+            });
             const pledgeAmount = ethers.parseUnits("1000", 18);
 
             it("Should correctly allocate capital and add a new adapter", async function () {
@@ -250,6 +250,13 @@ describe("PoolRegistry", function () {
         });
 
         describe("updateCapitalPendingWithdrawal()", function () {
+            beforeEach(async function () {
+                await poolRegistry.connect(riskManager).addProtocolRiskPool(
+                    token.target,
+                    sampleRateModel,
+                    sampleClaimFee
+                );
+            });
             const amount = ethers.parseUnits("100", 18);
 
             it("Should correctly increase capital pending withdrawal on request", async function () {
@@ -272,6 +279,13 @@ describe("PoolRegistry", function () {
         });
         
         describe("updateCoverageSold()", function () {
+            beforeEach(async function () {
+                await poolRegistry.connect(riskManager).addProtocolRiskPool(
+                    token.target,
+                    sampleRateModel,
+                    sampleClaimFee
+                );
+            });
             const amount = ethers.parseUnits("500", 18);
 
             it("Should correctly increase total coverage sold on sale", async function () {
@@ -293,9 +307,16 @@ describe("PoolRegistry", function () {
             });
         });
 
-        describe("updatePoolPauseState()", function () {
+        describe("setPauseState()", function () {
+            beforeEach(async function () {
+                await poolRegistry.connect(riskManager).addProtocolRiskPool(
+                    token.target,
+                    sampleRateModel,
+                    sampleClaimFee
+                );
+            });
             it("Should correctly pause a pool", async function () {
-                await poolRegistry.connect(riskManager).updatePoolPauseState(0, true);
+                await poolRegistry.connect(riskManager).setPauseState(0, true);
                 const poolData = await poolRegistry.getPoolData(0);
                 expect(poolData.isPaused).to.be.true;
                 
@@ -308,9 +329,9 @@ describe("PoolRegistry", function () {
 
             it("Should correctly unpause a pool", async function () {
                 // First pause it
-                await poolRegistry.connect(riskManager).updatePoolPauseState(0, true);
+                await poolRegistry.connect(riskManager).setPauseState(0, true);
                 // Then unpause it
-                await poolRegistry.connect(riskManager).updatePoolPauseState(0, false);
+                await poolRegistry.connect(riskManager).setPauseState(0, false);
 
                 const poolData = await poolRegistry.getPoolData(0);
                 expect(poolData.isPaused).to.be.false;
@@ -320,12 +341,19 @@ describe("PoolRegistry", function () {
             });
 
              it("Should prevent non-risk managers from updating", async function () {
-                 await expect(poolRegistry.connect(nonOwner).updatePoolPauseState(0, true))
+                 await expect(poolRegistry.connect(nonOwner).setPauseState(0, true))
                     .to.be.revertedWith("PR: Not RiskManager");
             });
         });
 
         describe("setFeeRecipient()", function () {
+            beforeEach(async function () {
+                await poolRegistry.connect(riskManager).addProtocolRiskPool(
+                    token.target,
+                    sampleRateModel,
+                    sampleClaimFee
+                );
+            });
              it("Should allow the risk manager to set the fee recipient", async function () {
                 await poolRegistry.connect(riskManager).setFeeRecipient(0, nonOwner.address);
                 const poolData = await poolRegistry.getPoolData(0);
@@ -436,7 +464,7 @@ describe("PoolRegistry", function () {
             await expect(poolRegistry.getPoolData(invalidPoolId)).to.be.reverted;
             await expect(poolRegistry.getPoolRateModel(invalidPoolId)).to.be.reverted;
             await expect(poolRegistry.updateCapitalAllocation(invalidPoolId, adapter1.address, amount, true)).to.be.reverted;
-            await expect(poolRegistry.updatePoolPauseState(invalidPoolId, true)).to.be.reverted;
+            await expect(poolRegistry.setPauseState(invalidPoolId, true)).to.be.reverted;
         });
 
         it("Should revert on arithmetic underflow when de-allocating capital", async function() {
