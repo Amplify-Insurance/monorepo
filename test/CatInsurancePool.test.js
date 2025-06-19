@@ -132,6 +132,26 @@ describe("CatInsurancePool", function () {
             expect(await catPool.idleUSDC()).to.equal(depositAmount);
             expect(await catPool.adapter()).to.equal(newAdapter.target);
         });
+        // New admin event tests
+        it("Should emit events when updating addresses", async function() {
+            await expect(catPool.connect(owner).setRiskManagerAddress(lp1.address))
+                .to.emit(catPool, "RiskManagerAddressSet").withArgs(lp1.address);
+            await expect(catPool.connect(owner).setCapitalPoolAddress(lp2.address))
+                .to.emit(catPool, "CapitalPoolAddressSet").withArgs(lp2.address);
+            await expect(catPool.connect(owner).setPolicyManagerAddress(lp2.address))
+                .to.emit(catPool, "PolicyManagerAddressSet").withArgs(lp2.address);
+            await expect(catPool.connect(owner).setRewardDistributor(nonParty.address))
+                .to.emit(catPool, "RewardDistributorSet").withArgs(nonParty.address);
+        });
+
+        it("flushToAdapter should deposit and emit event", async function() {
+            const amount = ethers.parseUnits("1000", 6);
+            await catPool.connect(lp1).depositLiquidity(amount);
+            await expect(catPool.connect(owner).flushToAdapter(amount))
+                .to.emit(catPool, "DepositToAdapter").withArgs(amount);
+            expect(await catPool.idleUSDC()).to.equal(0);
+            expect(await mockAdapter.totalValueHeld()).to.equal(amount);
+        });
     });
 
     describe("Liquidity Provision", function () {
@@ -243,6 +263,15 @@ describe("CatInsurancePool", function () {
         });
     });
 
+    describe("View Functions", function() {
+        it("liquidUsdc should include adapter balance", async function() {
+            const amount = ethers.parseUnits("1000", 6);
+            await catPool.connect(lp1).depositLiquidity(amount);
+            await catPool.connect(owner).flushToAdapter(amount);
+            await mockAdapter.setTotalValueHeld(amount * 2n);
+            expect(await catPool.liquidUsdc()).to.equal(amount * 2n);
+        });
+    });
     describe("Rewards", function() {
         it("claimProtocolAssetRewards should call the reward distributor", async function() {
             const rewardAmount = ethers.parseUnits("50", 18);
@@ -461,8 +490,17 @@ describe("CatInsurancePool", function () {
                 pool2.connect(riskManager).receiveProtocolAssetsForDistribution(mockRewardToken.target, 1)
             ).to.be.revertedWith("CIP: Reward distributor not set");
         });
-    });
+        it("Should revert when deposit would mint zero shares", async function() {
+            const amount = ethers.parseUnits("1000", 6);
+            await catPool.connect(lp1).depositLiquidity(amount);
+            await catPool.connect(owner).flushToAdapter(amount);
+            await mockAdapter.setTotalValueHeld(amount * 1000000000000n);
+            await expect(catPool.connect(lp2).depositLiquidity(amount))
+                .to.be.revertedWith("CIP: No shares to mint");
+        });
 
+
+    });
     describe("Security", function() {
         it("Should prevent re-entrancy on depositLiquidity", async function() {
             const MaliciousUSDCFactory = await ethers.getContractFactory("MaliciousToken");
