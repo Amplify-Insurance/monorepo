@@ -313,18 +313,35 @@ const MaliciousERC20Artifact = {
     ]
 };
 
-ethers.ContractFactory.getContractFactory = async (name, signer) => {
-    if (name === "MockERC20") {
-        const factory = new ethers.ContractFactory(MockERC20Artifact.abi, MockERC20Artifact.bytecode, signer);
-        return factory;
-    }
-    if (name === "MaliciousERC20") {
-        const factory = new ethers.ContractFactory(MaliciousERC20Artifact.abi, MaliciousERC20Artifact.bytecode, signer);
-        return factory;
-    }
-    const hardhatEthers = require("hardhat").ethers;
-    return hardhatEthers.getContractFactory(name, signer);
-};
+let originalGetContractFactory;
+
+before(function () {
+    originalGetContractFactory = ethers.ContractFactory.getContractFactory;
+    ethers.ContractFactory.getContractFactory = async (name, signer) => {
+        if (name === "MockERC20") {
+            const factory = new ethers.ContractFactory(
+                MockERC20Artifact.abi,
+                MockERC20Artifact.bytecode,
+                signer
+            );
+            return factory;
+        }
+        if (name === "MaliciousERC20") {
+            const factory = new ethers.ContractFactory(
+                MaliciousERC20Artifact.abi,
+                MaliciousERC20Artifact.bytecode,
+                signer
+            );
+            return factory;
+        }
+        const hardhatEthers = require("hardhat").ethers;
+        return hardhatEthers.getContractFactory(name, signer);
+    };
+});
+
+after(function () {
+    ethers.ContractFactory.getContractFactory = originalGetContractFactory;
+});
 
 // Helper contract for ERC20 failure tests
 const fs = require('fs');
