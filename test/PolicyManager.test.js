@@ -464,6 +464,34 @@ describe("PolicyManager", function () {
                 expect(await mockCatPool.last_premiumReceived()).to.equal(expectedCat);
                 expect(await mockRewardDistributor.totalRewards(POOL_ID, mockUsdc.target)).to.equal(expectedPool);
             });
+
+            it("Should send no premium to Cat Pool when share is zero", async function () {
+                await policyManager.connect(owner).setCatPremiumShareBps(0);
+                await mockPoolRegistry.setPoolData(POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    COVERAGE_AMOUNT,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+                const rateModel = { base: 100, slope1: 0, slope2: 0, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await mockUsdc.mint(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
+                await time.increase(COOLDOWN_PERIOD + 30 * 24 * 60 * 60 + 1);
+
+                const info = await mockPolicyNFT.policies(POLICY_ID);
+                await policyManager.connect(user1).cancelCover(POLICY_ID);
+
+                const latest = BigInt(await time.latest());
+                const timeElapsed = latest - BigInt(info.lastDrainTime);
+                const accrued = (COVERAGE_AMOUNT * 100n * timeElapsed) / (BigInt(SECS_YEAR) * BigInt(BPS));
+                const expectedPool = accrued; // all to pool when cat share is 0
+
+                expect(await mockCatPool.last_premiumReceived()).to.equal(0);
+                expect(await mockRewardDistributor.totalRewards(POOL_ID, mockUsdc.target)).to.equal(expectedPool);
+            });
         });
 
         // --- NEW TESTS START HERE ---
@@ -925,6 +953,41 @@ describe("PolicyManager", function () {
 
                 // The cancelCover call will trigger a distribution, which will call back to cancelCover again
                 await expect(policyManager.connect(user1).cancelCover(POLICY_ID))
+                    .to.be.revertedWithCustomError(policyManager, "ReentrancyGuardReentrantCall");
+            });
+
+            it("Should prevent re-entrancy during purchaseCover", async function () {
+                const MaliciousTokenFactory = await ethers.getContractFactory("MaliciousERC20Reentrant");
+                const maliciousToken = await MaliciousTokenFactory.deploy("MalToken", "MAL");
+                await maliciousToken.mint(user1.address, ethers.parseUnits("1000", 6));
+
+                const MalCapPoolFactory = await ethers.getContractFactory("MockCapitalPool");
+                const malCapPool = await MalCapPoolFactory.deploy(owner.address, maliciousToken.target);
+
+                await maliciousToken.connect(user1).approve(policyManager.target, ethers.MaxUint256);
+                await maliciousToken.setAttack(policyManager.target, POOL_ID, COVERAGE_AMOUNT, INITIAL_PREMIUM_DEPOSIT);
+
+                await policyManager.connect(owner).setAddresses(
+                    mockPoolRegistry.target,
+                    malCapPool.target,
+                    mockCatPool.target,
+                    mockRewardDistributor.target,
+                    mockRiskManager.target
+                );
+
+                await mockPoolRegistry.setPoolData(POOL_ID,
+                    maliciousToken.target,
+                    ethers.parseUnits("100000", 6),
+                    0,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+                const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+
+                await expect(policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, INITIAL_PREMIUM_DEPOSIT))
                     .to.be.revertedWithCustomError(policyManager, "ReentrancyGuardReentrantCall");
             });
         });
