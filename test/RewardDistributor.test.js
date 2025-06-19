@@ -248,5 +248,61 @@ describe("RewardDistributor", function () {
       const pending = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
       expect(pending).to.equal(0n);
     });
+
+    it("new risk manager controls privileged functions", async function () {
+      const { owner, riskManager, other, rd, token } = await deployFixture();
+      await rd.connect(owner).setRiskManager(other.address);
+      await expect(
+        rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge)
+      ).to.be.revertedWith("RD: Not RiskManager");
+      await expect(
+        rd.connect(other).distribute(poolId, token.target, rewardAmount, totalPledge)
+      ).to.not.be.reverted;
+    });
+
+    it("tracks rewards independently per pool", async function () {
+      const otherPool = 2;
+      const { owner, riskManager, catPool, user, rd, token } = await deployFixture();
+      await rd.connect(owner).setCatPool(catPool.address);
+      const userPledge2 = ethers.parseEther("50");
+
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge);
+      await rd.connect(riskManager).updateUserState(user.address, poolId, token.target, userPledge);
+      await rd.connect(riskManager).distribute(poolId, token.target, rewardAmount, totalPledge);
+
+      await rd.connect(riskManager).distribute(otherPool, token.target, rewardAmount, totalPledge);
+      await rd
+        .connect(riskManager)
+        .updateUserState(user.address, otherPool, token.target, userPledge2);
+      await rd.connect(riskManager).distribute(otherPool, token.target, rewardAmount, totalPledge);
+
+      const pending1 = await rd.pendingRewards(user.address, poolId, token.target, userPledge);
+      const pending2 = await rd.pendingRewards(user.address, otherPool, token.target, userPledge2);
+      expect(pending1).to.equal(ethers.parseEther("10"));
+      expect(pending2).to.equal(ethers.parseEther("5"));
+    });
+
+    it("handles fractional reward calculations", async function () {
+      const { owner, riskManager, catPool, user, rd, token } = await deployFixture();
+      await rd.connect(owner).setCatPool(catPool.address);
+
+      await rd.connect(riskManager).distribute(poolId, token.target, 1, 2);
+      await rd.connect(riskManager).updateUserState(user.address, poolId, token.target, 1);
+      await rd.connect(riskManager).distribute(poolId, token.target, 1, 2);
+
+      const pending = await rd.pendingRewards(user.address, poolId, token.target, 1);
+      expect(pending).to.equal(1);
+    });
+
+    it("new catPool takes over claimForCatPool", async function () {
+      const { owner, riskManager, catPool, user, rd, token, other } = await setupDistribution();
+      await rd.connect(owner).setCatPool(other.address);
+      await expect(
+        rd.connect(catPool).claimForCatPool(user.address, poolId, token.target, userPledge)
+      ).to.be.revertedWith("RD: Not CatPool");
+      await expect(
+        rd.connect(other).claimForCatPool(user.address, poolId, token.target, userPledge)
+      ).to.not.be.reverted;
+    });
   });
 });
