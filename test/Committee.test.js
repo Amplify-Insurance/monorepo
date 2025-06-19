@@ -514,6 +514,57 @@ describe("Committee", function () {
                 10001
             )).to.be.revertedWith("Invalid slash bps");
         });
+
+        it("Should clear active proposal flag after a defeated proposal", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(voter2).vote(1, 1); // vote against so it fails
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            expect(await committee.activeProposalForPool(POOL_ID)).to.equal(false);
+        });
+
+        it("Should clear active proposal flag after unpause execution", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(proposer).vote(1, 2);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await mockRiskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+            await time.increase(CHALLENGE_PERIOD + 1);
+            await committee.resolvePauseBond(1);
+
+            await committee.connect(proposer).createProposal(POOL_ID, 0, 0);
+            await committee.connect(proposer).vote(2, 2);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(2);
+            expect(await committee.activeProposalForPool(POOL_ID)).to.equal(false);
+        });
+
+        it("Should allow a non-staker voter to claim zero reward", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(proposer).vote(1, 2);
+            await committee.connect(nonStaker).vote(1, 2); // weight zero
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await mockRiskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+            await time.increase(CHALLENGE_PERIOD + 1);
+            await committee.resolvePauseBond(1);
+
+            await expect(committee.connect(nonStaker).claimReward(1))
+                .to.emit(committee, "RewardClaimed").withArgs(1, nonStaker.address, 0n);
+        });
+
+        it("Should accumulate multiple fee deposits", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(proposer).vote(1, 2);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await mockRiskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+            await mockRiskManager.sendFees(committee.target, 1, { value: ethers.parseEther("2") });
+            await time.increase(CHALLENGE_PERIOD + 1);
+            await committee.resolvePauseBond(1);
+            const proposal = await committee.proposals(1);
+            expect(proposal.totalRewardFees).to.equal(ethers.parseEther("3"));
+        });
     });
 });
 
