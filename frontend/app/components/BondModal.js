@@ -158,7 +158,7 @@ export default function BondModal({ isOpen, onClose }) {
         const approveTx = await token.approve(staking.address, value)
         await approveTx.wait()
       }
-      const tx = await staking.depositBond(pool.id, value)
+      const tx = await staking.depositBond(pool.id, selectedAsset, value)
       await tx.wait()
       setAmount("")
       onClose()

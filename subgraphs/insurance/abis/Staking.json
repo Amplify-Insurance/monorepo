@@ -20,6 +20,7 @@
   {
     "inputs": [
       {"internalType": "uint256", "name": "poolId", "type": "uint256"},
+      {"internalType": "address", "name": "asset", "type": "address"},
       {"internalType": "uint256", "name": "amount", "type": "uint256"}
     ],
     "name": "depositBond",
