@@ -184,6 +184,12 @@ const MAX_ALLOCATIONS = 5;
                 await expect(riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]))
                     .to.be.revertedWith("Already allocated to this pool");
             });
+
+            it("Should revert if no yield adapter is set", async function () {
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, ethers.ZeroAddress);
+                await expect(riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]))
+                    .to.be.revertedWith("User has no yield adapter set in CapitalPool");
+            });
         });
 
         describe("Capital Deallocation", function() {
@@ -223,11 +229,22 @@ const MAX_ALLOCATIONS = 5;
                 await expect(riskManager.connect(underwriter2).deallocateFromPool(POOL_ID_1))
                     .to.be.revertedWith("Not allocated to this pool");
             });
+
+            it("Should revert if yield adapter address is missing", async function () {
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, ethers.ZeroAddress);
+                await expect(riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1))
+                    .to.be.revertedWith("User has no yield adapter set in CapitalPool");
+            });
         });
 
         describe("Governance Hooks", function() {
             it("Should allow the committee to report an incident (pause a pool)", async function() {
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, 0, 0, 0, false, committee.address, 0);
                 await expect(riskManager.connect(committee).reportIncident(POOL_ID_1, true)).to.not.be.reverted;
+                expect((await mockPoolRegistry.pools(POOL_ID_1)).isPaused).to.equal(true);
+                await riskManager.connect(committee).reportIncident(POOL_ID_1, false);
+                expect((await mockPoolRegistry.pools(POOL_ID_1)).isPaused).to.equal(false);
             });
             
             it("Should prevent non-committee from reporting an incident", async function() {
@@ -236,7 +253,9 @@ const MAX_ALLOCATIONS = 5;
             });
 
             it("Should allow the committee to set a pool's fee recipient", async function() {
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, 0, 0, 0, false, committee.address, 0);
                 await expect(riskManager.connect(committee).setPoolFeeRecipient(POOL_ID_1, nonParty.address)).to.not.be.reverted;
+                expect((await mockPoolRegistry.pools(POOL_ID_1)).feeRecipient).to.equal(nonParty.address);
             });
         });
 
@@ -300,6 +319,28 @@ const MAX_ALLOCATIONS = 5;
                 const rewardStored2 = await mockRewardDistributor.totalRewards(POOL_ID_1, mockProtocolToken.target);
                 expect(rewardStored2).to.equal(HIGH_COVERAGE);
             });
+
+            it("Should scale reward amounts to protocol token decimals", async function() {
+                const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+                const highDecToken = await MockERC20Factory.deploy("PTKN", "PTK", 18);
+                await highDecToken.connect(owner).mint(claimant.address, ethers.parseUnits("50000", 18));
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    claimant.address,
+                    POOL_ID_1,
+                    COVERAGE_AMOUNT,
+                    0,
+                    0,
+                    0,
+                    0
+                );
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, highDecToken.target, TOTAL_PLEDGED, 0, 0, false, committee.address, 500);
+                await highDecToken.connect(claimant).approve(riskManager.target, ethers.parseUnits("50000", 18));
+
+                await expect(riskManager.connect(nonParty).processClaim(POLICY_ID)).to.not.be.reverted;
+                const stored = await mockRewardDistributor.totalRewards(POOL_ID_1, highDecToken.target);
+                expect(stored).to.equal(ethers.parseUnits("50000", 18));
+            });
         });
 
         describe("Liquidation", function() {
@@ -352,6 +393,17 @@ const MAX_ALLOCATIONS = 5;
             it("updateCoverageSold should revert if not called by PolicyManager", async function() {
                 await expect(riskManager.connect(nonParty).updateCoverageSold(POOL_ID_1, 100, true))
                     .to.be.revertedWithCustomError(riskManager, "NotPolicyManager");
+            });
+
+            it("updateCoverageSold should update pool data when called by PolicyManager", async function() {
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, 0, 0, 0, false, committee.address, 0);
+                await ethers.provider.send("hardhat_impersonateAccount", [mockPolicyManager.target]);
+                const pmSigner = await ethers.getSigner(mockPolicyManager.target);
+                await ethers.provider.send("hardhat_setBalance", [mockPolicyManager.target, "0x1000000000000000000"]);
+                await riskManager.connect(pmSigner).updateCoverageSold(POOL_ID_1, 100, true);
+                await ethers.provider.send("hardhat_stopImpersonatingAccount", [mockPolicyManager.target]);
+                const pool = await mockPoolRegistry.pools(POOL_ID_1);
+                expect(pool.totalCoverageSold).to.equal(100n);
             });
             
             it("onCapitalWithdrawn should handle partial withdrawal", async function() {
