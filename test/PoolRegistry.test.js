@@ -256,6 +256,28 @@ describe("PoolRegistry", function () {
                 expect(poolData.totalCapitalPledgedToPool).to.equal(0);
             });
 
+            it("Should revert when de-allocating from a non-existent adapter", async function () {
+                await expect(
+                    poolRegistry.connect(riskManager).updateCapitalAllocation(
+                        0,
+                        adapter1.address,
+                        pledgeAmount,
+                        false
+                    )
+                ).to.be.revertedWithPanic(0x11);
+            });
+
+            it("getPoolPayoutData should reflect adapter removal", async function () {
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, pledgeAmount, true);
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter2.address, pledgeAmount, true);
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter2.address, pledgeAmount, false);
+
+                const [adapters, capitalPerAdapter, totalCapital] = await poolRegistry.getPoolPayoutData(0);
+                expect(adapters).to.deep.equal([adapter1.address]);
+                expect(capitalPerAdapter).to.deep.equal([pledgeAmount]);
+                expect(totalCapital).to.equal(pledgeAmount);
+            });
+
             it("Should prevent non-risk managers from updating capital allocation", async function () {
                  await expect(poolRegistry.connect(nonOwner).updateCapitalAllocation(0, adapter1.address, pledgeAmount, true))
                     .to.be.revertedWith("PR: Not RiskManager");
