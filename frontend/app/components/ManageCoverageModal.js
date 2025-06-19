@@ -18,6 +18,7 @@ import { getTokenName, getTokenLogo, getProtocolName } from "../config/tokenName
 import { Slider } from "../../components/ui/slider";
 import { formatPercentage } from "../utils/formatting";
 import deployments, { getDeployment } from "../config/deployments";
+import { notifyTx } from "../utils/explorer";
 
 export default function ManageCoverageModal({
   isOpen,
@@ -114,11 +115,13 @@ export default function ManageCoverageModal({
         }
 
         tx = await pm.addPremium(policyId, depositBn);
+        notifyTx(tx.hash);
         await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
         const cp = await getCapitalPoolWithSigner(depInfo.capitalPool);
         tx = await cp.requestWithdrawal(shares);
+        notifyTx(tx.hash);
         await tx.wait();
       } else if (action === "increase") {
         if (!poolId) throw new Error("poolId required");
@@ -145,8 +148,10 @@ export default function ManageCoverageModal({
         }
 
         tx = await cp.deposit(amountBn, yieldChoice);
+        notifyTx(tx.hash);
         await tx.wait();
         const tx2 = await rm.allocateCapital([poolId]);
+        notifyTx(tx2.hash);
         await tx2.wait();
       } else {
         return;

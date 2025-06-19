@@ -5,6 +5,7 @@ import { Providers } from "./providers"; // Import the JS component
 
 import Navbar from "./components/Navbar"; // Ensure paths are correct
 import Sidebar from "./components/Sidebar"; // Ensure paths are correct
+import { Toaster } from "../components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,6 +24,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className={inter.className}>
         <Providers> {/* Use the JS Providers component */}
+          <Toaster />
           <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
             <Navbar />
             <div className="flex flex-1">

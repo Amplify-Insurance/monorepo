@@ -9,6 +9,7 @@ import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/
 import { getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
 import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
+import { notifyTx } from "../utils/explorer"
 
 export default function StakeModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
@@ -64,6 +65,7 @@ export default function StakeModal({ isOpen, onClose }) {
         await approveTx.wait()
       }
       const tx = await staking.stake(value)
+      notifyTx(tx.hash)
       await tx.wait()
       setAmount("")
       onClose()

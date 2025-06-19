@@ -10,6 +10,7 @@ import {
   getTokenName,
 } from "../config/tokenNameMap";
 import { getPoolManagerWithSigner } from "../../lib/poolManager";
+import { notifyTx } from "../utils/explorer";
 
 export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,6 +27,7 @@ export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
       const dep = getDeployment(coverage.deployment);
       const pm = await getPoolManagerWithSigner(dep.poolManager);
       const tx = await pm.cancelCover(coverage.id, { gasLimit: 500000 });
+      notifyTx(tx.hash);
       await tx.wait();
       onClose(true);
     } catch (err) {

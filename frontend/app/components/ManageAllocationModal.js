@@ -11,6 +11,7 @@ import { formatPercentage } from "../utils/formatting";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import deployments, { getDeployment } from "../config/deployments";
 import { YieldPlatform } from "../config/yieldPlatforms";
+import { notifyTx } from "../utils/explorer";
 
 export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const { pools } = usePools();
@@ -74,11 +75,13 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
 
       if (toAllocate.length > 0) {
         const tx = await rm.allocateCapital(toAllocate);
+        notifyTx(tx.hash);
         await tx.wait();
       }
 
       if (toDeallocate.length > 0) {
         const tx2 = await rm.deallocateCapital(toDeallocate);
+        notifyTx(tx2.hash);
         await tx2.wait();
       }
 
