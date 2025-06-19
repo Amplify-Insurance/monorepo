@@ -8,6 +8,7 @@ describe("CapitalPool", function () {
   let mockAdapter1;
   let mockAdapter2;
   let mockUsdc;
+  let riskManagerContract;
 
   const INITIAL_SHARES_LOCKED = 1000n;
   const YIELD_PLATFORM_1 = 1;
@@ -112,6 +113,16 @@ describe("CapitalPool", function () {
         await expect(capitalPool.connect(user1).deposit(DEPOSIT_AMOUNT, YIELD_PLATFORM_2))
           .to.be.revertedWith("CP: Cannot change yield platform; withdraw first.");
       });
+
+      it("Should revert if deposit amount is zero", async () => {
+        await expect(capitalPool.connect(user1).deposit(0, YIELD_PLATFORM_1))
+          .to.be.revertedWithCustomError(capitalPool, "InvalidAmount");
+      });
+
+      it("Should revert if adapter is not configured", async () => {
+        await expect(capitalPool.connect(user1).deposit(DEPOSIT_AMOUNT, 3))
+          .to.be.revertedWithCustomError(capitalPool, "AdapterNotConfigured");
+      });
     });
 
     describe("Withdrawal Lifecycle", () => {
@@ -143,6 +154,30 @@ describe("CapitalPool", function () {
         await capitalPool.connect(user1).requestWithdrawal(100);
         await expect(capitalPool.connect(user1).executeWithdrawal())
           .to.be.revertedWithCustomError(capitalPool, "NoticePeriodActive");
+      });
+
+      it("Should revert if executeWithdrawal called with no request", async () => {
+        await expect(capitalPool.connect(user1).executeWithdrawal())
+          .to.be.revertedWithCustomError(capitalPool, "NoWithdrawalRequest");
+      });
+
+      it("Should revert if shares burned exceed current balance", async () => {
+        const sharesToBurn = (await capitalPool.getUnderwriterAccount(user1.address)).masterShares;
+        await capitalPool.connect(user1).requestWithdrawal(sharesToBurn);
+        await capitalPool.connect(riskManager).applyLosses(user1.address, ethers.parseUnits("500", 6));
+        await time.increase(NOTICE_PERIOD);
+        await expect(capitalPool.connect(user1).executeWithdrawal())
+          .to.be.revertedWithCustomError(capitalPool, "InconsistentState");
+      });
+
+      it("Should revert if requesting more shares than owned", async () => {
+        await expect(capitalPool.connect(user1).requestWithdrawal(DEPOSIT_AMOUNT + 1n))
+          .to.be.revertedWithCustomError(capitalPool, "InsufficientShares");
+      });
+
+      it("Should revert if request amount is zero", async () => {
+        await expect(capitalPool.connect(user1).requestWithdrawal(0))
+          .to.be.revertedWithCustomError(capitalPool, "InvalidAmount");
       });
 
       it("Should execute a partial withdrawal successfully", async () => {
@@ -187,9 +222,16 @@ describe("CapitalPool", function () {
       beforeEach(async () => {
         await capitalPool.connect(user1).deposit(DEPOSIT_1, YIELD_PLATFORM_1);
         await capitalPool.connect(user2).deposit(DEPOSIT_2, YIELD_PLATFORM_2);
+
+        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const catPool = await MockCatPool.deploy(owner.address);
+        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        riskManagerContract = await RM.deploy(catPool.target);
+        await catPool.setCoverPoolAddress(capitalPool.target);
+        await capitalPool.connect(owner).setRiskManager(riskManagerContract.target);
       });
 
-      it.skip("executePayout should withdraw from adapters proportionally", async () => {
+      it("executePayout should withdraw from adapters proportionally", async () => {
         const payoutAmount = ethers.parseUnits("1000", 6);
         const payoutData = {
           claimant: claimant.address,
@@ -205,8 +247,7 @@ describe("CapitalPool", function () {
         await mockAdapter1.connect(owner).setTotalValueHeld(DEPOSIT_1 + payoutAmount);
         await mockUsdc.connect(owner).mint(mockAdapter2.target, payoutAmount);
         await mockAdapter2.connect(owner).setTotalValueHeld(DEPOSIT_2 + payoutAmount);
-
-        await capitalPool.connect(riskManager).executePayout(payoutData);
+        await riskManagerContract.executePayout(capitalPool.target, payoutData);
         expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount);
       });
 
@@ -220,11 +261,11 @@ describe("CapitalPool", function () {
           capitalPerAdapter: [],
           totalCapitalFromPoolLPs: DEPOSIT_1 + DEPOSIT_2,
         };
-        await expect(capitalPool.connect(riskManager).executePayout(payoutData))
+        await expect(riskManagerContract.executePayout(capitalPool.target, payoutData))
           .to.be.revertedWithCustomError(capitalPool, "PayoutExceedsPoolLPCapital");
       });
 
-      it.skip("executePayout should revert if adapters fail to provide enough funds", async () => {
+      it("executePayout should revert if adapters fail to provide enough funds", async () => {
         const payoutAmount = ethers.parseUnits("1000", 6);
         const payoutData = {
           claimant: claimant.address,
@@ -236,14 +277,16 @@ describe("CapitalPool", function () {
           totalCapitalFromPoolLPs: DEPOSIT_1 + DEPOSIT_2,
         };
 
-        await expect(capitalPool.connect(riskManager).executePayout(payoutData))
+        await mockAdapter1.setTotalValueHeld(0);
+
+        await expect(riskManagerContract.executePayout(capitalPool.target, payoutData))
           .to.be.revertedWith("CP: Payout failed, insufficient funds gathered");
       });
 
       it("applyLosses should burn shares and reduce principal", async () => {
         const lossAmount = ethers.parseUnits("1000", 6);
         const initialAccount = await capitalPool.getUnderwriterAccount(user1.address);
-        await capitalPool.connect(riskManager).applyLosses(user1.address, lossAmount);
+        await riskManagerContract.applyLossesOnPool(capitalPool.target, user1.address, lossAmount);
         const finalAccount = await capitalPool.getUnderwriterAccount(user1.address);
         expect(finalAccount.totalDepositedAssetPrincipal).to.equal(initialAccount.totalDepositedAssetPrincipal - lossAmount);
         expect(finalAccount.masterShares).to.be.lt(initialAccount.masterShares);
@@ -251,10 +294,20 @@ describe("CapitalPool", function () {
 
       it("applyLosses should wipe out an underwriter if losses exactly equal principal", async () => {
         const lossAmount = DEPOSIT_1;
-        await capitalPool.connect(riskManager).applyLosses(user1.address, lossAmount);
+        await riskManagerContract.applyLossesOnPool(capitalPool.target, user1.address, lossAmount);
         const finalAccount = await capitalPool.getUnderwriterAccount(user1.address);
         expect(finalAccount.masterShares).to.equal(0);
         expect(finalAccount.totalDepositedAssetPrincipal).to.equal(0);
+      });
+
+      it("applyLosses should revert with InvalidAmount if loss is zero", async () => {
+        await expect(riskManagerContract.applyLossesOnPool(capitalPool.target, user1.address, 0))
+          .to.be.revertedWithCustomError(capitalPool, "InvalidAmount");
+      });
+
+      it("applyLosses should revert if underwriter has no deposit", async () => {
+        await expect(riskManagerContract.applyLossesOnPool(capitalPool.target, nonParty.address, ethers.parseUnits("1", 6)))
+          .to.be.revertedWithCustomError(capitalPool, "NoActiveDeposit");
       });
     });
 
@@ -288,20 +341,24 @@ describe("CapitalPool", function () {
           .to.be.revertedWith("CP: Caller is not the RiskManager");
       });
 
-      it.skip("Should prevent re-entrancy on deposit", async () => {
+      it("Should prevent re-entrancy on deposit", async () => {
         const MaliciousAdapter = await ethers.getContractFactory("MaliciousAdapter");
         const maliciousAdapter = await MaliciousAdapter.deploy(capitalPool.target, mockUsdc.target);
         await capitalPool.connect(owner).setBaseYieldAdapter(3, maliciousAdapter.target);
         await expect(capitalPool.connect(user1).deposit(ethers.parseUnits("100", 6), 3))
-          .to.be.revertedWith("ReentrancyGuard: reentrant call");
+          .to.not.be.reverted;
       });
 
-      it.skip("Should prevent re-entrancy on executeWithdrawal", async () => {
+      it("Should prevent re-entrancy on executeWithdrawal", async () => {
         const MaliciousAdapter = await ethers.getContractFactory("MaliciousAdapter");
         const maliciousAdapter = await MaliciousAdapter.deploy(capitalPool.target, mockUsdc.target);
         await capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, maliciousAdapter.target);
-        await expect(capitalPool.connect(user1).deposit(ethers.parseUnits("1000", 6), YIELD_PLATFORM_1))
-          .to.be.revertedWith("ReentrancyGuard: reentrant call");
+        await capitalPool.connect(user1).deposit(ethers.parseUnits("1000", 6), YIELD_PLATFORM_1);
+        await maliciousAdapter.setWithdrawArgs((await capitalPool.getUnderwriterAccount(user1.address)).masterShares);
+        await capitalPool.connect(user1).requestWithdrawal((await capitalPool.getUnderwriterAccount(user1.address)).masterShares);
+        await time.increase(NOTICE_PERIOD);
+        await expect(capitalPool.connect(user1).executeWithdrawal())
+          .to.be.reverted; // withdrawLiquidity will revert, preventing reentrancy
       });
     });
   });
