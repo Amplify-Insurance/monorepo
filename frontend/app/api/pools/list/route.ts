@@ -179,7 +179,7 @@ export async function GET() {
         const rateRes = poolResults[2 * i + 1];
         if (!dataRes.success || !rateRes.success) continue;
         try {
-          const dataDec = poolRegistry.interface.decodeFunctionResult(
+        const dataDec = poolRegistry.interface.decodeFunctionResult(
             "getPoolData",
             dataRes.returnData
           );
@@ -196,6 +196,7 @@ export async function GET() {
               dataDec.capitalPendingWithdrawal ?? dataDec[3],
             isPaused: dataDec.isPaused ?? dataDec[4],
             feeRecipient: dataDec.feeRecipient ?? dataDec[5],
+            claimFeeBps: dataDec.claimFeeBps ?? dataDec[6],
             rateModel: rateDec[0],
           };
           const info = bnToString(rawInfo);
