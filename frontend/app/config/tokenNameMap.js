@@ -96,7 +96,7 @@ export function getUnderlyingTokenName(id) {
 export function getUnderlyingTokenLogo(id) {
   if (!id) return id;
   const key = typeof id === "string" ? id : `${id}`;
-  return UNDERLYING_TOKEN_MAP[key] || UNDERLYING_TOKEN_MAP[key.toLowerCase()] || id;
+  return UNDERLYING_TOKEN_LOGO_MAP[key] || UNDERLYING_TOKEN_LOGO_MAP[key.toLowerCase()] || id;
 }
 
 export function getTokenLogo(id) {
