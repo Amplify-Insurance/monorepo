@@ -29,6 +29,13 @@ describe("PolicyNFT", function () {
       expect(await policyNFT.riskManagerContract()).to.equal(riskManager.address);
     });
 
+    it("Emits event on update", async function () {
+      const { owner, riskManager, policyNFT } = await loadFixture(deployFixture);
+      await expect(policyNFT.connect(owner).setRiskManagerAddress(riskManager.address))
+        .to.emit(policyNFT, "RiskManagerAddressSet")
+        .withArgs(riskManager.address);
+    });
+
     it("Cannot set zero address", async function () {
       const { owner, policyNFT } = await loadFixture(deployFixture);
       await expect(policyNFT.connect(owner).setRiskManagerAddress(ethers.ZeroAddress))
@@ -95,6 +102,14 @@ describe("PolicyNFT", function () {
       const policy = await policyNFT.getPolicy(1);
       expect(policy.coverage).to.equal(0n);
     });
+
+    it("Reverts when token does not exist", async function () {
+      const { owner, riskManager, policyNFT } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await expect(policyNFT.connect(riskManager).burn(1))
+        .to.be.revertedWithCustomError(policyNFT, "ERC721NonexistentToken")
+        .withArgs(1);
+    });
   });
 
   describe("updatePremiumAccount", function () {
@@ -120,6 +135,36 @@ describe("PolicyNFT", function () {
       const policy = await policyNFT.getPolicy(1);
       expect(policy.premiumDeposit).to.equal(newDeposit);
       expect(policy.lastDrainTime).to.equal(newDrainTime);
+    });
+
+    it("Reverts if policy was burned", async function () {
+      const { owner, policyNFT, riskManager, user } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await policyNFT.connect(riskManager).mint(user.address, 1, 1000, 0, 0, 0);
+      await policyNFT.connect(riskManager).burn(1);
+      await expect(policyNFT.connect(riskManager).updatePremiumAccount(1, 0, 0)).to.be.revertedWith(
+        "PolicyNFT: Policy does not exist or has been burned"
+      );
+    });
+  });
+
+  describe("updateLastPaid", function () {
+    it("Always reverts", async function () {
+      const { owner, riskManager, policyNFT } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await expect(policyNFT.connect(riskManager).updateLastPaid(1, 0)).to.be.revertedWith(
+        "PolicyNFT: updateLastPaid is deprecated; use updatePremiumAccount"
+      );
+    });
+  });
+
+  describe("getPolicy", function () {
+    it("Returns zero struct for unknown id", async function () {
+      const { policyNFT } = await loadFixture(deployFixture);
+      const policy = await policyNFT.getPolicy(99);
+      expect(policy.coverage).to.equal(0);
+      expect(policy.poolId).to.equal(0);
+      expect(policy.start).to.equal(0);
     });
   });
 });
