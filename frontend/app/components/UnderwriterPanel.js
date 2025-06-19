@@ -13,7 +13,8 @@ import {
   UNDERLYING_TOKEN_MAP,
   getTokenName,
   getUnderlyingTokenName,
-  getUnderlyingTokenLogo
+  getUnderlyingTokenLogo,
+  getProtocolType
 } from "../config/tokenNameMap"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { YieldPlatform, getYieldPlatformInfo } from "../config/yieldPlatforms"
@@ -105,7 +106,10 @@ export default function UnderwriterPanel({ displayCurrency }) {
           id,
           name: getProtocolName(pool.id),
           description: `${getProtocolDescription(pool.id)}`,
-          category: "lending",
+          // Categorise protocol type so the filter works correctly
+          // Stablecoin pools should be marked as such; everything else defaults
+          // to lending for now.
+          category: getProtocolType(pool.id) === 'stablecoin' ? 'stablecoin' : 'lending',
           pools: [],
         }
       }
