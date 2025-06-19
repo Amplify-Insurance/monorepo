@@ -27,12 +27,12 @@ describe("PolicyManager", function () {
     const COOLDOWN_PERIOD = 5 * 24 * 60 * 60; // 5 days
 
     // --- Mock ABIs ---
-    const iPoolRegistryAbi = require("../artifacts/contracts/PolicyManager.sol/IPoolRegistry.json").abi;
-    const iCapitalPoolAbi = require("../artifacts/contracts/PolicyManager.sol/ICapitalPool.json").abi;
-    const iCatInsurancePoolAbi = require("../artifacts/contracts/PolicyManager.sol/ICatInsurancePool.json").abi;
-    const iPolicyNFTAbi = require("../artifacts/contracts/PolicyManager.sol/IPolicyNFT.json").abi;
-    const iRewardDistributorAbi = require("../artifacts/contracts/PolicyManager.sol/IRewardDistributor.json").abi;
-    const iRiskManagerHookAbi = require("../artifacts/contracts/PolicyManager.sol/IRiskManager_PM_Hook.json").abi;
+    const iPoolRegistryAbi = require("../artifacts/contracts/interfaces/IPoolRegistry.sol/IPoolRegistry.json").abi;
+    const iCapitalPoolAbi = require("../artifacts/contracts/interfaces/ICapitalPool.sol/ICapitalPool.json").abi;
+    const iCatInsurancePoolAbi = require("../artifacts/contracts/interfaces/ICatInsurancePool.sol/ICatInsurancePool.json").abi;
+    const iPolicyNFTAbi = require("../artifacts/contracts/interfaces/IPolicyNFT.sol/IPolicyNFT.json").abi;
+    const iRewardDistributorAbi = require("../artifacts/contracts/interfaces/IRewardDistributor.sol/IRewardDistributor.json").abi;
+    const iRiskManagerHookAbi = require("../artifacts/contracts/interfaces/IRiskManager_PM_Hook.sol/IRiskManager_PM_Hook.json").abi;
     const erc20Abi = require("@openzeppelin/contracts/build/contracts/ERC20.json").abi;
 
 
