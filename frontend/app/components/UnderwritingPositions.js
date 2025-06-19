@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
-import { TrendingUp, MoreHorizontal } from "lucide-react";
+import { useState, useEffect, Fragment } from "react";
+import { TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatCurrency, formatPercentage } from "../utils/formatting";
@@ -31,7 +31,12 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [isClaimingDistressed, setIsClaimingDistressed] = useState(false);
   const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState(null);
+  const [expandedRows, setExpandedRows] = useState([]);
+  const toggleRow = (id) => {
+    setExpandedRows((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [rewardsMap, setRewardsMap] = useState({});
   const { address } = useAccount();
@@ -304,7 +309,8 @@ const underwritingPositions = (details || [])
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {active.map((position) => (
-                      <tr key={position.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <Fragment key={position.id}>
+                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-750">
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
@@ -350,40 +356,70 @@ const underwritingPositions = (details || [])
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === 'requested withdrawal' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'}`}>{position.status}</span>
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                          <button onClick={() => setOpenDropdown(openDropdown === position.id ? null : position.id)} className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">
-                            <MoreHorizontal className="w-5 h-5" />
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => toggleRow(position.id)}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
+                          >
+                            <span className="hidden sm:inline">
+                              {expandedRows.includes(position.id) ? 'Hide' : 'Actions'}
+                            </span>
+                            {expandedRows.includes(position.id) ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
                           </button>
-                          {openDropdown === position.id && (
-                            <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
-                              <div className="py-1" role="menu" aria-orientation="vertical">
-                                <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                                  Pending Rewards: {((Number(rewardsMap[position.id] || 0) / 1e18).toFixed(4))}
-                                </div>
-                                <button className="block px-4 py-2 text-sm w-full text-left text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleClaimRewards(position); setOpenDropdown(null); }} disabled={isClaiming}>
-                                  {isClaiming ? 'Claiming...' : 'Claim Rewards'}
-                                </button>
-                                <button className="block px-4 py-2 text-sm w-full text-left text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleOpenModal(position); setOpenDropdown(null); }}>
-                                  Manage
-                                </button>
-                                <Link href={`/pool/${position.poolId}/${position.pool}`} className="block px-4 py-2 text-sm w-full text-left text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                  Pool Page
-                                </Link>
-                                {position.pendingLoss > 0 && (
-                                  <button className="block px-4 py-2 text-sm w-full text-left text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleClaimDistressed(position); setOpenDropdown(null); }} disabled={isClaimingDistressed}>
-                                    {isClaimingDistressed ? 'Claiming...' : 'Claim Distressed'}
-                                  </button>
-                                )}
-                                {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
-                                  <button className="block px-4 py-2 text-sm w-full text-left text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { handleExecuteWithdrawal(); setOpenDropdown(null); }} disabled={isExecuting}>
-                                    {isExecuting ? 'Executing...' : 'Execute Withdrawal'}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
                         </td>
                       </tr>
+                      {expandedRows.includes(position.id) && (
+                        <tr>
+                          <td colSpan={showPendingLoss ? 7 : 6} className="px-3 sm:px-6 py-4">
+                            <div className="flex flex-wrap gap-3 items-center">
+                              <div className="text-sm text-gray-700 dark:text-gray-200">
+                                Pending Rewards: {((Number(rewardsMap[position.id] || 0) / 1e18).toFixed(4))}
+                              </div>
+                              <button
+                                className="py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+                                onClick={() => handleClaimRewards(position)}
+                                disabled={isClaiming}
+                              >
+                                {isClaiming ? 'Claiming...' : 'Claim Rewards'}
+                              </button>
+                              <button
+                                className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
+                                onClick={() => handleOpenModal(position)}
+                              >
+                                Manage
+                              </button>
+                              <Link
+                                href={`/pool/${position.poolId}/${position.pool}`}
+                                className="py-2 px-3 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 rounded-md text-sm"
+                              >
+                                Pool Page
+                              </Link>
+                              {position.pendingLoss > 0 && (
+                                <button
+                                  className="py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
+                                  onClick={() => handleClaimDistressed(position)}
+                                  disabled={isClaimingDistressed}
+                                >
+                                  {isClaimingDistressed ? 'Claiming...' : 'Claim Distressed'}
+                                </button>
+                              )}
+                              {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
+                                <button
+                                  className="py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm"
+                                  onClick={handleExecuteWithdrawal}
+                                  disabled={isExecuting}
+                                >
+                                  {isExecuting ? 'Executing...' : 'Execute Withdrawal'}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     ))}
                   </tbody>
                 </table>
