@@ -165,6 +165,11 @@ describe("Committee", function () {
             await committee.connect(voter1).vote(1, 2); // For
             await committee.connect(voter2).vote(1, 1); // Against
         });
+
+        it("Should revert if executing before the voting period ends", async function() {
+            await expect(committee.executeProposal(1))
+                .to.be.revertedWith("Voting not over");
+        });
         
         it("Should execute a successful 'Pause' proposal", async function() {
 
@@ -316,6 +321,15 @@ describe("Committee", function () {
             const expectedReward = (remainingFees * voterWeight) / proposal.forVotes;
             expect(voterFinalBalance + gasUsed).to.be.gt(voterInitialBalance);
         });
+
+        it("Should emit RewardClaimed when a voter claims", async function() {
+            const proposal = await committee.proposals(1);
+            const voterWeight = await mockStakingContract.stakedBalance(voter1.address);
+            const expectedReward = (REWARD_AMOUNT * voterWeight) / proposal.forVotes;
+
+            await expect(committee.connect(voter1).claimReward(1))
+                .to.emit(committee, "RewardClaimed").withArgs(1, voter1.address, expectedReward);
+        });
         
         it("Should revert if a user who voted 'Against' tries to claim", async function() {
             await expect(committee.connect(voter2).claimReward(1))
@@ -340,6 +354,13 @@ describe("Committee", function () {
     });
 
     describe("Access Control and Security", function() {
+        it("Should allow RiskManager to send fees", async function() {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await mockRiskManager.connect(riskManager).sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+            const proposal = await committee.proposals(1);
+            expect(proposal.totalRewardFees).to.equal(ethers.parseEther("1"));
+        });
+
         it("Should only allow RiskManager to call receiveFees", async function() {
             await expect(committee.connect(nonStaker).receiveFees(1, { value: 1 }))
                 .to.be.revertedWith("Committee: Not RiskManager");
