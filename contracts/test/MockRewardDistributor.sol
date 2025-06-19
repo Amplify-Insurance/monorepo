@@ -8,6 +8,11 @@ contract MockRewardDistributor is IRewardDistributor {
 
     mapping(uint256 => mapping(address => uint256)) public totalRewards;
     mapping(uint256 => mapping(address => uint256)) public totalShares;
+    address public lastClaimUser;
+    uint256 public lastClaimPoolId;
+    address public lastClaimToken;
+    uint256 public lastClaimPledge;
+    uint256 public claimCallCount;
 
     function setCatPool(address _catPool) external override {
         catPool = _catPool;
@@ -26,7 +31,12 @@ contract MockRewardDistributor is IRewardDistributor {
         return reward;
     }
 
-    function claim(address, uint256, address, uint256) external override returns (uint256) {
+    function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override returns (uint256) {
+        lastClaimUser = user;
+        lastClaimPoolId = poolId;
+        lastClaimToken = rewardToken;
+        lastClaimPledge = userPledge;
+        claimCallCount++;
         return 0;
     }
 

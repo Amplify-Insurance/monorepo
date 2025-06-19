@@ -27,6 +27,8 @@ contract MockCatInsurancePool is Ownable {
     uint256 public receiveUsdcPremiumCallCount;
     uint256 public drawFundCallCount;
     uint256 public receiveProtocolAssetsCallCount;
+    address public last_claimProtocolToken;
+    uint256 public claimProtocolRewardsCallCount;
 
     // --- Events for Testing ---
 
@@ -91,5 +93,10 @@ contract MockCatInsurancePool is Ownable {
         last_distressedAssetReceived_amount = amount;
         receiveProtocolAssetsCallCount++;
         emit DistressedAssetReceivedCalled(address(protocolAsset), amount);
+    }
+
+    function claimProtocolAssetRewards(address protocolToken) external {
+        last_claimProtocolToken = protocolToken;
+        claimProtocolRewardsCallCount++;
     }
 }
