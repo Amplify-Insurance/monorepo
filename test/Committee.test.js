@@ -463,6 +463,18 @@ describe("Committee", function () {
             await expect(committee.connect(nonStaker).claimReward(1))
                 .to.be.revertedWith("Must have voted 'For' to claim rewards");
         });
+        it("Should revert if the proposer didn't vote but tries to claim", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(voter1).vote(1, 2);
+            await committee.connect(voter2).vote(1, 2);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await mockRiskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+            await time.increase(CHALLENGE_PERIOD + 1);
+            await committee.resolvePauseBond(1);
+            await expect(committee.connect(proposer).claimReward(1))
+                .to.be.revertedWith("Must have voted 'For' to claim rewards");
+        });
 
         it("Should refund the bond minus slash when a proposal is defeated", async function () {
             await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
