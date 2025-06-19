@@ -18,6 +18,10 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
 
     mapping(uint256 => PoolData) public pools;
     mapping(uint256 => RateModel) public rateModels;
+    uint256 public poolCount;
+    address[] public payoutAdapters;
+    uint256[] public payoutAmounts;
+    uint256 public payoutTotal;
 
     constructor() Ownable(msg.sender) {}
 
@@ -46,6 +50,16 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         rateModels[poolId] = model;
     }
 
+    function setPoolCount(uint256 count) external {
+        poolCount = count;
+    }
+
+    function setPayoutData(address[] calldata adapters, uint256[] calldata amounts, uint256 total) external {
+        payoutAdapters = adapters;
+        payoutAmounts = amounts;
+        payoutTotal = total;
+    }
+
     function getPoolData(uint256 poolId) external view override returns (
         IERC20 protocolTokenToCover,
         uint256 totalCapitalPledgedToPool,
@@ -69,11 +83,8 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         return rateModels[poolId];
     }
 
-    // The following functions are no-ops for this mock
     function getPoolPayoutData(uint256) external view override returns (address[] memory, uint256[] memory, uint256) {
-        address[] memory a;
-        uint256[] memory b;
-        return (a, b, 0);
+        return (payoutAdapters, payoutAmounts, payoutTotal);
     }
 
     function getPoolActiveAdapters(uint256) external view override returns (address[] memory) {
@@ -91,16 +102,32 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
 
     function updateCapitalAllocation(uint256, address, uint256, bool) external override {}
 
-    function updateCapitalPendingWithdrawal(uint256, uint256, bool) external override {}
-
-    function updateCoverageSold(uint256, uint256, bool) external override {}
-
-    function getPoolCount() external view override returns (uint256) {
-        return 0;
+    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external override {
+        if (isRequest) {
+            pools[poolId].capitalPendingWithdrawal += amount;
+        } else {
+            pools[poolId].capitalPendingWithdrawal -= amount;
+        }
     }
 
-    function setPauseState(uint256, bool) external override {}
+    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external override {
+        if (isSale) {
+            pools[poolId].totalCoverageSold += amount;
+        } else {
+            pools[poolId].totalCoverageSold -= amount;
+        }
+    }
 
-    function setFeeRecipient(uint256, address) external override {}
+    function getPoolCount() external view override returns (uint256) {
+        return poolCount;
+    }
+
+    function setPauseState(uint256 poolId, bool paused) external override {
+        pools[poolId].isPaused = paused;
+    }
+
+    function setFeeRecipient(uint256 poolId, address recipient) external override {
+        pools[poolId].feeRecipient = recipient;
+    }
 }
 

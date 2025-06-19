@@ -4,13 +4,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-// Helper function to create mock contracts from an ABI
-async function deployMock(abi, signer) {
-    // Minimal runtime code that simply reverts for any call but deploys cleanly
-    const minimalBytecode = '0x600a600c600039600a6000f3fe';
-    const factory = new ethers.ContractFactory(abi, minimalBytecode, signer);
-    return await factory.deploy();
-}
+// These tests use Solidity-based mocks located in contracts/test
 
 describe("RiskManager", function () {
     // --- Signers ---
@@ -25,38 +19,39 @@ describe("RiskManager", function () {
     const POOL_ID_2 = 1;
     const MAX_ALLOCATIONS = 5;
 
-    // --- Mock ABIs (assuming they are generated in the artifacts folder) ---
-    const iPoolRegistryAbi = require("../artifacts/contracts/interfaces/IPoolRegistry.sol/IPoolRegistry.json").abi;
-    const iCapitalPoolAbi = require("../artifacts/contracts/interfaces/ICapitalPool.sol/ICapitalPool.json").abi;
-    const iPolicyNFTAbi = require("../artifacts/contracts/interfaces/IPolicyNFT.sol/IPolicyNFT.json").abi;
-    const iCatInsurancePoolAbi = require("../artifacts/contracts/interfaces/ICatInsurancePool.sol/ICatInsurancePool.json").abi;
-    const iLossDistributorAbi = require("../artifacts/contracts/interfaces/ILossDistributor.sol/ILossDistributor.json").abi;
-    const iPolicyManagerAbi = require("../artifacts/contracts/interfaces/IPolicyManager.sol/IPolicyManager.json").abi;
-    const iRewardDistributorAbi = require("../artifacts/contracts/interfaces/IRewardDistributor.sol/IRewardDistributor.json").abi;
-
-
     beforeEach(async function () {
-        // --- Get Signers ---
         [owner, committee, underwriter1, underwriter2, claimant, liquidator, nonParty] = await ethers.getSigners();
-
-        // --- Deploy Mocks ---
-        mockPoolRegistry = await deployMock(iPoolRegistryAbi, owner);
-        mockCapitalPool = await deployMock(iCapitalPoolAbi, owner);
-        mockPolicyNFT = await deployMock(iPolicyNFTAbi, owner);
-        mockCatPool = await deployMock(iCatInsurancePoolAbi, owner);
-        mockLossDistributor = await deployMock(iLossDistributorAbi, owner);
-        mockPolicyManager = await deployMock(iPolicyManagerAbi, owner);
-        mockRewardDistributor = await deployMock(iRewardDistributorAbi, owner);
 
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
         mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
+
+        const PoolRegistryFactory = await ethers.getContractFactory("MockPoolRegistry");
+        mockPoolRegistry = await PoolRegistryFactory.deploy();
+
+        const CapitalPoolFactory = await ethers.getContractFactory("MockCapitalPool");
+        mockCapitalPool = await CapitalPoolFactory.deploy(owner.address, mockUsdc.target);
+
+        const PolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
+        mockPolicyNFT = await PolicyNFTFactory.deploy(owner.address);
+
+        const CatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
+        mockCatPool = await CatPoolFactory.deploy(owner.address);
+
+        const LossFactory = await ethers.getContractFactory("MockLossDistributor");
+        mockLossDistributor = await LossFactory.deploy();
+
+        const PolicyManagerFactory = await ethers.getContractFactory("MockPolicyManager");
+        mockPolicyManager = await PolicyManagerFactory.deploy();
+        await mockPolicyManager.setPolicyNFT(mockPolicyNFT.target);
+
+        const RewardFactory = await ethers.getContractFactory("MockRewardDistributor");
+        mockRewardDistributor = await RewardFactory.deploy();
         
         // --- Deploy RiskManager ---
         const RiskManagerFactory = await ethers.getContractFactory("RiskManager");
         riskManager = await RiskManagerFactory.deploy(owner.address);
 
-        // --- Mock Setup ---
-        await mockPolicyManager.mock.policyNFT.returns(mockPolicyNFT.target);
+        await mockRewardDistributor.setCatPool(mockCatPool.target);
     });
 
     describe("Admin Functions", function () {
@@ -114,10 +109,9 @@ describe("RiskManager", function () {
             const PLEDGE_AMOUNT = ethers.parseUnits("10000", 6);
 
             beforeEach(async function() {
-                await riskManager.connect(mockCapitalPool).onCapitalDeposited(underwriter1.address, PLEDGE_AMOUNT);
-                await mockPoolRegistry.mock.getPoolCount.returns(MAX_ALLOCATIONS + 1);
-                await mockCapitalPool.mock.getUnderwriterAdapterAddress.withArgs(underwriter1.address).returns(nonParty.address);
-                await mockPoolRegistry.mock.updateCapitalAllocation.returns();
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, PLEDGE_AMOUNT);
+                await mockPoolRegistry.setPoolCount(MAX_ALLOCATIONS + 1);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
             });
 
             it("Should allow an underwriter to allocate their capital to pools", async function() {
@@ -156,16 +150,14 @@ describe("RiskManager", function () {
             const PLEDGE_AMOUNT = ethers.parseUnits("10000", 6);
 
             beforeEach(async function() {
-                await riskManager.connect(mockCapitalPool).onCapitalDeposited(underwriter1.address, PLEDGE_AMOUNT);
-                await mockPoolRegistry.mock.getPoolCount.returns(1);
-                await mockCapitalPool.mock.getUnderwriterAdapterAddress.returns(nonParty.address);
-                await mockPoolRegistry.mock.updateCapitalAllocation.returns();
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, PLEDGE_AMOUNT);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
                 await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
-                await mockCapitalPool.mock.applyLosses.returns();
             });
 
             it("Should allow an underwriter to deallocate from a pool with no losses", async function() {
-                await mockLossDistributor.mock.realizeLosses.returns(0);
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
                 await expect(riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1))
                     .to.emit(riskManager, "CapitalDeallocated").withArgs(underwriter1.address, POOL_ID_1, PLEDGE_AMOUNT);
                 
@@ -175,7 +167,7 @@ describe("RiskManager", function () {
             
             it("Should correctly apply losses before deallocating", async function() {
                 const lossAmount = ethers.parseUnits("1000", 6);
-                await mockLossDistributor.mock.realizeLosses.withArgs(underwriter1.address, POOL_ID_1, PLEDGE_AMOUNT).returns(lossAmount);
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, lossAmount);
                 
                 await riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1);
 
@@ -184,7 +176,7 @@ describe("RiskManager", function () {
             });
             
             it("Should revert if trying to deallocate from a pool they are not in", async function() {
-                await mockLossDistributor.mock.realizeLosses.returns(0);
+                await mockLossDistributor.setPendingLoss(underwriter2.address, POOL_ID_1, 0);
                 await expect(riskManager.connect(underwriter2).deallocateFromPool(POOL_ID_1))
                     .to.be.revertedWith("Not allocated to this pool");
             });
@@ -192,7 +184,6 @@ describe("RiskManager", function () {
 
         describe("Governance Hooks", function() {
             it("Should allow the committee to report an incident (pause a pool)", async function() {
-                await mockPoolRegistry.mock.setPauseState.withArgs(POOL_ID_1, true).returns();
                 await expect(riskManager.connect(committee).reportIncident(POOL_ID_1, true)).to.not.be.reverted;
             });
             
@@ -202,7 +193,6 @@ describe("RiskManager", function () {
             });
 
             it("Should allow the committee to set a pool's fee recipient", async function() {
-                await mockPoolRegistry.mock.setFeeRecipient.withArgs(POOL_ID_1, nonParty.address).returns();
                 await expect(riskManager.connect(committee).setPoolFeeRecipient(POOL_ID_1, nonParty.address)).to.not.be.reverted;
             });
         });
@@ -217,45 +207,55 @@ describe("RiskManager", function () {
                 const MockERC20Factory = await ethers.getContractFactory("MockERC20");
                 mockProtocolToken = await MockERC20Factory.deploy("aToken", "aTKN", 6);
                 await mockProtocolToken.connect(owner).mint(claimant.address, COVERAGE_AMOUNT);
-                await mockPolicyNFT.mock.getPolicy.withArgs(POLICY_ID).returns(POOL_ID_1, COVERAGE_AMOUNT, 0, 0, 0);
-                await mockPoolRegistry.mock.getPoolPayoutData.withArgs(POOL_ID_1).returns([nonParty.address], [TOTAL_PLEDGED], TOTAL_PLEDGED);
-                await mockPoolRegistry.mock.getPoolData.withArgs(POOL_ID_1).returns(mockProtocolToken.target, TOTAL_PLEDGED, 0, 0, false, committee.address, 500);
-                await mockLossDistributor.mock.distributeLoss.returns();
-                await mockRewardDistributor.mock.distribute.returns();
-                await mockCapitalPool.mock.executePayout.returns();
-                await mockPoolRegistry.mock.updateCoverageSold.returns();
-                await mockPolicyNFT.mock.burn.returns();
-                await mockPolicyNFT.mock.ownerOf.withArgs(POLICY_ID).returns(claimant.address);
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    claimant.address,
+                    POOL_ID_1,
+                    COVERAGE_AMOUNT,
+                    0,
+                    0,
+                    0,
+                    0
+                );
+                await mockPoolRegistry.setPayoutData([nonParty.address], [TOTAL_PLEDGED], TOTAL_PLEDGED);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockProtocolToken.target, TOTAL_PLEDGED, 0, 0, false, committee.address, 500);
+                await mockPolicyNFT.setRiskManagerAddress(riskManager.target);
+                await mockProtocolToken.connect(claimant).approve(riskManager.target, COVERAGE_AMOUNT);
                 await mockProtocolToken.connect(claimant).approve(riskManager.target, COVERAGE_AMOUNT);
             });
 
             it("Should process a claim fully covered by the pool", async function() {
                 await expect(riskManager.connect(nonParty).processClaim(POLICY_ID)).to.not.be.reverted;
-                const payoutData = mockCapitalPool.mock.executePayout.getCall(0).args[0];
+                const payoutData = await mockCapitalPool.lastPayout();
                 const expectedFee = (COVERAGE_AMOUNT * 500n) / 10000n;
                 expect(payoutData.claimant).to.equal(claimant.address);
                 expect(payoutData.claimantAmount).to.equal(COVERAGE_AMOUNT - expectedFee);
                 expect(payoutData.feeRecipient).to.equal(committee.address);
                 expect(payoutData.feeAmount).to.equal(expectedFee);
-                const distCall = mockRewardDistributor.mock.distribute.getCall(0);
-                expect(distCall.args[0]).to.equal(POOL_ID_1);
-                expect(distCall.args[1]).to.equal(mockProtocolToken.target);
-                expect(distCall.args[2]).to.equal(COVERAGE_AMOUNT);
+                const rewardStored = await mockRewardDistributor.totalRewards(POOL_ID_1, mockProtocolToken.target);
+                expect(rewardStored).to.equal(COVERAGE_AMOUNT);
             });
             
             it("Should draw from the CAT pool if there is a shortfall", async function() {
                 const HIGH_COVERAGE = TOTAL_PLEDGED + 1000n;
                 const SHORTFALL = HIGH_COVERAGE - TOTAL_PLEDGED;
-                await mockPolicyNFT.mock.getPolicy.withArgs(POLICY_ID).returns(POOL_ID_1, HIGH_COVERAGE, 0, 0, 0);
-                await mockCatPool.mock.drawFund.withArgs(SHORTFALL).returns();
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    claimant.address,
+                    POOL_ID_1,
+                    HIGH_COVERAGE,
+                    0,
+                    0,
+                    0,
+                    0
+                );
+                await mockCatPool.setShouldRevertOnDrawFund(false);
                 await mockProtocolToken.connect(owner).mint(claimant.address, HIGH_COVERAGE);
                 await mockProtocolToken.connect(claimant).approve(riskManager.target, HIGH_COVERAGE);
-                await mockRewardDistributor.mock.distribute.returns();
-
                 await expect(riskManager.connect(nonParty).processClaim(POLICY_ID)).to.not.be.reverted;
-                expect(mockCatPool.mock.drawFund.callCount).to.equal(1);
-                const distCall2 = mockRewardDistributor.mock.distribute.getCall(0);
-                expect(distCall2.args[2]).to.equal(HIGH_COVERAGE);
+                expect(await mockCatPool.drawFundCallCount()).to.equal(1);
+                const rewardStored2 = await mockRewardDistributor.totalRewards(POOL_ID_1, mockProtocolToken.target);
+                expect(rewardStored2).to.equal(HIGH_COVERAGE);
             });
         });
 
@@ -264,22 +264,20 @@ describe("RiskManager", function () {
             const SHARES = ethers.parseUnits("10000", 18);
 
             beforeEach(async function() {
-                await riskManager.connect(mockCapitalPool).onCapitalDeposited(underwriter1.address, PLEDGE);
-                await mockPoolRegistry.mock.getPoolCount.returns(1);
-                await mockCapitalPool.mock.getUnderwriterAdapterAddress.returns(nonParty.address);
-                await mockPoolRegistry.mock.updateCapitalAllocation.returns();
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, PLEDGE);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
                 await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
-                
-                await mockCapitalPool.mock.getUnderwriterAccount.withArgs(underwriter1.address).returns(0,0,SHARES,0,0);
-                await mockLossDistributor.mock.realizeLosses.returns(0);
-                await mockCapitalPool.mock.applyLosses.returns();
+
+                await mockCapitalPool.setUnderwriterAccount(underwriter1.address, SHARES);
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
             });
 
             it("Should liquidate an insolvent underwriter", async function() {
                 const shareValue = ethers.parseUnits("9000", 6);
                 const pendingLosses = ethers.parseUnits("9001", 6);
-                await mockCapitalPool.mock.sharesToValue.withArgs(SHARES).returns(shareValue);
-                await mockLossDistributor.mock.getPendingLosses.withArgs(underwriter1.address, POOL_ID_1, PLEDGE).returns(pendingLosses);
+                await mockCapitalPool.setSharesToValue(SHARES, shareValue);
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, pendingLosses);
 
                 await expect(riskManager.connect(liquidator).liquidateInsolventUnderwriter(underwriter1.address))
                     .to.emit(riskManager, "UnderwriterLiquidated").withArgs(liquidator.address, underwriter1.address);
@@ -288,15 +286,15 @@ describe("RiskManager", function () {
             it("Should revert if underwriter is solvent", async function() {
                 const shareValue = ethers.parseUnits("9000", 6);
                 const pendingLosses = ethers.parseUnits("8999", 6);
-                await mockCapitalPool.mock.sharesToValue.withArgs(SHARES).returns(shareValue);
-                await mockLossDistributor.mock.getPendingLosses.withArgs(underwriter1.address, POOL_ID_1, PLEDGE).returns(pendingLosses);
+                await mockCapitalPool.setSharesToValue(SHARES, shareValue);
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, pendingLosses);
 
                 await expect(riskManager.connect(liquidator).liquidateInsolventUnderwriter(underwriter1.address))
                     .to.be.revertedWithCustomError(riskManager, "UnderwriterNotInsolvent");
             });
             
             it("Should revert if underwriter has no shares", async function() {
-                await mockCapitalPool.mock.getUnderwriterAccount.withArgs(underwriter2.address).returns(0,0,0,0,0);
+                await mockCapitalPool.setUnderwriterAccount(underwriter2.address, 0);
                  await expect(riskManager.connect(liquidator).liquidateInsolventUnderwriter(underwriter2.address))
                     .to.be.revertedWithCustomError(riskManager, "UnderwriterNotInsolvent");
             });
@@ -316,17 +314,15 @@ describe("RiskManager", function () {
              it("onCapitalWithdrawn should handle partial withdrawal", async function() {
                 const pledge = ethers.parseUnits("1000", 6);
                 const partialWithdrawal = ethers.parseUnits("400", 6);
-                await riskManager.connect(mockCapitalPool).onCapitalDeposited(underwriter1.address, pledge);
-                await mockPoolRegistry.mock.getPoolCount.returns(1);
-                await mockCapitalPool.mock.getUnderwriterAdapterAddress.returns(nonParty.address);
-                await mockPoolRegistry.mock.updateCapitalAllocation.returns();
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, pledge);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
                 await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
-                
-                await mockLossDistributor.mock.realizeLosses.returns(0);
-                await mockPoolRegistry.mock.updateCapitalPendingWithdrawal.returns();
+
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
                 
                 // Perform a partial withdrawal
-                await riskManager.connect(mockCapitalPool).onCapitalWithdrawn(underwriter1.address, partialWithdrawal, false);
+                await mockCapitalPool.triggerOnCapitalWithdrawn(riskManager.target, underwriter1.address, partialWithdrawal, false);
                 
                 expect(await riskManager.underwriterTotalPledge(underwriter1.address)).to.equal(pledge - partialWithdrawal);
                 const allocations = await riskManager.underwriterAllocations(underwriter1.address);
@@ -351,8 +347,8 @@ describe("RiskManager", function () {
                 );
 
                 const PLEDGE_AMOUNT = ethers.parseUnits("10000", 6);
-                await riskManager.connect(mockCapitalPool).onCapitalDeposited(underwriter1.address, PLEDGE_AMOUNT);
-                await mockCapitalPool.mock.getUnderwriterAdapterAddress.returns(nonParty.address);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, PLEDGE_AMOUNT);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
 
                 // The malicious contract will try to re-enter `allocateCapital`
                 await expect(riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]))
@@ -362,73 +358,3 @@ describe("RiskManager", function () {
     });
 });
 
-// A basic Mock ERC20 contract for testing purposes
-const MockERC20Artifact = {
-    "contractName": "MockERC20",
-    "abi": [
-        {"inputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"symbol","type":"string"},{"internalType":"uint256","name":"initialSupply","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},
-        {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},
-        {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},
-        {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-        {"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-        {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-        {"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
-        {"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"subtractedValue","type":"uint256"}],"name":"decreaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-        {"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"addedValue","type":"uint256"}],"name":"increaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-        {"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},
-        {"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},
-        {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-        {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
-        {"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}
-    ],
-};
-
-// Helper contract for re-entrancy test
-const MaliciousPoolRegistryArtifact = {
-    "contractName": "MaliciousPoolRegistry",
-    "abi": [
-        {"inputs":[],"name":"getPoolCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"pure","type":"function"},
-        {"inputs":[{"internalType":"address","name":"_rm","type":"address"}],"name":"setRiskManager","outputs":[],"stateMutability":"nonpayable","type":"function"},
-        {"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"bool","name":""}],"name":"updateCapitalAllocation","outputs":[],"stateMutability":"nonpayable","type":"function"}
-    ],
-    "bytecode": "0x608060405234801561001057600080fd5b50604051610214380380610214833981810160405281019061003291906100bd565b80600081905550506100f8565b600080fd5b600080600060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000018190555080830190808211156100b7576000828202808211156100b757fe5b9060200190a1505050565b6000602082840312156100ce57600080fd5b5035919050565b63461cb28160e01b81526004018080602001828103825260178152602001807f4e6f74205269736b4d616e616765720000000000000000000000000000000000815250600091019061012b565b600081519050919050565b6101c581610134565b82525050565b60006020820190506001600083018460405180828051906020019080838360005b83811015610170578082015181840152602001835260200182810190508083111561017057fe5b50505050905090810190601f16801561019d57808203815260200180519050905090565b505056fea2646970667358221220a2e0a2d2122f872c3d9a105c938b819f72365bb7e1d52d3a3d540242207b1a6264736f6c63430008140033"
-};
-
-ethers.ContractFactory.getContractFactory = async (name, signer) => {
-    if (name === "MockERC20") {
-        const factory = new ethers.ContractFactory(MockERC20Artifact.abi, MockERC20Artifact.bytecode, signer);
-        return factory;
-    }
-    if (name === "MaliciousPoolRegistry") {
-        const factory = new ethers.ContractFactory(MaliciousPoolRegistryArtifact.abi, MaliciousPoolRegistryArtifact.bytecode, signer);
-        return factory;
-    }
-    const hardhatEthers = require("hardhat").ethers;
-    return hardhatEthers.getContractFactory(name, signer);
-};
-
-// We need a simple contract artifact for the re-entrancy test
-const fs = require('fs');
-const path = require('path');
-const maliciousContractSource = `
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
-interface IRiskManager {
-    function allocateCapital(uint256[] calldata _poolIds) external;
-}
-contract MaliciousPoolRegistry {
-    address public riskManager;
-    function setRiskManager(address _rm) external {
-        riskManager = _rm;
-    }
-    function updateCapitalAllocation(uint256, address, uint256, bool) external {
-        // Re-enter
-        IRiskManager(riskManager).allocateCapital(new uint256[](0));
-    }
-    function getPoolCount() external pure returns (uint256) {
-        return 1;
-    }
-}
-`;
-// Create the contract file so Hardhat can compile it
-fs.writeFileSync(path.join(__dirname, "..", "contracts", "MaliciousPoolRegistry.sol"), maliciousContractSource);

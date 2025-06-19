@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "../interfaces/ICapitalPool.sol";
 
 /**
  * @title MockCapitalPool
@@ -29,6 +30,20 @@ contract MockCapitalPool is Ownable {
     event RevertOnApplyLossesSet(bool shouldRevert);
     event RiskManagerNotifiedOfDeposit(address indexed underwriter, uint256 amount);
     event RiskManagerNotifiedOfWithdrawal(address indexed underwriter, uint256 principal, bool isFull);
+
+    struct Account {
+        uint256 dummy1;
+        uint8 dummy2;
+        uint256 masterShares;
+        uint256 dummy3;
+        uint256 dummy4;
+    }
+
+    mapping(address => address) private adapterAddresses;
+    mapping(address => Account) private accounts;
+    mapping(uint256 => uint256) private shareValues;
+    ICapitalPool.PayoutData public lastPayout;
+    uint256 public executePayoutCallCount;
 
 
     // --- Constructor ---
@@ -91,5 +106,53 @@ contract MockCapitalPool is Ownable {
 
     function onCapitalWithdrawn(address _underwriter, uint256 _principal, bool _isFull) external {
         emit RiskManagerNotifiedOfWithdrawal(_underwriter, _principal, _isFull);
+    }
+
+    /* ----------------------- Additional Mock Helpers ----------------------- */
+
+    function setUnderwriterAdapterAddress(address user, address adapter) external {
+        adapterAddresses[user] = adapter;
+    }
+
+    function setUnderwriterAccount(address user, uint256 masterShares) external {
+        accounts[user] = Account(0, 0, masterShares, 0, 0);
+    }
+
+    function setSharesToValue(uint256 shares, uint256 value) external {
+        shareValues[shares] = value;
+    }
+
+    function getUnderwriterAdapterAddress(address user) external view returns (address) {
+        return adapterAddresses[user];
+    }
+
+    function getUnderwriterAccount(address user) external view returns (uint256, uint8, uint256, uint256, uint256) {
+        Account storage a = accounts[user];
+        return (a.dummy1, a.dummy2, a.masterShares, a.dummy3, a.dummy4);
+    }
+
+    function sharesToValue(uint256 shares) external view returns (uint256) {
+        return shareValues[shares];
+    }
+
+    function executePayout(ICapitalPool.PayoutData calldata payoutData) external {
+        lastPayout = payoutData;
+        executePayoutCallCount++;
+    }
+
+    // Helper functions to call RiskManager hooks from this contract
+    function triggerOnCapitalDeposited(address rm, address u, uint256 amt) external {
+        (bool ok,) = rm.call(abi.encodeWithSignature("onCapitalDeposited(address,uint256)", u, amt));
+        require(ok, "call failed");
+    }
+
+    function triggerOnCapitalWithdrawn(address rm, address u, uint256 amt, bool full) external {
+        (bool ok,) = rm.call(abi.encodeWithSignature("onCapitalWithdrawn(address,uint256,bool)", u, amt, full));
+        require(ok, "call failed");
+    }
+
+    function triggerOnWithdrawalRequested(address rm, address u, uint256 amt) external {
+        (bool ok,) = rm.call(abi.encodeWithSignature("onWithdrawalRequested(address,uint256)", u, amt));
+        require(ok, "call failed");
     }
 }
