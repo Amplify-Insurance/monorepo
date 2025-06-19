@@ -32,7 +32,7 @@ export default function BondModal({ isOpen, onClose }) {
   // mirrors the behaviour of the Insurance Markets page so only the actual
   // deposit assets (e.g. USDC) show up in the dropdown.
   const tokens = pools
-    ? Array.from(new Set(pools.map((p) => p.deployment.toLowerCase()))).map(
+    ? Array.from(new Set(pools.map((p) => p.underlyingAsset.toLowerCase()))).map(
         (address) => ({
           address,
           symbol: getUnderlyingTokenName(address),
@@ -71,14 +71,14 @@ export default function BondModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!selectedAsset) return
-    const first = pools.find((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase())
+    const first = pools.find((p) => p.underlyingAsset.toLowerCase() === selectedAsset.toLowerCase())
     if (first) setSelectedProtocol(String(first.id))
     else setSelectedProtocol("")
   }, [selectedAsset, pools])
 
   useEffect(() => {
     if (!selectedProtocol && pools && pools.length > 0) {
-      const first = pools.find((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase())
+      const first = pools.find((p) => p.underlyingAsset.toLowerCase() === selectedAsset.toLowerCase())
       if (first) setSelectedProtocol(String(first.id))
     }
   }, [pools, selectedProtocol, selectedAsset])
@@ -234,7 +234,7 @@ export default function BondModal({ isOpen, onClose }) {
               >
                 {pools
                   .filter(
-                    (p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase(),
+                    (p) => p.underlyingAsset.toLowerCase() === selectedAsset.toLowerCase(),
                   )
                   .map((p) => (
                     <option key={p.id} value={p.id}>
