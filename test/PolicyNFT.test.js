@@ -16,6 +16,8 @@ describe("PolicyNFT", function () {
       expect(await policyNFT.owner()).to.equal(owner.address);
       expect(await policyNFT.nextId()).to.equal(1n);
       expect(await policyNFT.riskManagerContract()).to.equal(ethers.ZeroAddress);
+      expect(await policyNFT.name()).to.equal("Premium Drain Cover");
+      expect(await policyNFT.symbol()).to.equal("PCOVER");
     });
   });
 
@@ -85,6 +87,16 @@ describe("PolicyNFT", function () {
       expect(policy.start).to.equal(BigInt(block.timestamp));
       expect(await policyNFT.ownerOf(1n)).to.equal(user.address);
     });
+
+    it("Increments token ids sequentially", async function () {
+      const { owner, policyNFT, riskManager, user, other } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await policyNFT.connect(riskManager).mint(user.address, poolId, coverage, activation, premiumDeposit, lastDrainTime);
+      await policyNFT.connect(riskManager).mint(other.address, poolId, coverage, activation, premiumDeposit, lastDrainTime);
+      expect(await policyNFT.nextId()).to.equal(3n);
+      expect(await policyNFT.ownerOf(1n)).to.equal(user.address);
+      expect(await policyNFT.ownerOf(2n)).to.equal(other.address);
+    });
   });
 
   describe("burn", function () {
@@ -101,6 +113,11 @@ describe("PolicyNFT", function () {
       await expect(policyNFT.ownerOf(1)).to.be.reverted;
       const policy = await policyNFT.getPolicy(1);
       expect(policy.coverage).to.equal(0n);
+      expect(policy.poolId).to.equal(0n);
+      expect(policy.start).to.equal(0n);
+      expect(policy.activation).to.equal(0n);
+      expect(policy.premiumDeposit).to.equal(0n);
+      expect(policy.lastDrainTime).to.equal(0n);
     });
 
     it("Reverts when token does not exist", async function () {
@@ -113,6 +130,20 @@ describe("PolicyNFT", function () {
   });
 
   describe("updatePremiumAccount", function () {
+    it("Reverts if risk manager address not set", async function () {
+      const { policyNFT, riskManager } = await loadFixture(deployFixture);
+      await expect(policyNFT.connect(riskManager).updatePremiumAccount(1, 0, 0))
+        .to.be.revertedWith("PolicyNFT: RiskManager address not set");
+    });
+
+    it("Reverts if caller is not risk manager", async function () {
+      const { owner, other, policyNFT, riskManager, user } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await policyNFT.connect(riskManager).mint(user.address, 1, 1000, 0, 0, 0);
+      await expect(policyNFT.connect(other).updatePremiumAccount(1, 0, 0))
+        .to.be.revertedWith("PolicyNFT: Caller is not the authorized RiskManager");
+    });
+
     it("Updates premium fields and emits event", async function () {
       const { owner, policyNFT, riskManager, user } = await loadFixture(deployFixture);
       await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
@@ -149,6 +180,21 @@ describe("PolicyNFT", function () {
   });
 
   describe("updateLastPaid", function () {
+    it("Reverts if risk manager address not set", async function () {
+      const { riskManager, policyNFT } = await loadFixture(deployFixture);
+      await expect(policyNFT.connect(riskManager).updateLastPaid(1, 0)).to.be.revertedWith(
+        "PolicyNFT: RiskManager address not set"
+      );
+    });
+
+    it("Reverts if caller is not risk manager", async function () {
+      const { owner, other, riskManager, policyNFT } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await expect(policyNFT.connect(other).updateLastPaid(1, 0)).to.be.revertedWith(
+        "PolicyNFT: Caller is not the authorized RiskManager"
+      );
+    });
+
     it("Always reverts", async function () {
       const { owner, riskManager, policyNFT } = await loadFixture(deployFixture);
       await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
