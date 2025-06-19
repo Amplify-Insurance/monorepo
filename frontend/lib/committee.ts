@@ -27,3 +27,10 @@ export async function getCommitteeWithSigner() {
 
   return new ethers.Contract(ADDRESS, Committee, signer)
 }
+
+export function getCommitteeWriter(address: string = ADDRESS, deployment?: string) {
+  const pk = process.env.PRIVATE_KEY
+  if (!pk) throw new Error('PRIVATE_KEY not set')
+  const signer = new ethers.Wallet(pk, getProvider(deployment))
+  return new ethers.Contract(address, Committee, signer)
+}

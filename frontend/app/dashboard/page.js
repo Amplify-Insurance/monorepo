@@ -57,14 +57,15 @@ export default function Dashboard() {
     if (!pastProposals || pastProposals.length === 0) return
     setIsClaimingRewards(true)
     try {
-      const committee = await getCommitteeWithSigner()
-      for (const p of pastProposals) {
-        try {
-          const tx = await committee.claimReward(p.id)
-          await tx.wait()
-        } catch (err) {
-          console.error(`Failed to claim reward for proposal ${p.id}`, err)
-        }
+      const ids = pastProposals.map((p) => p.id)
+      const res = await fetch('/api/committee/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposalIds: ids })
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to claim')
       }
     } catch (err) {
       console.error('Failed to claim rewards', err)
