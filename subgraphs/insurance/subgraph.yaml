@@ -35,6 +35,14 @@ dataSources:
           handler: handleCapitalDeallocated
         - event: OwnershipTransferred(indexed address,indexed address)
           handler: handleRiskManagerOwnershipTransferred
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreated
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsed
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaid
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessed
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -68,6 +76,14 @@ dataSources:
           handler: handleCapitalDeallocated
         - event: OwnershipTransferred(indexed address,indexed address)
           handler: handleRiskManagerOwnershipTransferred
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreated
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsed
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaid
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessed
       file: ./src/mapping.ts
 
   - kind: ethereum/contract

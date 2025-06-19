@@ -1,11 +1,15 @@
 import { ethereum, BigInt, Address, dataSource, store } from "@graphprotocol/graph-ts";
-import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, GovernanceProposal, GovernanceVote } from "../generated/schema";
+import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, GovernanceProposal, GovernanceVote, PolicyCreatedEvent, PolicyLapsedEvent, PremiumPaidEvent } from "../generated/schema";
 import {
   CapitalAllocated,
   CapitalDeallocated,
   AddressesSet,
   CommitteeSet,
   UnderwriterLiquidated,
+  PolicyCreated,
+  PolicyLapsed,
+  PremiumPaid,
+  ClaimProcessed,
   OwnershipTransferred as RiskManagerOwnershipTransferred
 } from "../generated/RiskManagerV2/RiskManager";
 import { RiskManager } from "../generated/RiskManagerV2/RiskManager";
@@ -334,4 +338,82 @@ export function handleUnstaked(event: Unstaked): void {
 
 export function handleCommitteeAddressSet(event: CommitteeAddressSet): void {
   saveGeneric(event, "CommitteeAddressSet");
+}
+
+export function handlePolicyCreated(event: PolicyCreated): void {
+  saveGeneric(event, "PolicyCreated");
+
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let e = new PolicyCreatedEvent(id);
+  e.deployment = deployment;
+  e.policyId = event.params.policyId;
+  e.poolId = event.params.poolId;
+  e.user = event.params.user;
+  e.coverage = event.params.coverageAmount;
+  e.timestamp = event.block.timestamp;
+  e.transactionHash = event.transaction.hash;
+  e.save();
+}
+
+export function handlePolicyLapsed(event: PolicyLapsed): void {
+  saveGeneric(event, "PolicyLapsed");
+
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let e = new PolicyLapsedEvent(id);
+  e.deployment = deployment;
+  e.policyId = event.params.policyId;
+  e.timestamp = event.block.timestamp;
+  e.transactionHash = event.transaction.hash;
+  e.save();
+}
+
+export function handlePremiumPaid(event: PremiumPaid): void {
+  saveGeneric(event, "PremiumPaid");
+
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let e = new PremiumPaidEvent(id);
+  e.deployment = deployment;
+  e.policyId = event.params.policyId;
+  e.poolId = event.params.poolId;
+  e.amountPaid = event.params.amountPaid;
+  e.catAmount = event.params.catAmount;
+  e.poolIncome = event.params.poolIncome;
+  e.timestamp = event.block.timestamp;
+  e.transactionHash = event.transaction.hash;
+  e.save();
+}
+
+export function handleClaimProcessed(event: ClaimProcessed): void {
+  saveGeneric(event, "ClaimProcessed");
+
+  let ctx = dataSource.context();
+  let deployment = ctx.getString("deployment");
+  if (deployment == null) deployment = "default";
+
+  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  let c = new Claim(id);
+  c.deployment = deployment;
+  c.policyId = event.params.policyId;
+  c.poolId = event.params.poolId;
+  c.claimant = event.params.claimant;
+  let policy = Policy.load(deployment + "-" + event.params.policyId.toString());
+  c.coverage = policy ? policy.coverageAmount : BigInt.fromI32(0);
+  c.netPayoutToClaimant = event.params.netPayoutToClaimant;
+  c.claimFee = event.params.claimFee;
+  c.protocolTokenAmountReceived = event.params.protocolTokenAmountReceived;
+  c.timestamp = event.block.timestamp;
+  c.transactionHash = event.transaction.hash;
+  c.save();
 }
