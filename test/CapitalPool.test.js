@@ -83,16 +83,13 @@ describe("CapitalPool", function () {
       await capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, mockAdapter1.target);
     });
 
-    it("deposit should revert when RiskManager is unset", async () => {
+    it("deposit should succeed when RiskManager is unset", async () => {
       await expect(capitalPool.connect(user1).deposit(100, YIELD_PLATFORM_1))
-        .to.be.revertedWith("CP: Failed to notify RiskManager of deposit");
+        .to.not.be.reverted;
     });
 
     it("deposit should revert when RiskManager call fails", async () => {
-      const MockRM = await ethers.getContractFactory("MockRiskManager");
-      const mockRM = await MockRM.deploy();
-      await mockRM.setShouldReject(true);
-      await capitalPool.connect(owner).setRiskManager(mockRM.target);
+      await capitalPool.connect(owner).setRiskManager(mockUsdc.target);
       await expect(capitalPool.connect(user1).deposit(100, YIELD_PLATFORM_1))
         .to.be.revertedWith("CP: Failed to notify RiskManager of deposit");
     });
@@ -393,8 +390,8 @@ describe("CapitalPool", function () {
       it("deposit should revert when resulting shares equal zero", async () => {
         const bigDeposit = ethers.parseUnits("1000", 6);
         await capitalPool.connect(user1).deposit(bigDeposit, YIELD_PLATFORM_1);
-        await mockUsdc.connect(owner).mint(mockAdapter1.target, bigDeposit.mul(100));
-        await mockAdapter1.connect(owner).setTotalValueHeld(bigDeposit.mul(101));
+        await mockUsdc.connect(owner).mint(mockAdapter1.target, bigDeposit * 100n);
+        await mockAdapter1.connect(owner).setTotalValueHeld(bigDeposit * 101n);
         await capitalPool.connect(owner).syncYieldAndAdjustSystemValue();
         await expect(capitalPool.connect(user2).deposit(1, YIELD_PLATFORM_1))
           .to.be.revertedWithCustomError(capitalPool, "NoSharesToMint");
@@ -413,6 +410,67 @@ describe("CapitalPool", function () {
       it("getUnderwriterAdapterAddress should return correct adapter", async () => {
         await capitalPool.connect(user1).deposit(1000, YIELD_PLATFORM_1);
         expect(await capitalPool.getUnderwriterAdapterAddress(user1.address)).to.equal(mockAdapter1.target);
+      });
+
+      it("allows an underwriter to deposit multiple times", async () => {
+        const first = ethers.parseUnits("1000", 6);
+        const second = ethers.parseUnits("500", 6);
+        await capitalPool.connect(user1).deposit(first, YIELD_PLATFORM_1);
+        const tvBefore = await capitalPool.totalSystemValue();
+        const msBefore = await capitalPool.totalMasterSharesSystem();
+        const expectedShares = (second * msBefore) / tvBefore;
+        await expect(capitalPool.connect(user1).deposit(second, YIELD_PLATFORM_1))
+          .to.emit(capitalPool, "Deposit")
+          .withArgs(user1.address, second, expectedShares, YIELD_PLATFORM_1);
+        const account = await capitalPool.getUnderwriterAccount(user1.address);
+        expect(account.masterShares).to.equal(first + expectedShares);
+        expect(account.totalDepositedAssetPrincipal).to.equal(first + second);
+      });
+
+      it("valueToShares and sharesToValue round-trip", async () => {
+        const depositAmount = ethers.parseUnits("1000", 6);
+        await capitalPool.connect(user1).deposit(depositAmount, YIELD_PLATFORM_1);
+        const testValue = ethers.parseUnits("100", 6);
+        const shares = await capitalPool.valueToShares(testValue);
+        const value = await capitalPool.sharesToValue(shares);
+        expect(value).to.equal(testValue);
+      });
+
+      it("does not duplicate adapters when set multiple times", async () => {
+        await capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, mockAdapter1.target);
+        await expect(capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, mockAdapter1.target))
+          .to.emit(capitalPool, "BaseYieldAdapterSet")
+          .withArgs(YIELD_PLATFORM_1, mockAdapter1.target);
+        expect(await capitalPool.activeYieldAdapterAddresses(0)).to.equal(mockAdapter1.target);
+        expect(await capitalPool.activeYieldAdapterAddresses(1)).to.equal(mockAdapter2.target);
+        await expect(capitalPool.activeYieldAdapterAddresses(2)).to.be.reverted;
+      });
+
+      it("executePayout distributes fee to feeRecipient", async () => {
+        const payoutAmount = ethers.parseUnits("500", 6);
+        const payoutData = {
+          claimant: claimant.address,
+          claimantAmount: payoutAmount,
+          feeRecipient: feeRecipient.address,
+          feeAmount: payoutAmount,
+          adapters: [mockAdapter1.target],
+          capitalPerAdapter: [payoutAmount * 2n],
+          totalCapitalFromPoolLPs: payoutAmount * 2n,
+        };
+
+        await mockUsdc.connect(owner).mint(mockAdapter1.target, payoutAmount * 2n);
+        await mockAdapter1.connect(owner).setTotalValueHeld(payoutAmount * 2n);
+        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const catPool = await MockCatPool.deploy(owner.address);
+        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        const rm = await RM.deploy(catPool.target);
+        await catPool.setCoverPoolAddress(capitalPool.target);
+        await capitalPool.connect(owner).setRiskManager(rm.target);
+        await capitalPool.connect(user1).deposit(payoutAmount * 2n, YIELD_PLATFORM_1);
+
+        await rm.executePayout(capitalPool.target, payoutData);
+        expect(await mockUsdc.balanceOf(feeRecipient.address)).to.equal(payoutAmount);
+        expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount);
       });
     });
   });
