@@ -350,5 +350,56 @@ describe("Committee", function () {
             await expect(maliciousRecipient.attack()).to.be.reverted;
         });
     });
+
+    describe("Edge Cases", function () {
+        it("Should enforce bond range when creating a pause proposal", async function () {
+            const minBond = ethers.parseEther("1000");
+            const maxBond = ethers.parseEther("2500");
+
+            await expect(
+                committee.connect(proposer).createProposal(POOL_ID, 1, minBond - 1n)
+            ).to.be.revertedWith("Invalid bond");
+
+            await expect(
+                committee.connect(proposer).createProposal(POOL_ID, 1, maxBond + 1n)
+            ).to.be.revertedWith("Invalid bond");
+        });
+
+        it("Should not allow an unpause proposal to include a bond", async function () {
+            const bond = ethers.parseEther("1000");
+            await expect(
+                committee.connect(proposer).createProposal(POOL_ID, 0, bond)
+            ).to.be.revertedWith("No bond for unpause");
+        });
+
+        it("Should block multiple active proposals for the same pool", async function () {
+            const bond = ethers.parseEther("1000");
+            await committee.connect(proposer).createProposal(POOL_ID, 1, bond);
+            await expect(
+                committee.connect(proposer).createProposal(POOL_ID, 1, bond)
+            ).to.be.revertedWith("Proposal already exists");
+        });
+
+        it("Should calculate proposer fee share relative to bond size", async function () {
+            const minBond = ethers.parseEther("1000");
+            const midBond = ethers.parseEther("1750");
+            const maxBond = ethers.parseEther("2500");
+
+            // Ensure proposer has enough tokens for multiple bonds
+            await mockGovToken.mint(proposer.address, ethers.parseEther("6000"));
+
+            await committee.connect(proposer).createProposal(POOL_ID, 1, minBond); // id 1
+            await committee.connect(proposer).createProposal(POOL_ID + 1, 1, midBond); // id 2
+            await committee.connect(proposer).createProposal(POOL_ID + 2, 1, maxBond); // id 3
+
+            const p1 = await committee.proposals(1);
+            const p2 = await committee.proposals(2);
+            const p3 = await committee.proposals(3);
+
+            expect(p1.proposerFeeShareBps).to.equal(1000);
+            expect(p2.proposerFeeShareBps).to.equal(1750);
+            expect(p3.proposerFeeShareBps).to.equal(2500);
+        });
+    });
 });
 
