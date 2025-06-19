@@ -246,7 +246,11 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
         // Update coverage sold directly without going through the PolicyManager
         // hook to avoid the NotPolicyManager revert when processing claims.
-        poolRegistry.updateCoverageSold(poolId, coverage, false);
+        (, , uint256 totalCoverageSold,, , ,) = poolRegistry.getPoolData(poolId);
+        uint256 reduction = Math.min(coverage, totalCoverageSold);
+        if (reduction > 0) {
+            poolRegistry.updateCoverageSold(poolId, reduction, false);
+        }
 
         policyNFT.burn(_policyId);
     }
@@ -294,7 +298,11 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
-            poolRegistry.updateCapitalPendingWithdrawal(poolId, _principalComponentRemoved, false);
+            (, , , uint256 pendingWithdrawal, , ,) = poolRegistry.getPoolData(poolId);
+            uint256 reduction = Math.min(_principalComponentRemoved, pendingWithdrawal);
+            if (reduction > 0) {
+                poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
+            }
             if (_isFullWithdrawal) {
                 _removeUnderwriterFromPool(_underwriter, poolId);
             }
