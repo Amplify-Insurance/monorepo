@@ -4,6 +4,7 @@ import { Shield } from "lucide-react"
 import Image from "next/image"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import ManageCoverageModal from "./ManageCoverageModal"
+import CancelCoverageModal from "./CancelCoverageModal"
 import { useAccount } from "wagmi"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
@@ -23,9 +24,10 @@ import deployments, { getDeployment } from "../config/deployments"
 export default function ActiveCoverages({ displayCurrency }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCoverage, setSelectedCoverage] = useState(null)
+  const [cancelCoverage, setCancelCoverage] = useState(null)
   const [cancellingId, setCancellingId] = useState(null)
   const { address } = useAccount()
-  const { policies } = useUserPolicies(address)
+  const { policies, refresh } = useUserPolicies(address)
   const { pools } = usePools()
   const [underlyingDec, setUnderlyingDec] = useState(6)
 
@@ -130,20 +132,23 @@ export default function ActiveCoverages({ displayCurrency }) {
     setModalOpen(true)
   }
 
-  const handleCancelCoverage = async (coverage) => {
-    if (!coverage) return
-    if (!window.confirm('Cancel this coverage early?')) return
+  const handleOpenCancelModal = (coverage) => {
+    setCancelCoverage(coverage)
+  }
+
+  const handleCancelCoverage = async () => {
+    if (!cancelCoverage) return
     try {
-      setCancellingId(coverage.id)
-      const dep = getDeployment(coverage.deployment)
+      setCancellingId(cancelCoverage.id)
+      const dep = getDeployment(cancelCoverage.deployment)
       const pm = await getPoolManagerWithSigner(dep.poolManager)
-      const tx = await pm.cancelCover(coverage.id)
+      const tx = await pm.cancelCover(cancelCoverage.id)
       await tx.wait()
-      window.location.reload()
+      setCancelCoverage(null)
+      await refresh()
     } catch (err) {
       console.error('Failed to cancel coverage', err)
-    } 
-    finally {
+    } finally {
       setCancellingId(null)
     }
   }
@@ -288,7 +293,7 @@ export default function ActiveCoverages({ displayCurrency }) {
                 </button>
                 <button
                   className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50"
-                  onClick={() => handleCancelCoverage(coverage)}
+                  onClick={() => handleOpenCancelModal(coverage)}
                   disabled={cancellingId === coverage.id}
                 >
                   {cancellingId === coverage.id ? 'Cancelling...' : 'Cancel'}
@@ -330,6 +335,16 @@ export default function ActiveCoverages({ displayCurrency }) {
           policyId={selectedCoverage.id}
           deployment={selectedCoverage.deployment}
           expiry={selectedCoverage.expiry}
+        />
+      )}
+      {cancelCoverage && (
+        <CancelCoverageModal
+          isOpen={!!cancelCoverage}
+          onClose={() => setCancelCoverage(null)}
+          onConfirm={handleCancelCoverage}
+          coverage={cancelCoverage}
+          cancelling={cancellingId === cancelCoverage.id}
+          displayCurrency={displayCurrency}
         />
       )}
     </div>
