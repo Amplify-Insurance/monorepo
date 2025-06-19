@@ -438,6 +438,26 @@ describe("Committee", function () {
             expect(await committee.activeProposalForPool(POOL_ID)).to.equal(false);
         });
 
+        it("Should revert if resolvePauseBond is called on an unpause proposal", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 0, 0);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await expect(committee.resolvePauseBond(1)).to.be.revertedWith("Not a pause proposal");
+        });
+
+        it("Should revert if resolvePauseBond is called when not in challenge phase", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await expect(committee.resolvePauseBond(1)).to.be.revertedWith("Not in challenge phase");
+        });
+
+        it("Should revert if claiming reward before proposal is resolved", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(proposer).vote(1, 2);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await expect(committee.connect(proposer).claimReward(1)).to.be.revertedWith("Proposal not resolved");
+        });
+
         it("Should revert when constructor slash bps exceeds 10000", async function () {
             await expect(CommitteeFactory.deploy(
                 mockRiskManager.target,
