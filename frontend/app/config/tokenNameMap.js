@@ -23,6 +23,8 @@ export const PROTOCOL_NAME_MAP = {
   1: 'Compound V3',
   2: 'Moonwell',
   3: 'Euler V2',
+  4: 'USD+',
+  5: 'DAI'
 
 };
 
@@ -31,6 +33,8 @@ export const PROTOCOL_DESCRIPTION_MAP = {
   1: 'Decentralized lending protocol',
   2: 'Decentralized lending protocol',
   3: 'Decentralized lending protocol',
+  4: 'Yield Bearing Stablecoin',
+  5: 'CDP Stablecoin',
 };
 
 export const PROTOCOL_LOGO_MAP = {
@@ -38,18 +42,31 @@ export const PROTOCOL_LOGO_MAP = {
   1: '/images/protocols/compound.png',
   2: '/images/protocols/moonwell.png',
   3: '/images/protocols/euler.png',
+  4: '/images/stablecoins/usd_plus.svg',
+  5: '/images/stablecoins/dai.svg',
 };
 
 export const TOKEN_NAME_MAP = {
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 'USDC',
-  "0x4200000000000000000000000000000000000006": "WETH"
+  "0x4200000000000000000000000000000000000006": "WETH",
+  "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB": 'USDC',
+  "0xb125E6687d4313864e53df431d5425969c15Eb2F": "USDC",
+  "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22": "USDC",
+  "0x0A1a3b5f2041F33522C4efc754a7D096f880eE16": "USDC",
+  "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb": "USD+",
+  "0xB79DD08EA68A908A97220C76d19A6aA9cBDE4376": "DAI"
 
 };
 
 export const TOKEN_LOGO_MAP = {
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": '/images/tokens/usdc.png',
+  "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB": '/images/tokens/usdc.png',
+  "0xb125E6687d4313864e53df431d5425969c15Eb2F": "/images/tokens/usdc.png",
+  "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22": "/images/tokens/usdc.png",
+  "0x0A1a3b5f2041F33522C4efc754a7D096f880eE16": "/images/tokens/usdc.png",
   "0x4200000000000000000000000000000000000006": '/images/tokens/eth.png',
-
+  "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb": '/images/stablecoins/usd_plus.svg',
+  "0xB79DD08EA68A908A97220C76d19A6aA9cBDE4376": '/images/stablecoins/dai.svg'
 };
 
 if (process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS) {

@@ -25,13 +25,12 @@ const AAVE_AUSDC_ADDRESS  = "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB";
 // 2. Compound v3 (Comet)
 const COMPOUND_COMET_USDC = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
 
-// 3. Moonwell (Compound‑v2 fork)
-const MOONWELL_MUSDC      = "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22";
 
-// 5. Euler v2
+const MOONWELL_MUSDC = "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22";
 const EULER_EUSDC = "0x0A1a3b5f2041F33522C4efc754a7D096f880eE16"; 
-const EULER_MARKETS = "0x1C376866039Aad238B3Ae977d28C02531B911f8A"
-const EULER_VAULT = "0x1C376866039Aad238B3Ae977d28C02531B911f8A"
+const USD_PLUS = "0xb79dd08ea68a908a97220c76d19a6aa9cbde4376"
+const DAI = "0x50c5725949a6f0c72e6c4a641f24049a917db0cb"
+
 
 // ────────────────────────────────────────────────────────────────────────────
 async function main() {
@@ -106,23 +105,6 @@ async function main() {
   await compoundAdapter.waitForDeployment();
   await compoundAdapter.setCapitalPoolAddress(capitalPool.target);
 
-  // 3. Moonwell (Compound‑v2)
-  const MoonwellAdapter = await ethers.getContractFactory("MoonwellAdapter");
-  const moonwellAdapter = await MoonwellAdapter.deploy(USDC_ADDRESS, MOONWELL_MUSDC, deployer.address);
-  await moonwellAdapter.waitForDeployment();
-
-
-  // 5. Euler v2
-  const EulerAdapter = await ethers.getContractFactory("EulerV2Adapter");
-  const eulerAdapter = await EulerAdapter.deploy(
-    USDC_ADDRESS,     // underlying
-    EULER_EUSDC,      // eToken
-    EULER_MARKETS,    // markets (rates)
-    EULER_VAULT,      // ERC-4626 vault
-    deployer.address  // owner
-  );
-    await eulerAdapter.waitForDeployment();
-
   /*──────────────── Register adapters in CapitalPool (enum indices) ──────*/
   // 1=AAVE, 2=COMPOUND, 3=MOONWELL, 4=MORPHO, 5=EULER
   await capitalPool.setBaseYieldAdapter(1, aaveAdapter.target);
@@ -132,11 +114,13 @@ async function main() {
   const defaultRateModel = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
 
   // USDC pools across all five platforms
-  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 1);
-  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 2);
-  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 3);
-  await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 4);
-  // await riskManager.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 5);
+  await riskManager.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 500);
+  await riskManager.addProtocolRiskPool(COMPOUND_COMET_USDC, defaultRateModel, 500);
+  await riskManager.addProtocolRiskPool(MOONWELL_MUSDC, defaultRateModel, 500);
+  await riskManager.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500);
+  await riskManager.addProtocolRiskPool(DAI, defaultRateModel, 250);
+  await riskManager.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250);
+
 
   /*──────────────────────────────── Output ──────────────────────────────*/
   const addresses = {
@@ -150,8 +134,6 @@ async function main() {
     RiskManager:       riskManager.target,
     "Aave Adapter":    aaveAdapter.target,
     "Compound Adapter": compoundAdapter.target,
-    "Moonwell Adapter": moonwellAdapter.target,
-    "Euler Adapter":    eulerAdapter.target,
   };
 
   console.table(addresses);
