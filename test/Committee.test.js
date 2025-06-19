@@ -151,6 +151,11 @@ describe("Committee", function () {
             await expect(committee.connect(voter2).vote(1, 2))
                 .to.be.revertedWith("Proposal not active");
         });
+
+        it("Should revert when using an invalid vote option", async function () {
+            await expect(committee.connect(voter1).vote(1, 0))
+                .to.be.revertedWith("Invalid vote option");
+        });
     });
 
     describe("Proposal Execution & Bond Resolution", function() {
@@ -399,6 +404,49 @@ describe("Committee", function () {
             expect(p1.proposerFeeShareBps).to.equal(1000);
             expect(p2.proposerFeeShareBps).to.equal(1750);
             expect(p3.proposerFeeShareBps).to.equal(2500);
+        });
+
+        it("Should revert if a non-voter tries to claim reward", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(proposer).vote(1, 2);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await mockRiskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+            await time.increase(CHALLENGE_PERIOD + 1);
+            await committee.resolvePauseBond(1);
+            await expect(committee.connect(nonStaker).claimReward(1))
+                .to.be.revertedWith("Must have voted 'For' to claim rewards");
+        });
+
+        it("Should refund the bond minus slash when a proposal is defeated", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1); // no votes -> defeated
+            const refund = PROPOSAL_BOND - (PROPOSAL_BOND * BigInt(SLASH_BPS) / 10000n);
+            const balance = await mockGovToken.balanceOf(proposer.address);
+            expect(balance).to.equal(ethers.parseEther("2000") - PROPOSAL_BOND + refund);
+        });
+
+        it("Should clear active proposal flag after resolution", async function () {
+            await committee.connect(proposer).createProposal(POOL_ID, 1, PROPOSAL_BOND);
+            await committee.connect(proposer).vote(1, 2);
+            await time.increase(VOTING_PERIOD + 1);
+            await committee.executeProposal(1);
+            await mockRiskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+            await time.increase(CHALLENGE_PERIOD + 1);
+            await committee.resolvePauseBond(1);
+            expect(await committee.activeProposalForPool(POOL_ID)).to.equal(false);
+        });
+
+        it("Should revert when constructor slash bps exceeds 10000", async function () {
+            await expect(CommitteeFactory.deploy(
+                mockRiskManager.target,
+                mockStakingContract.target,
+                VOTING_PERIOD,
+                CHALLENGE_PERIOD,
+                QUORUM_BPS,
+                10001
+            )).to.be.revertedWith("Invalid slash bps");
         });
     });
 });
