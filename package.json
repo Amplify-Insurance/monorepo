@@ -10,6 +10,8 @@
     "test:Committee": "npx hardhat test test/Committee.test.js",
     "test:PolicyNFT": "npx hardhat test test/PolicyNFT.test.js",
     "test:PoolRegistry": "npx hardhat test test/PoolRegistry.test.js",
+    "test:LossDistributor": "npx hardhat test test/LossDistributor.test.js",
+    "test:RewardDistributor": "npx hardhat test test/RewardDistributor.test.js",
     "test:RiskManager": "npx hardhat test test/RiskManager.test.js",
     "test:Staking": "npx hardhat test test/Staking.test.js",
     "test:PriceOracle": "npx hardhat test test/PriceOracle.test.js",
