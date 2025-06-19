@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Shield } from "lucide-react"
+import { Shield, ChevronDown, ChevronUp } from "lucide-react"
 import Image from "next/image"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import ManageCoverageModal from "./ManageCoverageModal"
@@ -28,6 +28,13 @@ export default function ActiveCoverages({ displayCurrency }) {
   const { policies } = useUserPolicies(address)
   const { pools } = usePools()
   const [underlyingDec, setUnderlyingDec] = useState(6)
+  const [expandedRows, setExpandedRows] = useState([])
+
+  const toggleRow = (id) => {
+    setExpandedRows((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
 
   useEffect(() => {
     async function loadDec() {
@@ -279,22 +286,43 @@ export default function ActiveCoverages({ displayCurrency }) {
                   {coverage.status}
                 </span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <button
-                  className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
-                  onClick={() => handleOpenModal(coverage)}
+                  onClick={() => toggleRow(coverage.id)}
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
                 >
-                  Manage
-                </button>
-                <button
-                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50"
-                  onClick={() => handleCancelCoverage(coverage)}
-                  disabled={cancellingId === coverage.id}
-                >
-                  {cancellingId === coverage.id ? 'Cancelling...' : 'Cancel'}
+                  <span className="hidden sm:inline">
+                    {expandedRows.includes(coverage.id) ? 'Hide' : 'Actions'}
+                  </span>
+                  {expandedRows.includes(coverage.id) ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
                 </button>
               </td>
             </tr>
+            {expandedRows.includes(coverage.id) && (
+              <tr>
+                <td colSpan={8} className="px-6 py-4">
+                  <div className="flex gap-3">
+                    <button
+                      className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
+                      onClick={() => handleOpenModal(coverage)}
+                    >
+                      Manage
+                    </button>
+                    <button
+                      className="py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm disabled:opacity-50"
+                      onClick={() => handleCancelCoverage(coverage)}
+                      disabled={cancellingId === coverage.id}
+                    >
+                      {cancellingId === coverage.id ? 'Cancelling...' : 'Cancel'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
           ))}
         </tbody>
       </table>
