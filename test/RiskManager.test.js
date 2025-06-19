@@ -17,7 +17,20 @@ describe("RiskManager", function () {
     // --- Constants ---
     const POOL_ID_1 = 0;
     const POOL_ID_2 = 1;
-    const MAX_ALLOCATIONS = 5;
+const MAX_ALLOCATIONS = 5;
+
+    async function getAllocations(user) {
+        const allocs = [];
+        for (let i = 0; ; i++) {
+            try {
+                const val = await riskManager.underwriterAllocations(user, i);
+                allocs.push(val);
+            } catch (err) {
+                break;
+            }
+        }
+        return allocs;
+    }
 
     beforeEach(async function () {
         [owner, committee, underwriter1, underwriter2, claimant, liquidator, nonParty] = await ethers.getSigners();
@@ -119,8 +132,8 @@ describe("RiskManager", function () {
                     .to.emit(riskManager, "CapitalAllocated").withArgs(underwriter1.address, POOL_ID_1, PLEDGE_AMOUNT)
                     .and.to.emit(riskManager, "CapitalAllocated").withArgs(underwriter1.address, POOL_ID_2, PLEDGE_AMOUNT);
                 
-                const allocations = await riskManager.underwriterAllocations(underwriter1.address);
-                expect(allocations).to.deep.equal([BigInt(POOL_ID_1), BigInt(POOL_ID_2)]);
+                const allocations = await getAllocations(underwriter1.address);
+                expect(allocations.map(a => BigInt(a))).to.deep.equal([BigInt(POOL_ID_1), BigInt(POOL_ID_2)]);
             });
 
             it("Should revert if allocating to more than MAX_ALLOCATIONS_PER_UNDERWRITER pools", async function() {
@@ -161,7 +174,7 @@ describe("RiskManager", function () {
                 await expect(riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1))
                     .to.emit(riskManager, "CapitalDeallocated").withArgs(underwriter1.address, POOL_ID_1, PLEDGE_AMOUNT);
                 
-                const allocations = await riskManager.underwriterAllocations(underwriter1.address);
+                const allocations = await getAllocations(underwriter1.address);
                 expect(allocations).to.be.empty;
             });
             
@@ -176,6 +189,9 @@ describe("RiskManager", function () {
             });
             
             it("Should revert if trying to deallocate from a pool they are not in", async function() {
+                const pledge = ethers.parseUnits("1000", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter2.address, pledge);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter2.address, nonParty.address);
                 await mockLossDistributor.setPendingLoss(underwriter2.address, POOL_ID_1, 0);
                 await expect(riskManager.connect(underwriter2).deallocateFromPool(POOL_ID_1))
                     .to.be.revertedWith("Not allocated to this pool");
@@ -325,8 +341,7 @@ describe("RiskManager", function () {
                 await mockCapitalPool.triggerOnCapitalWithdrawn(riskManager.target, underwriter1.address, partialWithdrawal, false);
                 
                 expect(await riskManager.underwriterTotalPledge(underwriter1.address)).to.equal(pledge - partialWithdrawal);
-                const allocations = await riskManager.underwriterAllocations(underwriter1.address);
-                expect(allocations).to.not.be.empty; // Should not be cleaned up
+                expect(await riskManager.isAllocatedToPool(underwriter1.address, POOL_ID_1)).to.be.true;
             });
         });
 
@@ -352,7 +367,7 @@ describe("RiskManager", function () {
 
                 // The malicious contract will try to re-enter `allocateCapital`
                 await expect(riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]))
-                    .to.be.revertedWith("ReentrancyGuard: reentrant call");
+                    .to.be.revertedWithCustomError(riskManager, "ReentrancyGuardReentrantCall");
             });
         });
     });
