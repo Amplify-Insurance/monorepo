@@ -13,6 +13,7 @@ import usePools from "../../hooks/usePools"
 // the Insurance Markets page so only unique underlying assets show up in the
 // dropdown.
 import { getUnderlyingTokenLogo, getUnderlyingTokenName } from "../config/tokenNameMap"
+import { notifyTx } from "../utils/explorer"
 import useClaims from "../../hooks/useClaims"
 import {
   getProtocolName,
@@ -160,6 +161,7 @@ export default function BondModal({ isOpen, onClose }) {
         await approveTx.wait()
       }
       const tx = await staking.depositBond(pool.id, selectedAsset, value)
+      notifyTx(tx.hash)
       await tx.wait()
       setAmount("")
       onClose()

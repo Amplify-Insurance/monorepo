@@ -18,6 +18,7 @@ import useUsdPrice from "../../hooks/useUsdPrice"
 import Modal from "./Modal"
 import { Slider } from "../../components/ui/slider"
 import { formatPercentage } from "../utils/formatting"
+import { notifyTx } from "../utils/explorer"
 
 export default function CoverageModal({
   isOpen,
@@ -183,6 +184,7 @@ export default function CoverageModal({
         }
 
         const tx = await pm.purchaseCover(poolId, amountBn, depositBn)
+        notifyTx(tx.hash)
         await tx.wait()
       } else {
         // "provide" flow
@@ -200,10 +202,12 @@ export default function CoverageModal({
         }
 
         const tx = await cp.deposit(amountBn, yieldChoice)
+        notifyTx(tx.hash)
         await tx.wait()
 
         if (ids.length) {
           const tx2 = await rm.allocateCapital(ids)
+          notifyTx(tx2.hash)
           await tx2.wait()
         }
       }

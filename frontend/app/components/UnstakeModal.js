@@ -9,6 +9,7 @@ import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/
 import { getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
 import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
+import { notifyTx } from "../utils/explorer"
 
 export default function UnstakeModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
@@ -56,6 +57,7 @@ export default function UnstakeModal({ isOpen, onClose }) {
     try {
       const staking = await getStakingWithSigner()
       const tx = await staking.unstake(ethers.utils.parseUnits(amount, decimals))
+      notifyTx(tx.hash)
       await tx.wait()
       setAmount("")
       onClose()

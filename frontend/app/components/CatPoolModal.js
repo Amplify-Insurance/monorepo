@@ -7,6 +7,7 @@ import Modal from "./Modal"
 import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals, getCatShareAddress } from "../../lib/catPool"
 import { getERC20WithSigner, getTokenDecimals } from "../../lib/erc20"
 import { getTokenLogo } from "../config/tokenNameMap"
+import { notifyTx } from "../utils/explorer"
 
 export default function CatPoolModal({
   isOpen,
@@ -100,6 +101,7 @@ export default function CatPoolModal({
           await approveTx.wait()
         }
         const tx = await cp.depositLiquidity(amountBn)
+        notifyTx(tx.hash)
         await tx.wait()
       } else {
         const dec = await getUsdcDecimals()
@@ -114,6 +116,7 @@ export default function CatPoolModal({
           ? ethers.BigNumber.from(0)
           : amountBn.mul(totalSupply).div(liquid)
         const tx = await cp.withdrawLiquidity(sharesBn)
+        notifyTx(tx.hash)
         await tx.wait()
       }
       setAmount("")
