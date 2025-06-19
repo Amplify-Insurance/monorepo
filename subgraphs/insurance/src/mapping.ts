@@ -1,16 +1,8 @@
-import { ethereum, BigInt, Address, dataSource } from "@graphprotocol/graph-ts";
-import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, PolicyCreatedEvent, PolicyLapsedEvent, PremiumPaidEvent, GovernanceProposal, GovernanceVote } from "../generated/schema";
+import { ethereum, BigInt, Address, dataSource, store } from "@graphprotocol/graph-ts";
+import { GenericEvent, Pool, Underwriter, Policy, ContractOwner, PoolUtilizationSnapshot, Claim, GovernanceProposal, GovernanceVote } from "../generated/schema";
 import {
-  PoolAdded,
-  IncidentReported,
   CapitalAllocated,
   CapitalDeallocated,
-  PolicyCreated,
-  PremiumPaid,
-  PolicyLapsed,
-  ClaimProcessed,
-  PremiumRewardsClaimed,
-  DistressedAssetRewardsClaimed,
   AddressesSet,
   CommitteeSet,
   UnderwriterLiquidated,
@@ -143,28 +135,6 @@ function snapshotPool(
 }
 
 // RiskManager events
-export function handlePoolAdded(event: PoolAdded): void {
-  saveGeneric(event, "PoolAdded");
-
-  let ctx = dataSource.context();
-  let deployment = ctx.getString("deployment");
-  if (deployment == null) deployment = "default";
-
-  let poolId = deployment + "-" + event.params.poolId.toString();
-  let pool = new Pool(poolId);
-  pool.deployment = deployment;
-  pool.underlyingAsset = Address.zero();
-  pool.protocolToken = event.params.protocolToken;
-  pool.protocolCovered = event.params.protocolCovered;
-
-  let rm = RiskManager.bind(event.address);
-  let info = rm.try_getPoolInfo(event.params.poolId);
-  if (!info.reverted) {
-    pool.protocolCovered = info.value.protocolCovered;
-    pool.protocolToken = info.value.protocolTokenToCover;
-  }
-  pool.save();
-}
 
 export function handleDeposit(event: Deposit): void {
   saveGeneric(event, "Deposit");
@@ -187,70 +157,6 @@ export function handleDeposit(event: Deposit): void {
 }
 export function handleWithdrawalRequested(event: WithdrawalRequested): void { saveGeneric(event, "WithdrawalRequested"); }
 export function handleWithdrawalExecuted(event: WithdrawalExecuted): void { saveGeneric(event, "WithdrawalExecuted"); }
-export function handlePremiumPaid(event: PremiumPaid): void {
-  saveGeneric(event, "PremiumPaid");
-
-  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
-  let ev = new PremiumPaidEvent(id);
-  let ctx = dataSource.context();
-  let deployment = ctx.getString("deployment");
-  if (deployment == null) deployment = "default";
-  ev.deployment = deployment;
-  ev.policyId = event.params.policyId;
-  ev.poolId = event.params.poolId;
-  ev.amountPaid = event.params.amountPaid;
-  ev.catAmount = event.params.catAmount;
-  ev.poolIncome = event.params.poolIncome;
-  ev.timestamp = event.block.timestamp;
-  ev.transactionHash = event.transaction.hash;
-  ev.save();
-}
-export function handleClaimProcessed(event: ClaimProcessed): void {
-  saveGeneric(event, "ClaimProcessed");
-  let rm = RiskManager.bind(event.address);
-  snapshotPool(rm, event, event.params.poolId);
-
-  let ctx = dataSource.context();
-  let deployment = ctx.getString("deployment");
-  if (deployment == null) deployment = "default";
-
-  let coverage = BigInt.zero();
-  let policyAddr = rm.try_policyNFT();
-  if (!policyAddr.reverted) {
-    let policyNft = PolicyNFT.bind(policyAddr.value);
-    let polRes = policyNft.try_getPolicy(event.params.policyId);
-    if (!polRes.reverted) {
-      coverage = polRes.value.coverage;
-    }
-  }
-
-  let scale = BigInt.zero();
-  let infoRes = rm.try_getPoolInfo(event.params.poolId);
-  if (!infoRes.reverted) {
-    scale = infoRes.value.scaleToProtocolToken;
-  }
-
-  let protocolTokenAmountReceived = coverage.times(scale);
-  let net = event.params.netPayoutToClaimant;
-  let claimFee = BigInt.zero();
-  if (coverage > net) {
-    claimFee = coverage.minus(net);
-  }
-
-  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
-  let entity = new Claim(id);
-  entity.deployment = deployment;
-  entity.policyId = event.params.policyId;
-  entity.poolId = event.params.poolId;
-  entity.claimant = event.params.claimant;
-  entity.coverage = coverage;
-  entity.netPayoutToClaimant = net;
-  entity.claimFee = claimFee;
-  entity.protocolTokenAmountReceived = protocolTokenAmountReceived;
-  entity.timestamp = event.block.timestamp;
-  entity.transactionHash = event.transaction.hash;
-  entity.save();
-}
 export function handleLossesApplied(event: LossesApplied): void { saveGeneric(event, "LossesApplied"); }
 export function handleCapitalAllocated(event: CapitalAllocated): void {
   saveGeneric(event, "CapitalAllocated");
@@ -261,83 +167,41 @@ export function handleCapitalDeallocated(event: CapitalDeallocated): void { save
 export function handleAddressesSet(event: AddressesSet): void { saveGeneric(event, "AddressesSet"); }
 export function handleCommitteeSet(event: CommitteeSet): void { saveGeneric(event, "CommitteeSet"); }
 export function handleUnderwriterLiquidated(event: UnderwriterLiquidated): void { saveGeneric(event, "UnderwriterLiquidated"); }
-export function handlePolicyCreated(event: PolicyCreated): void {
-  saveGeneric(event, "PolicyCreated");
-
-  let ctx = dataSource.context();
-  let deployment = ctx.getString("deployment");
-  if (deployment == null) deployment = "default";
-
-  let policyId = deployment + "-" + event.params.policyId.toString();
-  let policy = new Policy(policyId);
-  policy.deployment = deployment;
-  policy.owner = event.params.user;
-  policy.pool = deployment + "-" + event.params.poolId.toString();
-  policy.coverageAmount = event.params.coverageAmount;
-  policy.premiumPaid = event.params.premiumPaid;
-  let rm = RiskManager.bind(event.address);
-  let rate = snapshotPool(rm, event, event.params.poolId);
-  policy.premiumRateBps = rate == null ? BigInt.fromI32(0) : rate as BigInt;
-  policy.save();
-
-  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
-  let ev = new PolicyCreatedEvent(id);
-  ev.deployment = deployment;
-  ev.policyId = event.params.policyId;
-  ev.poolId = event.params.poolId;
-  ev.user = event.params.user;
-  ev.coverage = event.params.coverageAmount;
-  ev.timestamp = event.block.timestamp;
-  ev.transactionHash = event.transaction.hash;
-  ev.save();
-}
-export function handleIncidentReported(event: IncidentReported): void { saveGeneric(event, "IncidentReported"); }
-export function handlePolicyLapsed(event: PolicyLapsed): void {
-  saveGeneric(event, "PolicyLapsed");
-
-  let ctx = dataSource.context();
-  let deployment = ctx.getString("deployment");
-  if (deployment == null) deployment = "default";
-
-  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
-  let ev = new PolicyLapsedEvent(id);
-  ev.deployment = deployment;
-  ev.policyId = event.params.policyId;
-  ev.timestamp = event.block.timestamp;
-  ev.transactionHash = event.transaction.hash;
-  ev.save();
-  let policy = Policy.load(deployment + "-" + event.params.policyId.toString());
-  if (policy != null) {
-    let rm = RiskManager.bind(event.address);
-    snapshotPool(rm, event, BigInt.fromString(policy.pool.split("-")[1]));
-  }
-}
 export function handleBaseYieldAdapterSet(event: BaseYieldAdapterSet): void { saveGeneric(event, "BaseYieldAdapterSet"); }
 export function handleSystemValueSynced(event: SystemValueSynced): void { saveGeneric(event, "SystemValueSynced"); }
 export function handleAdapterCallFailed(event: AdapterCallFailed): void { saveGeneric(event, "AdapterCallFailed"); }
 export function handleRiskManagerSet(event: RiskManagerSet): void { saveGeneric(event, "RiskManagerSet"); }
-export function handlePremiumRewardsClaimed(event: PremiumRewardsClaimed): void { saveGeneric(event, "PremiumRewardsClaimed"); }
-export function handleDistressedAssetRewardsClaimed(event: DistressedAssetRewardsClaimed): void { saveGeneric(event, "DistressedAssetRewardsClaimed"); }
-
-// CatInsurancePool events
-export function handleAdapterChanged(event: AdapterChanged): void { saveGeneric(event, "AdapterChanged"); }
-export function handleCatLiquidityDeposited(event: CatLiquidityDeposited): void { saveGeneric(event, "CatLiquidityDeposited"); }
-export function handleCatLiquidityWithdrawn(event: CatLiquidityWithdrawn): void { saveGeneric(event, "CatLiquidityWithdrawn"); }
-export function handleCoverPoolAddressSet(event: CoverPoolAddressSet): void { saveGeneric(event, "CoverPoolAddressSet"); }
-export function handleDepositToAdapter(event: DepositToAdapter): void { saveGeneric(event, "DepositToAdapter"); }
-export function handleDrawFromFund(event: DrawFromFund): void { saveGeneric(event, "DrawFromFund"); }
-export function handleProtocolAssetReceivedForDistribution(event: ProtocolAssetReceivedForDistribution): void { saveGeneric(event, "ProtocolAssetReceivedForDistribution"); }
-export function handleProtocolAssetRewardsClaimed(event: ProtocolAssetRewardsClaimed): void { saveGeneric(event, "ProtocolAssetRewardsClaimed"); }
-export function handleUsdcPremiumReceived(event: UsdcPremiumReceived): void { saveGeneric(event, "UsdcPremiumReceived"); }
-
-// PolicyNFT events
 export function handlePolicyPremiumAccountUpdated(event: PolicyPremiumAccountUpdated): void { saveGeneric(event, "PolicyPremiumAccountUpdated"); }
+
 export function handleTransfer(event: Transfer): void {
   saveGeneric(event, "Transfer");
 
   let ctx = dataSource.context();
   let deployment = ctx.getString("deployment");
   if (deployment == null) deployment = "default";
+
+  if (event.params.from.equals(Address.zero())) {
+    let nft = PolicyNFT.bind(event.address);
+    let res = nft.try_getPolicy(event.params.tokenId);
+    if (!res.reverted) {
+      let p = res.value;
+      let id = deployment + "-" + event.params.tokenId.toString();
+      let policy = new Policy(id);
+      policy.deployment = deployment;
+      policy.owner = event.params.to;
+      policy.pool = deployment + "-" + p.poolId.toString();
+      policy.coverageAmount = p.coverage;
+      policy.premiumPaid = p.premiumDeposit;
+      policy.premiumRateBps = BigInt.fromI32(0);
+      policy.save();
+    }
+    return;
+  }
+
+  if (event.params.to.equals(Address.zero())) {
+    store.remove("Policy", deployment + "-" + event.params.tokenId.toString());
+    return;
+  }
 
   let policy = Policy.load(deployment + "-" + event.params.tokenId.toString());
   if (policy != null) {
