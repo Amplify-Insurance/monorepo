@@ -18,6 +18,7 @@ import {
   getProtocolName,
   getProtocolLogo,
 } from "../config/tokenNameMap"
+import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
 import {
   getERC20WithSigner,
   getTokenDecimals,
@@ -43,7 +44,7 @@ export default function BondModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [maxPayout, setMaxPayout] = useState("0")
-  const tokenAddress = process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS
+  const tokenAddress = STAKING_TOKEN_ADDRESS
   const [symbol, setSymbol] = useState("")
   const [decimals, setDecimals] = useState(18)
   const [balance, setBalance] = useState("0")

@@ -1,11 +1,9 @@
 import { ethers } from 'ethers'
 import PriceOracle from '../abi/PriceOracle.json'
 import { getProvider, provider } from './provider'
-import deployments from '../app/config/deployments'
+import deployments, { PRICE_ORACLE_ADDRESS } from '../app/config/deployments'
 
-const DEFAULT_ADDRESS =
-  (deployments[0] && deployments[0].priceOracle) ||
-  (process.env.NEXT_PUBLIC_PRICE_ORACLE_ADDRESS as string);
+const DEFAULT_ADDRESS = PRICE_ORACLE_ADDRESS as string;
 
 export function getPriceOracle(address: string = DEFAULT_ADDRESS, deployment?: string) {
   return new ethers.Contract(address, PriceOracle, getProvider(deployment));

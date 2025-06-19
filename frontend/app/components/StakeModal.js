@@ -8,6 +8,7 @@ import { getStakingWithSigner } from "../../lib/staking"
 import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/erc20"
 import { getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
+import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
 
 export default function StakeModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
@@ -15,7 +16,7 @@ export default function StakeModal({ isOpen, onClose }) {
   const [balance, setBalance] = useState("0")
   const [symbol, setSymbol] = useState("")
   const [decimals, setDecimals] = useState(18)
-  const tokenAddress = process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS
+  const tokenAddress = STAKING_TOKEN_ADDRESS
 
   const loadBalance = async () => {
     if (!tokenAddress) return

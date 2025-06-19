@@ -1,11 +1,9 @@
 import { ethers } from 'ethers'
 import Committee from '../abi/Committee.json'
 import { getProvider, provider } from './provider'
-import deployments from '../app/config/deployments'
+import deployments, { COMMITTEE_ADDRESS } from '../app/config/deployments'
 
-const ADDRESS =
-  (deployments[0] && deployments[0].committee) ||
-  (process.env.NEXT_PUBLIC_COMMITTEE_ADDRESS as string)
+const ADDRESS = COMMITTEE_ADDRESS as string
 
 if (!ADDRESS) {
   console.error('❌  Committee address not configured')
