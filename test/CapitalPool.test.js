@@ -252,6 +252,15 @@ describe("CapitalPool", function () {
           .to.be.revertedWithCustomError(capitalPool, "InvalidAmount");
       });
 
+      it("Should revert if RiskManager notification fails during executeWithdrawal", async () => {
+        const sharesToBurn = (await capitalPool.getUnderwriterAccount(user1.address)).masterShares;
+        await capitalPool.connect(user1).requestWithdrawal(sharesToBurn);
+        await capitalPool.connect(owner).setRiskManager(mockUsdc.target);
+        await time.increase(NOTICE_PERIOD);
+        await expect(capitalPool.connect(user1).executeWithdrawal())
+          .to.be.revertedWith("CP: Failed to notify RiskManager of withdrawal");
+      });
+
       it("Should execute a partial withdrawal successfully", async () => {
         const sharesToBurn = (await capitalPool.getUnderwriterAccount(user1.address)).masterShares / 2n;
         await capitalPool.connect(user1).requestWithdrawal(sharesToBurn);
