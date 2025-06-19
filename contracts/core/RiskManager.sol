@@ -258,6 +258,18 @@ contract RiskManager is Ownable, ReentrancyGuard {
         poolRegistry.updateCoverageSold(_poolId, _amount, _isSale);
     }
 
+    /* ───────────────── Rewards Claiming ───────────────── */
+
+    function claimPremiumRewards(uint256 _poolId) external nonReentrant {
+        (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(_poolId);
+        rewardDistributor.claim(msg.sender, _poolId, address(protocolToken), underwriterTotalPledge[msg.sender]);
+    }
+
+    function claimDistressedAssets(uint256 _poolId) external nonReentrant {
+        (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(_poolId);
+        catPool.claimProtocolAssetRewards(address(protocolToken));
+    }
+
     function onCapitalDeposited(address _underwriter, uint256 _amount) external {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         underwriterTotalPledge[_underwriter] += _amount;

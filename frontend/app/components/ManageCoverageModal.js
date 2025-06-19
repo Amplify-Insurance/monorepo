@@ -163,8 +163,7 @@ export default function ManageCoverageModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Manage ${type === "coverage" ? "Coverage" : "Position"
-        } - ${getProtocolName(protocol)} ${tokenName}`}
+      title={`Manage ${type === "coverage" ? "Coverage" : "Position"} - ${getProtocolName(protocol)} ${tokenName}`}
     >
       <div className="space-y-6">
         {/* Current position */}
