@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test": "npx hardhat test",
     "test:capitalPool": "npx hardhat test test/CapitalPool.test.js",
     "test:catInsurancePool": "npx hardhat test test/CatInsurancePool.test.js",
     "test:PolicyManager": "npx hardhat test test/PolicyManager.test.js",
