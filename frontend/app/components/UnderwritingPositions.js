@@ -89,6 +89,10 @@ const underwritingPositions = (details || [])
     (p) => p.pendingLoss > 0
   );
 
+  const hasDistressedAssets = underwritingPositions.some(
+    (p) => p.pendingLoss > 0
+  );
+
   console.log(activePositions, "activePositions")
 
   const unlockTimestamp =
@@ -148,12 +152,41 @@ const underwritingPositions = (details || [])
     }
   };
 
-  const handleClaimDistressed = async () => {
-    console.warn("Claiming distressed assets is not implemented");
+  const handleClaimDistressed = async (position) => {
+    setIsClaimingDistressed(true);
+    try {
+      const dep = getDeployment(position.deployment);
+      const rm = await getRiskManagerWithSigner(dep.riskManager);
+      await (await rm.claimDistressedAssets(position.poolId)).wait();
+    } catch (err) {
+      console.error("Failed to claim distressed assets", err);
+    } finally {
+      setIsClaimingDistressed(false);
+    }
   };
 
   const handleClaimAllDistressed = async () => {
-    console.warn("Claiming distressed assets is not implemented");
+    if (underwritingPositions.length === 0) return;
+    setIsClaimingAllDistressed(true);
+    try {
+      const grouped = underwritingPositions.reduce((acc, p) => {
+        if (p.pendingLoss > 0) {
+          (acc[p.deployment] = acc[p.deployment] || []).push(p.poolId);
+        }
+        return acc;
+      }, {});
+      for (const [depName, ids] of Object.entries(grouped)) {
+        const dep = getDeployment(depName);
+        const rm = await getRiskManagerWithSigner(dep.riskManager);
+        for (const id of ids) {
+          await (await rm.claimDistressedAssets(id)).wait();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to claim all distressed assets", err);
+    } finally {
+      setIsClaimingAllDistressed(false);
+    }
   };
 
   const handleExecuteWithdrawal = async () => {
