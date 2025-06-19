@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MockComet is Ownable {
     IERC20 public immutable asset;
     mapping(address => uint256) public balanceOf;
+    uint256 public supplyIndex = 1e15;
 
     constructor(IERC20 _asset) Ownable(msg.sender) {
         asset = _asset;
@@ -33,5 +34,18 @@ contract MockComet is Ownable {
 
     function baseToken() external view returns (address) {
         return address(asset);
+    }
+
+    struct UserBasic {
+        int104 principal;
+        uint64 baseTrackingIndex;
+    }
+
+    function userBasic(address account) external view returns (UserBasic memory) {
+        return UserBasic(int104(int256(balanceOf[account])), uint64(supplyIndex));
+    }
+
+    function baseSupplyIndex() external view returns (uint256) {
+        return supplyIndex;
     }
 }

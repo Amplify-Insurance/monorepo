@@ -17,6 +17,7 @@ async function deployAaveFixture() {
 
   const Adapter = await ethers.getContractFactory("AaveV3Adapter");
   const adapter = await Adapter.deploy(token.target, pool.target, aToken.target, owner.address);
+  await adapter.setCapitalPoolAddress(user.address);
 
   const initial = toWei(1000);
   for (const acc of [owner, user]) {
@@ -37,6 +38,7 @@ async function deployCompoundFixture() {
 
   const Adapter = await ethers.getContractFactory("CompoundV3Adapter");
   const adapter = await Adapter.deploy(comet.target, owner.address);
+  await adapter.setCapitalPoolAddress(user.address);
 
   const initial = toWei(1000);
   for (const acc of [owner, user]) {
@@ -66,18 +68,17 @@ describe("AaveV3Adapter", function () {
     expect(await token.balanceOf(adapter.target)).to.equal(0);
 
     const before = await token.balanceOf(user.address);
-    await expect(adapter.connect(owner).withdraw(amount / 2n, user.address))
+    await expect(adapter.connect(user).withdraw(amount / 2n, user.address))
       .to.emit(adapter, "FundsWithdrawn")
       .withArgs(user.address, amount / 2n, amount / 2n);
     expect(await aToken.balanceOf(adapter.target)).to.equal(amount / 2n);
     expect(await token.balanceOf(user.address)).to.equal(before + amount / 2n);
   });
 
-  it("only owner can withdraw", async function () {
-    const { adapter, user } = await loadFixture(deployAaveFixture);
-    await expect(adapter.connect(user).withdraw(1, user.address))
-      .to.be.revertedWithCustomError(adapter, "OwnableUnauthorizedAccount")
-      .withArgs(user.address);
+  it("only capital pool can withdraw", async function () {
+    const { adapter, owner } = await loadFixture(deployAaveFixture);
+    await expect(adapter.connect(owner).withdraw(1, owner.address))
+      .to.be.revertedWith("AaveV3Adapter: Caller is not CapitalPool");
   });
 
   it("getCurrentValueHeld totals token and aToken", async function () {
@@ -104,18 +105,17 @@ describe("CompoundV3Adapter", function () {
     expect(await token.balanceOf(adapter.target)).to.equal(0);
 
     const before = await token.balanceOf(user.address);
-    await expect(adapter.connect(owner).withdraw(amount, user.address))
+    await expect(adapter.connect(user).withdraw(amount, user.address))
       .to.emit(adapter, "FundsWithdrawn")
       .withArgs(user.address, amount, amount);
     expect(await token.balanceOf(user.address)).to.equal(before + amount);
     expect(await comet.balanceOf(adapter.target)).to.equal(0);
   });
 
-  it("only owner can withdraw", async function () {
-    const { adapter, user } = await loadFixture(deployCompoundFixture);
-    await expect(adapter.connect(user).withdraw(1, user.address))
-      .to.be.revertedWithCustomError(adapter, "OwnableUnauthorizedAccount")
-      .withArgs(user.address);
+  it("only capital pool can withdraw", async function () {
+    const { adapter, owner } = await loadFixture(deployCompoundFixture);
+    await expect(adapter.connect(owner).withdraw(1, owner.address))
+      .to.be.revertedWith("CompoundV3Adapter: Caller is not CapitalPool");
   });
 
   it("getCurrentValueHeld sums balances", async function () {
