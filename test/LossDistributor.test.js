@@ -54,6 +54,21 @@ describe("LossDistributor", function () {
       await lossDistributor.connect(owner).setRiskManager(other.address);
       expect(await lossDistributor.riskManager()).to.equal(other.address);
     });
+
+    it("New risk manager controls privileged functions", async function () {
+      const { owner, riskManager, other, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      await lossDistributor.connect(owner).setRiskManager(other.address);
+      await expect(
+        lossDistributor
+          .connect(riskManager)
+          .distributeLoss(1, 1, 1)
+      ).to.be.revertedWith("LD: Not RiskManager");
+      await expect(
+        lossDistributor.connect(other).distributeLoss(1, 1, 1)
+      ).to.not.be.reverted;
+    });
   });
 
   describe("distributeLoss", function () {
@@ -216,6 +231,54 @@ describe("LossDistributor", function () {
         .getFunction("realizeLosses")
         .staticCall(user.address, poolId, pledge);
       expect(finalPending).to.equal(0n);
+    });
+
+    it("Tracks losses independently per pool", async function () {
+      const { riskManager, user, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      const poolA = 1;
+      const poolB = 2;
+      const pledgeAmount = 1000n;
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolA, 100n, pledgeAmount);
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolB, 200n, pledgeAmount);
+      await (
+        await lossDistributor
+          .connect(riskManager)
+          .realizeLosses(user.address, poolA, pledgeAmount)
+      ).wait();
+      expect(
+        await lossDistributor.getPendingLosses(user.address, poolB, pledgeAmount)
+      ).to.equal(200n);
+    });
+
+    it("Handles fractional loss calculations", async function () {
+      const { riskManager, user, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      const pool = 3;
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(pool, 1n, 2n);
+      expect(
+        await lossDistributor.getPendingLosses(user.address, pool, 1n)
+      ).to.equal(0n);
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(pool, 1n, 2n);
+      expect(
+        await lossDistributor.getPendingLosses(user.address, pool, 1n)
+      ).to.equal(1n);
+      await lossDistributor
+        .connect(riskManager)
+        .realizeLosses(user.address, pool, 1n);
+      expect(
+        await lossDistributor.getPendingLosses(user.address, pool, 1n)
+      ).to.equal(0n);
     });
 
     it("Calculates pending losses for multiple users", async function () {
