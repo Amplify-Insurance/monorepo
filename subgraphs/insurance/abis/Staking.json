@@ -1,40 +1,28 @@
 [
   {
+    "anonymous": false,
     "inputs": [
-      {"internalType": "uint256", "name": "amount", "type": "uint256"}
+      {"indexed": true, "internalType": "address", "name": "user", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
     ],
-    "name": "stake",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "name": "Staked",
+    "type": "event"
   },
   {
+    "anonymous": false,
     "inputs": [
-      {"internalType": "uint256", "name": "amount", "type": "uint256"}
+      {"indexed": true, "internalType": "address", "name": "user", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
     ],
-    "name": "unstake",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "name": "Unstaked",
+    "type": "event"
   },
   {
+    "anonymous": false,
     "inputs": [
-      {"internalType": "uint256", "name": "poolId", "type": "uint256"},
-      {"internalType": "uint256", "name": "amount", "type": "uint256"}
+      {"indexed": true, "internalType": "address", "name": "committeeAddress", "type": "address"}
     ],
-    "name": "depositBond",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "uint256", "name": "poolId", "type": "uint256"},
-      {"internalType": "bool", "name": "freeze", "type": "bool"}
-    ],
-    "name": "freezePool",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    "name": "CommitteeAddressSet",
+    "type": "event"
   }
 ]

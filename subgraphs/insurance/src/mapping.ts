@@ -99,39 +99,8 @@ function snapshotPool(
   event: ethereum.Event,
   poolId: BigInt
 ): BigInt | null {
-  let infoRes = rm.try_getPoolInfo(poolId);
-  if (infoRes.reverted) {
-    return null;
-  }
-  let info = infoRes.value;
-  let totalCapital = info.totalCapitalPledgedToPool;
-  let sold = info.totalCoverageSold;
-  let utilization = totalCapital.equals(BigInt.zero())
-    ? BigInt.zero()
-    : sold.times(BPS).div(totalCapital);
-  let base = info.rateModel.base;
-  let slope1 = info.rateModel.slope1;
-  let slope2 = info.rateModel.slope2;
-  let kink = info.rateModel.kink;
-  let rate = utilization.lt(kink)
-    ? base.plus(slope1.times(utilization).div(BPS))
-    : base
-        .plus(slope1.times(kink).div(BPS))
-        .plus(slope2.times(utilization.minus(kink)).div(BPS));
-
-  let ctx = dataSource.context();
-  let deployment = ctx.getString("deployment");
-  if (deployment == null) deployment = "default";
-  let snapId = deployment + "-" + poolId.toString() + "-" + event.block.number.toString();
-  let snap = new PoolUtilizationSnapshot(snapId);
-  snap.deployment = deployment;
-  snap.pool = deployment + "-" + poolId.toString();
-  snap.timestamp = event.block.timestamp;
-  snap.blockNumber = event.block.number;
-  snap.utilizationBps = utilization;
-  snap.premiumRateBps = rate;
-  snap.save();
-  return rate;
+  // ABI for getPoolInfo is unavailable so snapshot functionality is disabled
+  return null;
 }
 
 // RiskManager events
