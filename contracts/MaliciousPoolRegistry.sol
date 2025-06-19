@@ -10,6 +10,7 @@ contract MaliciousPoolRegistry {
         riskManager = _rm;
     }
     function updateCapitalAllocation(uint256, address, uint256, bool) external {
+        // Re-enter
         IRiskManager(riskManager).allocateCapital(new uint256[](0));
     }
     function getPoolCount() external pure returns (uint256) {
