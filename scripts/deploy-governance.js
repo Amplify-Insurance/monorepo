@@ -21,8 +21,9 @@ const RISK_MANAGER_ADDRESS = "0xD1c640f4C9ff53ba46B42959ECB9a76f2dB9Cb2b";
 const VOTING_PERIOD = 7 * 24 * 60 * 60;       // 7 days
 const CHALLENGE_PERIOD = 7 * 24 * 60 * 60;    // 7 days
 const QUORUM_BPS = 4000;                      // 40%
-const PROPOSAL_BOND = ethers.parseEther("100");
-const PROPOSER_FEE_SHARE_BPS = 1000;          // 10%
+// const PROPOSAL_BOND = ethers.parseEther("100");
+// const PROPOSER_FEE_SHARE_BPS = 1000;          // 10%
+const SLASH_BPS = 500;                        // 5%
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -54,8 +55,7 @@ async function main() {
     VOTING_PERIOD,
     CHALLENGE_PERIOD,
     QUORUM_BPS,
-    PROPOSAL_BOND,
-    PROPOSER_FEE_SHARE_BPS
+    SLASH_BPS
   );
   await committee.waitForDeployment();
 
