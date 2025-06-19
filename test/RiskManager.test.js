@@ -99,9 +99,36 @@ const MAX_ALLOCATIONS = 5;
             expect(await riskManager.committee()).to.equal(committee.address);
         });
         
-         it("Should prevent setting committee to zero address", async function () {
+        it("Should prevent setting committee to zero address", async function () {
             await expect(riskManager.connect(owner).setCommittee(ethers.ZeroAddress))
                 .to.be.revertedWith("Zero address not allowed");
+        });
+
+        it("Should update max allocations per underwriter", async function () {
+            await expect(riskManager.connect(owner).setMaxAllocationsPerUnderwriter(7))
+                .to.emit(riskManager, "MaxAllocationsPerUnderwriterSet").withArgs(7);
+            expect(await riskManager.maxAllocationsPerUnderwriter()).to.equal(7);
+        });
+
+        it("Should revert when setting max allocations to zero", async function () {
+            await expect(riskManager.connect(owner).setMaxAllocationsPerUnderwriter(0))
+                .to.be.revertedWith("Invalid max");
+        });
+
+        it("Should restrict addProtocolRiskPool to owner", async function () {
+            const model = { base: 0, slope1: 0, slope2: 0, kink: 0 };
+            await riskManager.connect(owner).setAddresses(
+                mockCapitalPool.target,
+                mockPoolRegistry.target,
+                mockPolicyManager.target,
+                mockCatPool.target,
+                mockLossDistributor.target,
+                mockRewardDistributor.target
+            );
+            await expect(riskManager.connect(nonParty).addProtocolRiskPool(mockUsdc.target, model, 0))
+                .to.be.revertedWithCustomError(riskManager, "OwnableUnauthorizedAccount");
+            await expect(riskManager.connect(owner).addProtocolRiskPool(mockUsdc.target, model, 0))
+                .to.not.be.reverted;
         });
     });
 
@@ -327,7 +354,7 @@ const MAX_ALLOCATIONS = 5;
                     .to.be.revertedWithCustomError(riskManager, "NotPolicyManager");
             });
             
-             it("onCapitalWithdrawn should handle partial withdrawal", async function() {
+            it("onCapitalWithdrawn should handle partial withdrawal", async function() {
                 const pledge = ethers.parseUnits("1000", 6);
                 const partialWithdrawal = ethers.parseUnits("400", 6);
                 await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, pledge);
@@ -342,6 +369,64 @@ const MAX_ALLOCATIONS = 5;
                 
                 expect(await riskManager.underwriterTotalPledge(underwriter1.address)).to.equal(pledge - partialWithdrawal);
                 expect(await riskManager.isAllocatedToPool(underwriter1.address, POOL_ID_1)).to.be.true;
+            });
+
+            it("onCapitalDeposited should increase pledge when called by CapitalPool", async function () {
+                const amount = ethers.parseUnits("1000", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+                expect(await riskManager.underwriterTotalPledge(underwriter1.address)).to.equal(amount);
+            });
+
+            it("onWithdrawalRequested should mark pending withdrawal for each pool", async function () {
+                const amount = ethers.parseUnits("500", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+                await mockPoolRegistry.setPoolCount(2);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1, POOL_ID_2]);
+
+                await mockCapitalPool.triggerOnWithdrawalRequested(riskManager.target, underwriter1.address, amount);
+                const pool1 = await mockPoolRegistry.pools(POOL_ID_1);
+                const pool2 = await mockPoolRegistry.pools(POOL_ID_2);
+                expect(pool1.capitalPendingWithdrawal).to.equal(amount);
+                expect(pool2.capitalPendingWithdrawal).to.equal(amount);
+            });
+
+            it("onCapitalWithdrawn should handle full withdrawal", async function () {
+                const amount = ethers.parseUnits("1000", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
+
+                await mockCapitalPool.triggerOnCapitalWithdrawn(riskManager.target, underwriter1.address, amount, true);
+
+                expect(await riskManager.underwriterTotalPledge(underwriter1.address)).to.equal(0);
+                expect(await riskManager.isAllocatedToPool(underwriter1.address, POOL_ID_1)).to.be.false;
+                const allocs = await getAllocations(underwriter1.address);
+                expect(allocs).to.be.empty;
+            });
+        });
+
+        describe("Reward Claims", function () {
+            it("claimPremiumRewards should call the reward distributor", async function () {
+                const amount = ethers.parseUnits("1000", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, amount, 0, 0, false, committee.address, 0);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
+
+                await riskManager.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                expect(await mockRewardDistributor.claimCallCount()).to.equal(1);
+                expect(await mockRewardDistributor.lastClaimUser()).to.equal(underwriter1.address);
+            });
+
+            it("claimDistressedAssets should call the cat pool", async function () {
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, 0, 0, 0, false, committee.address, 0);
+                await riskManager.connect(nonParty).claimDistressedAssets(POOL_ID_1);
+                expect(await mockCatPool.claimProtocolRewardsCallCount()).to.equal(1);
+                expect(await mockCatPool.last_claimProtocolToken()).to.equal(mockUsdc.target);
             });
         });
 
