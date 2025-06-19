@@ -8,12 +8,15 @@ import { getStakingWithSigner } from "../../lib/staking"
 import { getCommittee } from "../../lib/committee"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
-import useTokenList from "../../hooks/useTokenList"
+// Bond deposits are denominated in the underlying asset of each deployment
+// rather than the protocol token being covered. Use the same token mapping as
+// the Insurance Markets page so only unique underlying assets show up in the
+// dropdown.
+import { getUnderlyingTokenLogo, getUnderlyingTokenName } from "../config/tokenNameMap"
 import useClaims from "../../hooks/useClaims"
 import {
   getProtocolName,
   getProtocolLogo,
-  getTokenLogo,
 } from "../config/tokenNameMap"
 import {
   getERC20WithSigner,
@@ -24,7 +27,17 @@ import {
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
   const { claims } = useClaims()
-  const tokens = useTokenList(pools)
+  // Build a list of unique underlying assets across all deployments. This
+  // mirrors the behaviour of the Insurance Markets page so only the actual
+  // deposit assets (e.g. USDC) show up in the dropdown.
+  const tokens = pools
+    ? Array.from(new Set(pools.map((p) => p.deployment.toLowerCase()))).map(
+        (address) => ({
+          address,
+          symbol: getUnderlyingTokenName(address),
+        }),
+      )
+    : []
   const [selectedAsset, setSelectedAsset] = useState("")
   const [selectedProtocol, setSelectedProtocol] = useState("")
   const [amount, setAmount] = useState("")
@@ -57,14 +70,14 @@ export default function BondModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!selectedAsset) return
-    const first = pools.find((p) => p.protocolTokenToCover === selectedAsset)
+    const first = pools.find((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase())
     if (first) setSelectedProtocol(String(first.id))
     else setSelectedProtocol("")
   }, [selectedAsset, pools])
 
   useEffect(() => {
     if (!selectedProtocol && pools && pools.length > 0) {
-      const first = pools.find((p) => p.protocolTokenToCover === selectedAsset)
+      const first = pools.find((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase())
       if (first) setSelectedProtocol(String(first.id))
     }
   }, [pools, selectedProtocol, selectedAsset])
@@ -103,9 +116,7 @@ export default function BondModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!selectedAsset) return
-    getTokenSymbol(selectedAsset)
-      .then(setAssetSymbol)
-      .catch(() => setAssetSymbol(""))
+    setAssetSymbol(getUnderlyingTokenName(selectedAsset))
   }, [selectedAsset])
 
   // Calculate max payout based on claim fees for the selected pool
@@ -181,7 +192,7 @@ export default function BondModal({ isOpen, onClose }) {
           <div className="relative">
             <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer">
               <Image
-                src={getTokenLogo(selectedAsset) || "/placeholder.svg"}
+                src={getUnderlyingTokenLogo(selectedAsset) || "/placeholder.svg"}
                 alt={assetSymbol}
                 width={24}
                 height={24}
@@ -221,7 +232,9 @@ export default function BondModal({ isOpen, onClose }) {
                 onChange={(e) => setSelectedProtocol(e.target.value)}
               >
                 {pools
-                  .filter((p) => p.protocolTokenToCover === selectedAsset)
+                  .filter(
+                    (p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase(),
+                  )
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       {getProtocolName(p.id)}
