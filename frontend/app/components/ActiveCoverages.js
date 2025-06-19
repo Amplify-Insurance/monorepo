@@ -27,7 +27,7 @@ export default function ActiveCoverages({ displayCurrency }) {
   const [cancelCoverage, setCancelCoverage] = useState(null)
   const [cancellingId, setCancellingId] = useState(null)
   const { address } = useAccount()
-  const { policies } = useUserPolicies(address)
+  const { policies, refresh } = useUserPolicies(address)
   const { pools } = usePools()
   const [underlyingDec, setUnderlyingDec] = useState(6)
 
@@ -145,7 +145,7 @@ export default function ActiveCoverages({ displayCurrency }) {
       const tx = await pm.cancelCover(cancelCoverage.id)
       await tx.wait()
       setCancelCoverage(null)
-      window.location.reload()
+      await refresh()
     } catch (err) {
       console.error('Failed to cancel coverage', err)
     } finally {

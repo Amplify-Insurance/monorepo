@@ -35,9 +35,18 @@ export default function CancelCoverageModal({
             <p className="font-medium text-gray-900 dark:text-white">
               {coverage.protocol}
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {tokenName}
-            </p>
+            <div className="flex items-center space-x-1">
+              <Image
+                src={tokenLogo}
+                alt={tokenName}
+                width={16}
+                height={16}
+                className="rounded-full"
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {tokenName}
+              </p>
+            </div>
           </div>
         </div>
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
