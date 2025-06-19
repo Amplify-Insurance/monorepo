@@ -36,9 +36,13 @@ const protocolCategories = [
 export default function UnderwriterPanel({ displayCurrency }) {
   const { isConnected } = useAccount()
   const { pools, loading } = usePools()
+  // Token list should only contain underlying assets used for providing
+  // coverage. Previously this also included the protocol tokens which led to
+  // multiple USD variants showing up in the dropdown. Filter it down to the
+  // actual deposit assets only.
   const tokens = useTokenList(
     pools.map((p) => ({
-      protocolTokenToCover: p.underlyingAsset || p.protocolTokenToCover,
+      protocolTokenToCover: p.underlyingAsset,
     })),
   )
   const [selectedToken, setSelectedToken] = useState(null)
