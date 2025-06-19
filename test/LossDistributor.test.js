@@ -126,6 +126,14 @@ describe("LossDistributor", function () {
         (lossAmount * 10n ** 18n) / pledge
       );
     });
+
+    it("Handles varying total pledge amounts across distributions", async function () {
+      const { riskManager, lossDistributor } = await loadFixture(deployFixture);
+      await lossDistributor.connect(riskManager).distributeLoss(poolId, 100n, 1000n);
+      await lossDistributor.connect(riskManager).distributeLoss(poolId, 50n, 500n);
+      const expected = (100n * 10n ** 18n) / 1000n + (50n * 10n ** 18n) / 500n;
+      expect(await lossDistributor.poolLossTrackers(poolId)).to.equal(expected);
+    });
   });
 
   describe("Loss realization", function () {
@@ -323,6 +331,23 @@ describe("LossDistributor", function () {
       expect(
         await lossDistributor.userLossStates(user.address, poolId)
       ).to.equal(0n);
+    });
+
+    it("Reverts when pledge is smaller than recorded debt", async function () {
+      const { riskManager, user, lossDistributor } = await loadFixture(
+        deployFixture
+      );
+      await lossDistributor
+        .connect(riskManager)
+        .distributeLoss(poolId, 100n, pledge);
+      await lossDistributor
+        .connect(riskManager)
+        .realizeLosses(user.address, poolId, pledge);
+      await expect(
+        lossDistributor
+          .connect(riskManager)
+          .realizeLosses(user.address, poolId, pledge / 10n)
+      ).to.be.revertedWithPanic(0x11);
     });
 
     it("New risk manager controls realizeLosses", async function () {
