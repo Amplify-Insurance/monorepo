@@ -49,7 +49,7 @@ describe("PolicyManager", function () {
         mockRiskManager = await deployMock("IRiskManager_PM_Hook", iRiskManagerHookAbi, owner);
         
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", ethers.parseUnits("1000000", 6));
+        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         
         // --- Deploy PolicyManager ---
         const PolicyManagerFactory = await ethers.getContractFactory("PolicyManager");

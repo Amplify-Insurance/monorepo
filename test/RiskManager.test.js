@@ -47,7 +47,7 @@ describe("RiskManager", function () {
         mockRewardDistributor = await deployMock(iRewardDistributorAbi, owner);
 
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", ethers.parseUnits("1000000", 6));
+        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         
         // --- Deploy RiskManager ---
         const RiskManagerFactory = await ethers.getContractFactory("RiskManager");

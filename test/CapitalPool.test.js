@@ -26,7 +26,7 @@ describe("CapitalPool", function () {
     const NOTICE_PERIOD = 1 * 24 * 60 * 60; // 1 day
 
     // --- Mock ABIs ---
-    const iYieldAdapterAbi = require("../contracts/CapitalPool.sol/IYieldAdapter.json").abi;
+    const iYieldAdapterAbi = require("../artifacts/contracts/interfaces/IYieldAdapter.sol/IYieldAdapter.json").abi;
     const iRiskManagerHookAbi = `[{"inputs":[{"internalType":"address","name":"_underwriter","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"}],"name":"onCapitalDeposited","outputs":[],"stateMutability":"nonpayable","type":"function"}, {"inputs":[{"internalType":"address","name":"_underwriter","type":"address"},{"internalType":"uint256","name":"_principalComponent","type":"uint256"}],"name":"onWithdrawalRequested","outputs":[],"stateMutability":"nonpayable","type":"function"}, {"inputs":[{"internalType":"address","name":"_underwriter","type":"address"},{"internalType":"uint256","name":"_principalComponentRemoved","type":"uint256"},{"internalType":"bool","name":"_isFullWithdrawal","type":"bool"}],"name":"onCapitalWithdrawn","outputs":[],"stateMutability":"nonpayable","type":"function"}]`;
 
     beforeEach(async function () {
@@ -35,7 +35,7 @@ describe("CapitalPool", function () {
 
         // --- Deploy Mocks ---
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", ethers.parseUnits("1000000", 6));
+        mockUsdc = await MockERC20Factory.deploy("USD Coin", "USDC", 6);
         
         mockRiskManager = await deployMock(iRiskManagerHookAbi, owner);
         mockAdapter1 = await deployMock(iYieldAdapterAbi, owner);
