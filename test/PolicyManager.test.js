@@ -115,6 +115,41 @@ describe("PolicyManager", function () {
             await expect(policyManager.connect(owner).setCatPremiumShareBps(5001))
                 .to.be.revertedWith("PM: Max share is 50%");
         });
+
+        it("Should set cover cooldown period", async function () {
+            await expect(policyManager.connect(owner).setCoverCooldownPeriod(100))
+                .to.emit(policyManager, "CoverCooldownPeriodSet").withArgs(100);
+            expect(await policyManager.coverCooldownPeriod()).to.equal(100);
+        });
+    });
+
+    describe("Address checks", function () {
+        it("purchaseCover reverts when addresses not set", async function () {
+            await expect(
+                policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, INITIAL_PREMIUM_DEPOSIT)
+            ).to.be.revertedWithCustomError(policyManager, "AddressesNotSet");
+        });
+
+        it("cancelCover reverts when addresses not set", async function () {
+            await expect(policyManager.connect(user1).cancelCover(1)).to.be.revertedWithCustomError(
+                policyManager,
+                "AddressesNotSet"
+            );
+        });
+
+        it("addPremium reverts when addresses not set", async function () {
+            await expect(policyManager.connect(user1).addPremium(1, 1)).to.be.revertedWithCustomError(
+                policyManager,
+                "AddressesNotSet"
+            );
+        });
+
+        it("lapsePolicy reverts when addresses not set", async function () {
+            await expect(policyManager.connect(user1).lapsePolicy(1)).to.be.revertedWithCustomError(
+                policyManager,
+                "AddressesNotSet"
+            );
+        });
     });
     
     context("With Addresses Set", function () {
@@ -482,6 +517,78 @@ describe("PolicyManager", function () {
 
                 await time.increase(30 * 24 * 60 * 60); // 30 days should be enough to deplete it
                 expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.false;
+            });
+        });
+
+        describe("lapsePolicy()", function() {
+            const POLICY_ID = 1;
+
+            beforeEach(async function() {
+                const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await mockPoolRegistry.setPoolData(
+                    POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    0,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+            });
+
+            it("Should successfully lapse an inactive policy", async function() {
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    0,
+                    0,
+                    0,
+                    0
+                );
+
+                await expect(policyManager.connect(user1).lapsePolicy(POLICY_ID)).to.not.be.reverted;
+                expect(await mockPolicyNFT.last_burn_id()).to.equal(POLICY_ID);
+            });
+
+            it("Should revert when policy is still active", async function() {
+                const activationTime = await time.latest();
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    activationTime,
+                    activationTime,
+                    INITIAL_PREMIUM_DEPOSIT,
+                    activationTime
+                );
+
+                await expect(policyManager.connect(user1).lapsePolicy(POLICY_ID)).to.be.revertedWithCustomError(
+                    policyManager,
+                    "PolicyIsActive"
+                );
+            });
+
+            it("Should revert if policy already terminated", async function() {
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                );
+
+                await expect(policyManager.connect(user1).lapsePolicy(POLICY_ID)).to.be.revertedWithCustomError(
+                    policyManager,
+                    "PolicyAlreadyTerminated"
+                );
             });
         });
 
