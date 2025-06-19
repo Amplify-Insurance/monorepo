@@ -7,7 +7,7 @@ import Modal from "./Modal"
 import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals, getCatShareAddress } from "../../lib/catPool"
 import { getERC20WithSigner, getTokenDecimals } from "../../lib/erc20"
 import { getTokenLogo } from "../config/tokenNameMap"
-import { notifyTx } from "../utils/explorer"
+import { getTxExplorerUrl } from "../utils/explorer"
 
 export default function CatPoolModal({
   isOpen,
@@ -23,6 +23,7 @@ export default function CatPoolModal({
   const [amount, setAmount] = useState("")
   const [usdValue, setUsdValue] = useState("0")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [txHash, setTxHash] = useState("")
   const [balance, setBalance] = useState("0")
   const projected = amount ? (Number.parseFloat(amount) * (apr / 100)).toFixed(2) : "0"
 
@@ -101,7 +102,7 @@ export default function CatPoolModal({
           await approveTx.wait()
         }
         const tx = await cp.depositLiquidity(amountBn)
-        notifyTx(tx.hash)
+        setTxHash(tx.hash)
         await tx.wait()
       } else {
         const dec = await getUsdcDecimals()
@@ -116,7 +117,7 @@ export default function CatPoolModal({
           ? ethers.BigNumber.from(0)
           : amountBn.mul(totalSupply).div(liquid)
         const tx = await cp.withdrawLiquidity(sharesBn)
-        notifyTx(tx.hash)
+        setTxHash(tx.hash)
         await tx.wait()
       }
       setAmount("")
@@ -259,6 +260,19 @@ export default function CatPoolModal({
             `${isDeposit ? "Deposit" : "Withdraw"} ${symbol}`
           )}
         </button>
+        {txHash && (
+          <p className="text-xs text-center mt-2">
+            Transaction submitted.{' '}
+            <a
+              href={getTxExplorerUrl(txHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on block explorer
+            </a>
+          </p>
+        )}
       </div>
     </Modal>
   )

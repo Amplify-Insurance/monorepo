@@ -18,7 +18,7 @@ import { getTokenName, getTokenLogo, getProtocolName } from "../config/tokenName
 import { Slider } from "../../components/ui/slider";
 import { formatPercentage } from "../utils/formatting";
 import deployments, { getDeployment } from "../config/deployments";
-import { notifyTx } from "../utils/explorer";
+import { getTxExplorerUrl } from "../utils/explorer";
 
 export default function ManageCoverageModal({
   isOpen,
@@ -49,6 +49,7 @@ export default function ManageCoverageModal({
   const tokenPrice = useUsdPrice(token) || 0;
   const maxAmount = type === "coverage" ? capacity : amount;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [txHash, setTxHash] = useState("");
   const [extendWeeks, setExtendWeeks] = useState(1);
   const [endDate, setEndDate] = useState("");
   const weeklyPremiumCost =
@@ -115,13 +116,13 @@ export default function ManageCoverageModal({
         }
 
         tx = await pm.addPremium(policyId, depositBn);
-        notifyTx(tx.hash);
+        setTxHash(tx.hash);
         await tx.wait();
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing");
         const cp = await getCapitalPoolWithSigner(depInfo.capitalPool);
         tx = await cp.requestWithdrawal(shares);
-        notifyTx(tx.hash);
+        setTxHash(tx.hash);
         await tx.wait();
       } else if (action === "increase") {
         if (!poolId) throw new Error("poolId required");
@@ -148,10 +149,10 @@ export default function ManageCoverageModal({
         }
 
         tx = await cp.deposit(amountBn, yieldChoice);
-        notifyTx(tx.hash);
+        setTxHash(tx.hash);
         await tx.wait();
         const tx2 = await rm.allocateCapital([poolId]);
-        notifyTx(tx2.hash);
+        setTxHash(tx2.hash);
         await tx2.wait();
       } else {
         return;
@@ -399,6 +400,19 @@ export default function ManageCoverageModal({
             ? "Extend Coverage"
             : `${action === "increase" ? "Increase" : "Decrease"} ${type === "coverage" ? "Coverage" : "Position"}`}
         </button>
+        {txHash && (
+          <p className="text-xs text-center mt-2">
+            Transaction submitted.{' '}
+            <a
+              href={getTxExplorerUrl(txHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on block explorer
+            </a>
+          </p>
+        )}
       </div>
     </Modal>
   );

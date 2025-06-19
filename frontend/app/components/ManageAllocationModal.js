@@ -11,7 +11,7 @@ import { formatPercentage } from "../utils/formatting";
 import { getRiskManagerWithSigner } from "../../lib/riskManager";
 import deployments, { getDeployment } from "../config/deployments";
 import { YieldPlatform } from "../config/yieldPlatforms";
-import { notifyTx } from "../utils/explorer";
+import { getTxExplorerUrl } from "../utils/explorer";
 
 export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const { pools } = usePools();
@@ -39,6 +39,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const [selectedPools, setSelectedPools] = useState([]);
   const [initialPools, setInitialPools] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [txHash, setTxHash] = useState("");
 
   useEffect(() => {
     if (details) {
@@ -75,13 +76,13 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
 
       if (toAllocate.length > 0) {
         const tx = await rm.allocateCapital(toAllocate);
-        notifyTx(tx.hash);
+        setTxHash(tx.hash);
         await tx.wait();
       }
 
       if (toDeallocate.length > 0) {
         const tx2 = await rm.deallocateCapital(toDeallocate);
-        notifyTx(tx2.hash);
+        setTxHash(tx2.hash);
         await tx2.wait();
       }
 
@@ -163,6 +164,19 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
         >
           {isSubmitting ? "Submitting..." : "Save"}
         </button>
+        {txHash && (
+          <p className="text-xs text-center mt-2 ml-4">
+            Transaction submitted.{' '}
+            <a
+              href={getTxExplorerUrl(txHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              View on block explorer
+            </a>
+          </p>
+        )}
       </div>
     </Modal>
   );
