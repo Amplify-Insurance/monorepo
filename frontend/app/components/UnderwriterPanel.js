@@ -9,7 +9,11 @@ import { useAccount } from "wagmi"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
-import { UNDERLYING_TOKEN_MAP, getTokenName } from "../config/tokenNameMap"
+import {
+  UNDERLYING_TOKEN_MAP,
+  getTokenName,
+  getUnderlyingTokenName,
+} from "../config/tokenNameMap"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { YieldPlatform, getYieldPlatformInfo } from "../config/yieldPlatforms"
 import { ethers } from "ethers"
@@ -41,20 +45,17 @@ export default function UnderwriterPanel({ displayCurrency }) {
   // multiple USD variants showing up in the dropdown. Filter it down to the
   // actual deposit assets only.
   const tokens = pools
-    ? Object.entries(UNDERLYING_TOKEN_MAP)
-        .filter(([addr]) =>
-          pools.some((p) => p.underlyingAsset.toLowerCase() === addr.toLowerCase())
-        )
-        .map(([address, symbol]) => ({
-          address,
-          symbol,
-          name: getTokenName(address),
-        }))
+    ? Array.from(
+        new Set(pools.map((p) => p.underlyingAsset.toLowerCase())),
+      ).map((address) => ({
+        address,
+        symbol: getUnderlyingTokenName(address),
+        name: getTokenName(address),
+      }))
     : []
   const [selectedToken, setSelectedToken] = useState(null)
   const tokenDeploymentMap = Object.fromEntries(
     pools.map((p) => [
-      console.log(p.underlyingAsset,  p.protocolTokenToCover, "p.protocolTokenToCover" )
       (p.underlyingAsset || p.protocolTokenToCover).toLowerCase(),
       p.deployment,
     ]),
