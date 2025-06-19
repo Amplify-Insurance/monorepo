@@ -88,6 +88,20 @@ describe("CatInsurancePool", function () {
 
             await expect(pool.initialize()).to.be.revertedWith("CIP: Pool must be owner of share token");
         });
+
+        it("Should revert constructor when USDC address is zero", async function () {
+            const CatShareFactory = await ethers.getContractFactory("CatShare");
+            const share = await CatShareFactory.deploy();
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            await expect(CatPoolFactory.deploy(ethers.ZeroAddress, share.target, ethers.ZeroAddress, owner.address))
+                .to.be.revertedWith("CIP: Invalid USDC token address");
+        });
+
+        it("Should revert constructor when CatShare address is zero", async function () {
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            await expect(CatPoolFactory.deploy(mockUsdc.target, ethers.ZeroAddress, ethers.ZeroAddress, owner.address))
+                .to.be.revertedWith("CIP: Invalid CatShare token address");
+        });
     });
 
     describe("Admin Functions", function () {
