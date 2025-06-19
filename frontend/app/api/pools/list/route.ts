@@ -139,9 +139,14 @@ export async function GET() {
       const multicall = getMulticallReader(dep.multicallReader, dep.name);
       const pools: any[] = [];
       let underlyingDec = 6;
+      let underlyingAsset = "";
       try {
+        underlyingAsset = await getUnderlyingAssetAddress(
+          dep.capitalPool,
+          dep.name,
+        );
         underlyingDec = Number(
-          await getUnderlyingAssetDecimals(dep.capitalPool, dep.name)
+          await getUnderlyingAssetDecimals(dep.capitalPool, dep.name),
         );
       } catch {
         // ignore
@@ -253,6 +258,7 @@ export async function GET() {
         allPools.push({
           deployment: dep.name,
           underlyingAssetDecimals: underlyingDec,
+          underlyingAsset,
           ...p,
         });
       }
