@@ -1,18 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
 import MarketsTable from "../components/MarketsTable"
 import UnderwriterPanel from "../components/UnderwriterPanel"
 import CurrencyToggle from "../components/CurrencyToggle"
 // import ConnectWallet from "../components/ConnectWallet"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useSearchParams } from "next/navigation"
 
 
 export default function Markets() {
   const { isConnected } = useAccount()
+  const searchParams = useSearchParams()
   const [displayCurrency, setDisplayCurrency] = useState("native") // 'native' or 'usd'
   const [activeTab, setActiveTab] = useState("purchase") // 'purchase' or 'underwrite'
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab === "underwrite") {
+      setActiveTab("underwrite")
+    }
+  }, [searchParams])
 
   return (
     <div className="container mx-auto max-w-7xl">
