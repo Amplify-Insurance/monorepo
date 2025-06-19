@@ -26,7 +26,8 @@ describe("StakingContract", function () {
         
         // --- Deploy Mocks ---
         const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-        mockGovToken = await MockERC20Factory.deploy("Governance Token", "GOV", ethers.parseEther("1000000"));
+        mockGovToken = await MockERC20Factory.deploy("Governance Token", "GOV", 18);
+        await mockGovToken.connect(owner).mint(owner.address, ethers.parseEther("1000000"));
 
         // --- Deploy StakingContract ---
         StakingContractFactory = await ethers.getContractFactory("StakingContract");
@@ -261,13 +262,9 @@ describe("StakingContract", function () {
             await expect(failingStakingContract.connect(staker1).unstake(ethers.parseEther("100")))
                 .to.be.revertedWith("MaliciousERC20: transfer failed");
             
-            // Ensure state was not reverted (as this is an OpenZeppelin SafeERC20 check)
-            // But the user did not receive their tokens. This highlights the importance of the check.
-            // The state IS changed before the transfer, so this test shows that if the transfer fails,
-            // the user loses their internal balance record without getting tokens back.
-            // THIS IS A KEY INSIGHT: The contract should use a re-entrancy guard and a pull pattern for unstaking, or a check-effect-interaction pattern for more robustness if the token could be malicious.
-            // However, for standard ERC20s, SafeERC20's revert is the expected behavior.
-            expect(await failingStakingContract.stakedBalance(staker1.address)).to.equal(0);
+            // Since SafeERC20 reverts on failed transfers, the entire transaction
+            // is rolled back and the staked balance remains unchanged.
+            expect(await failingStakingContract.stakedBalance(staker1.address)).to.equal(ethers.parseEther("100"));
         });
         
         it("Should revert slash if token transfer fails", async function() {
@@ -359,4 +356,3 @@ contract MaliciousERC20 is ERC20 {
     }
 }
 `;
-fs.writeFileSync(path.join(__dirname, "..", "contracts", "MaliciousERC20.sol"), maliciousERC20Source);
