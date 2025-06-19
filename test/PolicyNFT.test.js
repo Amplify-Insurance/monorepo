@@ -88,6 +88,27 @@ describe("PolicyNFT", function () {
       expect(await policyNFT.ownerOf(1n)).to.equal(user.address);
     });
 
+    it("Returns the minted token id", async function () {
+      const { owner, policyNFT, riskManager, user } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      const tx = await policyNFT.connect(riskManager).mint(user.address, poolId, coverage, activation, premiumDeposit, lastDrainTime);
+      const receipt = await tx.wait();
+      const tokenId = receipt.logs
+        .filter((l) => l.fragment && l.fragment.name === "Transfer")[0]
+        .args[2];
+      expect(tokenId).to.equal(1n);
+    });
+
+    it("Cannot mint to the zero address", async function () {
+      const { owner, policyNFT, riskManager } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await expect(
+        policyNFT.connect(riskManager).mint(ethers.ZeroAddress, poolId, coverage, activation, premiumDeposit, lastDrainTime)
+      )
+        .to.be.revertedWithCustomError(policyNFT, "ERC721InvalidReceiver")
+        .withArgs(ethers.ZeroAddress);
+    });
+
     it("Increments token ids sequentially", async function () {
       const { owner, policyNFT, riskManager, user, other } = await loadFixture(deployFixture);
       await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
@@ -118,6 +139,16 @@ describe("PolicyNFT", function () {
       expect(policy.activation).to.equal(0n);
       expect(policy.premiumDeposit).to.equal(0n);
       expect(policy.lastDrainTime).to.equal(0n);
+    });
+
+    it("Emits a Transfer event on burn", async function () {
+      const { owner, policyNFT, riskManager, user } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setRiskManagerAddress(riskManager.address);
+      await policyNFT.connect(riskManager).mint(user.address, 1, 1000, 0, 0, 0);
+
+      await expect(policyNFT.connect(riskManager).burn(1))
+        .to.emit(policyNFT, "Transfer")
+        .withArgs(user.address, ethers.ZeroAddress, 1n);
     });
 
     it("Reverts when token does not exist", async function () {
