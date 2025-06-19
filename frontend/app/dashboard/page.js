@@ -111,11 +111,6 @@ export default function Dashboard() {
         {showPositionsFirst ? underwritingPositionsSection : activeCoveragesSection}
         {showPositionsFirst ? activeCoveragesSection : underwritingPositionsSection}
 
-        {/* Add Claims Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-xl font-semibold mb-4">Claims & Affected Positions</h2>
-          <ClaimsSection displayCurrency={displayCurrency} />
-        </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
           <div className="flex items-center justify-between mb-4">
@@ -220,6 +215,12 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Claims & Affected Positions moved to bottom */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-xl font-semibold mb-4">Claims & Affected Positions</h2>
+          <ClaimsSection displayCurrency={displayCurrency} />
+        </div>
       </div>
     </div>
   )
