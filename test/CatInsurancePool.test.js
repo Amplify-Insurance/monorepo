@@ -395,6 +395,72 @@ describe("CatInsurancePool", function () {
 
             expect(await catPool.getPendingProtocolAssetRewards(lp1.address, mockRewardToken.target)).to.equal(expected);
         });
+
+        it("Should revert when withdrawal amount below minimum", async function () {
+            const depositAmount = ethers.parseUnits("2000", 6);
+            await catPool.connect(lp1).depositLiquidity(depositAmount);
+            await expect(catPool.connect(lp1).withdrawLiquidity(1))
+                .to.be.revertedWith("CIP: Withdrawal amount below minimum");
+        });
+
+        it("Should revert when adapter cannot return enough funds", async function () {
+            const depositAmount = ethers.parseUnits("2000", 6);
+            await catPool.connect(lp1).depositLiquidity(depositAmount);
+
+            // Move half to the adapter and then inflate its reported value
+            const flushAmount = depositAmount / 2n;
+            await catPool.connect(owner).flushToAdapter(flushAmount);
+            await mockAdapter.setTotalValueHeld(flushAmount * 4n); // Report more than actual balance
+
+            const shares = await catShareToken.balanceOf(lp1.address);
+            await expect(catPool.connect(lp1).withdrawLiquidity(shares))
+                .to.be.revertedWith("CIP: Adapter withdrawal failed");
+        });
+
+        it("claimProtocolAssetRewards should revert when distributor unset", async function () {
+            const CatShareFactory = await ethers.getContractFactory("CatShare");
+            const share = await CatShareFactory.deploy();
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, ethers.ZeroAddress, owner.address);
+            await share.transferOwnership(pool.target);
+            await pool.initialize();
+            await pool.connect(owner).setRiskManagerAddress(riskManager.address);
+            await pool.connect(owner).setPolicyManagerAddress(policyManager.address);
+
+            await mockUsdc.connect(lp1).approve(pool.target, MIN_USDC_AMOUNT);
+            await pool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT);
+            await expect(
+                pool.connect(lp1).claimProtocolAssetRewards(mockRewardToken.target)
+            ).to.be.revertedWith("CIP: Reward distributor not set");
+        });
+
+        it("receiveProtocolAssetsForDistribution should validate caller and params", async function () {
+            await expect(
+                catPool.connect(owner).receiveProtocolAssetsForDistribution(mockRewardToken.target, 1)
+            ).to.be.revertedWith("CIP: Caller is not the RiskManager");
+
+            await expect(
+                catPool.connect(riskManager).receiveProtocolAssetsForDistribution(ethers.ZeroAddress, 1)
+            ).to.be.revertedWith("CIP: Protocol asset cannot be zero address");
+
+            await mockRewardToken.connect(owner).transfer(riskManager.address, 1);
+            await mockRewardToken.connect(riskManager).approve(catPool.target, 1);
+            await expect(
+                catPool.connect(riskManager).receiveProtocolAssetsForDistribution(mockRewardToken.target, 0)
+            ).to.be.revertedWith("CIP: Amount of protocol asset must be positive");
+
+            const CatShareFactory = await ethers.getContractFactory("CatShare");
+            const share2 = await CatShareFactory.deploy();
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const pool2 = await CatPoolFactory.deploy(mockUsdc.target, share2.target, ethers.ZeroAddress, owner.address);
+            await share2.transferOwnership(pool2.target);
+            await pool2.initialize();
+            await pool2.connect(owner).setRiskManagerAddress(riskManager.address);
+            await mockRewardToken.connect(riskManager).approve(pool2.target, 1);
+            await expect(
+                pool2.connect(riskManager).receiveProtocolAssetsForDistribution(mockRewardToken.target, 1)
+            ).to.be.revertedWith("CIP: Reward distributor not set");
+        });
     });
 
     describe("Security", function() {
