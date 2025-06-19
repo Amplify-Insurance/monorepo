@@ -39,6 +39,12 @@ export const PROTOCOL_TYPE_MAP = {
   5: 'stablecoin',
 };
 
+
+export const UNDERLYING_TOKEN_MAP = {
+  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 'USDC',
+  "0x4200000000000000000000000000000000000006": "WETH"
+}
+
 export const TOKEN_NAME_MAP = {
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 'USDC',
   "0x4200000000000000000000000000000000000006": "WETH",
@@ -75,6 +81,13 @@ export function getTokenName(id) {
   if (!id) return id;
   const key = typeof id === "string" ? id : `${id}`;
   return TOKEN_NAME_MAP[key] || TOKEN_NAME_MAP[key.toLowerCase()] || id;
+}
+
+
+export function getUnderlyingTokenName(id) {
+  if (!id) return id;
+  const key = typeof id === "string" ? id : `${id}`;
+  return UNDERLYING_TOKEN_MAP[key] || UNDERLYING_TOKEN_MAP[key.toLowerCase()] || id;
 }
 
 export function getTokenLogo(id) {

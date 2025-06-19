@@ -48,10 +48,13 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const [selectedToken, setSelectedToken] = useState(null)
   const tokenDeploymentMap = Object.fromEntries(
     pools.map((p) => [
+      console.log(p.underlyingAsset,  p.protocolTokenToCover, "p.protocolTokenToCover" )
       (p.underlyingAsset || p.protocolTokenToCover).toLowerCase(),
       p.deployment,
     ]),
   )
+
+
   const selectedDeployment =
     selectedToken && tokenDeploymentMap[selectedToken.address.toLowerCase()]
   const adapters = useYieldAdapters(selectedDeployment)
@@ -83,7 +86,6 @@ export default function UnderwriterPanel({ displayCurrency }) {
     )
   }, [selectedYield])
 
-  console.log(adapters, "adapters data")
 
   const markets = Object.values(
     pools.reduce((acc, pool) => {
@@ -114,9 +116,6 @@ export default function UnderwriterPanel({ displayCurrency }) {
       return acc
     }, {})
   )
-
-  console.log(pools, "pools data")
-
 
 
   if (loading) {
