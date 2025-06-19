@@ -100,6 +100,14 @@ describe("PoolRegistry", function () {
                     )
                 ).to.be.revertedWith("PR: Not RiskManager");
             });
+
+            it("Should allow the owner to change the risk manager multiple times", async function () {
+                await poolRegistry.connect(owner).setRiskManager(nonOwner.address);
+                expect(await poolRegistry.riskManager()).to.equal(nonOwner.address);
+
+                await poolRegistry.connect(owner).setRiskManager(riskManager.address);
+                expect(await poolRegistry.riskManager()).to.equal(riskManager.address);
+            });
         });
     });
 
@@ -241,6 +249,23 @@ describe("PoolRegistry", function () {
                 
                 const poolData = await poolRegistry.getPoolData(0);
                 expect(poolData.totalCapitalPledgedToPool).to.equal(pledgeAmount * 2n);
+            });
+
+            it("Should correctly update indexes when removing multiple adapters sequentially", async function () {
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter1.address, pledgeAmount, true);
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter2.address, pledgeAmount, true);
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter3.address, pledgeAmount, true);
+
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter2.address, pledgeAmount, false);
+                await poolRegistry.connect(riskManager).updateCapitalAllocation(0, adapter3.address, pledgeAmount, false);
+
+                const activeAdapters = await poolRegistry.getPoolActiveAdapters(0);
+                expect(activeAdapters).to.deep.equal([adapter1.address]);
+                const poolData = await poolRegistry.getPoolData(0);
+                expect(poolData.totalCapitalPledgedToPool).to.equal(pledgeAmount);
+                expect(await poolRegistry.getCapitalPerAdapter(0, adapter1.address)).to.equal(pledgeAmount);
+                expect(await poolRegistry.getCapitalPerAdapter(0, adapter2.address)).to.equal(0);
+                expect(await poolRegistry.getCapitalPerAdapter(0, adapter3.address)).to.equal(0);
             });
 
             it("Should handle removing the last remaining adapter", async function () {
