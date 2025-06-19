@@ -4,7 +4,10 @@ import { getPoolRegistry } from "../../../../lib/poolRegistry";
 import { getPoolManager } from "../../../../lib/poolManager";
 import { getPriceOracle } from "../../../../lib/priceOracle";
 import { getMulticallReader } from "../../../../lib/multicallReader";
-import { getUnderlyingAssetDecimals } from "../../../../lib/capitalPool";
+import {
+  getUnderlyingAssetAddress,
+  getUnderlyingAssetDecimals,
+} from "../../../../lib/capitalPool";
 import { ethers } from "ethers";
 import deployments from "../../../config/deployments";
 

@@ -48,10 +48,10 @@ export default function UnderwriterPanel({ displayCurrency }) {
   // actual deposit assets only.
   const tokens = pools
     ? Array.from(
-        new Set(pools.map((p) => p.deployment.toLowerCase())),
+        new Set(pools.map((p) => p.underlyingAsset.toLowerCase())),
       ).map((address) => ({
         address,
-        symbol: getUnderlyingTokenName(address),
+        symbol: getTokenName(address),
         name: getTokenName(address),
       }))
     : []
@@ -240,7 +240,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
               <div className="flex items-center">
                 <div className="flex-shrink-0 h-6 w-6 mr-2">
                   <Image
-                    src={getUnderlyingTokenLogo(selectedToken.address)}
+                    src={getTokenLogo(selectedToken.address)}
                     alt={selectedToken?.name || ''}
                     width={24}
                     height={24}
@@ -248,7 +248,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                   />
                 </div>
                 <span className="block truncate">
-                  {selectedToken?.symbol} - {selectedToken?.name}
+                  {getTokenName(selectedToken.address)}
                 </span>
               </div>
             )}
@@ -275,7 +275,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-6 w-6 mr-2">
                       <Image
-                        src={getUnderlyingTokenLogo(token.address)}
+                        src={getTokenLogo(token.address)}
                         alt={token.name}
                         width={24}
                         height={24}
@@ -286,7 +286,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                       className={`block truncate ${token.symbol === selectedToken?.symbol ? "font-medium" : "font-normal"
                         }`}
                     >
-                      {token.symbol} - {token.name}
+                      {token.symbol}
                     </span>
                   </div>
                 </button>

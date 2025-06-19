@@ -50,7 +50,7 @@ export const UNDERLYING_TOKEN_LOGO_MAP = {
 }
 
 export const TOKEN_NAME_MAP = {
-  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 'USDC',
+  "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": 'USDC',
   "0x4200000000000000000000000000000000000006": "WETH",
   "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB": 'USDC',
   "0xb125E6687d4313864e53df431d5425969c15Eb2F": "USDC",
@@ -62,7 +62,7 @@ export const TOKEN_NAME_MAP = {
 };
 
 export const TOKEN_LOGO_MAP = {
-  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": '/images/tokens/usdc.png',
+  "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": '/images/tokens/usdc.png',
   "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB": '/images/tokens/usdc.png',
   "0xb125E6687d4313864e53df431d5425969c15Eb2F": "/images/tokens/usdc.png",
   "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22": "/images/tokens/usdc.png",
