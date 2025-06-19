@@ -67,6 +67,29 @@ describe("CatInsurancePool", function () {
         await mockAdapter.setTotalValueHeld(0);
     });
 
+    describe("Initialization", function () {
+        it("Should emit Initialized and prevent re-initialization", async function () {
+            const CatShareFactory = await ethers.getContractFactory("CatShare");
+            const share = await CatShareFactory.deploy();
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, ethers.ZeroAddress, owner.address);
+
+            await share.transferOwnership(pool.target);
+            await expect(pool.initialize()).to.emit(pool, "Initialized");
+
+            await expect(pool.initialize()).to.be.revertedWith("CIP: Already initialized");
+        });
+
+        it("Should revert initialize when pool does not own CatShare", async function () {
+            const CatShareFactory = await ethers.getContractFactory("CatShare");
+            const share = await CatShareFactory.deploy();
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, ethers.ZeroAddress, owner.address);
+
+            await expect(pool.initialize()).to.be.revertedWith("CIP: Pool must be owner of share token");
+        });
+    });
+
     describe("Admin Functions", function () {
         it("Should set all external contract addresses correctly", async function () {
             expect(await catPool.riskManagerAddress()).to.equal(riskManager.address);
@@ -78,6 +101,15 @@ describe("CatInsurancePool", function () {
         it("Should prevent non-owners from setting addresses", async function () {
             await expect(catPool.connect(nonParty).setRiskManagerAddress(nonParty.address))
                 .to.be.revertedWithCustomError(catPool, "OwnableUnauthorizedAccount");
+        });
+
+        it("Should revert when setting addresses to zero", async function () {
+            await expect(catPool.connect(owner).setRiskManagerAddress(ethers.ZeroAddress))
+                .to.be.revertedWith("CIP: Address cannot be zero");
+            await expect(catPool.connect(owner).setCapitalPoolAddress(ethers.ZeroAddress))
+                .to.be.revertedWith("CIP: Address cannot be zero");
+            await expect(catPool.connect(owner).setPolicyManagerAddress(ethers.ZeroAddress))
+                .to.be.revertedWith("CIP: Address cannot be zero");
         });
 
         it("Should allow owner to set a new adapter and flush funds from the old one", async function() {
@@ -266,6 +298,15 @@ describe("CatInsurancePool", function () {
             ).to.be.revertedWith("CIP: Yield adapter not set");
         });
 
+        it("flushToAdapter should not allow withdrawing more than idle", async function () {
+            await mockUsdc.connect(owner).approve(catPool.target, MIN_USDC_AMOUNT);
+            await catPool.connect(owner).setPolicyManagerAddress(owner.address);
+            await catPool.connect(owner).receiveUsdcPremium(MIN_USDC_AMOUNT);
+            await expect(
+                catPool.connect(owner).flushToAdapter(MIN_USDC_AMOUNT * 2n)
+            ).to.be.revertedWith("CIP: Amount exceeds idle USDC");
+        });
+
         it("setRewardDistributor should enforce access control and non-zero", async function () {
             await expect(
                 catPool.connect(nonParty).setRewardDistributor(mockRewardDistributor.target)
@@ -303,6 +344,23 @@ describe("CatInsurancePool", function () {
             ).to.be.revertedWith("CIP: Draw amount exceeds Cat Pool's liquid USDC");
         });
 
+        it("drawFund should revert when capital pool address is unset", async function () {
+            const CatShareFactory = await ethers.getContractFactory("CatShare");
+            const share = await CatShareFactory.deploy();
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, mockAdapter.target, owner.address);
+            await share.transferOwnership(pool.target);
+            await pool.initialize();
+            await pool.connect(owner).setRiskManagerAddress(riskManager.address);
+            await mockAdapter.setDepositor(pool.target);
+
+            await mockUsdc.connect(lp1).approve(pool.target, MIN_USDC_AMOUNT);
+            await pool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT);
+
+            await expect(pool.connect(riskManager).drawFund(MIN_USDC_AMOUNT))
+                .to.be.revertedWith("CIP: CapitalPool address not set");
+        });
+
         it("claimProtocolAssetRewards should revert when no rewards", async function () {
             await catPool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT);
             await expect(
@@ -320,6 +378,22 @@ describe("CatInsurancePool", function () {
             await newCatPool.connect(owner).setRiskManagerAddress(riskManager.address);
             await newCatPool.connect(owner).setPolicyManagerAddress(policyManager.address);
             await expect(await newCatPool.getPendingProtocolAssetRewards(lp1.address, mockRewardToken.target)).to.equal(0);
+        });
+
+        it("getPendingProtocolAssetRewards should return correct value with rewards", async function () {
+            const depositAmount = ethers.parseUnits("1000", 6);
+            await catPool.connect(lp1).depositLiquidity(depositAmount);
+            const userShares = await catShareToken.balanceOf(lp1.address);
+
+            const rewardAmount = ethers.parseUnits("100", 18);
+            await mockRewardToken.connect(owner).transfer(riskManager.address, rewardAmount);
+            await mockRewardToken.connect(riskManager).approve(catPool.target, rewardAmount);
+            await catPool.connect(riskManager).receiveProtocolAssetsForDistribution(mockRewardToken.target, rewardAmount);
+
+            const totalShares = await catShareToken.totalSupply();
+            const expected = (rewardAmount * userShares) / totalShares;
+
+            expect(await catPool.getPendingProtocolAssetRewards(lp1.address, mockRewardToken.target)).to.equal(expected);
         });
     });
 
