@@ -11,6 +11,7 @@ import usePools from "../../hooks/usePools"
 import { getTokenName, getTokenLogo, getProtocolName} from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getERC20WithSigner } from "../../lib/erc20"
 import {
   Sheet,
   SheetTrigger,
@@ -56,7 +57,6 @@ export default function ClaimsPage() {
       : 0;
 
     return {
-      // The id is likely a plain number already, but if it's an object, convert it too
       id: typeof p.id === 'object' ? ethers.BigNumber.from(p.id).toNumber() : p.id,
       protocol: getProtocolName(pool.id),
       pool: pool.protocolTokenToCover,
@@ -66,6 +66,9 @@ export default function ClaimsPage() {
       startDate: new Date(activationTs * 1000).toISOString(),
       endDate: new Date(lastPaidUntilTs * 1000).toISOString(),
       isActive: Date.now() / 1000 >= activationTs,
+      protocolTokenDecimals: Number(pool.protocolTokenDecimals ?? 18),
+      underlyingAssetDecimals: Number(pool.underlyingAssetDecimals ?? 18),
+      deployment: pool.deployment,
     };
   })
   .filter(Boolean);
@@ -94,6 +97,47 @@ export default function ClaimsPage() {
     setIsSubmitting(true)
     try {
       const rm = await getRiskManagerWithSigner()
+      const tokenContract = await getERC20WithSigner(selectedCoverage.pool)
+      const signerAddress = await tokenContract.signer.getAddress()
+      const coverageBn = ethers.utils.parseUnits(
+        selectedCoverage.coverageAmount.toString(),
+        selectedCoverage.underlyingAssetDecimals,
+      )
+      let protocolCoverageBn = coverageBn
+      if (
+        selectedCoverage.protocolTokenDecimals >
+        selectedCoverage.underlyingAssetDecimals
+      ) {
+        protocolCoverageBn = coverageBn.mul(
+          ethers.BigNumber.from(10).pow(
+            selectedCoverage.protocolTokenDecimals -
+              selectedCoverage.underlyingAssetDecimals,
+          ),
+        )
+      } else if (
+        selectedCoverage.protocolTokenDecimals <
+        selectedCoverage.underlyingAssetDecimals
+      ) {
+        protocolCoverageBn = coverageBn.div(
+          ethers.BigNumber.from(10).pow(
+            selectedCoverage.underlyingAssetDecimals -
+              selectedCoverage.protocolTokenDecimals,
+          ),
+        )
+      }
+
+      const allowance = await tokenContract.allowance(
+        signerAddress,
+        rm.address,
+      )
+      if (allowance.lt(protocolCoverageBn)) {
+        const approveTx = await tokenContract.approve(
+          rm.address,
+          protocolCoverageBn,
+        )
+        await approveTx.wait()
+      }
+
       const tx = await rm.processClaim(selectedCoverage.id)
       await tx.wait()
       setShowConfirmation(true)
