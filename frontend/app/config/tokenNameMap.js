@@ -46,6 +46,17 @@ export const PROTOCOL_LOGO_MAP = {
   5: '/images/stablecoins/dai.svg',
 };
 
+// Categorise protocols so the frontend can filter markets. The default value is
+// 'protocol' unless explicitly listed as a stablecoin.
+export const PROTOCOL_TYPE_MAP = {
+  0: 'protocol',
+  1: 'protocol',
+  2: 'protocol',
+  3: 'protocol',
+  4: 'stablecoin',
+  5: 'stablecoin',
+};
+
 export const TOKEN_NAME_MAP = {
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 'USDC',
   "0x4200000000000000000000000000000000000006": "WETH",
@@ -72,6 +83,10 @@ export const TOKEN_LOGO_MAP = {
 if (process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS) {
   TOKEN_NAME_MAP[process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS] = 'Staking Token';
   TOKEN_LOGO_MAP[process.env.NEXT_PUBLIC_STAKING_TOKEN_ADDRESS] = '/images/tokens/placeholder-token.svg';
+}
+
+export function getProtocolType(id) {
+  return PROTOCOL_TYPE_MAP[id] || 'protocol';
 }
 
 export function getTokenName(id) {
