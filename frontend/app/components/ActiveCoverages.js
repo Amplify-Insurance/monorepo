@@ -9,7 +9,13 @@ import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
 import { ethers } from "ethers"
 import { getUnderlyingAssetDecimals } from "../../lib/capitalPool"
-import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName} from "../config/tokenNameMap"
+import {
+  getTokenName,
+  getTokenLogo,
+  getProtocolLogo,
+  getProtocolName,
+  getProtocolType,
+} from "../config/tokenNameMap"
 import { getPoolManagerWithSigner } from "../../lib/poolManager"
 import deployments, { getDeployment } from "../config/deployments"
 
@@ -97,6 +103,7 @@ export default function ActiveCoverages({ displayCurrency }) {
       deployment: p.deployment,
       protocol,
       protocolLogo,
+      type: getProtocolType(pool.id),
       pool: pool.protocolTokenToCover,
       poolName: getTokenName(pool.protocolTokenToCover),
       coverageAmount,
@@ -109,6 +116,13 @@ export default function ActiveCoverages({ displayCurrency }) {
   }).filter(Boolean)
 
   console.log("Processed Coverage data:", activeCoverages) // For debugging the processed data
+
+  const protocolCoverages = activeCoverages.filter(
+    (c) => c.type === 'protocol'
+  )
+  const stablecoinCoverages = activeCoverages.filter(
+    (c) => c.type === 'stablecoin'
+  )
 
 
   const handleOpenModal = (coverage) => {
@@ -148,8 +162,7 @@ export default function ActiveCoverages({ displayCurrency }) {
     )
   }
 
-
-  return (
+  const renderTable = (covers) => (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead>
@@ -205,7 +218,7 @@ export default function ActiveCoverages({ displayCurrency }) {
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-          {activeCoverages.map((coverage) => (
+          {covers.map((coverage) => (
             <tr key={coverage.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
@@ -285,6 +298,23 @@ export default function ActiveCoverages({ displayCurrency }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {protocolCoverages.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium mb-2">Protocol Cover</h3>
+          {renderTable(protocolCoverages)}
+        </div>
+      )}
+      {stablecoinCoverages.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium mb-2">Stablecoin Cover</h3>
+          {renderTable(stablecoinCoverages)}
+        </div>
+      )}
 
       {/* Manage Coverage Modal */}
       {selectedCoverage && (
