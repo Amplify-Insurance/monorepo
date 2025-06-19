@@ -447,6 +447,27 @@ describe("PoolRegistry", function () {
                 expect(pool.pauseTimestamp).to.equal(0);
             });
 
+            it("Should handle repeated pausing and unpausing", async function () {
+                await poolRegistry.connect(riskManager).setPauseState(0, true);
+                const firstPause = await ethers.provider.getBlock('latest');
+                await poolRegistry.connect(riskManager).setPauseState(0, false);
+
+                // Pause again and expect a new timestamp
+                await poolRegistry.connect(riskManager).setPauseState(0, true);
+                const secondPause = await ethers.provider.getBlock('latest');
+
+                const pool = await poolRegistry.protocolRiskPools(0);
+                expect(pool.isPaused).to.be.true;
+                expect(pool.pauseTimestamp).to.equal(secondPause.timestamp);
+
+                // Unpause again
+                await poolRegistry.connect(riskManager).setPauseState(0, false);
+                const finalPool = await poolRegistry.protocolRiskPools(0);
+                expect(finalPool.isPaused).to.be.false;
+                expect(finalPool.pauseTimestamp).to.equal(0);
+                expect(secondPause.timestamp).to.be.above(firstPause.timestamp);
+            });
+
              it("Should prevent non-risk managers from updating", async function () {
                  await expect(poolRegistry.connect(nonOwner).setPauseState(0, true))
                     .to.be.revertedWith("PR: Not RiskManager");
