@@ -110,6 +110,11 @@ describe("PolicyManager", function () {
                 .to.emit(policyManager, "CatPremiumShareSet").withArgs(2500);
             expect(await policyManager.catPremiumBps()).to.equal(2500);
         });
+
+        it("Should prevent non-owner from setting CAT premium share BPS", async function() {
+            await expect(policyManager.connect(user1).setCatPremiumShareBps(2500))
+                .to.be.revertedWithCustomError(policyManager, "OwnableUnauthorizedAccount");
+        });
         
         it("Should prevent setting CAT premium share over 50%", async function() {
             await expect(policyManager.connect(owner).setCatPremiumShareBps(5001))
@@ -120,6 +125,11 @@ describe("PolicyManager", function () {
             await expect(policyManager.connect(owner).setCoverCooldownPeriod(100))
                 .to.emit(policyManager, "CoverCooldownPeriodSet").withArgs(100);
             expect(await policyManager.coverCooldownPeriod()).to.equal(100);
+        });
+
+        it("Should prevent non-owner from setting cover cooldown period", async function() {
+            await expect(policyManager.connect(user1).setCoverCooldownPeriod(100))
+                .to.be.revertedWithCustomError(policyManager, "OwnableUnauthorizedAccount");
         });
     });
 
@@ -644,6 +654,36 @@ describe("PolicyManager", function () {
                     now + 86400
                 );
                 expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.true;
+            });
+
+            it("Should revert when pool has no available capital", async function() {
+                const now = await time.latest();
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    0,
+                    now,
+                    INITIAL_PREMIUM_DEPOSIT,
+                    now
+                );
+
+                await mockPoolRegistry.setPoolData(
+                    POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("1000", 6),
+                    0,
+                    ethers.parseUnits("1000", 6),
+                    false,
+                    owner.address,
+                    0
+                );
+
+                const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+
+                await expect(policyManager.isPolicyActive(POLICY_ID)).to.be.reverted;
             });
         });
 
