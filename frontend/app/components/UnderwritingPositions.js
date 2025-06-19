@@ -127,8 +127,12 @@ const underwritingPositions = (details || [])
     try {
       const dep = getDeployment(position.deployment);
       const rm = await getRiskManagerWithSigner(dep.riskManager);
-      await (await rm.claimPremiumRewards(position.poolId)).wait();
-      await (await rm.claimDistressedAssets(position.poolId)).wait();
+      if (typeof rm.claimPremiumRewards === "function") {
+        await (await rm.claimPremiumRewards(position.poolId)).wait();
+      }
+      if (typeof rm.claimDistressedAssets === "function") {
+        await (await rm.claimDistressedAssets(position.poolId)).wait();
+      }
     } catch (err) {
       console.error("Failed to claim rewards", err);
     } finally {
@@ -148,8 +152,12 @@ const underwritingPositions = (details || [])
         const dep = getDeployment(depName);
         const rm = await getRiskManagerWithSigner(dep.riskManager);
         for (const id of ids) {
-          await (await rm.claimPremiumRewards(id)).wait();
-          await (await rm.claimDistressedAssets(id)).wait();
+          if (typeof rm.claimPremiumRewards === "function") {
+            await (await rm.claimPremiumRewards(id)).wait();
+          }
+          if (typeof rm.claimDistressedAssets === "function") {
+            await (await rm.claimDistressedAssets(id)).wait();
+          }
         }
       }
     } catch (err) {
@@ -164,7 +172,9 @@ const underwritingPositions = (details || [])
     try {
       const dep = getDeployment(position.deployment);
       const rm = await getRiskManagerWithSigner(dep.riskManager);
-      await (await rm.claimDistressedAssets(position.poolId)).wait();
+      if (typeof rm.claimDistressedAssets === "function") {
+        await (await rm.claimDistressedAssets(position.poolId)).wait();
+      }
     } catch (err) {
       console.error("Failed to claim distressed assets", err);
     } finally {
@@ -186,7 +196,9 @@ const underwritingPositions = (details || [])
         const dep = getDeployment(depName);
         const rm = await getRiskManagerWithSigner(dep.riskManager);
         for (const id of ids) {
-          await (await rm.claimDistressedAssets(id)).wait();
+          if (typeof rm.claimDistressedAssets === "function") {
+            await (await rm.claimDistressedAssets(id)).wait();
+          }
         }
       }
     } catch (err) {
