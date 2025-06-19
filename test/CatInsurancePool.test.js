@@ -17,7 +17,7 @@ describe("CatInsurancePool", function () {
     let mockAdapter, mockRewardDistributor, mockUsdc, mockRewardToken, catShareToken;
 
     // --- Constants ---
-    const MIN_USDC_AMOUNT = 1_000_000; // 1 USDC with 6 decimals
+    const MIN_USDC_AMOUNT = 1000n; // matches CatInsurancePool.MIN_USDC_AMOUNT
     const CAT_POOL_REWARD_ID = ethers.MaxUint256;
 
 
@@ -229,6 +229,97 @@ describe("CatInsurancePool", function () {
             )
                 .to.emit(catPool, "ProtocolAssetRewardsClaimed")
                 .withArgs(lp1.address, mockRewardToken.target, expectedReward);
+        });
+    });
+
+    describe("Validation and Reverts", function () {
+        it("Should revert when deposit amount is below minimum", async function () {
+            await expect(
+                catPool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT - 1n)
+            ).to.be.revertedWith("CIP: Amount below minimum");
+        });
+
+        it("Should revert when withdrawing zero shares", async function () {
+            await catPool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT);
+            await expect(
+                catPool.connect(lp1).withdrawLiquidity(0)
+            ).to.be.revertedWith("CIP: Shares to burn must be positive");
+        });
+
+        it("Should revert when withdrawing more shares than owned", async function () {
+            await catPool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT);
+            await expect(
+                catPool.connect(lp1).withdrawLiquidity(MIN_USDC_AMOUNT * 2n)
+            ).to.be.revertedWith("CIP: Insufficient CatShare balance");
+        });
+
+        it("flushToAdapter should validate amount and adapter", async function () {
+            await catPool.connect(owner).setAdapter(ethers.ZeroAddress);
+            await catPool.connect(owner).setPolicyManagerAddress(owner.address);
+            await mockUsdc.connect(owner).approve(catPool.target, MIN_USDC_AMOUNT);
+            await catPool.connect(owner).receiveUsdcPremium(MIN_USDC_AMOUNT);
+            await expect(
+                catPool.connect(owner).flushToAdapter(0)
+            ).to.be.revertedWith("CIP: Amount must be > 0");
+            await expect(
+                catPool.connect(owner).flushToAdapter(MIN_USDC_AMOUNT)
+            ).to.be.revertedWith("CIP: Yield adapter not set");
+        });
+
+        it("setRewardDistributor should enforce access control and non-zero", async function () {
+            await expect(
+                catPool.connect(nonParty).setRewardDistributor(mockRewardDistributor.target)
+            ).to.be.revertedWithCustomError(catPool, "OwnableUnauthorizedAccount");
+
+            await expect(
+                catPool.connect(owner).setRewardDistributor(ethers.ZeroAddress)
+            ).to.be.revertedWith("CIP: Address cannot be zero");
+        });
+
+        it("receiveUsdcPremium should only be callable by PolicyManager and with positive amount", async function () {
+            await expect(
+                catPool.connect(owner).receiveUsdcPremium(MIN_USDC_AMOUNT)
+            ).to.be.revertedWith("CIP: Caller is not the PolicyManager");
+
+            await mockUsdc.connect(policyManager).approve(catPool.target, 0);
+            await expect(
+                catPool.connect(policyManager).receiveUsdcPremium(0)
+            ).to.be.revertedWith("CIP: Premium amount must be positive");
+        });
+
+        it("drawFund should enforce risk manager and validate amounts", async function () {
+            await catPool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT * 2n);
+
+            await expect(
+                catPool.connect(owner).drawFund(1)
+            ).to.be.revertedWith("CIP: Caller is not the RiskManager");
+
+            await expect(
+                catPool.connect(riskManager).drawFund(0)
+            ).to.be.revertedWith("CIP: Draw amount must be positive");
+
+            await expect(
+                catPool.connect(riskManager).drawFund(MIN_USDC_AMOUNT * 3n)
+            ).to.be.revertedWith("CIP: Draw amount exceeds Cat Pool's liquid USDC");
+        });
+
+        it("claimProtocolAssetRewards should revert when no rewards", async function () {
+            await catPool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT);
+            await expect(
+                catPool.connect(lp1).claimProtocolAssetRewards(mockRewardToken.target)
+            ).to.be.revertedWith("CIP: No rewards to claim for this asset");
+        });
+
+        it("getPendingProtocolAssetRewards should return zero when distributor unset", async function () {
+            const CatShareFactory = await ethers.getContractFactory("CatShare");
+            const newShare = await CatShareFactory.deploy();
+            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const newCatPool = await CatPoolFactory.deploy(mockUsdc.target, newShare.target, ethers.ZeroAddress, owner.address);
+            await newShare.transferOwnership(newCatPool.target);
+            await newCatPool.initialize();
+            await newCatPool.connect(owner).setRiskManagerAddress(riskManager.address);
+            await newCatPool.connect(owner).setPolicyManagerAddress(policyManager.address);
+            await expect(await newCatPool.getPendingProtocolAssetRewards(lp1.address, mockRewardToken.target)).to.equal(0);
         });
     });
 
