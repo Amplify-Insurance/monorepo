@@ -6,7 +6,9 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 // Helper function to create mock contracts from an ABI
 async function deployMock(abi, signer) {
-    const factory = new ethers.ContractFactory(abi, `0x${'6080604052348015600f57600080fd5b50600080fdfe'}`, signer);
+    // Minimal runtime code that simply reverts for any call but deploys cleanly
+    const minimalBytecode = '0x600a600c600039600a6000f3fe';
+    const factory = new ethers.ContractFactory(abi, minimalBytecode, signer);
     return await factory.deploy();
 }
 
