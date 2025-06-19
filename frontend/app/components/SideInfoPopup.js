@@ -3,6 +3,16 @@
 import { useState, useEffect } from "react"
 import { X, Info, Shield, TrendingUp, AlertTriangle } from "lucide-react"
 
+/**
+ * Floating side popup for contextual information.
+ *
+ * Props:
+ * - isOpen: controls visibility
+ * - onClose: callback to close the popup
+ * - title: heading text
+ * - children: popup body
+ * - type: info | warning | success | growth
+ */
 export default function SideInfoPopup({ isOpen, onClose, title, children, type = "info" }) {
   const [isVisible, setIsVisible] = useState(false)
 
@@ -17,36 +27,37 @@ export default function SideInfoPopup({ isOpen, onClose, title, children, type =
 
   if (!isVisible) return null
 
+  const defaultInfo = "This popup provides extra context about the current page. Pass children to display custom content."
   const getTypeStyles = () => {
     switch (type) {
       case "warning":
         return {
-          bg: "bg-amber-50 dark:bg-amber-900/20",
-          border: "border-amber-200 dark:border-amber-800",
+          bg: "bg-amber-100 dark:bg-amber-900/70",
+          border: "border-amber-200 dark:border-amber-700",
           icon: AlertTriangle,
           iconColor: "text-amber-600 dark:text-amber-400",
           titleColor: "text-amber-900 dark:text-amber-100",
         }
       case "success":
         return {
-          bg: "bg-green-50 dark:bg-green-900/20",
-          border: "border-green-200 dark:border-green-800",
+          bg: "bg-green-100 dark:bg-green-900/70",
+          border: "border-green-200 dark:border-green-700",
           icon: Shield,
           iconColor: "text-green-600 dark:text-green-400",
           titleColor: "text-green-900 dark:text-green-100",
         }
       case "growth":
         return {
-          bg: "bg-blue-50 dark:bg-blue-900/20",
-          border: "border-blue-200 dark:border-blue-800",
+          bg: "bg-blue-100 dark:bg-blue-900/70",
+          border: "border-blue-200 dark:border-blue-700",
           icon: TrendingUp,
           iconColor: "text-blue-600 dark:text-blue-400",
           titleColor: "text-blue-900 dark:text-blue-100",
         }
       default:
         return {
-          bg: "bg-gray-50 dark:bg-gray-800/50",
-          border: "border-gray-200 dark:border-gray-700",
+          bg: "bg-gray-100 dark:bg-gray-900/80",
+          border: "border-gray-200 dark:border-gray-800",
           icon: Info,
           iconColor: "text-gray-600 dark:text-gray-400",
           titleColor: "text-gray-900 dark:text-gray-100",
@@ -80,7 +91,7 @@ export default function SideInfoPopup({ isOpen, onClose, title, children, type =
               <div className={`w-8 h-8 rounded-lg ${styles.bg} flex items-center justify-center`}>
                 <IconComponent className={`w-4 h-4 ${styles.iconColor}`} />
               </div>
-              <h3 className={`font-semibold text-lg ${styles.titleColor}`}>{title}</h3>
+              <h3 className={`font-semibold text-xl ${styles.titleColor}`}>{title}</h3>
             </div>
             <button
               onClick={onClose}
@@ -92,7 +103,7 @@ export default function SideInfoPopup({ isOpen, onClose, title, children, type =
 
           {/* Content */}
           <div className="p-4 max-h-96 overflow-y-auto">
-            <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{children}</div>
+            <div className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">{children || defaultInfo}</div>
           </div>
 
           {/* Footer gradient */}
