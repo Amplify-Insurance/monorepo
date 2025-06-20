@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
 
-    const cp = getCatPool(dep.catPool, dep.name);
+    const cp = getCatPool(dep.catInsurancePool, dep.name);
     const adapterAddr = await cp.adapter();
     let apr = '0';
     if (adapterAddr !== ethers.constants.AddressZero) {

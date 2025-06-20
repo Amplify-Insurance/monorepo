@@ -3,9 +3,12 @@ import CapitalPool from '../abi/CapitalPool.json';
 import { getProvider, provider } from './provider';
 import deployments from '../app/config/deployments';
 
-const DEFAULT_ADDRESS =
-  (deployments[0] && deployments[0].capitalPool) ||
-  (process.env.NEXT_PUBLIC_CAPITAL_POOL_ADDRESS as string);
+const DEFAULT_ADDRESS = deployments[0]?.capitalPool as string;
+
+if (!DEFAULT_ADDRESS) {
+  console.error('❌  CapitalPool address not configured');
+  throw new Error('CapitalPool address not set');
+}
 
 export function getCapitalPool(address: string = DEFAULT_ADDRESS, deployment?: string) {
   return new ethers.Contract(address, CapitalPool, getProvider(deployment));

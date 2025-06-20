@@ -11,7 +11,7 @@ export async function GET(req: Request, { params }: { params: { address: string 
     const url = new URL(req.url);
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const cp = getCatPool(dep.catPool, dep.name)
+    const cp = getCatPool(dep.catInsurancePool, dep.name)
 
     const addr = params.address.toLowerCase()
     const catShareAddr = await cp.catShareToken()
@@ -21,7 +21,7 @@ export async function GET(req: Request, { params }: { params: { address: string 
     const calls = [
       { target: catShareAddr, callData: token.interface.encodeFunctionData('balanceOf', [addr]) },
       { target: catShareAddr, callData: token.interface.encodeFunctionData('totalSupply') },
-      { target: dep.catPool, callData: cp.interface.encodeFunctionData('liquidUsdc') },
+      { target: dep.catInsurancePool, callData: cp.interface.encodeFunctionData('liquidUsdc') },
     ]
 
     const res = await multicall.tryAggregate(false, calls)

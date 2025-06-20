@@ -8,9 +8,7 @@ import deployments from '../app/config/deployments';
    Validate & create read-only contract
 ────────────────────────────────── */
 
-const DEFAULT_ADDRESS =
-  (deployments[0] && deployments[0].riskManager) ||
-  (process.env.NEXT_PUBLIC_RISK_MANAGER_ADDRESS as string);
+const DEFAULT_ADDRESS = deployments[0]?.riskManager as string;
 
 if (!DEFAULT_ADDRESS) {
   console.error('❌  RiskManager address not configured');

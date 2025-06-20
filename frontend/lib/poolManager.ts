@@ -3,9 +3,7 @@ import PoolManager from '../abi/PoolManager.json'
 import { getProvider } from './provider'
 import deployments from '../app/config/deployments'
 
-const DEFAULT_ADDRESS =
-  (deployments[0] && deployments[0].poolManager) ||
-  (process.env.NEXT_PUBLIC_POOL_MANAGER_ADDRESS as string)
+const DEFAULT_ADDRESS = deployments[0]?.poolManager as string
 
 if (!DEFAULT_ADDRESS) {
   console.error('❌  PoolManager address not configured')
