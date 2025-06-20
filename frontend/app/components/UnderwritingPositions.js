@@ -62,7 +62,13 @@ export default function UnderwritingPositions({ displayCurrency }) {
           pendingLoss,
           pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
           yield: Number(pool.underwriterYieldBps || 0) / 100,
-          status: Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0 ? "requested withdrawal" : "active",
+          status:
+            Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
+              ? withdrawalReady
+                ? "withdrawal ready"
+                : "requested withdrawal"
+              : "active",
+          withdrawalRequestShares: d.withdrawalRequestShares,
           shares: d.masterShares,
           yieldChoice: d.yieldChoice,
         }
@@ -370,7 +376,11 @@ export default function UnderwritingPositions({ displayCurrency }) {
                           )}
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                             <span
-                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${position.status === "requested withdrawal" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400"}`}
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                position.status === "requested withdrawal" || position.status === "withdrawal ready"
+                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                  : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400"
+                              }`}
                             >
                               {position.status}
                             </span>
@@ -481,7 +491,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               <div className="mt-1">
                                                 <span
                                                   className={`px-2 py-1 text-xs rounded-full font-medium ${
-                                                    position.status === "requested withdrawal"
+                                                    position.status === "requested withdrawal" || position.status === "withdrawal ready"
                                                       ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
                                                       : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400"
                                                   }`}
@@ -527,7 +537,14 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                             </svg>
                                             Quick Actions
                                           </h4>
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          <div
+                                            className={`grid grid-cols-1 ${
+                                              BigInt(position.withdrawalRequestShares || 0n) > 0n &&
+                                              BigInt(position.withdrawalRequestShares || 0n) < BigInt(position.shares || 0n)
+                                                ? 'sm:grid-cols-3'
+                                                : 'sm:grid-cols-2'
+                                            } gap-3`}
+                                          >
                                             <button
                                               className="group flex items-center justify-center gap-3 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                               onClick={() => handleClaimRewards(position)}
@@ -549,31 +566,78 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               {isClaiming ? "Claiming..." : "Claim Rewards"}
                                             </button>
 
-                                            <button
-                                              className="group flex items-center justify-center gap-3 py-3 px-4 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-                                              onClick={() => handleOpenModal(position)}
-                                            >
-                                              <svg
-                                                className="w-5 h-5 group-hover:scale-110 transition-transform"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
+                                            {BigInt(position.withdrawalRequestShares || 0n) >= BigInt(position.shares || 0n) && BigInt(position.withdrawalRequestShares || 0n) > 0n ? (
+                                              <button
+                                                className="group flex items-center justify-center gap-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                onClick={handleExecuteWithdrawal}
+                                                disabled={isExecuting || !withdrawalReady}
                                               >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                                                />
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                                />
-                                              </svg>
-                                              Manage Position
-                                            </button>
+                                                <svg
+                                                  className="w-5 h-5 group-hover:scale-110 transition-transform"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                                  />
+                                                </svg>
+                                                {isExecuting ? "Withdrawing..." : "Withdraw"}
+                                              </button>
+                                            ) : (
+                                              <>
+                                                <button
+                                                  className="group flex items-center justify-center gap-3 py-3 px-4 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                                                  onClick={() => handleOpenModal(position)}
+                                                >
+                                                  <svg
+                                                    className="w-5 h-5 group-hover:scale-110 transition-transform"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                  >
+                                                    <path
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      strokeWidth={2}
+                                                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                                                    />
+                                                    <path
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      strokeWidth={2}
+                                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                                    />
+                                                  </svg>
+                                                  Manage Position
+                                                </button>
+                                                {BigInt(position.withdrawalRequestShares || 0n) > 0n && (
+                                                  <button
+                                                    className="group flex items-center justify-center gap-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={handleExecuteWithdrawal}
+                                                    disabled={isExecuting || !withdrawalReady}
+                                                  >
+                                                    <svg
+                                                      className="w-5 h-5 group-hover:scale-110 transition-transform"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      viewBox="0 0 24 24"
+                                                    >
+                                                      <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                                      />
+                                                    </svg>
+                                                    {isExecuting ? "Withdrawing..." : "Withdraw"}
+                                                  </button>
+                                                )}
+                                              </>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -641,28 +705,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               </button>
                                             )}
 
-                                            {withdrawalReady && details?.[0]?.withdrawalRequestShares > 0 && (
-                                              <button
-                                                className="group w-full flex items-center gap-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50"
-                                                onClick={handleExecuteWithdrawal}
-                                                disabled={isExecuting}
-                                              >
-                                                <svg
-                                                  className="w-5 h-5 group-hover:scale-110 transition-transform"
-                                                  fill="none"
-                                                  stroke="currentColor"
-                                                  viewBox="0 0 24 24"
-                                                >
-                                                  <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                                                  />
-                                                </svg>
-                                                {isExecuting ? "Executing..." : "Execute Withdrawal"}
-                                              </button>
-                                            )}
                                           </div>
                                         </div>
 
@@ -691,6 +733,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                                   "Your position is actively earning yield and providing coverage."}
                                                 {position.status === "requested withdrawal" &&
                                                   `Withdrawal will be available in ${unlockDays} days.`}
+                                                {position.status === "withdrawal ready" &&
+                                                  "Withdrawal can now be executed."}
                                               </p>
                                             </div>
                                           </div>
