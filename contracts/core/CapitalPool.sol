@@ -210,14 +210,18 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         
         ICatInsurancePool catPool = IRiskManagerWithCat(riskManager).catPool();
 
+        uint256 initialBalance = underlyingAsset.balanceOf(address(this));
+        uint256 totalWithdrawn = 0;
         if (_payoutData.totalCapitalFromPoolLPs > 0) {
             for (uint i = 0; i < _payoutData.adapters.length; i++) {
                 IYieldAdapter adapter = IYieldAdapter(_payoutData.adapters[i]);
                 uint256 adapterCapitalShare = _payoutData.capitalPerAdapter[i];
                 if (adapterCapitalShare > 0) {
                     uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
-                    if(amountToWithdraw > 0) {
-                        try adapter.withdraw(amountToWithdraw, address(this)) {
+                    if (amountToWithdraw > 0) {
+                        uint256 withdrawn;
+                        try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256 v) {
+                            withdrawn = v;
                         } catch {
                             emit AdapterCallFailed(_payoutData.adapters[i], "withdraw", "withdraw failed");
                             uint256 sent;
@@ -228,11 +232,33 @@ contract CapitalPool is ReentrancyGuard, Ownable {
                                 catPool.drawFund(amountToWithdraw);
                             }
                         }
+                        // track the actual amount withdrawn from adapters
+                        totalWithdrawn += withdrawn;
                     }
                 }
             }
         }
-        require(underlyingAsset.balanceOf(address(this)) >= totalPayoutAmount, "CP: Payout failed, insufficient funds gathered");
+
+        uint256 currentBalance = underlyingAsset.balanceOf(address(this));
+        uint256 gathered = currentBalance - initialBalance;
+        if (gathered < totalPayoutAmount) {
+            uint256 shortfall = totalPayoutAmount - gathered;
+            if (_payoutData.adapters.length > 0) {
+                IYieldAdapter fallbackAdapter = IYieldAdapter(_payoutData.adapters[0]);
+                uint256 extra;
+                try fallbackAdapter.withdraw(shortfall, address(this)) returns (uint256 v) {
+                    extra = v;
+                } catch {
+                    emit AdapterCallFailed(_payoutData.adapters[0], "withdraw", "shortfall withdraw failed");
+                }
+                if (extra < shortfall) {
+                    catPool.drawFund(shortfall - extra);
+                }
+            } else {
+                catPool.drawFund(shortfall);
+            }
+        }
+
         totalSystemValue -= totalPayoutAmount;
         if (_payoutData.claimantAmount > 0) {
             underlyingAsset.safeTransfer(_payoutData.claimant, _payoutData.claimantAmount);

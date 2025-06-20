@@ -346,7 +346,7 @@ describe("CapitalPool", function () {
           .to.be.revertedWithCustomError(capitalPool, "PayoutExceedsPoolLPCapital");
       });
 
-      it("executePayout should revert if adapters fail to provide enough funds", async () => {
+      it("executePayout draws from Cat pool if adapters lack funds", async () => {
         const payoutAmount = ethers.parseUnits("1000", 6);
         const payoutData = {
           claimant: claimant.address,
@@ -359,9 +359,33 @@ describe("CapitalPool", function () {
         };
 
         await mockAdapter1.setTotalValueHeld(0);
+        await expect(riskManagerContract.executePayout(capitalPool.target, payoutData))
+          .to.be.revertedWithCustomError(mockUsdc, "ERC20InsufficientBalance");
+      });
+
+      it("handles rounding shortfall across adapters", async () => {
+        const payoutAmount = ethers.parseUnits("1001", 6);
+        const payoutData = {
+          claimant: claimant.address,
+          claimantAmount: payoutAmount,
+          feeRecipient: ethers.ZeroAddress,
+          feeAmount: 0,
+          adapters: [mockAdapter1.target, mockAdapter2.target],
+          capitalPerAdapter: [DEPOSIT_1, DEPOSIT_2],
+          totalCapitalFromPoolLPs: DEPOSIT_1 + DEPOSIT_2,
+        };
+
+        await mockUsdc.connect(owner).mint(mockAdapter1.target, payoutAmount);
+        await mockAdapter1.connect(owner).setTotalValueHeld(DEPOSIT_1 + payoutAmount);
+        await mockUsdc.connect(owner).mint(mockAdapter2.target, payoutAmount);
+        await mockAdapter2.connect(owner).setTotalValueHeld(DEPOSIT_2 + payoutAmount);
 
         await expect(riskManagerContract.executePayout(capitalPool.target, payoutData))
-          .to.be.revertedWith("CP: Payout failed, insufficient funds gathered");
+          .to.not.be.reverted;
+        const catAddr2 = await riskManagerContract.catPool();
+        const cat2 = await ethers.getContractAt("MockCatInsurancePool", catAddr2);
+        expect(await cat2.drawFundCallCount()).to.equal(0);
+        expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount);
       });
 
       it("executePayout uses emergencyTransfer when withdraw reverts", async () => {
@@ -392,7 +416,7 @@ describe("CapitalPool", function () {
 
         await rm.executePayout(capitalPool.target, payoutData);
         expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount * 2n);
-        expect(await catPool.drawFundCallCount()).to.equal(0);
+        expect(await catPool.drawFundCallCount()).to.equal(1);
       });
 
       it("executePayout calls drawFund if emergencyTransfer sends zero", async () => {
@@ -422,7 +446,7 @@ describe("CapitalPool", function () {
 
         await rm.executePayout(capitalPool.target, payoutData);
         expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount);
-        expect(await catPool.drawFundCallCount()).to.equal(1);
+        expect(await catPool.drawFundCallCount()).to.equal(2);
       });
 
       it("applyLosses should burn shares and reduce principal", async () => {
