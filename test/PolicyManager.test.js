@@ -405,6 +405,26 @@ describe("PolicyManager", function () {
                 const userBalAfter = await mockUsdc.balanceOf(user1.address);
                 expect(userBalAfter).to.equal(userBalBefore);
             });
+
+            it("Should cancel when pool has no available capital", async function() {
+                await time.increase(COOLDOWN_PERIOD + 1);
+
+                await mockPoolRegistry.setPoolData(
+                    POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("1000", 6),
+                    COVERAGE_AMOUNT,
+                    ethers.parseUnits("1000", 6),
+                    false,
+                    owner.address,
+                    0
+                );
+                const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await mockUsdc.mint(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
+
+                await expect(policyManager.connect(user1).cancelCover(POLICY_ID)).to.not.be.reverted;
+            });
             it("Should distribute premiums and emit event on cancel", async function () {
                 await mockPoolRegistry.setPoolData(POOL_ID,
                     mockUsdc.target,
@@ -574,6 +594,24 @@ describe("PolicyManager", function () {
 
                 expect(await mockCatPool.last_premiumReceived()).to.equal(expectedCat);
                 expect(await mockRewardDistributor.totalRewards(POOL_ID, mockUsdc.target)).to.equal(expectedPool);
+            });
+
+            it("Should add premium when pool has no available capital", async function() {
+                await mockPoolRegistry.setPoolData(
+                    POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("1000", 6),
+                    COVERAGE_AMOUNT,
+                    ethers.parseUnits("1000", 6),
+                    false,
+                    owner.address,
+                    0
+                );
+
+                await expect(policyManager.connect(user1).addPremium(POLICY_ID, PREMIUM_TO_ADD)).to.not.be.reverted;
+
+                const info = await mockPolicyNFT.policies(POLICY_ID);
+                expect(info.premiumDeposit).to.equal(INITIAL_PREMIUM_DEPOSIT + PREMIUM_TO_ADD);
             });
 
             it("Should prevent re-entrancy during addPremium", async function() {
@@ -808,7 +846,7 @@ describe("PolicyManager", function () {
                 expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.true;
             });
 
-            it("Should revert when pool has no available capital", async function() {
+            it("Should remain active when pool has no available capital", async function() {
                 const now = await time.latest();
                 await mockPolicyNFT.mock_setPolicy(
                     POLICY_ID,
@@ -835,7 +873,7 @@ describe("PolicyManager", function () {
                 const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
                 await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
 
-                await expect(policyManager.isPolicyActive(POLICY_ID)).to.be.reverted;
+                expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.true;
             });
         });
 
