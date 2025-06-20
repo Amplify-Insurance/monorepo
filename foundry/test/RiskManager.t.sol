@@ -66,6 +66,7 @@ contract RiskManagerTest is Test {
         cp.triggerOnCapitalDeposited(address(rm), underwriter, pledge);
         cp.setUnderwriterAdapterAddress(underwriter, address(1));
         pr.setPoolCount(1);
+        pr.setPoolData(0, token, pledge, 0, 0, false, address(0), 0);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
@@ -74,10 +75,35 @@ contract RiskManagerTest is Test {
 
         ld.setPendingLoss(underwriter, 0, 0);
         vm.prank(underwriter);
-        rm.deallocateFromPool(0);
+    rm.requestDeallocateFromPool(0, pledge);
+    vm.prank(underwriter);
+    rm.deallocateFromPool(0);
 
-        assertFalse(rm.isAllocatedToPool(underwriter, 0));
-    }
+    assertFalse(rm.isAllocatedToPool(underwriter, 0));
+}
+
+function testPartialDeallocate() public {
+    uint256 pledge = 5_000 * 1e6;
+    cp.triggerOnCapitalDeposited(address(rm), underwriter, pledge);
+    cp.setUnderwriterAdapterAddress(underwriter, address(1));
+    pr.setPoolCount(1);
+    pr.setPoolData(0, token, pledge, 0, 0, false, address(0), 0);
+
+    uint256[] memory pools = new uint256[](1);
+    pools[0] = 0;
+    vm.prank(underwriter);
+    rm.allocateCapital(pools);
+
+    ld.setPendingLoss(underwriter, 0, 0);
+    uint256 half = pledge / 2;
+    vm.prank(underwriter);
+    rm.requestDeallocateFromPool(0, half);
+    vm.prank(underwriter);
+    rm.deallocateFromPool(0);
+
+    assertEq(rm.underwriterCapitalPerPool(underwriter, 0), half);
+    assertTrue(rm.isAllocatedToPool(underwriter, 0));
+}
 
 
 function testAllocateCapitalRevertsWithoutDeposit() public {
@@ -104,6 +130,7 @@ function testAllocateCapitalRevertsInvalidPoolId() public {
     cp.triggerOnCapitalDeposited(address(rm), underwriter, 1000);
     cp.setUnderwriterAdapterAddress(underwriter, address(1));
     pr.setPoolCount(1);
+    pr.setPoolData(0, token, 1000, 0, 0, false, address(0), 0);
     uint256[] memory pools = new uint256[](1);
     pools[0] = 1;
     vm.prank(underwriter);
@@ -121,6 +148,8 @@ function testDeallocateRealizesLoss() public {
     rm.allocateCapital(pools);
 
     ld.setPendingLoss(underwriter, 0, 200);
+    vm.prank(underwriter);
+    rm.requestDeallocateFromPool(0, 1000);
     vm.prank(underwriter);
     rm.deallocateFromPool(0);
 

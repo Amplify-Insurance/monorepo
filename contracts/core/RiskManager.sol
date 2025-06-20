@@ -39,10 +39,15 @@ contract RiskManager is Ownable, ReentrancyGuard {
     mapping(address => uint256[]) public underwriterAllocations;
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
     mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
-    
+    mapping(address => mapping(uint256 => uint256)) public underwriterCapitalPerPool;
+
     uint256 public maxAllocationsPerUnderwriter = 5;
     uint256 public constant CLAIM_FEE_BPS = 500;
     uint256 public constant BPS = 10_000;
+
+    uint256 public deallocationNoticePeriod;
+    mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
+    mapping(address => mapping(uint256 => uint256)) public deallocationRequestAmount;
 
     /* ───────────────────────── Errors & Events ───────────────────────── */
     error NotCapitalPool();
@@ -55,12 +60,19 @@ contract RiskManager is Ownable, ReentrancyGuard {
     error NotAllocated();
     error UnderwriterNotInsolvent();
     error ZeroAddressNotAllowed();
+    error DeallocationRequestPending();
+    error NoDeallocationRequest();
+    error NoticePeriodActive();
+    error InsufficientFreeCapital();
+    error InvalidDeallocationAmount();
 
     event AddressesSet(address capital, address registry, address policy, address cat, address loss, address rewards);
     event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
     event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
     event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
+    event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 amount, uint256 timestamp);
+    event DeallocationNoticePeriodSet(uint256 newPeriod);
     event MaxAllocationsPerUnderwriterSet(uint256 newMax);
 
     /* ───────────────────── Constructor & Setup ───────────────────── */
@@ -99,6 +111,11 @@ contract RiskManager is Ownable, ReentrancyGuard {
         emit MaxAllocationsPerUnderwriterSet(_newMax);
     }
 
+    function setDeallocationNoticePeriod(uint256 _newPeriod) external onlyOwner {
+        deallocationNoticePeriod = _newPeriod;
+        emit DeallocationNoticePeriodSet(_newPeriod);
+    }
+
     /**
      * @notice Wrapper for PoolRegistry.addProtocolRiskPool restricted to the owner.
      * @dev Enables governance to create new pools through the RiskManager.
@@ -129,6 +146,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
             require(!isAllocatedToPool[msg.sender][poolId], "Already allocated to this pool");
             
             poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, totalPledge, true);
+            underwriterCapitalPerPool[msg.sender][poolId] = totalPledge;
 
             isAllocatedToPool[msg.sender][poolId] = true;
             underwriterAllocations[msg.sender].push(poolId);
@@ -139,24 +157,55 @@ contract RiskManager is Ownable, ReentrancyGuard {
         }
     }
     
-    function deallocateFromPool(uint256 _poolId) external nonReentrant {
+    function requestDeallocateFromPool(uint256 _poolId, uint256 _amount) external nonReentrant {
         address underwriter = msg.sender;
-        _realizeLossesForAllPools(underwriter);
-        
-        uint256 totalPledge = underwriterTotalPledge[underwriter];
-        if (totalPledge == 0) revert NoCapitalToAllocate();
-        
         uint256 poolCount = poolRegistry.getPoolCount();
         require(_poolId < poolCount, "Invalid poolId");
         require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
-        
+        if (deallocationRequestTimestamp[underwriter][_poolId] != 0) revert DeallocationRequestPending();
+
+        uint256 allocated = underwriterCapitalPerPool[underwriter][_poolId];
+        if (_amount == 0 || _amount > allocated) revert InvalidDeallocationAmount();
+
+        (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,, ,) = poolRegistry.getPoolData(_poolId);
+        uint256 freeCapital = totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
+        if (_amount > freeCapital) revert InsufficientFreeCapital();
+
+        poolRegistry.updateCapitalPendingWithdrawal(_poolId, _amount, true);
+        deallocationRequestTimestamp[underwriter][_poolId] = block.timestamp;
+        deallocationRequestAmount[underwriter][_poolId] = _amount;
+        emit DeallocationRequested(underwriter, _poolId, _amount, block.timestamp);
+    }
+
+    function deallocateFromPool(uint256 _poolId) external nonReentrant {
+        address underwriter = msg.sender;
+        uint256 requestTime = deallocationRequestTimestamp[underwriter][_poolId];
+        if (requestTime == 0) revert NoDeallocationRequest();
+        if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
+
+        _realizeLossesForAllPools(underwriter);
+
+        uint256 amount = deallocationRequestAmount[underwriter][_poolId];
+        if (amount == 0) revert InvalidDeallocationAmount();
+
+        uint256 poolCount = poolRegistry.getPoolCount();
+        require(_poolId < poolCount, "Invalid poolId");
+        require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
+
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
         require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
-        
-        poolRegistry.updateCapitalAllocation(_poolId, userAdapterAddress, totalPledge, false);
-        _removeUnderwriterFromPool(underwriter, _poolId);
 
-        emit CapitalDeallocated(underwriter, _poolId, totalPledge);
+        poolRegistry.updateCapitalAllocation(_poolId, userAdapterAddress, amount, false);
+        poolRegistry.updateCapitalPendingWithdrawal(_poolId, amount, false);
+        uint256 remaining = underwriterCapitalPerPool[underwriter][_poolId] - amount;
+        underwriterCapitalPerPool[underwriter][_poolId] = remaining;
+        if (remaining == 0) {
+            _removeUnderwriterFromPool(underwriter, _poolId);
+        }
+        delete deallocationRequestTimestamp[underwriter][_poolId];
+        delete deallocationRequestAmount[underwriter][_poolId];
+
+        emit CapitalDeallocated(underwriter, _poolId, amount);
     }
     
     // CORRECTED: Added missing governance hook functions
@@ -355,5 +404,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
         underwriterIndexInPoolArray[_poolId][last] = index;
         underwriters.pop();
         delete underwriterIndexInPoolArray[_poolId][_underwriter];
+        delete underwriterCapitalPerPool[_underwriter][_poolId];
     }
 }
