@@ -175,10 +175,19 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
 
         uint256 annualRateBps = _getPremiumRateBpsAnnual(pol.poolId);
         uint256 timeElapsed = block.timestamp - pol.lastDrainTime;
+
+        if (annualRateBps == 0) {
+            policyNFT.updatePremiumAccount(_policyId, pol.premiumDeposit, uint128(block.timestamp));
+            return;
+        }
+
         uint256 accruedCost = (pol.coverage * annualRateBps * timeElapsed) / (SECS_YEAR * BPS);
 
         uint256 amountToDrain = Math.min(accruedCost, pol.premiumDeposit);
-        if (amountToDrain == 0) return;
+        if (amountToDrain == 0) {
+            policyNFT.updatePremiumAccount(_policyId, pol.premiumDeposit, uint128(block.timestamp));
+            return;
+        }
 
         // --- Checks & Effects ---
         uint128 newDeposit = uint128(pol.premiumDeposit - amountToDrain);
@@ -212,19 +221,23 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
         if (block.timestamp <= pol.lastDrainTime) return pol.premiumDeposit > 0;
         
         uint256 annualRateBps = _getPremiumRateBpsAnnual(pol.poolId);
+
+        if (annualRateBps == 0) {
+            return pol.premiumDeposit > 0;
+        }
+
         uint256 timeElapsed = block.timestamp - pol.lastDrainTime;
         uint256 accruedCost = (pol.coverage * annualRateBps * timeElapsed) / (SECS_YEAR * BPS);
-        
+
         return pol.premiumDeposit > accruedCost;
     }
     
     function _getPremiumRateBpsAnnual(uint256 _poolId) internal view returns (uint256) {
         (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal, , ,) = poolRegistry.getPoolData(_poolId);
-        
-        // Resolution: If pending withdrawals exceed or equal pledged capital, 
-        // there is no available capital. This check prevents an underflow revert.
+
+        // If all capital is pending withdrawal, no premiums should accrue
         if (pendingWithdrawal >= totalPledged) {
-            return type(uint256).max;
+            return 0;
         }
 
         uint256 availableCapital = totalPledged - pendingWithdrawal;
