@@ -7,29 +7,49 @@ import { ChevronDown, ChevronUp } from "lucide-react"
 import { getCommitteeWithSigner } from "../../lib/committee"
 import { getStakingWithSigner } from "../../lib/staking"
 import { useAccount } from "wagmi"
+import VoteConfirmationModal from "./VoteConfirmationModal"
 
 export default function ProposalsTable({ proposals, loading }) {
   const [expanded, setExpanded] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isClaiming, setIsClaiming] = useState(false)
   const { isConnected } = useAccount()
+  const [showVoteModal, setShowVoteModal] = useState(false)
+  const [pendingVote, setPendingVote] = useState(null)
+  const [votingPower, setVotingPower] = useState(0)
 
   const toggle = (id) => {
     setExpanded((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const handleVote = async (id, vote) => {
-    if (!isConnected) return
+  const handleVoteClick = (proposalId, voteType) => {
+    const proposal = proposals.find((p) => p.id === proposalId)
+    setPendingVote({ proposalId, voteType, proposal })
+    // In a real app, you'd fetch the user's actual voting power from the contract
+    // For now, we'll use a placeholder value
+    setVotingPower(1000) // This should be fetched from the staking contract
+    setShowVoteModal(true)
+  }
+
+  const handleVoteConfirm = async () => {
+    if (!pendingVote || !isConnected) return
     setIsSubmitting(true)
     try {
       const committee = await getCommitteeWithSigner()
-      const tx = await committee.vote(id, vote)
+      const tx = await committee.vote(pendingVote.proposalId, pendingVote.voteType)
       await tx.wait()
+      setShowVoteModal(false)
+      setPendingVote(null)
     } catch (err) {
       console.error("Vote failed", err)
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleVoteCancel = () => {
+    setShowVoteModal(false)
+    setPendingVote(null)
   }
 
   const handleClaim = async (id) => {
@@ -294,25 +314,25 @@ export default function ProposalsTable({ proposals, loading }) {
                                   </span>
                                 </div>
                                 <button
-                                  onClick={() => handleVote(p.id, 1)}
+                                  onClick={() => handleVoteClick(p.id, 1)}
                                   disabled={isSubmitting}
                                   className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed"
                                 >
-                                  {isSubmitting ? "Voting..." : "Vote For"}
+                                  Vote For
                                 </button>
                                 <button
-                                  onClick={() => handleVote(p.id, 0)}
+                                  onClick={() => handleVoteClick(p.id, 0)}
                                   disabled={isSubmitting}
                                   className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed"
                                 >
-                                  {isSubmitting ? "Voting..." : "Vote Against"}
+                                  Vote Against
                                 </button>
                                 <button
-                                  onClick={() => handleVote(p.id, 2)}
+                                  onClick={() => handleVoteClick(p.id, 2)}
                                   disabled={isSubmitting}
                                   className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed"
                                 >
-                                  {isSubmitting ? "Voting..." : "Abstain"}
+                                  Abstain
                                 </button>
                               </div>
                             )}
@@ -327,6 +347,15 @@ export default function ProposalsTable({ proposals, loading }) {
           </table>
         </div>
       </div>
+      <VoteConfirmationModal
+        isOpen={showVoteModal}
+        onClose={handleVoteCancel}
+        onConfirm={handleVoteConfirm}
+        proposal={pendingVote?.proposal}
+        voteType={pendingVote?.voteType}
+        votingPower={votingPower}
+        isSubmitting={isSubmitting}
+      />
     </div>
   )
 }
