@@ -57,7 +57,12 @@ contract PriceOracle is Ownable {
         (int256 price, uint8 feedDecimals) = getLatestUsdPrice(token);
         if (price <= 0) return 0;
         uint8 tokenDecimals = IERC20Metadata(token).decimals();
-        uint256 scaledPrice = uint256(price) * (10 ** (18 - feedDecimals));
+        uint256 scaledPrice;
+        if (feedDecimals > 18) {
+            scaledPrice = uint256(price) / (10 ** (feedDecimals - 18));
+        } else {
+            scaledPrice = uint256(price) * (10 ** (18 - feedDecimals));
+        }
         value = (amount * scaledPrice) / (10 ** tokenDecimals);
     }
 }
