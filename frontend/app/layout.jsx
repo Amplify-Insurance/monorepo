@@ -1,18 +1,18 @@
 // app/layout.jsx
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { Providers } from "./providers"; // Import the JS component
+import { Inter } from "next/font/google"
+import "../app/globals.css"
+import { Providers } from "./providers" // Import the JS component
 
-import Navbar from "./components/Navbar"; // Ensure paths are correct
-import Sidebar from "./components/Sidebar"; // Ensure paths are correct
-import { Toaster } from "../components/ui/toaster";
+import Navbar from "./components/Navbar" // Ensure paths are correct
+import Sidebar from "./components/Sidebar" // Ensure paths are correct
+import { Toaster } from "../components/ui/toaster"
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
   title: "LayerCover",
   description: "Insurance coverage for DeFi protocols",
-};
+}
 
 // No type annotation needed for children in JS
 export default function RootLayout({ children }) {
@@ -23,19 +23,19 @@ export default function RootLayout({ children }) {
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
       </head>
       <body className={inter.className}>
-        <Providers> {/* Use the JS Providers component */}
+        <Providers>
+          {" "}
+          {/* Use the JS Providers component */}
           <Toaster />
           <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
             <Navbar />
             <div className="flex flex-1">
               <Sidebar />
-              <main className="flex-1 p-4 md:p-6 lg:p-8 pt-20 md:ml-64">
-                {children}
-              </main>
+              <main className="flex-1 p-4 md:p-6 lg:p-8 pt-20 md:ml-64">{children}</main>
             </div>
           </div>
         </Providers>
       </body>
     </html>
-  );
+  )
 }

@@ -31,10 +31,7 @@ export default function AnalyticsPage() {
       const tokenName = getTokenName(pool.protocolTokenToCover)
 
       const distressedAmount = Number(
-        ethers.utils.formatUnits(
-          c.protocolTokenAmountReceived,
-          pool.protocolTokenDecimals ?? 18,
-        ),
+        ethers.utils.formatUnits(c.protocolTokenAmountReceived, pool.protocolTokenDecimals ?? 18),
       )
       const coverage = Number(ethers.utils.formatUnits(c.coverage, pool.underlyingAssetDecimals))
       const netPayout = Number(ethers.utils.formatUnits(c.netPayoutToClaimant, pool.underlyingAssetDecimals))
@@ -153,13 +150,13 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Claims Paid</div>
-                <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                <div className="text-3xl font-bold text-slate-700 dark:text-slate-300">
                   ${stats.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-red-600 dark:text-red-400"
+                  className="w-6 h-6 text-slate-600 dark:text-slate-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -179,13 +176,13 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Active Cover</div>
-                <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
                   ${activeCover.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-green-600 dark:text-green-400"
+                  className="w-6 h-6 text-emerald-600 dark:text-emerald-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -205,13 +202,13 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Premiums Collected</div>
-                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
                   ${totalPremiums.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-purple-600 dark:text-purple-400"
+                  className="w-6 h-6 text-blue-600 dark:text-blue-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -233,13 +230,13 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Claim Fees</div>
-                <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">
+                <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
                   ${totalClaimFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
                 <svg
-                  className="w-5 h-5 text-pink-600 dark:text-pink-400"
+                  className="w-5 h-5 text-gray-600 dark:text-gray-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -259,13 +256,13 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Underwriters</div>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
                   {underwriterCount.toLocaleString()}
                 </div>
               </div>
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center">
                 <svg
-                  className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                  className="w-5 h-5 text-slate-600 dark:text-slate-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -285,13 +282,13 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Policy Holders</div>
-                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                <div className="text-2xl font-bold text-slate-700 dark:text-slate-300">
                   {policyHolderCount.toLocaleString()}
                 </div>
               </div>
-              <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center">
                 <svg
-                  className="w-5 h-5 text-indigo-600 dark:text-indigo-400"
+                  className="w-5 h-5 text-slate-600 dark:text-slate-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -574,8 +571,8 @@ function ClaimsOverTimeChart({ data }) {
 
     // Create gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, rect.height)
-    gradient.addColorStop(0, "rgba(52, 211, 153, 0.8)")
-    gradient.addColorStop(1, "rgba(52, 211, 153, 0.1)")
+    gradient.addColorStop(0, "rgba(71, 85, 105, 0.8)")
+    gradient.addColorStop(1, "rgba(71, 85, 105, 0.1)")
 
     // Create chart
     window.claimsTimeChart = new window.Chart(ctx, {
@@ -587,9 +584,9 @@ function ClaimsOverTimeChart({ data }) {
             label: "Claims Paid",
             data: values,
             backgroundColor: gradient,
-            borderColor: "rgb(52, 211, 153)",
+            borderColor: "rgb(71, 85, 105)",
             borderWidth: 2,
-            pointBackgroundColor: "rgb(52, 211, 153)",
+            pointBackgroundColor: "rgb(71, 85, 105)",
             pointBorderColor: isDarkMode ? "#1f2937" : "#ffffff",
             pointBorderWidth: 2,
             pointRadius: 4,
@@ -636,37 +633,22 @@ function ClaimsOverTimeChart({ data }) {
             },
             ticks: {
               color: textColor,
-              callback: (value) => {
-                if (value >= 1000000) {
-                  return `$${value / 1000000}M`
-                }
-                if (value >= 1000) {
-                  return `$${value / 1000}K`
-                }
-                return `$${value}`
-              },
+              callback: (value) => `$${value.toLocaleString()}`,
             },
           },
         },
+        interaction: {
+          intersect: false,
+          mode: "index",
+        },
       },
     })
-
-    return () => {
-      if (window.claimsTimeChart) {
-        window.claimsTimeChart.destroy()
-      }
-    }
   }, [data])
 
-  return (
-    <div className="h-full w-full">
-      <canvas id="claimsOverTimeChart" className="h-full w-full" ref={canvasRef} />
-    </div>
-  )
+  return <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
 }
 
 // Claims By Product Chart Component
-
 function ClaimsByProductChart({ data }) {
   const canvasRef = useRef(null)
 
@@ -675,34 +657,40 @@ function ClaimsByProductChart({ data }) {
     const el = canvasRef.current
     const ctx = el.getContext("2d")
 
+    // Clear previous chart if it exists
     if (window.claimsProductChart) {
       window.claimsProductChart.destroy()
     }
 
+    // Set canvas dimensions for high DPI displays
     const dpr = window.devicePixelRatio || 1
     const rect = el.getBoundingClientRect()
     el.width = rect.width * dpr
     el.height = rect.height * dpr
     ctx.scale(dpr, dpr)
 
+    // Draw chart
     const isDarkMode = document.documentElement.classList.contains("dark")
     const textColor = isDarkMode ? "#e5e7eb" : "#374151"
     const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
 
     const labels = data.map((item) => item.name)
-    const approvedValues = data.map((item) => item.amount)
+    const values = data.map((item) => item.amount)
 
+    // Create chart
     window.claimsProductChart = new window.Chart(ctx, {
       type: "bar",
       data: {
         labels: labels,
         datasets: [
           {
-            label: "Approved Claims",
-            data: approvedValues,
-            backgroundColor: "rgba(52, 211, 153, 0.8)",
-            borderColor: "rgb(52, 211, 153)",
+            label: "Claims Paid",
+            data: values,
+            backgroundColor: "rgba(71, 85, 105, 0.8)",
+            borderColor: "rgb(71, 85, 105)",
             borderWidth: 1,
+            borderRadius: 4,
+            borderSkipped: false,
           },
         ],
       },
@@ -711,14 +699,7 @@ function ClaimsByProductChart({ data }) {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            display: true,
-            position: "top",
-            labels: {
-              color: textColor,
-              padding: 20,
-              usePointStyle: true,
-              pointStyle: "rect",
-            },
+            display: false,
           },
           tooltip: {
             backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
@@ -727,18 +708,21 @@ function ClaimsByProductChart({ data }) {
             borderColor: isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)",
             borderWidth: 1,
             padding: 12,
+            displayColors: false,
             callbacks: {
-              label: (context) => `${context.dataset.label}: $${context.raw.toLocaleString()}`,
+              label: (context) => `$${context.raw.toLocaleString()}`,
             },
           },
         },
         scales: {
           x: {
             grid: {
-              display: false,
+              color: gridColor,
             },
             ticks: {
               color: textColor,
+              maxRotation: 45,
+              minRotation: 45,
             },
           },
           y: {
@@ -747,34 +731,17 @@ function ClaimsByProductChart({ data }) {
             },
             ticks: {
               color: textColor,
-              callback: (value) => {
-                if (value >= 1000000) {
-                  return `$${value / 1000000}M`
-                }
-                if (value >= 1000) {
-                  return `$${value / 1000}K`
-                }
-                return `$${value}`
-              },
+              callback: (value) => `$${value.toLocaleString()}`,
             },
           },
         },
       },
     })
-
-    return () => {
-      if (window.claimsProductChart) {
-        window.claimsProductChart.destroy()
-      }
-    }
   }, [data])
 
-  return (
-    <div className="h-full w-full">
-      <canvas id="claimsByProductChart" className="h-full w-full" ref={canvasRef} />
-    </div>
-  )
+  return <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
 }
+
 // Active Cover Chart Component
 function ActiveCoverChart({ data }) {
   const canvasRef = useRef(null)
@@ -784,34 +751,48 @@ function ActiveCoverChart({ data }) {
     const el = canvasRef.current
     const ctx = el.getContext("2d")
 
-    if (window.activeCoverChart && typeof window.activeCoverChart.destroy === "function") {
+    // Clear previous chart if it exists
+    if (window.activeCoverChart) {
       window.activeCoverChart.destroy()
     }
 
+    // Set canvas dimensions for high DPI displays
     const dpr = window.devicePixelRatio || 1
     const rect = el.getBoundingClientRect()
     el.width = rect.width * dpr
     el.height = rect.height * dpr
     ctx.scale(dpr, dpr)
 
+    // Draw chart
     const isDarkMode = document.documentElement.classList.contains("dark")
     const textColor = isDarkMode ? "#e5e7eb" : "#374151"
     const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
 
-    const labels = data.map((d) => d.date)
-    const values = data.map((d) => d.amount)
+    const labels = data.map((item) => item.date)
+    const values = data.map((item) => item.amount)
 
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, rect.height)
+    gradient.addColorStop(0, "rgba(16, 185, 129, 0.8)")
+    gradient.addColorStop(1, "rgba(16, 185, 129, 0.1)")
+
+    // Create chart
     window.activeCoverChart = new window.Chart(ctx, {
       type: "line",
       data: {
-        labels,
+        labels: labels,
         datasets: [
           {
             label: "Active Cover",
             data: values,
-            backgroundColor: "rgba(59, 130, 246, 0.4)",
-            borderColor: "rgb(59, 130, 246)",
+            backgroundColor: gradient,
+            borderColor: "rgb(16, 185, 129)",
             borderWidth: 2,
+            pointBackgroundColor: "rgb(16, 185, 129)",
+            pointBorderColor: isDarkMode ? "#1f2937" : "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
             fill: true,
             tension: 0.3,
           },
@@ -821,50 +802,54 @@ function ActiveCoverChart({ data }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: false,
+          },
           tooltip: {
             backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
-            titleColor: textColor,
-            bodyColor: textColor,
-            borderColor: gridColor,
+            titleColor: isDarkMode ? "#e5e7eb" : "#374151",
+            bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
+            borderColor: isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)",
             borderWidth: 1,
             padding: 12,
             displayColors: false,
+            callbacks: {
+              label: (context) => `$${context.raw.toLocaleString()}`,
+            },
           },
         },
         scales: {
           x: {
-            grid: { color: gridColor },
-            ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
-          },
-          y: {
-            grid: { color: gridColor },
+            grid: {
+              color: gridColor,
+            },
             ticks: {
               color: textColor,
-              callback: (value) => {
-                if (value >= 1_000_000) return `$${value / 1_000_000}M`
-                if (value >= 1_000) return `$${value / 1_000}K`
-                return `$${value}`
-              },
+              maxRotation: 45,
+              minRotation: 45,
+            },
+          },
+          y: {
+            grid: {
+              color: gridColor,
+            },
+            ticks: {
+              color: textColor,
+              callback: (value) => `$${value.toLocaleString()}`,
             },
           },
         },
+        interaction: {
+          intersect: false,
+          mode: "index",
+        },
       },
     })
-
-    return () => {
-      if (window.activeCoverChart && typeof window.activeCoverChart.destroy === "function") {
-        window.activeCoverChart.destroy()
-      }
-    }
   }, [data])
 
-  return (
-    <div className="h-full w-full">
-      <canvas id="activeCoverChart" className="h-full w-full" ref={canvasRef} />
-    </div>
-  )
+  return <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
 }
+
 // Lapsed Cover Chart Component
 function LapsedCoverChart({ data }) {
   const canvasRef = useRef(null)
@@ -873,33 +858,51 @@ function LapsedCoverChart({ data }) {
     if (!canvasRef.current || !data) return
     const el = canvasRef.current
     const ctx = el.getContext("2d")
-    if (window.lapsedCoverChart && typeof window.lapsedCoverChart.destroy === "function") {
+
+    // Clear previous chart if it exists
+    if (window.lapsedCoverChart) {
       window.lapsedCoverChart.destroy()
     }
+
+    // Set canvas dimensions for high DPI displays
     const dpr = window.devicePixelRatio || 1
     const rect = el.getBoundingClientRect()
     el.width = rect.width * dpr
     el.height = rect.height * dpr
     ctx.scale(dpr, dpr)
 
+    // Draw chart
     const isDarkMode = document.documentElement.classList.contains("dark")
     const textColor = isDarkMode ? "#e5e7eb" : "#374151"
     const gridColor = isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)"
 
-    const labels = data.map((d) => d.date)
-    const values = data.map((d) => d.amount)
+    const labels = data.map((item) => item.date)
+    const values = data.map((item) => item.amount)
 
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, rect.height)
+    gradient.addColorStop(0, "rgba(239, 68, 68, 0.8)")
+    gradient.addColorStop(1, "rgba(239, 68, 68, 0.1)")
+
+    // Create chart
     window.lapsedCoverChart = new window.Chart(ctx, {
-      type: "bar",
+      type: "line",
       data: {
-        labels,
+        labels: labels,
         datasets: [
           {
-            label: "Cover Dropped",
+            label: "Lapsed Cover",
             data: values,
-            backgroundColor: "rgba(239, 68, 68, 0.8)",
+            backgroundColor: gradient,
             borderColor: "rgb(239, 68, 68)",
-            borderWidth: 1,
+            borderWidth: 2,
+            pointBackgroundColor: "rgb(239, 68, 68)",
+            pointBorderColor: isDarkMode ? "#1f2937" : "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            fill: true,
+            tension: 0.3,
           },
         ],
       },
@@ -907,49 +910,50 @@ function LapsedCoverChart({ data }) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: false,
+          },
           tooltip: {
             backgroundColor: isDarkMode ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
-            titleColor: textColor,
-            bodyColor: textColor,
-            borderColor: gridColor,
+            titleColor: isDarkMode ? "#e5e7eb" : "#374151",
+            bodyColor: isDarkMode ? "#e5e7eb" : "#374151",
+            borderColor: isDarkMode ? "rgba(75, 85, 99, 0.2)" : "rgba(209, 213, 219, 0.5)",
             borderWidth: 1,
             padding: 12,
+            displayColors: false,
             callbacks: {
-              label: (ctx) => `$${ctx.raw.toLocaleString()}`,
+              label: (context) => `$${context.raw.toLocaleString()}`,
             },
           },
         },
         scales: {
           x: {
-            grid: { color: gridColor },
-            ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
-          },
-          y: {
-            grid: { color: gridColor },
+            grid: {
+              color: gridColor,
+            },
             ticks: {
               color: textColor,
-              callback: (value) => {
-                if (value >= 1_000_000) return `$${value / 1_000_000}M`
-                if (value >= 1_000) return `$${value / 1_000}K`
-                return `$${value}`
-              },
+              maxRotation: 45,
+              minRotation: 45,
+            },
+          },
+          y: {
+            grid: {
+              color: gridColor,
+            },
+            ticks: {
+              color: textColor,
+              callback: (value) => `$${value.toLocaleString()}`,
             },
           },
         },
+        interaction: {
+          intersect: false,
+          mode: "index",
+        },
       },
     })
-
-    return () => {
-      if (window.lapsedCoverChart && typeof window.lapsedCoverChart.destroy === "function") {
-        window.lapsedCoverChart.destroy()
-      }
-    }
   }, [data])
 
-  return (
-    <div className="h-full w-full">
-      <canvas id="lapsedCoverChart" className="h-full w-full" ref={canvasRef} />
-    </div>
-  )
+  return <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
 }
