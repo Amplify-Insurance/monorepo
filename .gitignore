@@ -19,3 +19,8 @@ ignition/deployments/chain-31337
 /frontend/.next
 /frontend/out
 /frontend/node_modules
+
+# Foundry
+lib/
+foundry/out
+
