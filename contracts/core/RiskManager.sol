@@ -35,6 +35,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     address public committee;
 
     mapping(address => uint256) public underwriterTotalPledge;
+    mapping(address => mapping(uint256 => uint256)) public underwriterPoolPledge;
     mapping(uint256 => address[]) public poolSpecificUnderwriters;
     mapping(address => uint256[]) public underwriterAllocations;
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
@@ -46,6 +47,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     uint256 public deallocationNoticePeriod;
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
+    mapping(address => mapping(uint256 => uint256)) public deallocationRequestAmount;
 
     /* ───────────────────────── Errors & Events ───────────────────────── */
     error NotCapitalPool();
@@ -68,7 +70,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
     event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
     event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
-    event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 timestamp);
+    event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 amount, uint256 timestamp);
     event DeallocationNoticePeriodSet(uint256 newPeriod);
     event MaxAllocationsPerUnderwriterSet(uint256 newMax);
 
@@ -143,6 +145,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
             require(!isAllocatedToPool[msg.sender][poolId], "Already allocated to this pool");
             
             poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, totalPledge, true);
+            underwriterPoolPledge[msg.sender][poolId] = totalPledge;
 
             isAllocatedToPool[msg.sender][poolId] = true;
             underwriterAllocations[msg.sender].push(poolId);
@@ -153,28 +156,33 @@ contract RiskManager is Ownable, ReentrancyGuard {
         }
     }
     
-    function requestDeallocateFromPool(uint256 _poolId) external nonReentrant {
+    function requestDeallocateFromPool(uint256 _poolId, uint256 _amount) external nonReentrant {
         address underwriter = msg.sender;
         uint256 poolCount = poolRegistry.getPoolCount();
         require(_poolId < poolCount, "Invalid poolId");
         require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
         if (deallocationRequestTimestamp[underwriter][_poolId] != 0) revert DeallocationRequestPending();
 
+        require(_amount > 0, "Invalid amount");
         uint256 totalPledge = underwriterTotalPledge[underwriter];
+        uint256 currentPledge = underwriterPoolPledge[underwriter][_poolId];
+        require(_amount <= currentPledge, "Amount exceeds pledge");
         if (totalPledge == 0) revert NoCapitalToAllocate();
 
         (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,, ,) = poolRegistry.getPoolData(_poolId);
         uint256 freeCapital = totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
-        if (totalPledge > freeCapital) revert InsufficientFreeCapital();
+        if (_amount > freeCapital) revert InsufficientFreeCapital();
 
-        poolRegistry.updateCapitalPendingWithdrawal(_poolId, totalPledge, true);
+        poolRegistry.updateCapitalPendingWithdrawal(_poolId, _amount, true);
         deallocationRequestTimestamp[underwriter][_poolId] = block.timestamp;
-        emit DeallocationRequested(underwriter, _poolId, block.timestamp);
+        deallocationRequestAmount[underwriter][_poolId] = _amount;
+        emit DeallocationRequested(underwriter, _poolId, _amount, block.timestamp);
     }
 
     function deallocateFromPool(uint256 _poolId) external nonReentrant {
         address underwriter = msg.sender;
         uint256 requestTime = deallocationRequestTimestamp[underwriter][_poolId];
+        uint256 amount = deallocationRequestAmount[underwriter][_poolId];
         if (requestTime == 0) revert NoDeallocationRequest();
         if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
 
@@ -190,12 +198,17 @@ contract RiskManager is Ownable, ReentrancyGuard {
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
         require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
 
-        poolRegistry.updateCapitalAllocation(_poolId, userAdapterAddress, totalPledge, false);
-        poolRegistry.updateCapitalPendingWithdrawal(_poolId, totalPledge, false);
-        _removeUnderwriterFromPool(underwriter, _poolId);
+        poolRegistry.updateCapitalAllocation(_poolId, userAdapterAddress, amount, false);
+        poolRegistry.updateCapitalPendingWithdrawal(_poolId, amount, false);
+        uint256 remaining = underwriterPoolPledge[underwriter][_poolId] - amount;
+        underwriterPoolPledge[underwriter][_poolId] = remaining;
+        if (remaining == 0) {
+            _removeUnderwriterFromPool(underwriter, _poolId);
+        }
         delete deallocationRequestTimestamp[underwriter][_poolId];
+        delete deallocationRequestAmount[underwriter][_poolId];
 
-        emit CapitalDeallocated(underwriter, _poolId, totalPledge);
+        emit CapitalDeallocated(underwriter, _poolId, amount);
     }
     
     // CORRECTED: Added missing governance hook functions
@@ -316,6 +329,10 @@ contract RiskManager is Ownable, ReentrancyGuard {
     function onCapitalDeposited(address _underwriter, uint256 _amount) external {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         underwriterTotalPledge[_underwriter] += _amount;
+        uint256[] memory pools = underwriterAllocations[_underwriter];
+        for(uint i=0; i<pools.length; i++){
+            underwriterPoolPledge[_underwriter][pools[i]] += _amount;
+        }
     }
 
     function onWithdrawalRequested(address _underwriter, uint256 _principalComponent) external {
@@ -342,7 +359,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
             if (reduction > 0) {
                 poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
             }
-            if (_isFullWithdrawal) {
+            uint256 pledgeReduction = _principalComponentRemoved > underwriterPoolPledge[_underwriter][poolId] ? underwriterPoolPledge[_underwriter][poolId] : _principalComponentRemoved;
+            underwriterPoolPledge[_underwriter][poolId] -= pledgeReduction;
+            if (_isFullWithdrawal || underwriterPoolPledge[_underwriter][poolId] == 0) {
                 _removeUnderwriterFromPool(_underwriter, poolId);
             }
         }
@@ -394,5 +413,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
         underwriterIndexInPoolArray[_poolId][last] = index;
         underwriters.pop();
         delete underwriterIndexInPoolArray[_poolId][_underwriter];
+        delete underwriterPoolPledge[_underwriter][_poolId];
     }
 }
