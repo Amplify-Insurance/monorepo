@@ -78,5 +78,120 @@ contract RiskManagerTest is Test {
 
         assertFalse(rm.isAllocatedToPool(underwriter, 0));
     }
+
+
+function testAllocateCapitalRevertsWithoutDeposit() public {
+    cp.setUnderwriterAdapterAddress(underwriter, address(1));
+    pr.setPoolCount(1);
+    uint256[] memory pools = new uint256[](1);
+    pools[0] = 0;
+    vm.prank(underwriter);
+    vm.expectRevert(RiskManager.NoCapitalToAllocate.selector);
+    rm.allocateCapital(pools);
 }
 
+function testAllocateCapitalRevertsWithoutAdapter() public {
+    cp.triggerOnCapitalDeposited(address(rm), underwriter, 1000);
+    pr.setPoolCount(1);
+    uint256[] memory pools = new uint256[](1);
+    pools[0] = 0;
+    vm.prank(underwriter);
+    vm.expectRevert("User has no yield adapter set in CapitalPool");
+    rm.allocateCapital(pools);
+}
+
+function testAllocateCapitalRevertsInvalidPoolId() public {
+    cp.triggerOnCapitalDeposited(address(rm), underwriter, 1000);
+    cp.setUnderwriterAdapterAddress(underwriter, address(1));
+    pr.setPoolCount(1);
+    uint256[] memory pools = new uint256[](1);
+    pools[0] = 1;
+    vm.prank(underwriter);
+    vm.expectRevert("Invalid poolId");
+    rm.allocateCapital(pools);
+}
+
+function testDeallocateRealizesLoss() public {
+    cp.triggerOnCapitalDeposited(address(rm), underwriter, 1000);
+    cp.setUnderwriterAdapterAddress(underwriter, address(1));
+    pr.setPoolCount(1);
+    uint256[] memory pools = new uint256[](1);
+    pools[0] = 0;
+    vm.prank(underwriter);
+    rm.allocateCapital(pools);
+
+    ld.setPendingLoss(underwriter, 0, 200);
+    vm.prank(underwriter);
+    rm.deallocateFromPool(0);
+
+    assertEq(cp.applyLossesCallCount(), 1);
+    assertEq(cp.last_applyLosses_underwriter(), underwriter);
+    assertEq(cp.last_applyLosses_principalLossAmount(), 200);
+    assertEq(rm.underwriterTotalPledge(underwriter), 800);
+}
+
+function testClaimPremiumRewards() public {
+    cp.triggerOnCapitalDeposited(address(rm), underwriter, 1000);
+    pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
+    vm.prank(underwriter);
+    rm.claimPremiumRewards(0);
+    assertEq(rd.claimCallCount(), 1);
+    assertEq(rd.lastClaimUser(), underwriter);
+    assertEq(rd.lastClaimPoolId(), 0);
+    assertEq(rd.lastClaimToken(), address(token));
+    assertEq(rd.lastClaimPledge(), 1000);
+}
+
+function testClaimDistressedAssets() public {
+    pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
+    vm.prank(underwriter);
+    rm.claimDistressedAssets(0);
+    assertEq(cat.claimProtocolRewardsCallCount(), 1);
+    assertEq(cat.last_claimProtocolToken(), address(token));
+}
+
+function testUpdateCoverageSoldOnlyPolicyManager() public {
+    pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
+    vm.prank(underwriter);
+    vm.expectRevert(RiskManager.NotPolicyManager.selector);
+    rm.updateCoverageSold(0, 100, true);
+
+    vm.prank(address(pm));
+    rm.updateCoverageSold(0, 100, true);
+    (, , uint256 sold,, , ,) = pr.getPoolData(0);
+    assertEq(sold, 100);
+}
+
+function testReportIncidentOnlyCommittee() public {
+    pr.setPoolCount(1);
+    vm.prank(underwriter);
+    vm.expectRevert(RiskManager.NotCommittee.selector);
+    rm.reportIncident(0, true);
+
+    vm.prank(committee);
+    rm.reportIncident(0, true);
+    (, , , , bool paused,,) = pr.getPoolData(0);
+    assertTrue(paused);
+}
+
+function testSetPoolFeeRecipientOnlyCommittee() public {
+    pr.setPoolCount(1);
+    address recipient = address(123);
+    vm.prank(underwriter);
+    vm.expectRevert(RiskManager.NotCommittee.selector);
+    rm.setPoolFeeRecipient(0, recipient);
+
+    vm.prank(committee);
+    rm.setPoolFeeRecipient(0, recipient);
+    (, , , , , address feeRecipient,) = pr.getPoolData(0);
+    assertEq(feeRecipient, recipient);
+}
+
+function testOnCapitalDepositedOnlyCapitalPool() public {
+    vm.expectRevert(RiskManager.NotCapitalPool.selector);
+    rm.onCapitalDeposited(underwriter, 500);
+
+    cp.triggerOnCapitalDeposited(address(rm), underwriter, 500);
+    assertEq(rm.underwriterTotalPledge(underwriter), 500);
+}
+}
