@@ -15,7 +15,7 @@ export default function useActiveProposals() {
         const count = await c.proposalCounter()
         const quorumBps = await c.quorumBps()
         const totalStaked = await staking.totalStaked()
-        const quorumVotes = (totalStaked * quorumBps) / 10000n
+        const quorumVotes = (BigInt(totalStaked) * BigInt(quorumBps)) / 10000n
 
         const items = []
         for (let i = Number(count); i > 0; i--) {
