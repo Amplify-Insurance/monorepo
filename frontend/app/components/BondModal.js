@@ -4,8 +4,7 @@ import { useState, useEffect } from "react"
 import { ethers } from "ethers"
 import Image from "next/image"
 import { AlertTriangle, Info, DollarSign, ChevronDown } from "lucide-react"
-import { getStakingWithSigner } from "../../lib/staking"
-import { getCommittee } from "../../lib/committee"
+import { getCommittee, getCommitteeWithSigner } from "../../lib/committee"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
 // Bond deposits are denominated in the underlying asset of each deployment
@@ -19,7 +18,10 @@ import {
   getProtocolName,
   getProtocolLogo,
 } from "../config/tokenNameMap"
-import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
+import {
+  STAKING_TOKEN_ADDRESS,
+  COMMITTEE_ADDRESS,
+} from "../config/deployments"
 import {
   getERC20WithSigner,
   getTokenDecimals,
@@ -152,16 +154,16 @@ export default function BondModal({ isOpen, onClose }) {
     if (!pool) return
     setIsSubmitting(true)
     try {
-      const staking = await getStakingWithSigner()
+      const committee = await getCommitteeWithSigner()
       const token = await getERC20WithSigner(tokenAddress)
       const value = ethers.utils.parseUnits(amount, decimals)
       const owner = await token.signer.getAddress()
-      const allowance = await token.allowance(owner, staking.address)
+      const allowance = await token.allowance(owner, COMMITTEE_ADDRESS)
       if (allowance.lt(value)) {
-        const approveTx = await token.approve(staking.address, value)
+        const approveTx = await token.approve(COMMITTEE_ADDRESS, value)
         await approveTx.wait()
       }
-      const tx = await staking.depositBond(pool.id, selectedAsset, value)
+      const tx = await committee.createProposal(pool.id, 1, value)
       setTxHash(tx.hash)
       await tx.wait()
       setAmount("")

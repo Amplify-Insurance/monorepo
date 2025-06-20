@@ -169,8 +169,8 @@ export default function StakingPage() {
                   </SheetHeader>
                   <div className="mt-4 text-sm space-y-3">
                     <p>
-                      Depositing a bond triggers{" "}
-                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">depositBond(poolId, asset, amount)</code>.
+                      Depositing a bond triggers{' '}
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">createProposal(poolId, 1, amount)</code>.
                       The bond is tied to the selected risk pool and remains locked as collateral.
                     </p>
                     <p>Bonds encourage honest participation in governance by putting your own assets at risk.</p>
