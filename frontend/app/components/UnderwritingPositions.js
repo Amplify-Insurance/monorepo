@@ -17,6 +17,15 @@ import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName, getProtoc
 import { getDeployment } from "../config/deployments"
 
 export default function UnderwritingPositions({ displayCurrency }) {
+  const toBigInt = (value) => {
+    if (typeof value === "bigint") return value
+    if (typeof value === "string" || typeof value === "number") return BigInt(value)
+    if (value && typeof value === "object") {
+      if ("hex" in value) return BigInt(value.hex)
+      if (typeof value.toString === "function") return BigInt(value.toString())
+    }
+    return 0n
+  }
   const NOTICE_PERIOD = 600 // seconds
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState(null)
@@ -548,8 +557,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                           </h4>
                                           <div
                                             className={`grid grid-cols-1 ${
-                                              BigInt(position.withdrawalRequestShares || 0n) > 0n &&
-                                              BigInt(position.withdrawalRequestShares || 0n) < BigInt(position.shares || 0n)
+                                              toBigInt(position.withdrawalRequestShares) > 0n &&
+                                              toBigInt(position.withdrawalRequestShares) < toBigInt(position.shares)
                                                 ? 'sm:grid-cols-3'
                                                 : 'sm:grid-cols-2'
                                             } gap-3`}
@@ -575,7 +584,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               {isClaiming ? "Claiming..." : "Claim Rewards"}
                                             </button>
 
-                                            {BigInt(position.withdrawalRequestShares || 0n) >= BigInt(position.shares || 0n) && BigInt(position.withdrawalRequestShares || 0n) > 0n ? (
+                                            {toBigInt(position.withdrawalRequestShares) >= toBigInt(position.shares) &&
+                                              toBigInt(position.withdrawalRequestShares) > 0n ? (
                                               <button
                                                 className="group flex items-center justify-center gap-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                                 onClick={handleExecuteWithdrawal}
@@ -623,7 +633,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                                   </svg>
                                                   Manage Position
                                                 </button>
-                                                {BigInt(position.withdrawalRequestShares || 0n) > 0n && (
+                                                {toBigInt(position.withdrawalRequestShares) > 0n && (
                                                   <button
                                                     className="group flex items-center justify-center gap-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                                     onClick={handleExecuteWithdrawal}
