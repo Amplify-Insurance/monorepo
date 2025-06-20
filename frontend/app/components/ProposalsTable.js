@@ -101,6 +101,26 @@ export default function ProposalsTable({ proposals, loading }) {
                     <tr>
                       <td colSpan={4} className="px-3 sm:px-6 py-4">
                         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4">
+                          <div className="mb-3 space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-green-700 dark:text-green-300">For: {p.forVotes}</span>
+                              <span className="text-red-600 dark:text-red-300">Against: {p.againstVotes}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                              <div
+                                className="bg-purple-600 h-2 rounded-full"
+                                style={{ width: `${Math.min(((p.forVotes + p.againstVotes) / p.quorumVotes) * 100, 100)}%` }}
+                              ></div>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                              <span>
+                                {p.forVotes + p.againstVotes} / {p.quorumVotes} votes for quorum
+                              </span>
+                              <span>
+                                {((p.forVotes + p.againstVotes) / p.totalStaked * 100).toFixed(2)}% of stake voted
+                              </span>
+                            </div>
+                          </div>
                           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Votes</h4>
                           <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
