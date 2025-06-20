@@ -54,6 +54,10 @@ export default function BondModal({ isOpen, onClose }) {
   const [balance, setBalance] = useState("0")
   const [assetSymbol, setAssetSymbol] = useState("")
   const [feeShareBps, setFeeShareBps] = useState(0)
+  const [minBond, setMinBond] = useState("0")
+  const [maxBond, setMaxBond] = useState("0")
+  const [minFeeBps, setMinFeeBps] = useState(0)
+  const [maxFeeBps, setMaxFeeBps] = useState(0)
 
   const handleAmountChange = (e) => {
     const value = e.target.value
@@ -63,7 +67,7 @@ export default function BondModal({ isOpen, onClose }) {
   }
 
   const handleSetMax = () => {
-    setAmount(balance)
+    setAmount(maxBond)
   }
 
 
@@ -103,19 +107,27 @@ export default function BondModal({ isOpen, onClose }) {
       }
     }
 
-    async function loadFeeShare() {
+    async function loadCommitteeParams() {
       try {
         const c = getCommittee()
-        const bps = await c.proposerFeeShareBps()
-        setFeeShareBps(Number(bps.toString()))
+        const [minB, maxB, minFee, maxFee] = await Promise.all([
+          c.minBondAmount(),
+          c.maxBondAmount(),
+          c.minProposerFeeBps(),
+          c.maxProposerFeeBps(),
+        ])
+        setMinBond(ethers.utils.formatEther(minB))
+        setMaxBond(ethers.utils.formatEther(maxB))
+        setMinFeeBps(Number(minFee.toString()))
+        setMaxFeeBps(Number(maxFee.toString()))
       } catch (err) {
-        console.error('Failed to load proposer fee share', err)
+        console.error('Failed to load committee params', err)
       }
     }
 
     if (isOpen) {
       loadTokenInfo()
-      loadFeeShare()
+      loadCommitteeParams()
     }
   }, [isOpen, tokenAddress])
 
@@ -123,6 +135,24 @@ export default function BondModal({ isOpen, onClose }) {
     if (!selectedAsset) return
     setAssetSymbol(getUnderlyingTokenName(selectedAsset))
   }, [selectedAsset])
+
+  // Calculate proposer fee share based on bond amount
+  useEffect(() => {
+    if (!amount) {
+      setFeeShareBps(0)
+      return
+    }
+    const amt = Number(amount)
+    const min = Number(minBond)
+    const max = Number(maxBond)
+    if (!min || !max) return
+    if (amt <= min) return setFeeShareBps(minFeeBps)
+    if (amt >= max) return setFeeShareBps(maxFeeBps)
+    const span = max - min
+    const bpsSpan = maxFeeBps - minFeeBps
+    const bps = minFeeBps + ((amt - min) * bpsSpan) / span
+    setFeeShareBps(bps)
+  }, [amount, minBond, maxBond, minFeeBps, maxFeeBps])
 
   // Calculate max payout based on claim fees for the selected pool
   useEffect(() => {
@@ -149,7 +179,11 @@ export default function BondModal({ isOpen, onClose }) {
 
   const handleSubmit = async () => {
     if (!amount || !selectedProtocol) return
-    if (Number(amount) < 1000) return
+    if (
+      Number(amount) < Number(minBond) ||
+      Number(amount) > Number(maxBond)
+    )
+      return
     const pool = pools.find((p) => String(p.id) === selectedProtocol)
     if (!pool) return
     setIsSubmitting(true)
@@ -256,7 +290,9 @@ export default function BondModal({ isOpen, onClose }) {
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Bond Amount</label>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Balance: {Number.parseFloat(balance).toFixed(4)} {symbol}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Balance: {Number.parseFloat(balance).toFixed(4)} {symbol} | Min: {Number.parseFloat(minBond).toFixed(2)} {symbol} | Max: {Number.parseFloat(maxBond).toFixed(2)} {symbol}
+            </div>
           </div>
 
           <div className="relative">
@@ -288,12 +324,14 @@ export default function BondModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Max Payout Info */}
+        {/* Estimated Payout Info */}
         {amount && Number.parseFloat(amount) > 0 && (
           <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Max Payout</span>
+              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                Est. Payout ({(feeShareBps / 100).toFixed(2)}% of fees)
+              </span>
             </div>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
               {maxPayout} {assetSymbol}
@@ -321,7 +359,8 @@ export default function BondModal({ isOpen, onClose }) {
           disabled={
             isSubmitting ||
             !amount ||
-            Number.parseFloat(amount) < 1000
+            Number.parseFloat(amount) < Number(minBond) ||
+            Number.parseFloat(amount) > Number(maxBond)
           }
           className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
         >
