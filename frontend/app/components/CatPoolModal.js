@@ -26,6 +26,7 @@ export default function CatPoolModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [txHash, setTxHash] = useState("")
   const [balance, setBalance] = useState("0")
+  const [decimals, setDecimals] = useState(6)
   const [needsApproval, setNeedsApproval] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
   const projected = amount ? (Number.parseFloat(amount) * (apr / 100)).toFixed(2) : "0"
@@ -35,6 +36,8 @@ export default function CatPoolModal({
   const handleAmountChange = (e) => {
     const value = e.target.value
     if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      const parts = value.split(".")
+      if (decimals != null && parts[1] && parts[1].length > decimals) return
       setAmount(value)
       setUsdValue(value || "0")
     }
@@ -69,6 +72,7 @@ export default function CatPoolModal({
       }
       const human = ethers.utils.formatUnits(bal, dec)
       setBalance(human)
+      setDecimals(dec)
       return human
     } catch {
       setBalance("0")
