@@ -83,4 +83,204 @@ contract RewardDistributorTest is Test {
         vm.expectRevert("RD: Not RiskManager");
         rd.updateUserState(user, 1, address(token), 100 ether);
     }
+
+    function testConstructorZeroRiskManagerReverts() public {
+        vm.expectRevert(RewardDistributor.ZeroAddress.selector);
+        new RewardDistributor(address(0));
+    }
+
+    function testSetCatPoolOnlyOwner() public {
+        vm.prank(address(0x5));
+        vm.expectRevert("OwnableUnauthorizedAccount");
+        rd.setCatPool(catPool);
+    }
+
+    function testSetCatPoolZeroReverts() public {
+        vm.prank(owner);
+        vm.expectRevert(RewardDistributor.ZeroAddress.selector);
+        rd.setCatPool(address(0));
+    }
+
+    function testSetRiskManagerOnlyOwner() public {
+        vm.prank(address(0x5));
+        vm.expectRevert("OwnableUnauthorizedAccount");
+        rd.setRiskManager(address(0x6));
+    }
+
+    function testSetRiskManagerZeroReverts() public {
+        vm.prank(owner);
+        vm.expectRevert(RewardDistributor.ZeroAddress.selector);
+        rd.setRiskManager(address(0));
+    }
+
+    function testDistributeAccumulates() public {
+        uint256 poolId = 1;
+        uint256 totalPledge = 1000 ether;
+        uint256 rewardAmount = 100 ether;
+
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), rewardAmount, totalPledge);
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), rewardAmount / 2, totalPledge);
+
+        uint256 tracker = rd.poolRewardTrackers(poolId, address(token));
+        uint256 expected = (rewardAmount + rewardAmount / 2) * PRECISION / totalPledge;
+        assertEq(tracker, expected);
+    }
+
+    function testDistributeIgnoresZeroValues() public {
+        uint256 poolId = 1;
+        uint256 totalPledge = 1000 ether;
+        uint256 rewardAmount = 100 ether;
+
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), rewardAmount, totalPledge);
+        uint256 before = rd.poolRewardTrackers(poolId, address(token));
+
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), 0, totalPledge);
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), rewardAmount, 0);
+
+        uint256 afterTracker = rd.poolRewardTrackers(poolId, address(token));
+        assertEq(before, afterTracker);
+    }
+
+    function testDistributeOnlyRiskManager() public {
+        vm.expectRevert("RD: Not RiskManager");
+        rd.distribute(1, address(token), 1 ether, 1 ether);
+    }
+
+    function testClaimReturnsZeroWhenNothing() public {
+        vm.prank(riskManager);
+        uint256 claimed = rd.claim(user, 1, address(token), 1 ether);
+        assertEq(claimed, 0);
+        assertEq(token.balanceOf(user), 0);
+    }
+
+    function testClaimOnlyRiskManager() public {
+        vm.expectRevert("RD: Not RiskManager");
+        rd.claim(user, 1, address(token), 1 ether);
+    }
+
+    function testClaimForCatPoolRevertsIfNotSet() public {
+        vm.prank(catPool);
+        vm.expectRevert("RD: Not CatPool");
+        rd.claimForCatPool(user, 1, address(token), 1 ether);
+    }
+
+    function testClaimForCatPoolOnlyCatPool() public {
+        vm.prank(owner);
+        rd.setCatPool(catPool);
+        vm.prank(address(0x5));
+        vm.expectRevert("RD: Not CatPool");
+        rd.claimForCatPool(user, 1, address(token), 1 ether);
+    }
+
+    function testUpdateUserStateRecordsDebt() public {
+        uint256 poolId = 1;
+        uint256 totalPledge = 1000 ether;
+        uint256 rewardAmount = 100 ether;
+        uint256 userPledge = 100 ether;
+
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), rewardAmount, totalPledge);
+        vm.prank(riskManager);
+        rd.updateUserState(user, poolId, address(token), userPledge);
+
+        uint256 tracker = rd.poolRewardTrackers(poolId, address(token));
+        uint256 userDebt = rd.userRewardStates(user, poolId, address(token));
+        assertEq(userDebt, userPledge * tracker / PRECISION);
+    }
+
+    function testPendingRewardsZeroAfterClaim() public {
+        (uint256 poolId, uint256 userPledge) = _setupDistribution();
+        vm.prank(riskManager);
+        rd.claim(user, poolId, address(token), userPledge);
+        uint256 pending = rd.pendingRewards(user, poolId, address(token), userPledge);
+        assertEq(pending, 0);
+    }
+
+    function testMultipleTokensIndependent() public {
+        (uint256 poolId, uint256 userPledge) = _setupDistribution();
+        MockERC20 token2 = new MockERC20("Reward2", "RW2", 18);
+        token2.mint(address(rd), 1000 ether);
+
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token2), 100 ether, 1000 ether);
+        vm.prank(riskManager);
+        rd.updateUserState(user, poolId, address(token2), userPledge);
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token2), 100 ether, 1000 ether);
+
+        uint256 pending1 = rd.pendingRewards(user, poolId, address(token), userPledge);
+        uint256 pending2 = rd.pendingRewards(user, poolId, address(token2), userPledge);
+        assertEq(pending1, 10 ether);
+        assertEq(pending2, 10 ether);
+    }
+
+    function testRewardsIndependentPerPool() public {
+        uint256 poolId1 = 1;
+        uint256 poolId2 = 2;
+        uint256 totalPledge = 1000 ether;
+        uint256 rewardAmount = 100 ether;
+        uint256 userPledge1 = 100 ether;
+        uint256 userPledge2 = 50 ether;
+
+        vm.prank(riskManager);
+        rd.distribute(poolId1, address(token), rewardAmount, totalPledge);
+        vm.prank(riskManager);
+        rd.updateUserState(user, poolId1, address(token), userPledge1);
+        vm.prank(riskManager);
+        rd.distribute(poolId1, address(token), rewardAmount, totalPledge);
+
+        vm.prank(riskManager);
+        rd.distribute(poolId2, address(token), rewardAmount, totalPledge);
+        vm.prank(riskManager);
+        rd.updateUserState(user, poolId2, address(token), userPledge2);
+        vm.prank(riskManager);
+        rd.distribute(poolId2, address(token), rewardAmount, totalPledge);
+
+        uint256 pending1 = rd.pendingRewards(user, poolId1, address(token), userPledge1);
+        uint256 pending2 = rd.pendingRewards(user, poolId2, address(token), userPledge2);
+        assertEq(pending1, 10 ether);
+        assertEq(pending2, 5 ether);
+    }
+
+    function testFractionalRewards() public {
+        uint256 poolId = 1;
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), 1, 2);
+        vm.prank(riskManager);
+        rd.updateUserState(user, poolId, address(token), 1);
+        vm.prank(riskManager);
+        rd.distribute(poolId, address(token), 1, 2);
+        uint256 pending = rd.pendingRewards(user, poolId, address(token), 1);
+        assertEq(pending, 1);
+    }
+
+    function testNewRiskManagerControls() public {
+        address newRM = address(0x7);
+        vm.prank(owner);
+        rd.setRiskManager(newRM);
+        vm.prank(riskManager);
+        vm.expectRevert("RD: Not RiskManager");
+        rd.distribute(1, address(token), 1, 1);
+        vm.prank(newRM);
+        rd.distribute(1, address(token), 1, 1);
+    }
+
+    function testNewCatPoolTakesOver() public {
+        (uint256 poolId, uint256 userPledge) = _setupDistribution();
+        address newCat = address(0x8);
+        vm.prank(owner);
+        rd.setCatPool(newCat);
+
+        vm.prank(catPool);
+        vm.expectRevert("RD: Not CatPool");
+        rd.claimForCatPool(user, poolId, address(token), userPledge);
+
+        vm.prank(newCat);
+        rd.claimForCatPool(user, poolId, address(token), userPledge);
+    }
 }
