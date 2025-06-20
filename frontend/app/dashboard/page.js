@@ -17,6 +17,7 @@ import useCatPoolStats from "../../hooks/useCatPoolStats"
 import useStakingInfo from "../../hooks/useStakingInfo"
 import usePastProposals from "../../hooks/usePastProposals"
 import useActiveProposals from "../../hooks/useActiveProposals"
+import useBondedAmount from "../../hooks/useBondedAmount"
 import { ethers } from "ethers"
 
 export default function Dashboard() {
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const { info: stakingInfo } = useStakingInfo(address)
   const { proposals: pastProposals } = usePastProposals()
   const { proposals: activeProposals } = useActiveProposals()
+  const { amount: bondedAmount } = useBondedAmount(address)
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
 
   const hasActiveCoverages = (policies || []).length > 0
@@ -210,8 +212,10 @@ export default function Dashboard() {
                 <div className="text-lg font-semibold">{activeProposals.length}</div>
               </div>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Past Bonds</div>
-                <div className="text-lg font-semibold">{pastProposals.length}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Bonded</div>
+                <div className="text-lg font-semibold">
+                  {Number(ethers.utils.formatUnits(bondedAmount || "0", 18)).toFixed(4)}
+                </div>
               </div>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claimable Rewards</div>
