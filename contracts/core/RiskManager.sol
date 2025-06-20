@@ -301,6 +301,15 @@ contract RiskManager is Ownable, ReentrancyGuard {
         
         capitalPool.executePayout(payoutData);
 
+        if (lossBorneByPool > 0 && totalCapitalPledged > 0) {
+            for (uint256 i = 0; i < adapters.length; i++) {
+                uint256 adapterLoss = (lossBorneByPool * capitalPerAdapter[i]) / totalCapitalPledged;
+                if (adapterLoss > 0) {
+                    poolRegistry.updateCapitalAllocation(poolId, adapters[i], adapterLoss, false);
+                }
+            }
+        }
+
         // Update coverage sold directly without going through the PolicyManager
         // hook to avoid the NotPolicyManager revert when processing claims.
         (, , uint256 totalCoverageSold,, , ,) = poolRegistry.getPoolData(poolId);

@@ -17,6 +17,7 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
     }
 
     mapping(uint256 => PoolData) public pools;
+    mapping(uint256 => mapping(address => uint256)) public capitalPerAdapter;
     mapping(uint256 => RateModel) public rateModels;
     uint256 public poolCount;
     address[] public payoutAdapters;
@@ -58,6 +59,9 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         payoutAdapters = adapters;
         payoutAmounts = amounts;
         payoutTotal = total;
+        for(uint256 i = 0; i < adapters.length; i++) {
+            capitalPerAdapter[0][adapters[i]] = amounts[i];
+        }
     }
 
     function getPoolData(uint256 poolId) external view override returns (
@@ -92,15 +96,24 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         return a;
     }
 
-    function getCapitalPerAdapter(uint256, address) external view override returns (uint256) {
-        return 0;
+    function getCapitalPerAdapter(uint256 poolId, address adapter) external view override returns (uint256) {
+        return capitalPerAdapter[poolId][adapter];
     }
 
     function addProtocolRiskPool(address, RateModel calldata, uint256) external override returns (uint256) {
         return 0;
     }
 
-    function updateCapitalAllocation(uint256, address, uint256, bool) external override {}
+    function updateCapitalAllocation(uint256 poolId, address adapter, uint256 amount, bool isAllocation) external override {
+        PoolData storage pool = pools[poolId];
+        if (isAllocation) {
+            pool.totalCapitalPledgedToPool += amount;
+            capitalPerAdapter[poolId][adapter] += amount;
+        } else {
+            pool.totalCapitalPledgedToPool -= amount;
+            capitalPerAdapter[poolId][adapter] -= amount;
+        }
+    }
 
     function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external override {
         if (isRequest) {
