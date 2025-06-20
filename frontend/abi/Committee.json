@@ -28,12 +28,7 @@
 			},
 			{
 				"internalType": "uint256",
-				"name": "_proposalBond",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_proposerFeeShare",
+				"name": "_slashPercentageBps",
 				"type": "uint256"
 			}
 		],
@@ -222,6 +217,25 @@
 		"type": "event"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "activeProposalForPool",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "challengePeriod",
 		"outputs": [
@@ -258,6 +272,11 @@
 				"internalType": "enum Committee.ProposalType",
 				"name": "_pType",
 				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_bondAmount",
+				"type": "uint256"
 			}
 		],
 		"name": "createProposal",
@@ -323,12 +342,12 @@
 	},
 	{
 		"inputs": [],
-		"name": "owner",
+		"name": "maxBondAmount",
 		"outputs": [
 			{
-				"internalType": "address",
+				"internalType": "uint256",
 				"name": "",
-				"type": "address"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -336,12 +355,51 @@
 	},
 	{
 		"inputs": [],
-		"name": "proposalBondAmount",
+		"name": "maxProposerFeeBps",
 		"outputs": [
 			{
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "minBondAmount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "minProposerFeeBps",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -411,11 +469,6 @@
 				"type": "uint256"
 			},
 			{
-				"internalType": "bool",
-				"name": "executed",
-				"type": "bool"
-			},
-			{
 				"internalType": "enum Committee.ProposalStatus",
 				"name": "status",
 				"type": "uint8"
@@ -427,25 +480,17 @@
 			},
 			{
 				"internalType": "uint256",
+				"name": "proposerFeeShareBps",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
 				"name": "challengeDeadline",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
 				"name": "totalRewardFees",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "proposerFeeShareBps",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
 				"type": "uint256"
 			}
 		],
@@ -506,6 +551,19 @@
 				"internalType": "contract IRiskManager",
 				"name": "",
 				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "slashPercentageBps",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
