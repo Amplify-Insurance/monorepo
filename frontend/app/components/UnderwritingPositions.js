@@ -94,14 +94,9 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const protocolPositions = underwritingPositions.filter((p) => p.type === "protocol")
   const stablecoinPositions = underwritingPositions.filter((p) => p.type === "stablecoin")
 
-  const activePositions = underwritingPositions.filter((p) => p.status === "active")
-  const withdrawalPositions = underwritingPositions.filter((p) => p.status === "requested withdrawal")
-
   const showPendingLoss = underwritingPositions.some((p) => p.pendingLoss > 0)
 
   const hasDistressedAssets = underwritingPositions.some((p) => p.pendingLoss > 0)
-
-  console.log(activePositions, "activePositions")
 
   const unlockTimestamp =
     Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD
@@ -226,7 +221,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
     const pool = pools.find((p) => p.deployment === d.deployment)
     const price = pool?.tokenPriceUsd ?? 1
     const dec = pool?.underlyingAssetDecimals ?? 6
-    console.log(price, sum, d.totalDepositedAssetPrincipal, "price totalDepositedUsd")
 
     return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, dec)) * price
   }, 0)
@@ -710,125 +704,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
                           </tr>
                         )}
                       </Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-        {withdrawal.length > 0 && (
-          <div className="mt-8 overflow-x-auto -mx-4 sm:mx-0">
-            <div className="inline-block min-w-full align-middle">
-              <div className="overflow-visible shadow-sm ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-800">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                      >
-                        Protocol
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                      >
-                        Pool
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                      >
-                        {displayCurrency === "native" ? "Amount" : "Value"}
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
-                      >
-                        Unlock
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                      >
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {withdrawal.map((position) => (
-                      <tr key={position.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-8 w-8 mr-2 sm:mr-3">
-                              <Image
-                                src={getProtocolLogo(position.id) || "/placeholder.svg"}
-                                alt={position.protocol}
-                                width={32}
-                                height={32}
-                                className="rounded-full"
-                              />
-                            </div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {getProtocolName(position.id)}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-6 w-6 mr-2">
-                              <Image
-                                src={getTokenLogo(position.pool) || "/placeholder.svg"}
-                                alt={position.poolName}
-                                width={24}
-                                height={24}
-                                className="rounded-full"
-                              />
-                            </div>
-                            <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
-                          </div>
-                          <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
-                            {displayCurrency === "native"
-                              ? `${position.amount}`
-                              : formatCurrency(position.usdValue, "USD", "usd")}
-                          </div>
-                          <div className="mt-1 sm:hidden text-xs font-medium text-green-600 dark:text-green-400">
-                            {unlockDays}d
-                          </div>
-                          {position.pendingLoss > 0 && (
-                            <div className="mt-1 sm:hidden text-xs text-red-600 dark:text-red-400">
-                              Loss:{" "}
-                              {formatCurrency(
-                                displayCurrency === "native" ? position.pendingLoss : position.pendingLossUsd,
-                                "USD",
-                                displayCurrency,
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {displayCurrency === "native"
-                              ? `${position.amount}`
-                              : formatCurrency(position.usdValue, "USD", "usd")}
-                          </div>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                          <div className="text-sm font-medium text-green-600 dark:text-green-400">{unlockDays}d</div>
-                        </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {withdrawalReady && (
-                            <button
-                              onClick={handleExecuteWithdrawal}
-                              disabled={isExecuting}
-                              className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 disabled:opacity-50"
-                            >
-                              {isExecuting ? "Executing..." : "Withdraw"}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
                     ))}
                   </tbody>
                 </table>
