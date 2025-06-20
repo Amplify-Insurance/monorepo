@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ethers } from 'ethers'
 import { getCommittee } from '../lib/committee'
 import { getStaking } from '../lib/staking'
 
@@ -32,10 +33,10 @@ export default function useActiveProposals() {
             votingDeadline: Number(p.votingDeadline),
             executed,
             passed,
-            forVotes: Number(p.forVotes),
-            againstVotes: Number(p.againstVotes),
-            quorumVotes: Number(quorumVotes),
-            totalStaked: Number(totalStaked),
+            forVotes: parseFloat(ethers.utils.formatUnits(p.forVotes, 18)),
+            againstVotes: parseFloat(ethers.utils.formatUnits(p.againstVotes, 18)),
+            quorumVotes: parseFloat(ethers.utils.formatUnits(quorumVotes.toString(), 18)),
+            totalStaked: parseFloat(ethers.utils.formatUnits(totalStaked, 18)),
             abstainVotes: 0,
             votes: []
           })
