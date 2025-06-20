@@ -221,10 +221,12 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
     function _getPremiumRateBpsAnnual(uint256 _poolId) internal view returns (uint256) {
         (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal, , ,) = poolRegistry.getPoolData(_poolId);
         
-        // Resolution: If pending withdrawals exceed or equal pledged capital, 
-        // there is no available capital. This check prevents an underflow revert.
+        // If pending withdrawals exceed or equal pledged capital, there is no
+        // available capital for calculating a premium rate.  Returning zero
+        // avoids overflow in callers while signalling that premiums should not
+        // accrue.
         if (pendingWithdrawal >= totalPledged) {
-            return type(uint256).max;
+            return 0;
         }
 
         uint256 availableCapital = totalPledged - pendingWithdrawal;

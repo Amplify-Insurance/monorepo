@@ -808,7 +808,7 @@ describe("PolicyManager", function () {
                 expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.true;
             });
 
-            it("Should revert when pool has no available capital", async function() {
+            it("Should return true when pool has no available capital", async function() {
                 const now = await time.latest();
                 await mockPolicyNFT.mock_setPolicy(
                     POLICY_ID,
@@ -835,7 +835,7 @@ describe("PolicyManager", function () {
                 const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
                 await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
 
-                await expect(policyManager.isPolicyActive(POLICY_ID)).to.be.reverted;
+                expect(await policyManager.isPolicyActive(POLICY_ID)).to.be.true;
             });
         });
 
