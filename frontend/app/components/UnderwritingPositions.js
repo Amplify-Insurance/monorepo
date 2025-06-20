@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, Fragment } from "react"
+import { useState, useEffect, Fragment, useMemo } from "react"
 import { TrendingUp, ChevronDown, ChevronUp } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -37,44 +37,59 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const defaultDeployment = details?.[0]?.deployment
   const adapters = useYieldAdapters(defaultDeployment)
 
-  const underwritingPositions = (details || [])
-    .flatMap((d) =>
-      d.allocatedPoolIds.map((pid) => {
-        const pool = pools.find((pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid))
-        if (!pool) return null
-        const protocol = getTokenName(pool.id)
-        const amount = Number(
-          ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, pool.underlyingAssetDecimals ?? 6),
+  const unlockTimestamp =
+    Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) +
+    NOTICE_PERIOD
+  const currentTimestamp = Math.floor(Date.now() / 1000)
+  const unlockDays = Math.max(0, Math.ceil((unlockTimestamp - currentTimestamp) / 86400))
+  const withdrawalReady = currentTimestamp >= unlockTimestamp
+
+  const underwritingPositions = useMemo(
+    () =>
+      (details || [])
+        .flatMap((d) =>
+          d.allocatedPoolIds.map((pid) => {
+            const pool = pools.find(
+              (pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid),
+            )
+            if (!pool) return null
+            const protocol = getTokenName(pool.id)
+            const amount = Number(
+              ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, pool.underlyingAssetDecimals ?? 6),
+            )
+            const pendingLossStr = d.pendingLosses?.[pid] ?? "0"
+            const pendingLoss = Number(
+              ethers.utils.formatUnits(pendingLossStr, pool.underlyingAssetDecimals ?? 6),
+            )
+            return {
+              id: `${d.deployment}-${pid}`,
+              deployment: d.deployment,
+              protocol,
+              type: getProtocolType(pool.id),
+              pool: pool.protocolTokenToCover,
+              poolName: getTokenName(pool.id),
+              poolId: pid,
+              amount,
+              nativeValue: amount,
+              usdValue: amount * (pool.tokenPriceUsd ?? 1),
+              pendingLoss,
+              pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
+              yield: Number(pool.underwriterYieldBps || 0) / 100,
+              status:
+                Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
+                  ? withdrawalReady
+                    ? "withdrawal ready"
+                    : "requested withdrawal"
+                  : "active",
+              withdrawalRequestShares: d.withdrawalRequestShares,
+              shares: d.masterShares,
+              yieldChoice: d.yieldChoice,
+            }
+          }),
         )
-        const pendingLossStr = d.pendingLosses?.[pid] ?? "0"
-        const pendingLoss = Number(ethers.utils.formatUnits(pendingLossStr, pool.underlyingAssetDecimals ?? 6))
-        return {
-          id: `${d.deployment}-${pid}`,
-          deployment: d.deployment,
-          protocol,
-          type: getProtocolType(pool.id),
-          pool: pool.protocolTokenToCover,
-          poolName: getTokenName(pool.id),
-          poolId: pid,
-          amount,
-          nativeValue: amount,
-          usdValue: amount * (pool.tokenPriceUsd ?? 1),
-          pendingLoss,
-          pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
-          yield: Number(pool.underwriterYieldBps || 0) / 100,
-          status:
-            Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
-              ? withdrawalReady
-                ? "withdrawal ready"
-                : "requested withdrawal"
-              : "active",
-          withdrawalRequestShares: d.withdrawalRequestShares,
-          shares: d.masterShares,
-          yieldChoice: d.yieldChoice,
-        }
-      }),
-    )
-    .filter(Boolean)
+        .filter(Boolean),
+    [details, pools, withdrawalReady],
+  )
 
   useEffect(() => {
     async function loadRewards() {
@@ -103,12 +118,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const showPendingLoss = underwritingPositions.some((p) => p.pendingLoss > 0)
 
   const hasDistressedAssets = underwritingPositions.some((p) => p.pendingLoss > 0)
-
-  const unlockTimestamp =
-    Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD
-  const currentTimestamp = Math.floor(Date.now() / 1000)
-  const unlockDays = Math.max(0, Math.ceil((unlockTimestamp - currentTimestamp) / 86400))
-  const withdrawalReady = currentTimestamp >= unlockTimestamp
 
   const handleOpenModal = (position) => {
     setSelectedPosition(position)
