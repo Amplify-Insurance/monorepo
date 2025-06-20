@@ -20,14 +20,18 @@ export default function useActiveProposals() {
         const items = []
         for (let i = Number(count); i > 0; i--) {
           const p = await c.proposals(i)
-          if (p.executed) continue
+          const status = Number(p.status)
+          // Skip proposals that are finished
+          if (status === 2 || status === 3 || status === 4 || status === 6) continue
+          const executed = status === 4 || status === 6
+          const passed = status === 4 || status === 6
           items.push({
             id: Number(p.id),
             poolId: Number(p.poolId),
             pauseState: Number(p.pType) === 1,
             votingDeadline: Number(p.votingDeadline),
-            executed: p.executed,
-            passed: false,
+            executed,
+            passed,
             forVotes: Number(p.forVotes),
             againstVotes: Number(p.againstVotes),
             quorumVotes: Number(quorumVotes),
