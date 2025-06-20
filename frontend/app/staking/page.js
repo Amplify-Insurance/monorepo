@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { HelpCircle, Vote, Shield, Users } from "lucide-react"
@@ -11,8 +11,9 @@ import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../.
 import StakeModal from "../components/StakeModal"
 import UnstakeModal from "../components/UnstakeModal"
 import BondModal from "../components/BondModal"
-import { getCommitteeWithSigner } from "../../lib/committee"
+import { getCommitteeWithSigner, getCommittee } from "../../lib/committee"
 import { getStakingWithSigner } from "../../lib/staking"
+import { formatPercentage } from "../utils/formatting"
 
 export default function StakingPage() {
   const { address, isConnected } = useAccount()
@@ -22,8 +23,22 @@ export default function StakingPage() {
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
   const [isUnstakingBond, setIsUnstakingBond] = useState(false)
+  const [maxFeePercent, setMaxFeePercent] = useState(0)
   const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
   const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const c = getCommittee()
+        const bps = await c.maxProposerFeeBps()
+        setMaxFeePercent(Number(bps.toString()) / 100)
+      } catch (err) {
+        console.error('Failed to load max proposer fee', err)
+      }
+    }
+    load()
+  }, [])
 
   const handleUnstakeBond = async () => {
     setIsUnstakingBond(true)
@@ -180,7 +195,10 @@ export default function StakingPage() {
                 <div className="text-sm text-green-800 dark:text-green-200">
                   <p className="font-medium mb-1">Bond Features</p>
                   <ul className="text-xs space-y-1">
-                    <li>• Earn up to 2x bond value</li>
+                    <li>
+                      • Earn up to {formatPercentage(maxFeePercent)} of Claim
+                      Fees
+                    </li>
                     <li>• Secure protocol operations</li>
                     <li>• Risk of slashing if dishonest</li>
                   </ul>
