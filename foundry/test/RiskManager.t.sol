@@ -66,6 +66,7 @@ contract RiskManagerTest is Test {
         cp.triggerOnCapitalDeposited(address(rm), underwriter, pledge);
         cp.setUnderwriterAdapterAddress(underwriter, address(1));
         pr.setPoolCount(1);
+        pr.setPoolData(0, token, pledge, 0, 0, false, address(0), 0);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
@@ -73,6 +74,8 @@ contract RiskManagerTest is Test {
         rm.allocateCapital(pools);
 
         ld.setPendingLoss(underwriter, 0, 0);
+        vm.prank(underwriter);
+        rm.requestDeallocateFromPool(0);
         vm.prank(underwriter);
         rm.deallocateFromPool(0);
 
@@ -104,6 +107,7 @@ function testAllocateCapitalRevertsInvalidPoolId() public {
     cp.triggerOnCapitalDeposited(address(rm), underwriter, 1000);
     cp.setUnderwriterAdapterAddress(underwriter, address(1));
     pr.setPoolCount(1);
+    pr.setPoolData(0, token, 1000, 0, 0, false, address(0), 0);
     uint256[] memory pools = new uint256[](1);
     pools[0] = 1;
     vm.prank(underwriter);
@@ -121,6 +125,8 @@ function testDeallocateRealizesLoss() public {
     rm.allocateCapital(pools);
 
     ld.setPendingLoss(underwriter, 0, 200);
+    vm.prank(underwriter);
+    rm.requestDeallocateFromPool(0);
     vm.prank(underwriter);
     rm.deallocateFromPool(0);
 
