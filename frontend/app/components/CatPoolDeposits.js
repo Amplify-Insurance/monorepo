@@ -17,7 +17,12 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   }
 
   const shares = Number(ethers.utils.formatUnits(info.balance || "0", 18))
-  const value = Number(ethers.utils.formatUnits(info.value || "0", 6))
+  let value
+  try {
+    value = Number(ethers.utils.formatUnits(info.value || "0", 6))
+  } catch {
+    value = Number(info.value || 0)
+  }
 
   return (
     <div className="overflow-x-auto -mx-4 sm:mx-0">
