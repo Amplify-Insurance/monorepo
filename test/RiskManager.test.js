@@ -359,6 +359,15 @@ const MAX_ALLOCATIONS = 5;
                 const stored = await mockRewardDistributor.totalRewards(POOL_ID_1, highDecToken.target);
                 expect(stored).to.equal(ethers.parseUnits("50000", 18));
             });
+
+            it("Should reduce pool capital after a claim", async function () {
+                const initial = (await mockPoolRegistry.pools(POOL_ID_1)).totalCapitalPledgedToPool;
+                await expect(riskManager.connect(nonParty).processClaim(POLICY_ID)).to.not.be.reverted;
+                const poolAfter = await mockPoolRegistry.pools(POOL_ID_1);
+                expect(poolAfter.totalCapitalPledgedToPool).to.equal(initial - COVERAGE_AMOUNT);
+                const capPerAdapter = await mockPoolRegistry.capitalPerAdapter(POOL_ID_1, nonParty.address);
+                expect(capPerAdapter).to.equal(initial - COVERAGE_AMOUNT);
+            });
         });
 
         describe("Liquidation", function() {
