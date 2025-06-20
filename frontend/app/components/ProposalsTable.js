@@ -8,6 +8,8 @@ import { getCommitteeWithSigner } from "../../lib/committee"
 import { getStakingWithSigner } from "../../lib/staking"
 import { useAccount } from "wagmi"
 import VoteConfirmationModal from "./VoteConfirmationModal"
+import usePools from "../../hooks/usePools"
+import { getProtocolName, getTokenName } from "../config/tokenNameMap"
 
 export default function ProposalsTable({ proposals, loading }) {
   const [expanded, setExpanded] = useState([])
@@ -17,6 +19,8 @@ export default function ProposalsTable({ proposals, loading }) {
   const [showVoteModal, setShowVoteModal] = useState(false)
   const [pendingVote, setPendingVote] = useState(null)
   const [votingPower, setVotingPower] = useState(0)
+  const [voterPage, setVoterPage] = useState({})
+  const { pools } = usePools()
 
   const toggle = (id) => {
     setExpanded((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -101,26 +105,35 @@ export default function ProposalsTable({ proposals, loading }) {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {proposals.map((p) => (
-                <>
-                  <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        Pool {p.poolId} - {p.pauseState ? "Pause" : "Unpause"}
-                      </div>
-                      <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
-                        {p.executed ? (p.passed ? "Passed" : "Failed") : "Active"}
-                      </div>
-                    </td>
+              {proposals.map((p) => {
+                const pool = pools.find((pl) => Number(pl.id) === p.poolId)
+                const protocolName = getProtocolName(p.poolId)
+                const tokenName = pool ? getTokenName(pool.protocolTokenToCover) : ""
+                const status = p.executed ? (p.passed ? "Passed" : "Failed") : "Active"
+                const statusClass =
+                  status === "Active"
+                    ? "text-blue-600 dark:text-blue-400"
+                    : status === "Passed"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                return (
+                  <>
+                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {protocolName} - {tokenName}
+                        </div>
+                        <div className="mt-1 sm:hidden text-xs">
+                          <span className={statusClass}>{status}</span>
+                        </div>
+                      </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="text-sm text-gray-900 dark:text-white">
                         {new Date(p.votingDeadline * 1000).toLocaleDateString()}
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {p.executed ? (p.passed ? "Passed" : "Failed") : "Active"}
-                      </div>
+                      <div className={`text-sm font-medium ${statusClass}`}>{status}</div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
@@ -148,7 +161,7 @@ export default function ProposalsTable({ proposals, loading }) {
                             <div className="flex flex-wrap gap-4 text-sm">
                               <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                <span className="text-gray-600 dark:text-gray-400">Pool {p.poolId}</span>
+                                <span className="text-gray-600 dark:text-gray-400">{protocolName} - {tokenName}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
@@ -247,7 +260,9 @@ export default function ProposalsTable({ proposals, loading }) {
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:border-gray-700">
-                                  {p.votes.map((v) => (
+                                  {p.votes
+                                    .slice((voterPage[p.id] || 0) * 9, (voterPage[p.id] || 0) * 9 + 9)
+                                    .map((v) => (
                                     <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                       <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="font-mono text-sm text-gray-900 dark:text-gray-300 break-all">
@@ -275,6 +290,37 @@ export default function ProposalsTable({ proposals, loading }) {
                                 </tbody>
                               </table>
                             </div>
+                            {p.votes.length > 9 && (
+                              <div className="flex items-center justify-between px-6 py-2 text-sm border-t border-gray-200 dark:border-gray-700">
+                                <button
+                                  onClick={() =>
+                                    setVoterPage((prev) => ({
+                                      ...prev,
+                                      [p.id]: Math.max(0, (prev[p.id] || 0) - 1),
+                                    }))
+                                  }
+                                  disabled={(voterPage[p.id] || 0) === 0}
+                                  className="px-2 py-1 rounded disabled:opacity-50"
+                                >
+                                  Prev
+                                </button>
+                                <span>
+                                  {(voterPage[p.id] || 0) + 1} / {Math.ceil(p.votes.length / 9)}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setVoterPage((prev) => ({
+                                      ...prev,
+                                      [p.id]: Math.min(Math.ceil(p.votes.length / 9) - 1, (prev[p.id] || 0) + 1),
+                                    }))
+                                  }
+                                  disabled={(voterPage[p.id] || 0) >= Math.ceil(p.votes.length / 9) - 1}
+                                  className="px-2 py-1 rounded disabled:opacity-50"
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            )}
                           </div>
 
                           {/* Action Buttons */}
