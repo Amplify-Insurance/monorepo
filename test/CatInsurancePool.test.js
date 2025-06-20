@@ -117,6 +117,13 @@ describe("CatInsurancePool", function () {
                 .to.be.revertedWithCustomError(catPool, "OwnableUnauthorizedAccount");
         });
 
+        it("Should prevent non-owners from setting the adapter", async function () {
+            const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
+            const dummy = await MockYieldAdapter.deploy(mockUsdc.target, ethers.ZeroAddress, owner.address);
+            await expect(catPool.connect(nonParty).setAdapter(dummy.target))
+                .to.be.revertedWithCustomError(catPool, "OwnableUnauthorizedAccount");
+        });
+
         it("Should revert when setting addresses to zero", async function () {
             await expect(catPool.connect(owner).setRiskManagerAddress(ethers.ZeroAddress))
                 .to.be.revertedWith("CIP: Address cannot be zero");
