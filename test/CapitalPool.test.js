@@ -560,6 +560,21 @@ describe("CapitalPool", function () {
         expect(value).to.equal(testValue);
       });
 
+      it("sharesToValue returns zero when shares is zero", async () => {
+        expect(await capitalPool.sharesToValue(0)).to.equal(0);
+      });
+
+      it("valueToShares returns input when system value is zero", async () => {
+        const someValue = ethers.parseUnits("50", 6);
+        expect(await capitalPool.valueToShares(someValue)).to.equal(someValue);
+      });
+
+      it("valueToShares returns zero when amount is zero even after deposits", async () => {
+        const depositAmount = ethers.parseUnits("1000", 6);
+        await capitalPool.connect(user1).deposit(depositAmount, YIELD_PLATFORM_1);
+        expect(await capitalPool.valueToShares(0)).to.equal(0);
+      });
+
       it("does not duplicate adapters when set multiple times", async () => {
         await capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, mockAdapter1.target);
         await expect(capitalPool.connect(owner).setBaseYieldAdapter(YIELD_PLATFORM_1, mockAdapter1.target))
