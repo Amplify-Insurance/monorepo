@@ -1,25 +1,42 @@
 "use client"
 import { useAccount } from "wagmi"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { ethers } from "ethers"
 import { formatCurrency } from "../utils/formatting"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
+import { getUsdcDecimals, getCatShareDecimals } from "../../lib/catPool"
 export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { address } = useAccount()
   const { info, refresh } = useCatPoolUserInfo(address)
+  const [valueDecimals, setValueDecimals] = useState(6)
+  const [shareDecimals, setShareDecimals] = useState(18)
 
   useEffect(() => {
     refresh()
   }, [refreshTrigger])
 
+  useEffect(() => {
+    async function loadDecimals() {
+      try {
+        const [valDec, shareDec] = await Promise.all([
+          getUsdcDecimals(),
+          getCatShareDecimals(),
+        ])
+        setValueDecimals(valDec)
+        setShareDecimals(shareDec)
+      } catch {}
+    }
+    loadDecimals()
+  }, [])
+
   if (!info || info.balance === "0") {
     return <p className="text-gray-500">No deposits in the Cat Pool.</p>
   }
 
-  const shares = Number(ethers.utils.formatUnits(info.balance || "0", 18))
+  const shares = Number(ethers.utils.formatUnits(info.balance || "0", shareDecimals))
   let value
   try {
-    value = Number(ethers.utils.formatUnits(info.value || "0", 6))
+    value = Number(ethers.utils.formatUnits(info.value || "0", valueDecimals))
   } catch {
     value = Number(info.value || 0)
   }
