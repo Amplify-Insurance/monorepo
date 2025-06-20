@@ -498,6 +498,51 @@ const MAX_ALLOCATIONS = 5;
                 const allocs = await getAllocations(underwriter1.address);
                 expect(allocs).to.be.empty;
             });
+
+            it("onCapitalDeposited should update reward state for each pool", async function () {
+                const amount = ethers.parseUnits("500", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+                await mockPoolRegistry.setPoolCount(2);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, amount, 0, 0, false, committee.address, 0);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_2, mockUsdc.target, amount, 0, 0, false, committee.address, 0);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1, POOL_ID_2]);
+
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+
+                expect(await mockRewardDistributor.updateCallCount()).to.equal(2);
+                expect(await mockRewardDistributor.lastUpdateUser()).to.equal(underwriter1.address);
+            });
+
+            it("onWithdrawalRequested should snapshot reward state", async function () {
+                const amount = ethers.parseUnits("500", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, amount, 0, 0, false, committee.address, 0);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
+
+                await mockCapitalPool.triggerOnWithdrawalRequested(riskManager.target, underwriter1.address, amount);
+
+                expect(await mockRewardDistributor.updateCallCount()).to.equal(1);
+                expect(await mockRewardDistributor.lastUpdatePoolId()).to.equal(POOL_ID_1);
+            });
+
+            it("onCapitalWithdrawn should update reward state after withdrawal", async function () {
+                const pledge = ethers.parseUnits("1000", 6);
+                const withdraw = ethers.parseUnits("400", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, pledge);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, pledge, 0, 0, false, committee.address, 0);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
+
+                await mockCapitalPool.triggerOnCapitalWithdrawn(riskManager.target, underwriter1.address, withdraw, false);
+
+                expect(await mockRewardDistributor.updateCallCount()).to.equal(1);
+                expect(await mockRewardDistributor.lastUpdatePledge()).to.equal(pledge - withdraw);
+            });
         });
 
         describe("Reward Claims", function () {
@@ -520,6 +565,88 @@ const MAX_ALLOCATIONS = 5;
                 await riskManager.connect(nonParty).claimDistressedAssets(POOL_ID_1);
                 expect(await mockCatPool.claimProtocolRewardsCallCount()).to.equal(1);
                 expect(await mockCatPool.last_claimProtocolToken()).to.equal(mockUsdc.target);
+            });
+        });
+
+        describe("Reward accrual after deposits and withdrawals", function () {
+            let realRM, realRD;
+            const reward = ethers.parseUnits("100", 6);
+
+            beforeEach(async function () {
+                const RiskManagerFactory = await ethers.getContractFactory("RiskManager");
+                realRM = await RiskManagerFactory.deploy(owner.address);
+                const RDFactory = await ethers.getContractFactory("RewardDistributor");
+                realRD = await RDFactory.deploy(realRM.target);
+                await realRM.connect(owner).setAddresses(
+                    mockCapitalPool.target,
+                    mockPoolRegistry.target,
+                    mockPolicyManager.target,
+                    mockCatPool.target,
+                    mockLossDistributor.target,
+                    realRD.target
+                );
+                await mockUsdc.connect(owner).mint(realRD.target, ethers.parseUnits("1000", 6));
+                await realRM.connect(owner).setCommittee(committee.address);
+            });
+
+            async function distribute(amount, total) {
+                await ethers.provider.send("hardhat_impersonateAccount", [realRM.target]);
+                const signer = await ethers.getSigner(realRM.target);
+                await ethers.provider.send("hardhat_setBalance", [realRM.target, "0x1000000000000000000"]);
+                await realRD.connect(signer).distribute(POOL_ID_1, mockUsdc.target, amount, total);
+                await ethers.provider.send("hardhat_stopImpersonatingAccount", [realRM.target]);
+            }
+
+            it("accrues correctly after additional deposit", async function () {
+                const first = ethers.parseUnits("1000", 6);
+                const second = ethers.parseUnits("500", 6);
+
+                await mockCapitalPool.triggerOnCapitalDeposited(realRM.target, underwriter1.address, first);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, first, 0, 0, false, committee.address, 0);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await realRM.connect(underwriter1).allocateCapital([POOL_ID_1]);
+
+                await distribute(reward, first);
+                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+
+                await mockCapitalPool.triggerOnCapitalDeposited(realRM.target, underwriter1.address, second);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, first + second, 0, 0, false, committee.address, 0);
+
+                await distribute(reward, first + second);
+
+                const pledgeNow = await realRM.underwriterPoolPledge(underwriter1.address, POOL_ID_1);
+                const expected = await realRD.pendingRewards(underwriter1.address, POOL_ID_1, mockUsdc.target, pledgeNow);
+                const before = await mockUsdc.balanceOf(underwriter1.address);
+                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                const after = await mockUsdc.balanceOf(underwriter1.address);
+                expect(after - before).to.equal(expected);
+            });
+
+            it("accrues correctly after withdrawal", async function () {
+                const pledge = ethers.parseUnits("1000", 6);
+                const withdraw = ethers.parseUnits("400", 6);
+
+                await mockCapitalPool.triggerOnCapitalDeposited(realRM.target, underwriter1.address, pledge);
+                await mockPoolRegistry.setPoolCount(1);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, pledge, 0, 0, false, committee.address, 0);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await realRM.connect(underwriter1).allocateCapital([POOL_ID_1]);
+
+                await distribute(reward, pledge);
+                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+
+                await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
+                await mockCapitalPool.triggerOnCapitalWithdrawn(realRM.target, underwriter1.address, withdraw, false);
+                await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, pledge - withdraw, 0, 0, false, committee.address, 0);
+
+                await distribute(reward, pledge - withdraw);
+                const pledgeNow = await realRM.underwriterPoolPledge(underwriter1.address, POOL_ID_1);
+                const expected = await realRD.pendingRewards(underwriter1.address, POOL_ID_1, mockUsdc.target, pledgeNow);
+                const before = await mockUsdc.balanceOf(underwriter1.address);
+                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                const after = await mockUsdc.balanceOf(underwriter1.address);
+                expect(after - before).to.equal(expected);
             });
         });
 

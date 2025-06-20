@@ -346,6 +346,13 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256[] memory pools = underwriterAllocations[_underwriter];
         for(uint i=0; i<pools.length; i++){
             underwriterPoolPledge[_underwriter][pools[i]] += _amount;
+            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(pools[i]);
+            rewardDistributor.updateUserState(
+                _underwriter,
+                pools[i],
+                address(protocolToken),
+                underwriterPoolPledge[_underwriter][pools[i]]
+            );
         }
     }
 
@@ -354,6 +361,13 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
             poolRegistry.updateCapitalPendingWithdrawal(allocations[i], _principalComponent, true);
+            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(allocations[i]);
+            rewardDistributor.updateUserState(
+                _underwriter,
+                allocations[i],
+                address(protocolToken),
+                underwriterPoolPledge[_underwriter][allocations[i]]
+            );
         }
     }
 
@@ -375,6 +389,13 @@ contract RiskManager is Ownable, ReentrancyGuard {
             }
             uint256 pledgeReduction = _principalComponentRemoved > underwriterPoolPledge[_underwriter][poolId] ? underwriterPoolPledge[_underwriter][poolId] : _principalComponentRemoved;
             underwriterPoolPledge[_underwriter][poolId] -= pledgeReduction;
+            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(poolId);
+            rewardDistributor.updateUserState(
+                _underwriter,
+                poolId,
+                address(protocolToken),
+                underwriterPoolPledge[_underwriter][poolId]
+            );
             if (_isFullWithdrawal || underwriterPoolPledge[_underwriter][poolId] == 0) {
                 _removeUnderwriterFromPool(_underwriter, poolId);
             }

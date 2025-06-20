@@ -14,6 +14,12 @@ contract MockRewardDistributor is IRewardDistributor {
     uint256 public lastClaimPledge;
     uint256 public claimCallCount;
 
+    address public lastUpdateUser;
+    uint256 public lastUpdatePoolId;
+    address public lastUpdateToken;
+    uint256 public lastUpdatePledge;
+    uint256 public updateCallCount;
+
     function setCatPool(address _catPool) external override {
         catPool = _catPool;
     }
@@ -40,7 +46,13 @@ contract MockRewardDistributor is IRewardDistributor {
         return 0;
     }
 
-    function updateUserState(address, uint256, address, uint256) external override {}
+    function updateUserState(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override {
+        lastUpdateUser = user;
+        lastUpdatePoolId = poolId;
+        lastUpdateToken = rewardToken;
+        lastUpdatePledge = userPledge;
+        updateCallCount++;
+    }
 
     function pendingRewards(address, uint256 poolId, address rewardToken, uint256 userPledge) public view override returns (uint256) {
         uint256 total = totalRewards[poolId][rewardToken];
