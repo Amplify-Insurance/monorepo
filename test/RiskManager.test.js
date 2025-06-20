@@ -390,6 +390,16 @@ const MAX_ALLOCATIONS = 5;
                     .to.be.revertedWithCustomError(riskManager, "NotCapitalPool");
             });
 
+            it("onWithdrawalRequested should revert if not called by CapitalPool", async function () {
+                await expect(riskManager.connect(nonParty).onWithdrawalRequested(underwriter1.address, 100))
+                    .to.be.revertedWithCustomError(riskManager, "NotCapitalPool");
+            });
+
+            it("onCapitalWithdrawn should revert if not called by CapitalPool", async function () {
+                await expect(riskManager.connect(nonParty).onCapitalWithdrawn(underwriter1.address, 100, false))
+                    .to.be.revertedWithCustomError(riskManager, "NotCapitalPool");
+            });
+
             it("updateCoverageSold should revert if not called by PolicyManager", async function() {
                 await expect(riskManager.connect(nonParty).updateCoverageSold(POOL_ID_1, 100, true))
                     .to.be.revertedWithCustomError(riskManager, "NotPolicyManager");
