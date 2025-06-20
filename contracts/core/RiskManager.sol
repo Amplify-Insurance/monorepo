@@ -247,7 +247,12 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256 totalPendingLosses = 0;
         
         for (uint i = 0; i < allocations.length; i++) {
-            totalPendingLosses += lossDistributor.getPendingLosses(_underwriter, allocations[i], underwriterTotalPledge[_underwriter]);
+            uint256 poolId = allocations[i];
+            totalPendingLosses += lossDistributor.getPendingLosses(
+                _underwriter,
+                poolId,
+                underwriterPoolPledge[_underwriter][poolId]
+            );
         }
 
         if (totalPendingLosses < totalShareValue) revert UnderwriterNotInsolvent();
@@ -318,7 +323,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     function claimPremiumRewards(uint256 _poolId) external nonReentrant {
         (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(_poolId);
-        rewardDistributor.claim(msg.sender, _poolId, address(protocolToken), underwriterTotalPledge[msg.sender]);
+        rewardDistributor.claim(msg.sender, _poolId, address(protocolToken), underwriterPoolPledge[msg.sender][_poolId]);
     }
 
     function claimDistressedAssets(uint256 _poolId) external nonReentrant {
@@ -383,14 +388,15 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     function _realizeLossesForAllPools(address _user) internal {
         uint256[] memory allocations = underwriterAllocations[_user];
-        uint256 originalPledge = underwriterTotalPledge[_user];
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
-            uint256 currentPledge = underwriterTotalPledge[_user];
-            if (currentPledge == 0) break;
-            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, originalPledge);
+            uint256 poolPledge = underwriterPoolPledge[_user][poolId];
+            if (poolPledge == 0) continue;
+            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, poolPledge);
             if (pendingLoss > 0) {
-                underwriterTotalPledge[_user] -= Math.min(currentPledge, pendingLoss);
+                uint256 lossApplied = Math.min(poolPledge, pendingLoss);
+                underwriterPoolPledge[_user][poolId] -= lossApplied;
+                underwriterTotalPledge[_user] -= lossApplied;
                 capitalPool.applyLosses(_user, pendingLoss);
             }
         }
