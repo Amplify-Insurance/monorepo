@@ -223,6 +223,9 @@ const MAX_ALLOCATIONS = 5;
 
                 // Check that pledge was reduced before emitting the event
                 expect(await riskManager.underwriterTotalPledge(underwriter1.address)).to.equal(PLEDGE_AMOUNT - lossAmount);
+                expect(
+                    await riskManager.underwriterPoolPledge(underwriter1.address, POOL_ID_1)
+                ).to.equal(PLEDGE_AMOUNT - lossAmount - HALF_PLEDGE);
             });
             
             it("Should revert if trying to deallocate from a pool they are not in", async function() {
@@ -500,6 +503,7 @@ const MAX_ALLOCATIONS = 5;
                 await riskManager.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
                 expect(await mockRewardDistributor.claimCallCount()).to.equal(1);
                 expect(await mockRewardDistributor.lastClaimUser()).to.equal(underwriter1.address);
+                expect(await mockRewardDistributor.lastClaimPledge()).to.equal(amount);
             });
 
             it("claimDistressedAssets should call the cat pool", async function () {
