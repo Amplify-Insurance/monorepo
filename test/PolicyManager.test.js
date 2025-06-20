@@ -673,6 +673,26 @@ describe("PolicyManager", function () {
                     .to.be.revertedWithCustomError(policyManager, "DepositTooLow");
             });
 
+            it("Should use slope2 when utilization equals the kink", async function() {
+                const totalSold = (availableCapital * BigInt(rateModel.kink)) / BigInt(BPS);
+                await mockPoolRegistry.setPoolData(POOL_ID,
+                    mockUsdc.target,
+                    availableCapital,
+                    totalSold,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+
+                const expectedRateBps = BigInt(rateModel.base)
+                    + (BigInt(rateModel.slope1) * BigInt(rateModel.kink)) / BigInt(BPS);
+                const minPremium = (COVERAGE_AMOUNT * expectedRateBps * 7n * 24n * 60n * 60n) / (BigInt(SECS_YEAR) * BigInt(BPS));
+
+                await expect(policyManager.connect(user1).purchaseCover(POOL_ID, COVERAGE_AMOUNT, minPremium - 1n))
+                    .to.be.revertedWithCustomError(policyManager, "DepositTooLow");
+            });
+
             it("Should handle zero available capital gracefully", async function() {
                 // Set pending withdrawals to equal total pledged capital
                 await mockPoolRegistry.setPoolData(POOL_ID,
