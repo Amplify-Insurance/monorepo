@@ -13,7 +13,7 @@ export async function GET(
     const url = new URL(req.url);
     const depName = url.searchParams.get('deployment');
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const cp = getCatPool(dep.catPool, dep.name);
+    const cp = getCatPool(dep.catInsurancePool, dep.name);
     const amount = await cp.getPendingProtocolAssetRewards(address, token);
     return NextResponse.json({ address, token, claimable: amount.toString() });
   } catch (err: any) {

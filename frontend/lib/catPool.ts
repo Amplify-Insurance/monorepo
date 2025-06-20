@@ -3,9 +3,12 @@ import CatPool from '../abi/CatInsurancePool.json';
 import { getProvider, provider } from './provider';
 import deployments from '../app/config/deployments';
 
-const DEFAULT_ADDRESS =
-  (deployments[0] && deployments[0].catPool) ||
-  (process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS as string);
+const DEFAULT_ADDRESS = deployments[0]?.catInsurancePool as string;
+
+if (!DEFAULT_ADDRESS) {
+  console.error('❌  CatInsurancePool address not configured');
+  throw new Error('CatInsurancePool address not set');
+}
 
 export function getCatPool(address: string = DEFAULT_ADDRESS, deployment?: string) {
   return new ethers.Contract(address, CatPool, getProvider(deployment));

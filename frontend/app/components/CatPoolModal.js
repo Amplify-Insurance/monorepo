@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Info, AlertTriangle, Clock, TrendingUp } from "lucide-react"
 import Modal from "./Modal"
 import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals, getCatShareAddress } from "../../lib/catPool"
+import deployments from "../config/deployments"
 import { getERC20WithSigner, getTokenDecimals } from "../../lib/erc20"
 import { getTokenLogo } from "../config/tokenNameMap"
 import { getTxExplorerUrl } from "../utils/explorer"
@@ -96,7 +97,7 @@ export default function CatPoolModal({
         const usdcAddr = await getUsdcAddress()
         const usdcToken = await getERC20WithSigner(usdcAddr)
         const addr = await usdcToken.signer.getAddress()
-        const allowance = await usdcToken.allowance(addr, process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS)
+        const allowance = await usdcToken.allowance(addr, deployments[0]?.catInsurancePool)
         setNeedsApproval(allowance.lt(amountBn))
       } catch {
         setNeedsApproval(false)
@@ -116,7 +117,7 @@ export default function CatPoolModal({
       const usdcAddr = await getUsdcAddress()
       const usdcToken = await getERC20WithSigner(usdcAddr)
       const approveTx = await usdcToken.approve(
-        process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
+        deployments[0]?.catInsurancePool,
         amountBn,
       )
       setTxHash(approveTx.hash)

@@ -3,9 +3,12 @@ import RewardDistributor from '../abi/RewardDistributor.json'
 import { getProvider } from './provider'
 import deployments from '../app/config/deployments'
 
-const ADDRESS =
-  (deployments[0] && deployments[0].rewardDistributor) ||
-  (process.env.NEXT_PUBLIC_REWARD_DISTRIBUTOR_ADDRESS as string)
+const ADDRESS = deployments[0]?.rewardDistributor as string
+
+if (!ADDRESS) {
+  console.error('❌  RewardDistributor address not configured')
+  throw new Error('RewardDistributor address not set')
+}
 
 export function getRewardDistributor(address: string = ADDRESS, deployment?: string) {
   return new ethers.Contract(address, RewardDistributor, getProvider(deployment))

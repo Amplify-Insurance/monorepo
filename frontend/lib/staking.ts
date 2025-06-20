@@ -4,9 +4,7 @@ import { getProvider, provider } from './provider'
 import deployments from '../app/config/deployments'
 
 // Validate presence of the staking contract address
-const ADDRESS =
-  (deployments[0] && deployments[0].staking) ||
-  (process.env.NEXT_PUBLIC_STAKING_ADDRESS as string)
+const ADDRESS = deployments[0]?.staking as string
 
 if (!ADDRESS) {
   console.error('❌  Staking address not configured')

@@ -159,23 +159,15 @@ npm install
 npm run dev
 ```
 
-Environment variables such as the RPC endpoint and contract addresses are
-configured in `.env` (see `.env.example`). Address resolution happens inside
-`frontend/app/config/deployments.js` in the following order:
-
-1. `deployments/deployedAddresses.json` – the file written by the Hardhat deploy scripts
-   in the `deployments` directory. It now stores an array of deployments and is loaded
-   first when present.
-2. `NEXT_PUBLIC_DEPLOYMENTS` – optional environment variable containing a JSON
-   array of deployments which overrides the config file.
-3. Individual address variables such as `NEXT_PUBLIC_RISK_MANAGER_ADDRESS` –
-   used when neither of the above sources are present.
+Environment variables such as the RPC endpoint are configured in `.env` (see
+`.env.example`). Contract addresses are loaded solely from
+`deployments/deployedAddresses.json` written by the Hardhat deploy scripts.
+`frontend/app/config/deployments.js` reads this file and exposes the addresses to
+the frontend. Environment variables are no longer used for contract addresses.
 
 The ABIs for each contract live under `frontend/abi`, so only the addresses need
-to be provided. At a minimum set `NEXT_PUBLIC_POOL_MANAGER_ADDRESS` and
-`NEXT_PUBLIC_RISK_MANAGER_ADDRESS` so the frontend knows where the core
-contracts live when no JSON file is present. Several API routes under `app/api`
-demonstrate reading data from the contracts.
+to be provided. Several API routes under `app/api` demonstrate reading data from
+the contracts. Examples include:
 Examples
 include:
 
@@ -212,18 +204,16 @@ State‑changing routes use **POST** requests:
 
 ### Multiple Deployments
 
-The frontend can aggregate contract data from several deployments. Set
-`NEXT_PUBLIC_DEPLOYMENTS` in `.env` to a JSON array where each entry defines the
-addresses and optional RPC/Subgraph endpoints for a deployment. When the
-variable is not provided, the single address variables such as
-`NEXT_PUBLIC_RISK_MANAGER_ADDRESS` are used instead.
+The frontend can aggregate contract data from several deployments by adding
+entries to `deployments/deployedAddresses.json`. Each object may also include
+optional RPC and Subgraph endpoints.
 
 Each deployment object supports the following keys:
 
 - `name` – label reported in API responses
 - `riskManager` – `RiskManager` contract address
 - `capitalPool` – `CapitalPool` contract address
-- `catPool` – `CatInsurancePool` contract address
+- `catInsurancePool` – `CatInsurancePool` contract address
 - `priceOracle` – `PriceOracle` contract address
 - `multicallReader` – `MulticallReader` contract address
 - `lossDistributor` – `LossDistributor` contract address
@@ -234,12 +224,12 @@ Each deployment object supports the following keys:
 Example:
 
 ```json
-NEXT_PUBLIC_DEPLOYMENTS='[
+[
   {
     "name": "base",
     "riskManager": "0xabc...",
     "capitalPool": "0xdef...",
-    "catPool": "0xghi...",
+    "catInsurancePool": "0xghi...",
     "lossDistributor": "0xlmn...",
     "rewardDistributor": "0xopq...",
     "priceOracle": "0xjkl...",
@@ -251,7 +241,7 @@ NEXT_PUBLIC_DEPLOYMENTS='[
     "name": "optimism",
     "riskManager": "0x123...",
     "capitalPool": "0x456...",
-    "catPool": "0x789...",
+    "catInsurancePool": "0x789...",
     "lossDistributor": "0xuvw...",
     "rewardDistributor": "0xyz...",
     "priceOracle": "0xabc...",
@@ -259,7 +249,7 @@ NEXT_PUBLIC_DEPLOYMENTS='[
     "rpcUrl": "https://optimism.publicnode.com",
     "subgraphUrl": "https://api.thegraph.com/subgraphs/name/project/optimism"
   }
-]'
+]
 ```
 
 The API routes iterate over each deployment, combining results so callers see a

@@ -7,10 +7,7 @@ const rpc = process.env.NEXT_PUBLIC_RPC_URL;
 console.log('RPC URL:', rpc);
 
 
-const READ_ADDRESS =
-  (deployments[0] && deployments[0].policyNft) ||
-  process.env.NEXT_PUBLIC_POLICY_NFT_ADDRESS ||
-  process.env.POLICY_NFT_ADDRESS;
+const READ_ADDRESS = deployments[0]?.policyNft as string;
 
 if (!READ_ADDRESS) {
   console.error('❌  PolicyNFT address not configured');
@@ -23,7 +20,7 @@ export function getPolicyNft(address: string = READ_ADDRESS as string, deploymen
 
 export const policyNft = getPolicyNft();
 
-export function getPolicyNftWriter(address: string = process.env.POLICY_NFT_ADDRESS as string, deployment?: string) {
+export function getPolicyNftWriter(address: string = READ_ADDRESS, deployment?: string) {
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PRIVATE_KEY not set');
   const signer = new ethers.Wallet(pk, getProvider(deployment));

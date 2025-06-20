@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   try {
     const { tokens, deployment: depName } = await req.json();
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
-    const cp = getCatPoolWriter(dep.catPool, dep.name);
+    const cp = getCatPoolWriter(dep.catInsurancePool, dep.name);
     const tx = await cp.claimProtocolAssetRewards(tokens);
     await tx.wait();
     return NextResponse.json({ txHash: tx.hash });

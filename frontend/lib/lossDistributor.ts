@@ -3,9 +3,12 @@ import LossDistributor from '../abi/LossDistributor.json'
 import { getProvider } from './provider'
 import deployments from '../app/config/deployments'
 
-const ADDRESS =
-  (deployments[0] && deployments[0].lossDistributor) ||
-  (process.env.NEXT_PUBLIC_LOSS_DISTRIBUTOR_ADDRESS as string)
+const ADDRESS = deployments[0]?.lossDistributor as string
+
+if (!ADDRESS) {
+  console.error('❌  LossDistributor address not configured')
+  throw new Error('LossDistributor address not set')
+}
 
 export function getLossDistributor(address: string = ADDRESS, deployment?: string) {
   return new ethers.Contract(address, LossDistributor, getProvider(deployment))

@@ -3,9 +3,12 @@ import PoolRegistry from '../abi/PoolRegistry.json'
 import { getProvider } from './provider'
 import deployments from '../app/config/deployments'
 
-const DEFAULT_ADDRESS =
-  (deployments[0] && deployments[0].poolRegistry) ||
-  (process.env.NEXT_PUBLIC_POOL_REGISTRY_ADDRESS as string)
+const DEFAULT_ADDRESS = deployments[0]?.poolRegistry as string
+
+if (!DEFAULT_ADDRESS) {
+  console.error('❌  PoolRegistry address not configured')
+  throw new Error('PoolRegistry address not set')
+}
 
 export function getPoolRegistry(address: string = DEFAULT_ADDRESS, deployment?: string) {
   return new ethers.Contract(address, PoolRegistry, getProvider(deployment))
