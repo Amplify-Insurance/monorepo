@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getCommittee } from '../lib/committee'
+import { getStaking } from '../lib/staking'
 
 export default function useActiveProposals() {
   const [proposals, setProposals] = useState([])
@@ -9,7 +10,13 @@ export default function useActiveProposals() {
     async function load() {
       try {
         const c = getCommittee()
+        const staking = getStaking()
+
         const count = await c.proposalCounter()
+        const quorumBps = await c.quorumBps()
+        const totalStaked = await staking.totalStaked()
+        const quorumVotes = (totalStaked * quorumBps) / 10000n
+
         const items = []
         for (let i = Number(count); i > 0; i--) {
           const p = await c.proposals(i)
@@ -23,6 +30,8 @@ export default function useActiveProposals() {
             passed: false,
             forVotes: Number(p.forVotes),
             againstVotes: Number(p.againstVotes),
+            quorumVotes: Number(quorumVotes),
+            totalStaked: Number(totalStaked),
             abstainVotes: 0,
             votes: []
           })
