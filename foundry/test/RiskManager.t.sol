@@ -75,7 +75,7 @@ contract RiskManagerTest is Test {
 
         ld.setPendingLoss(underwriter, 0, 0);
         vm.prank(underwriter);
-        rm.requestDeallocateFromPool(0);
+        rm.requestDeallocateFromPool(0, 5000 * 1e6);
         vm.prank(underwriter);
         rm.deallocateFromPool(0);
 
@@ -126,7 +126,7 @@ function testDeallocateRealizesLoss() public {
 
     ld.setPendingLoss(underwriter, 0, 200);
     vm.prank(underwriter);
-    rm.requestDeallocateFromPool(0);
+    rm.requestDeallocateFromPool(0, 500);
     vm.prank(underwriter);
     rm.deallocateFromPool(0);
 

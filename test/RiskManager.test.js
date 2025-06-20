@@ -193,6 +193,7 @@ const MAX_ALLOCATIONS = 5;
         });
 
         describe("Capital Deallocation", function() {
+            const HALF_PLEDGE = ethers.parseUnits("5000", 6);
             const PLEDGE_AMOUNT = ethers.parseUnits("10000", 6);
 
             beforeEach(async function() {
@@ -206,18 +207,18 @@ const MAX_ALLOCATIONS = 5;
 
             it("Should allow an underwriter to deallocate from a pool with no losses", async function() {
                 await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
-                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1);
+                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE);
                 await expect(riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1))
-                    .to.emit(riskManager, "CapitalDeallocated").withArgs(underwriter1.address, POOL_ID_1, PLEDGE_AMOUNT);
+                    .to.emit(riskManager, "CapitalDeallocated").withArgs(underwriter1.address, POOL_ID_1, HALF_PLEDGE);
 
                 const allocations = await getAllocations(underwriter1.address);
-                expect(allocations).to.be.empty;
+                expect(allocations.map(a => BigInt(a))).to.deep.equal([BigInt(POOL_ID_1)]);
             });
             
             it("Should correctly apply losses before deallocating", async function() {
                 const lossAmount = ethers.parseUnits("1000", 6);
                 await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, lossAmount);
-                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1);
+                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE);
                 await riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1);
 
                 // Check that pledge was reduced before emitting the event
@@ -229,7 +230,7 @@ const MAX_ALLOCATIONS = 5;
                 await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter2.address, pledge);
                 await mockCapitalPool.setUnderwriterAdapterAddress(underwriter2.address, nonParty.address);
                 await mockLossDistributor.setPendingLoss(underwriter2.address, POOL_ID_1, 0);
-                await expect(riskManager.connect(underwriter2).requestDeallocateFromPool(POOL_ID_1))
+                await expect(riskManager.connect(underwriter2).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE))
                     .to.be.revertedWith("Not allocated to this pool");
             });
 
@@ -240,7 +241,7 @@ const MAX_ALLOCATIONS = 5;
 
             it("Should revert if notice period not elapsed", async function() {
                 await riskManager.connect(owner).setDeallocationNoticePeriod(100);
-                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1);
+                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE);
                 await expect(riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1))
                     .to.be.revertedWithCustomError(riskManager, "NoticePeriodActive");
                 await riskManager.connect(owner).setDeallocationNoticePeriod(0);
@@ -248,7 +249,7 @@ const MAX_ALLOCATIONS = 5;
 
             it("Should revert if yield adapter address is missing", async function () {
                 await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
-                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1);
+                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE);
                 await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, ethers.ZeroAddress);
                 await expect(riskManager.connect(underwriter1).deallocateFromPool(POOL_ID_1))
                     .to.be.revertedWith("User has no yield adapter set in CapitalPool");
