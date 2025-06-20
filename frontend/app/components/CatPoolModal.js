@@ -25,6 +25,8 @@ export default function CatPoolModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [txHash, setTxHash] = useState("")
   const [balance, setBalance] = useState("0")
+  const [needsApproval, setNeedsApproval] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
   const projected = amount ? (Number.parseFloat(amount) * (apr / 100)).toFixed(2) : "0"
 
   const [tokenAddr, setTokenAddr] = useState(token || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") // default USDC
@@ -85,6 +87,48 @@ export default function CatPoolModal({
     }
   }, [isOpen, isDeposit, tokenAddr])
 
+  useEffect(() => {
+    const checkAllowance = async () => {
+      if (!isDeposit || !amount) return setNeedsApproval(false)
+      try {
+        const dec = await getUsdcDecimals()
+        const amountBn = ethers.utils.parseUnits(amount, dec)
+        const usdcAddr = await getUsdcAddress()
+        const usdcToken = await getERC20WithSigner(usdcAddr)
+        const addr = await usdcToken.signer.getAddress()
+        const allowance = await usdcToken.allowance(addr, process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS)
+        setNeedsApproval(allowance.lt(amountBn))
+      } catch {
+        setNeedsApproval(false)
+      }
+    }
+    if (isOpen) {
+      checkAllowance()
+    }
+  }, [amount, isDeposit, isOpen])
+
+  const handleApprove = async () => {
+    if (!amount) return
+    setIsApproving(true)
+    try {
+      const dec = await getUsdcDecimals()
+      const amountBn = ethers.utils.parseUnits(amount, dec)
+      const usdcAddr = await getUsdcAddress()
+      const usdcToken = await getERC20WithSigner(usdcAddr)
+      const approveTx = await usdcToken.approve(
+        process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS,
+        amountBn,
+      )
+      setTxHash(approveTx.hash)
+      await approveTx.wait()
+      setNeedsApproval(false)
+    } catch (err) {
+      console.error('Approval failed', err)
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!amount) return
     setIsSubmitting(true)
@@ -93,14 +137,6 @@ export default function CatPoolModal({
       if (isDeposit) {
         const dec = await getUsdcDecimals()
         const amountBn = ethers.utils.parseUnits(amount, dec)
-        const usdcAddr = await getUsdcAddress()
-        const usdcToken = await getERC20WithSigner(usdcAddr)
-        const addr = await usdcToken.signer.getAddress()
-        const allowance = await usdcToken.allowance(addr, process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS)
-        if (allowance.lt(amountBn)) {
-          const approveTx = await usdcToken.approve(process.env.NEXT_PUBLIC_CAT_POOL_ADDRESS, amountBn)
-          await approveTx.wait()
-        }
         const tx = await cp.depositLiquidity(amountBn)
         setTxHash(tx.hash)
         await tx.wait()
@@ -121,6 +157,7 @@ export default function CatPoolModal({
         await tx.wait()
       }
       setAmount("")
+      setNeedsApproval(false)
       onActionComplete && onActionComplete()
       onClose()
     } catch (err) {
@@ -246,20 +283,37 @@ export default function CatPoolModal({
         </div>
 
         {/* Action Button */}
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting || !amount || Number.parseFloat(amount) <= 0}
-          className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          {isSubmitting ? (
-            <div className="flex items-center justify-center space-x-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Processing...</span>
-            </div>
-          ) : (
-            `${isDeposit ? "Deposit" : "Withdraw"} ${symbol}`
-          )}
-        </button>
+        {isDeposit && needsApproval ? (
+          <button
+            onClick={handleApprove}
+            disabled={isApproving || !amount || Number.parseFloat(amount) <= 0}
+            className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            {isApproving ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Approving...</span>
+              </div>
+            ) : (
+              `Approve ${symbol}`
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !amount || Number.parseFloat(amount) <= 0}
+            className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            {isSubmitting ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Processing...</span>
+              </div>
+            ) : (
+              `${isDeposit ? "Deposit" : "Withdraw"} ${symbol}`
+            )}
+          </button>
+        )}
         {txHash && (
           <p className="text-xs text-center mt-2">
             Transaction submitted.{' '}
