@@ -9,7 +9,7 @@ try {
     name: item.name || name,
     riskManager: item.RiskManager,
     capitalPool: item.CapitalPool,
-    catPool: item.CatInsurancePool,
+    catInsurancePool: item.CatInsurancePool,
     poolRegistry: item.PoolRegistry,
     poolManager: item.PolicyManager,
     priceOracle: item.PriceOracle,
