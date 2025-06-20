@@ -201,6 +201,51 @@ export default function Dashboard() {
           </div>
         )}
 
+        {(activeProposals.length > 0 || pastProposals.length > 0) && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-xl font-semibold mb-4">My Bonds</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active Bonds</div>
+                <div className="text-lg font-semibold">{activeProposals.length}</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Past Bonds</div>
+                <div className="text-lg font-semibold">{pastProposals.length}</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Claimable Rewards</div>
+                <div className="text-lg font-semibold">{pastProposals.length}</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Status</div>
+                <div className="text-lg font-semibold">
+                  {activeProposals.length > 0 ? (
+                    <span className="text-blue-600 dark:text-blue-400">Active</span>
+                  ) : (
+                    <span className="text-green-600 dark:text-green-400">Up to Date</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                href="/staking"
+                className="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-lg transition-colors text-center"
+              >
+                Manage Bonds
+              </Link>
+              <button
+                onClick={handleClaimGovRewards}
+                disabled={isClaimingRewards || pastProposals.length === 0}
+                className="flex-1 py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white disabled:text-gray-500 dark:disabled:text-gray-400 rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
+              >
+                {isClaimingRewards ? "Claiming..." : `Claim Rewards (${pastProposals.length})`}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Claims & Affected Positions moved to bottom */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h2 className="text-xl font-semibold mb-4">Claims & Affected Positions</h2>

@@ -12,6 +12,7 @@ import StakeModal from "../components/StakeModal"
 import UnstakeModal from "../components/UnstakeModal"
 import BondModal from "../components/BondModal"
 import { getCommitteeWithSigner } from "../../lib/committee"
+import { getStakingWithSigner } from "../../lib/staking"
 
 export default function StakingPage() {
   const { address, isConnected } = useAccount()
@@ -20,28 +21,20 @@ export default function StakingPage() {
   const [bondOpen, setBondOpen] = useState(false)
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
-  const [isClaimingRewards, setIsClaimingRewards] = useState(false)
+  const [isUnstakingBond, setIsUnstakingBond] = useState(false)
   const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
   const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
 
-  const handleClaimRewards = async () => {
-    if (pastProposals.length === 0) return
-    setIsClaimingRewards(true)
+  const handleUnstakeBond = async () => {
+    setIsUnstakingBond(true)
     try {
-      const ids = pastProposals.map((p) => p.id)
-      const res = await fetch('/api/committee/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposalIds: ids })
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Failed to claim')
-      }
+      const staking = await getStakingWithSigner()
+      const tx = await staking.withdrawBond(0)
+      await tx.wait()
     } catch (err) {
-      console.error('Failed to claim rewards', err)
+      console.error('Withdraw bond failed', err)
     } finally {
-      setIsClaimingRewards(false)
+      setIsUnstakingBond(false)
     }
   }
 
@@ -201,11 +194,11 @@ export default function StakingPage() {
                   Deposit Bond
                 </button>
                 <button
-                  onClick={handleClaimRewards}
-                  disabled={isClaimingRewards}
+                  onClick={handleUnstakeBond}
+                  disabled={isUnstakingBond}
                   className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
                 >
-                  {isClaimingRewards ? 'Claiming...' : 'Claim Rewards'}
+                  {isUnstakingBond ? 'Unstaking...' : 'Unstake Bond'}
                 </button>
               </div>
             </div>
