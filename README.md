@@ -284,6 +284,13 @@ cd subgraphs/insurance
 npm run test
 ```
 
+Solidity fuzz tests use **Foundry**:
+
+```bash
+forge install
+forge test
+```
+
 ## License
 
 This project is licensed under the **Business Source License 1.1**. See [LICENSE](./LICENSE) for details.
