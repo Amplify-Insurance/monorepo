@@ -162,16 +162,20 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         
         uint256 sharesToMint;
         uint256 totalCatSharesSupply = catShareToken.totalSupply();
+        uint256 effectiveSupply =
+            totalCatSharesSupply > INITIAL_SHARES_LOCKED
+                ? totalCatSharesSupply - INITIAL_SHARES_LOCKED
+                : 0;
         uint256 currentTotalValueInPool = liquidUsdc();
 
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
         idleUSDC += usdcAmount;
 
-        // CORRECTED: Handles the first deposit case by checking if total value is zero.
-        if (currentTotalValueInPool == 0) {
+        // CORRECTED: Handles the first deposit case by checking if total value or effective supply is zero.
+        if (currentTotalValueInPool == 0 || effectiveSupply == 0) {
             sharesToMint = usdcAmount;
         } else {
-            sharesToMint = (usdcAmount * totalCatSharesSupply) / currentTotalValueInPool;
+            sharesToMint = (usdcAmount * effectiveSupply) / currentTotalValueInPool;
         }
         require(sharesToMint > 0, "CIP: No shares to mint");
         
@@ -185,8 +189,13 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         require(userCatShareBalance >= catShareAmountBurn, "CIP: Insufficient CatShare balance");
         
         uint256 totalCatSharesSupply = catShareToken.totalSupply();
+        uint256 effectiveSupply =
+            totalCatSharesSupply > INITIAL_SHARES_LOCKED
+                ? totalCatSharesSupply - INITIAL_SHARES_LOCKED
+                : 0;
         uint256 currentTotalValueInPool = liquidUsdc();
-        uint256 usdcToWithdraw = (catShareAmountBurn * currentTotalValueInPool) / totalCatSharesSupply;
+        require(effectiveSupply > 0, "CIP: No shares supply");
+        uint256 usdcToWithdraw = (catShareAmountBurn * currentTotalValueInPool) / effectiveSupply;
         require(usdcToWithdraw >= MIN_USDC_AMOUNT, "CIP: Withdrawal amount below minimum");
 
         catShareToken.burn(msg.sender, catShareAmountBurn);
