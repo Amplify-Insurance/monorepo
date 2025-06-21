@@ -148,6 +148,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         account.totalDepositedAssetPrincipal += _amount;
         account.masterShares += sharesToMint;
         underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
+        underlyingAsset.approve(address(chosenAdapter), 0);
         underlyingAsset.approve(address(chosenAdapter), _amount);
         chosenAdapter.deposit(_amount);
         totalMasterSharesSystem += sharesToMint;
