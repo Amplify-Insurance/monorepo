@@ -134,7 +134,7 @@ export default function StakingPage() {
                   <p className="font-medium mb-1">Benefits</p>
                   <ul className="text-xs space-y-1">
                     <li>• Vote on protocol proposals</li>
-                    <li>• Influence protocol direction</li>
+                    <li>• Earn rewards from claim fees</li>
                     <li>• Unstake anytime</li>
                   </ul>
                 </div>
