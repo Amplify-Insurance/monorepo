@@ -197,7 +197,7 @@ describe("CatInsurancePool", function () {
             // LP2 deposits the same amount of USDC
             const totalShares = await catShareToken.totalSupply();
             const totalValue = await catPool.liquidUsdc();
-            const expectedShares = (DEPOSIT_AMOUNT * totalShares) / totalValue;
+            const expectedShares = (DEPOSIT_AMOUNT * (totalShares - 1000n)) / totalValue;
 
             await expect(catPool.connect(lp2).depositLiquidity(DEPOSIT_AMOUNT))
                 .to.emit(catPool, "CatLiquidityDeposited")
@@ -211,7 +211,7 @@ describe("CatInsurancePool", function () {
             await catPool.connect(lp1).depositLiquidity(DEPOSIT_AMOUNT);
             const sharesToBurn = await catShareToken.balanceOf(lp1.address) / 2n;
             const totalShares = await catShareToken.totalSupply();
-            const usdcToWithdraw = (sharesToBurn * (await catPool.liquidUsdc())) / totalShares;
+            const usdcToWithdraw = (sharesToBurn * (await catPool.liquidUsdc())) / (totalShares - 1000n);
 
             await expect(catPool.connect(lp1).withdrawLiquidity(sharesToBurn))
                 .to.emit(catPool, "CatLiquidityWithdrawn")
@@ -236,7 +236,7 @@ describe("CatInsurancePool", function () {
 
             const finalBalance = await mockUsdc.balanceOf(lp1.address);
             const expectedBalance = ethers.parseUnits("10000", 6) - DEPOSIT_AMOUNT +
-                (sharesToBurn * DEPOSIT_AMOUNT) / (sharesToBurn + 1000n);
+                (sharesToBurn * DEPOSIT_AMOUNT) / sharesToBurn;
             expect(finalBalance).to.equal(expectedBalance);
         });
     });

@@ -60,10 +60,10 @@ contract CatInsurancePoolTest is Test {
         vm.prank(user);
         pool.withdrawLiquidity(shares);
 
-        // expected withdrawal = shares * totalValue / totalShares
-        uint256 expectedWithdraw = shares * DEPOSIT_AMOUNT / (shares + 1_000);
+        // expected withdrawal = shares * totalValue / (totalShares - locked)
+        uint256 expectedWithdraw = shares * DEPOSIT_AMOUNT / shares;
         assertEq(usdc.balanceOf(user), STARTING_BALANCE - DEPOSIT_AMOUNT + expectedWithdraw);
-        assertEq(adapter.totalValueHeld(), 1_000); // small remainder stays
+        assertEq(adapter.totalValueHeld(), 0); // adapter fully drained
         assertEq(share.totalSupply(), 1_000); // locked shares remain
     }
 
@@ -83,7 +83,7 @@ contract CatInsurancePoolTest is Test {
 
         uint256 totalShares = share.totalSupply();
         uint256 totalValue = pool.liquidUsdc();
-        uint256 expectedShares = DEPOSIT_AMOUNT * totalShares / totalValue;
+        uint256 expectedShares = DEPOSIT_AMOUNT * (totalShares - 1_000) / totalValue;
         assertEq(share.balanceOf(user2), expectedShares);
     }
 
