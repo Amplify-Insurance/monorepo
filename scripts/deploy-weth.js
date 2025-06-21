@@ -2,7 +2,7 @@
 /**
  * Hardhat deployment script
  * ------------------------------------------------------------
- * Supports Aave v3, Compound v3, Moonwell, Morpho Blue, and Euler v2
+ * Supports Aave v3 and Compound v3
  * ------------------------------------------------------------
  * ⚠️ Replace the placeholder addresses (marked TODO) with real
  *     network‑specific values before deploying to mainnet.
@@ -25,13 +25,6 @@ const AAVE_AWETH_ADDRESS  = "0xD4a0e0b9149BCee3C920d2E00b5dE09138fd8bb7";
 // 2. Compound v3 (Comet)
 const COMPOUND_COMET_WETH = "0x46e6b214b524310239732D51387075E0e70970bf";
 
-// 3. Moonwell (Compound‑v2 fork)
-const MOONWELL_MWETH      = "0x628ff693426583D9a7FB391E54366292F509D457";
-
-// 5. Euler v2
-const EULER_EWETH = "0xD8b27CF359b7D15710a5BE299AF6e7Bf904984C2"; 
-const EULER_MARKETS = "0x1C376866039Aad238B3Ae977d28C02531B911f8A" 
-const EULER_VAULT = "0x1C376866039Aad238B3Ae977d28C02531B911f8A"
 
 // ────────────────────────────────────────────────────────────────────────────
 async function main() {
@@ -104,36 +97,18 @@ async function main() {
   await compoundAdapter.waitForDeployment();
   await compoundAdapter.setCapitalPoolAddress(capitalPool.target);
 
-  // 3. Moonwell (Compound‑v2)
-  const MoonwellAdapter = await ethers.getContractFactory("MoonwellAdapter");
-  const moonwellAdapter = await MoonwellAdapter.deploy(WETH_ADDRESS, MOONWELL_MWETH, deployer.address);
-  await moonwellAdapter.waitForDeployment();
-
-  // 5. Euler v2
-  const EulerAdapter = await ethers.getContractFactory("EulerV2Adapter");
-  const eulerAdapter = await EulerAdapter.deploy(
-    WETH_ADDRESS,     // underlying
-    EULER_EWETH,      // eToken
-    EULER_MARKETS,    // markets (rates)
-    EULER_VAULT,      // ERC-4626 vault
-    deployer.address  // owner
-  );
-    await eulerAdapter.waitForDeployment();
 
   /*──────────────── Register adapters in CapitalPool (enum indices) ──────*/
-  // 1=AAVE, 2=COMPOUND, 3=MOONWELL, 4=MORPHO, 5=EULER
+  // 1=AAVE, 2=COMPOUND
   await capitalPool.setBaseYieldAdapter(1, aaveAdapter.target);
   await capitalPool.setBaseYieldAdapter(2, compoundAdapter.target);
 
   /*────────────────────── Protocol risk‑pool examples ───────────────────*/
   const defaultRateModel = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
 
-  // WETH pools across all five platforms
+  // WETH pools across both platforms
   await riskManager.addProtocolRiskPool(WETH_ADDRESS, defaultRateModel, 1);
   await riskManager.addProtocolRiskPool(WETH_ADDRESS, defaultRateModel, 2);
-  await riskManager.addProtocolRiskPool(WETH_ADDRESS, defaultRateModel, 3);
-  await riskManager.addProtocolRiskPool(WETH_ADDRESS, defaultRateModel, 4);
-  // await riskManager.addProtocolRiskPool(WETH_ADDRESS, defaultRateModel, 5);
 
   /*──────────────────────────────── Output ──────────────────────────────*/
   const addresses = {
@@ -147,8 +122,6 @@ async function main() {
     RiskManager:       riskManager.target,
     "Aave Adapter":    aaveAdapter.target,
     "Compound Adapter": compoundAdapter.target,
-    "Moonwell Adapter": moonwellAdapter.target,
-    "Euler Adapter":    eulerAdapter.target,
   };
 
   console.table(addresses);
