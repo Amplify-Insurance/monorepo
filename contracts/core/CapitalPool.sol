@@ -127,12 +127,19 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     /* ───────────────── Underwriter Deposit & Withdrawal ────────────────── */
     function deposit(uint256 _amount, YieldPlatform _yieldChoice) external nonReentrant {
         if (_amount == 0) revert InvalidAmount();
-        if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
-        IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
-        if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
-        if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
-            revert("CP: Cannot change yield platform; withdraw first.");
+        IYieldAdapter chosenAdapter;
+        if (account.masterShares > 0) {
+            if (account.yieldChoice != _yieldChoice) {
+                revert("CP: Cannot change yield platform; withdraw first.");
+            }
+            chosenAdapter = account.yieldAdapter;
+        } else {
+            if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
+            chosenAdapter = baseYieldAdapters[_yieldChoice];
+            if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
+            account.yieldChoice = _yieldChoice;
+            account.yieldAdapter = chosenAdapter;
         }
         uint256 sharesToMint;
         if (totalSystemValue == 0) {
@@ -141,10 +148,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             sharesToMint = (_amount * totalMasterSharesSystem) / totalSystemValue;
         }
         if (sharesToMint == 0) revert NoSharesToMint();
-        if (account.masterShares == 0) {
-            account.yieldChoice = _yieldChoice;
-            account.yieldAdapter = chosenAdapter;
-        }
         account.totalDepositedAssetPrincipal += _amount;
         account.masterShares += sharesToMint;
         underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
