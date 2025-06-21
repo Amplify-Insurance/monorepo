@@ -201,6 +201,7 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
             IERC20 underlying = capitalPool.underlyingAsset();
 
             // Approve the Cat Pool to pull the premium amount
+            underlying.approve(address(catPool), 0);
             underlying.approve(address(catPool), catAmount);
 
             catPool.receiveUsdcPremium(catAmount);
