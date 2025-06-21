@@ -371,6 +371,22 @@ const MAX_ALLOCATIONS = 5;
                 const capPerAdapter = await mockPoolRegistry.capitalPerAdapter(POOL_ID_1, nonParty.address);
                 expect(capPerAdapter).to.equal(initial - COVERAGE_AMOUNT);
             });
+
+            it("Should revert if claim is processed before activation", async function () {
+                const future = (await time.latest()) + 1000;
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    claimant.address,
+                    POOL_ID_1,
+                    COVERAGE_AMOUNT,
+                    future,
+                    0,
+                    0,
+                    0
+                );
+                await expect(riskManager.connect(nonParty).processClaim(POLICY_ID))
+                    .to.be.revertedWith("Policy not active");
+            });
         });
 
         describe("Liquidation", function() {
