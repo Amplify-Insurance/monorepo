@@ -194,22 +194,23 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
         policyNFT.updatePremiumAccount(_policyId, newDeposit, uint128(block.timestamp));
 
         // --- Interactions ---
+        IERC20 underlying = capitalPool.underlyingAsset();
+
         uint256 catAmount = (amountToDrain * catPremiumBps) / BPS;
         uint256 poolIncome = amountToDrain - catAmount;
 
         if (catAmount > 0) {
-            IERC20 underlying = capitalPool.underlyingAsset();
-
             // Approve the Cat Pool to pull the premium amount
             underlying.approve(address(catPool), 0);
             underlying.approve(address(catPool), catAmount);
 
             catPool.receiveUsdcPremium(catAmount);
         }
-        
+
         (, uint256 totalPledged, , , , ,) = poolRegistry.getPoolData(pol.poolId);
         if (poolIncome > 0 && totalPledged > 0) {
-            rewardDistributor.distribute(pol.poolId, address(capitalPool.underlyingAsset()), poolIncome, totalPledged);
+            underlying.safeTransfer(address(rewardDistributor), poolIncome);
+            rewardDistributor.distribute(pol.poolId, address(underlying), poolIncome, totalPledged);
         }
     }
     
