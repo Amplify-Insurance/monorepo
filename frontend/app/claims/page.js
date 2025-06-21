@@ -86,8 +86,10 @@ export default function ClaimsPage() {
       underlyingAssetDecimals: Number(pool.underlyingAssetDecimals ?? 18),
       deployment: pool.deployment,
     };
+
   })
   .filter(Boolean);
+
 
   const activeCoverages = coverages.filter((c) => c.isActive)
   const pendingCoverages = coverages.filter((c) => !c.isActive)
