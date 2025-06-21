@@ -2,6 +2,7 @@
 
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 // Helper function to create mock contracts from an ABI
 async function deployMock(abi, signer) {
@@ -252,6 +253,37 @@ describe("StakingContract", function () {
             expect(await stakingContract.stakedBalance(staker1.address)).to.equal(STAKE_1);
             expect(await stakingContract.stakedBalance(staker2.address)).to.equal(STAKE_2);
             expect(await stakingContract.totalStaked()).to.equal(STAKE_1 + STAKE_2);
+        });
+    });
+
+    describe("Vote Locking", function() {
+        const STAKE_AMOUNT = ethers.parseEther("100");
+        const LOCK_PERIOD = 7 * 24 * 60 * 60;
+        let mockCommittee;
+
+        beforeEach(async function() {
+            const MockCommitteeFactory = await ethers.getContractFactory("MockProposalFinalization");
+            mockCommittee = await MockCommitteeFactory.deploy();
+            await stakingContract.connect(owner).setCommitteeAddress(mockCommittee.target);
+            await stakingContract.connect(staker1).stake(STAKE_AMOUNT);
+            await mockCommittee.callRecordVote(stakingContract.target, staker1.address, 1);
+        });
+
+        it("Should prevent unstaking before proposal finalized", async function() {
+            await expect(stakingContract.connect(staker1).unstake(STAKE_AMOUNT))
+                .to.be.revertedWithCustomError(stakingContract, "VoteLockActive");
+        });
+
+        it("Should allow unstake after finalization", async function() {
+            await mockCommittee.setFinalized(true);
+            await expect(stakingContract.connect(staker1).unstake(STAKE_AMOUNT))
+                .to.emit(stakingContract, "Unstaked").withArgs(staker1.address, STAKE_AMOUNT);
+        });
+
+        it("Should allow unstake after lock period", async function() {
+            await time.increase(LOCK_PERIOD + 1);
+            await expect(stakingContract.connect(staker1).unstake(STAKE_AMOUNT))
+                .to.emit(stakingContract, "Unstaked").withArgs(staker1.address, STAKE_AMOUNT);
         });
     });
 
