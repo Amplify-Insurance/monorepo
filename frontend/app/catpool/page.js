@@ -12,6 +12,8 @@ import CurrencyToggle from "../components/CurrencyToggle"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import useCatPoolRewards from "../../hooks/useCatPoolRewards"
+import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
+import useCatPoolWithdrawalRequest from "../../hooks/useCatPoolWithdrawalRequest"
 import { getCatPoolWithSigner } from "../../lib/catPool"
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
@@ -27,6 +29,8 @@ export default function CatPoolPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { rewards } = useCatPoolRewards(address)
+  const { info } = useCatPoolUserInfo(address)
+  const { request, createRequest, NOTICE_PERIOD } = useCatPoolWithdrawalRequest(address)
 
   const adapters = useYieldAdapters()
   const [selectedAdapter, setSelectedAdapter] = useState(null)
@@ -38,6 +42,25 @@ export default function CatPoolPage() {
   }, [adapters, selectedAdapter])
 
   const { stats } = useCatPoolStats()
+
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000))
+
+  useEffect(() => {
+    const i = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
+    return () => clearInterval(i)
+  }, [])
+
+  const withdrawalReady = request && now >= request.timestamp + NOTICE_PERIOD
+  const timeLeft = request
+    ? Math.max(0, request.timestamp + NOTICE_PERIOD - now)
+    : 0
+
+  const formatTime = (s) => {
+    const d = Math.floor(s / 86400)
+    const h = Math.floor((s % 86400) / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    return `${d}d ${h}h ${m}m`
+  }
 
   const handleClaim = async () => {
     if (!rewards || rewards.length === 0) return
@@ -52,6 +75,11 @@ export default function CatPoolPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleRequestWithdrawal = () => {
+    if (!info || info.balance === "0") return
+    createRequest(info.balance)
   }
 
   if (!isConnected) {
@@ -146,6 +174,23 @@ export default function CatPoolPage() {
               <Wallet className="w-5 h-5 text-purple-500" />
             </div>
           <CatPoolDeposits displayCurrency={displayCurrency} refreshTrigger={refreshKey} />
+          {info && info.balance !== "0" && !request && (
+            <button
+              onClick={handleRequestWithdrawal}
+              className="w-full mt-4 py-2 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded"
+            >
+              Request Withdrawal
+            </button>
+          )}
+          {request && (
+            <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              {withdrawalReady ? (
+                "Withdrawal ready to execute"
+              ) : (
+                `Withdrawal available in ${formatTime(timeLeft)}`
+              )}
+            </div>
+          )}
           {rewards.length > 0 && (
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4 mt-4">
               <h3 className="text-lg font-medium">Claim Distressed Asset Rewards</h3>
