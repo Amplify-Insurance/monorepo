@@ -306,6 +306,24 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "protocolAsset",
+        "type": "address"
+      }
+    ],
+    "name": "claimProtocolAssetRewardsFor",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "coverPoolAddress",
     "outputs": [

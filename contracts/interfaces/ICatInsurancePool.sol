@@ -5,5 +5,6 @@ interface ICatInsurancePool {
     function drawFund(uint256 amount) external;
     function receiveUsdcPremium(uint256 amount) external;
     function claimProtocolAssetRewards(address protocolToken) external;
+    function claimProtocolAssetRewardsFor(address user, address protocolToken) external;
 }
 

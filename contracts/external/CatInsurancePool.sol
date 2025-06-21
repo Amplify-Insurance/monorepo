@@ -267,11 +267,30 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     function claimProtocolAssetRewards(address protocolAsset) external nonReentrant {
         require(address(rewardDistributor) != address(0), "CIP: Reward distributor not set");
         uint256 userShares = catShareToken.balanceOf(msg.sender);
-        
+
         uint256 claimableAmount = rewardDistributor.claimForCatPool(msg.sender, CAT_POOL_REWARD_ID, protocolAsset, userShares);
-        
+
         require(claimableAmount > 0, "CIP: No rewards to claim for this asset");
         emit ProtocolAssetRewardsClaimed(msg.sender, protocolAsset, claimableAmount);
+    }
+
+    function claimProtocolAssetRewardsFor(address user, address protocolAsset)
+        external
+        onlyRiskManager
+        nonReentrant
+    {
+        require(address(rewardDistributor) != address(0), "CIP: Reward distributor not set");
+        uint256 userShares = catShareToken.balanceOf(user);
+
+        uint256 claimableAmount = rewardDistributor.claimForCatPool(
+            user,
+            CAT_POOL_REWARD_ID,
+            protocolAsset,
+            userShares
+        );
+
+        require(claimableAmount > 0, "CIP: No rewards to claim for this asset");
+        emit ProtocolAssetRewardsClaimed(user, protocolAsset, claimableAmount);
     }
 
     /* ───────────────────── View Functions ───────────────────── */

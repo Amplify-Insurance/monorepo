@@ -337,7 +337,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     function claimDistressedAssets(uint256 _poolId) external nonReentrant {
         (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(_poolId);
-        catPool.claimProtocolAssetRewards(address(protocolToken));
+        catPool.claimProtocolAssetRewardsFor(msg.sender, address(protocolToken));
     }
 
     function onCapitalDeposited(address _underwriter, uint256 _amount) external {

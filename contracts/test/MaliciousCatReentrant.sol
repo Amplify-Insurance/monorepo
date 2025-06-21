@@ -23,4 +23,6 @@ contract MaliciousCatReentrant is ICatInsurancePool {
     function drawFund(uint256) external override {}
 
     function claimProtocolAssetRewards(address) external override {}
+
+    function claimProtocolAssetRewardsFor(address, address) external override {}
 }
