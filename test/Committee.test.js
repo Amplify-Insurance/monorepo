@@ -126,11 +126,16 @@ describe("Committee", function () {
                 .to.emit(committee, "Voted").withArgs(1, proposer.address, 2, proposerWeight);
 
             await committee.connect(voter1).vote(1, 1 /* Against */);
-            
+
             const proposal = await committee.proposals(1);
             expect(proposal.forVotes).to.equal(proposerWeight);
             expect(proposal.againstVotes).to.equal(voter1Weight);
             expect(await mockStakingContract.stakedBalance(proposer.address)).to.equal(proposerWeight);
+        });
+
+        it("Should record vote lock in staking contract", async function() {
+            await committee.connect(voter1).vote(1, 2);
+            expect(await mockStakingContract.lastProposal(voter1.address)).to.equal(1);
         });
         
         it("Should revert if trying to vote twice", async function() {

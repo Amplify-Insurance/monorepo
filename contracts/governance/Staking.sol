@@ -5,6 +5,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+interface ICommittee {
+    function isProposalFinalized(uint256 proposalId) external view returns (bool);
+}
+
 /**
  * @title StakingContract
  * @author Gemini
@@ -17,6 +21,11 @@ contract StakingContract is Ownable {
     IERC20 public immutable governanceToken;
     address public committeeAddress;
 
+    uint256 public constant UNSTAKE_LOCK_PERIOD = 7 days;
+
+    mapping(address => uint256) public lastVotedProposal;
+    mapping(address => uint256) public lastVoteTime;
+
     mapping(address => uint256) public stakedBalance;
     uint256 public totalStaked;
 
@@ -28,6 +37,7 @@ contract StakingContract is Ownable {
     error ZeroAddress();
     error InvalidAmount();
     error InsufficientStakedBalance();
+    error VoteLockActive();
 
     modifier onlyCommittee() {
         if (msg.sender != committeeAddress) revert NotCommittee();
@@ -61,13 +71,28 @@ contract StakingContract is Ownable {
         emit Staked(msg.sender, _amount);
     }
 
+    function recordVote(address _voter, uint256 _proposalId) external onlyCommittee {
+        lastVotedProposal[_voter] = _proposalId;
+        lastVoteTime[_voter] = block.timestamp;
+    }
+
     /**
      * @notice Unstake governance tokens.
      */
     function unstake(uint256 _amount) external {
         if (_amount == 0) revert InvalidAmount();
         if (stakedBalance[msg.sender] < _amount) revert InsufficientStakedBalance();
-        
+        uint256 proposalId = lastVotedProposal[msg.sender];
+        if (proposalId != 0) {
+            bool finalized = ICommittee(committeeAddress).isProposalFinalized(proposalId);
+            if (!finalized && block.timestamp < lastVoteTime[msg.sender] + UNSTAKE_LOCK_PERIOD) {
+                revert VoteLockActive();
+            } else {
+                lastVotedProposal[msg.sender] = 0;
+                lastVoteTime[msg.sender] = 0;
+            }
+        }
+
         stakedBalance[msg.sender] -= _amount;
         totalStaked -= _amount;
         governanceToken.safeTransfer(msg.sender, _amount);

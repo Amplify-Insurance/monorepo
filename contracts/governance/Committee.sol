@@ -127,6 +127,8 @@ contract Committee is Ownable, ReentrancyGuard {
         
         p.voterWeight[msg.sender] = weight;
 
+        stakingContract.recordVote(msg.sender, _proposalId);
+
         if (_vote == VoteOption.For) {
             p.forVotes += weight;
         } else {
@@ -246,5 +248,10 @@ contract Committee is Ownable, ReentrancyGuard {
         uint256 span = maxBondAmount - minBondAmount;
         uint256 bpsSpan = maxProposerFeeBps - minProposerFeeBps;
         return minProposerFeeBps + ((_bondAmount - minBondAmount) * bpsSpan) / span;
+    }
+
+    function isProposalFinalized(uint256 _proposalId) external view returns (bool) {
+        Proposal storage p = proposals[_proposalId];
+        return p.status == ProposalStatus.Defeated || p.status == ProposalStatus.Executed || p.status == ProposalStatus.Resolved;
     }
 }
