@@ -28,7 +28,7 @@ const fs = require('fs');
 const path = require('path');
 
 async function main() {
-  const addressesPath = path.join(__dirname, '..', 'deployedAddresses.json');
+  const addressesPath = path.join(__dirname, '..', 'deployments', 'deployedAddresses.json');
   const deployments = JSON.parse(fs.readFileSync(addressesPath, 'utf8'));
 
   let entry = deployments.find((d) => d.name === CONTRACT_SET);
