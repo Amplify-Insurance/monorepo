@@ -332,6 +332,31 @@ describe("CatInsurancePool", function () {
                 .to.emit(catPool, "ProtocolAssetRewardsClaimed")
                 .withArgs(lp1.address, mockRewardToken.target, expectedReward);
         });
+
+        it("claimProtocolAssetRewardsFor should allow risk manager to claim for user", async function() {
+            const rewardAmount = ethers.parseUnits("50", 18);
+            await catPool.connect(lp1).depositLiquidity(ethers.parseUnits("1000", 6));
+            const userShares = await catShareToken.balanceOf(lp1.address);
+
+            await mockRewardToken.connect(owner).transfer(riskManager.address, rewardAmount);
+            await mockRewardToken.connect(riskManager).approve(catPool.target, rewardAmount);
+            await catPool.connect(riskManager).receiveProtocolAssetsForDistribution(mockRewardToken.target, rewardAmount);
+
+            const totalSharesAfter = await catShareToken.totalSupply();
+            const expectedReward = (rewardAmount * userShares) / totalSharesAfter;
+
+            await expect(
+                catPool.connect(riskManager).claimProtocolAssetRewardsFor(lp1.address, mockRewardToken.target)
+            )
+                .to.emit(catPool, "ProtocolAssetRewardsClaimed")
+                .withArgs(lp1.address, mockRewardToken.target, expectedReward);
+        });
+
+        it("claimProtocolAssetRewardsFor should restrict caller", async function() {
+            await expect(
+                catPool.connect(lp1).claimProtocolAssetRewardsFor(lp1.address, mockRewardToken.target)
+            ).to.be.revertedWith("CIP: Caller is not the RiskManager");
+        });
     });
 
     describe("Validation and Reverts", function () {

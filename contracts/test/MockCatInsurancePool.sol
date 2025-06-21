@@ -29,6 +29,7 @@ contract MockCatInsurancePool is Ownable {
     uint256 public receiveProtocolAssetsCallCount;
     address public last_claimProtocolToken;
     uint256 public claimProtocolRewardsCallCount;
+    address public last_claimUser;
 
     // --- Events for Testing ---
 
@@ -97,6 +98,13 @@ contract MockCatInsurancePool is Ownable {
 
     function claimProtocolAssetRewards(address protocolToken) external {
         last_claimProtocolToken = protocolToken;
+        last_claimUser = msg.sender;
+        claimProtocolRewardsCallCount++;
+    }
+
+    function claimProtocolAssetRewardsFor(address user, address protocolToken) external {
+        last_claimProtocolToken = protocolToken;
+        last_claimUser = user;
         claimProtocolRewardsCallCount++;
     }
 }

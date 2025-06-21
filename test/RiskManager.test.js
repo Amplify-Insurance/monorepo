@@ -565,6 +565,7 @@ const MAX_ALLOCATIONS = 5;
                 await riskManager.connect(nonParty).claimDistressedAssets(POOL_ID_1);
                 expect(await mockCatPool.claimProtocolRewardsCallCount()).to.equal(1);
                 expect(await mockCatPool.last_claimProtocolToken()).to.equal(mockUsdc.target);
+                expect(await mockCatPool.last_claimUser()).to.equal(nonParty.address);
             });
         });
 
