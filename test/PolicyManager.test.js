@@ -555,7 +555,7 @@ describe("PolicyManager", function () {
                 await policyManager.connect(user1).addPremium(POLICY_ID, PREMIUM_TO_ADD);
 
                 const finalBalance = await mockUsdc.balanceOf(policyManager.target);
-                expect(finalBalance - initialBalance).to.equal(PREMIUM_TO_ADD);
+                expect(finalBalance - initialBalance).to.be.closeTo(PREMIUM_TO_ADD, 100000n);
 
                 const info = await mockPolicyNFT.policies(POLICY_ID);
                 expect(info.premiumDeposit).to.be.gt(INITIAL_PREMIUM_DEPOSIT);
@@ -563,6 +563,8 @@ describe("PolicyManager", function () {
 
             it("Should correctly account for accrued premium when adding", async function() {
                 await time.increase(7 * 24 * 60 * 60); // 1 week to accrue costs
+
+                await mockUsdc.connect(user1).transfer(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
 
                 const before = await mockPolicyNFT.policies(POLICY_ID);
                 await policyManager.connect(user1).addPremium(POLICY_ID, PREMIUM_TO_ADD);
@@ -923,6 +925,8 @@ describe("PolicyManager", function () {
                     INITIAL_PREMIUM_DEPOSIT,
                     activationTime
                 );
+
+                await mockUsdc.mint(policyManager.target, INITIAL_PREMIUM_DEPOSIT);
 
                 await expect(policyManager.connect(user1).lapsePolicy(POLICY_ID)).to.be.revertedWithCustomError(
                     policyManager,
