@@ -4,6 +4,7 @@ import { ethers } from "ethers"
 import Image from "next/image"
 import { Info, AlertTriangle, Clock, TrendingUp } from "lucide-react"
 import Modal from "./Modal"
+import { formatCurrency } from "../utils/formatting"
 import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals, getCatShareAddress } from "../../lib/catPool"
 import deployments from "../config/deployments"
 import { getERC20WithSigner, getTokenDecimals } from "../../lib/erc20"
@@ -29,7 +30,11 @@ export default function CatPoolModal({
   const [decimals, setDecimals] = useState(6)
   const [needsApproval, setNeedsApproval] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
-  const projected = amount ? (Number.parseFloat(amount) * (apr / 100)).toFixed(2) : "0"
+  const projectedRaw = amount ? Number.parseFloat(amount) * (apr / 100) : 0
+  const projected = projectedRaw.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })
 
   const [tokenAddr, setTokenAddr] = useState(token || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") // default USDC
 
@@ -183,7 +188,10 @@ export default function CatPoolModal({
             </label>
             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
               <span>
-                Balance: {Number.parseFloat(balance).toFixed(4)} {symbol}
+                Balance: {Number.parseFloat(balance).toLocaleString(undefined, {
+                  maximumFractionDigits: 4,
+                })}{" "}
+                {symbol}
               </span>
             </div>
           </div>
@@ -198,7 +206,9 @@ export default function CatPoolModal({
                   placeholder="0.00"
                   className="w-full bg-transparent text-2xl font-semibold text-gray-900 dark:text-white outline-none placeholder-gray-400"
                 />
-                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">≈ ${usdValue}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  ≈ {formatCurrency(Number(usdValue), "USD", "usd")}
+                </div>
               </div>
 
               <div className="flex items-center space-x-3">
