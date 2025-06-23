@@ -677,29 +677,53 @@
 		"stateMutability": "view",
 		"type": "function"
 	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "underwriterTotalPledge",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
+        {
+                "inputs": [
+                        {
+                                "internalType": "address",
+                                "name": "",
+                                "type": "address"
+                        }
+                ],
+                "name": "underwriterTotalPledge",
+                "outputs": [
+                        {
+                                "internalType": "uint256",
+                                "name": "",
+                                "type": "uint256"
+                        }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+        },
+        {
+                "inputs": [
+                        {
+                                "internalType": "address",
+                                "name": "",
+                                "type": "address"
+                        },
+                        {
+                                "internalType": "uint256",
+                                "name": "",
+                                "type": "uint256"
+                        }
+                ],
+                "name": "underwriterPoolPledge",
+                "outputs": [
+                        {
+                                "internalType": "uint256",
+                                "name": "",
+                                "type": "uint256"
+                        }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+        },
+        {
+                "inputs": [
+                        {
+                                "internalType": "uint256",
 				"name": "_poolId",
 				"type": "uint256"
 			},
@@ -714,10 +738,41 @@
 				"type": "bool"
 			}
 		],
-		"name": "updateCoverageSold",
-		"outputs": [],
+                "name": "updateCoverageSold",
+                "outputs": [],
   "stateMutability": "nonpayable",
   "type": "function"
+        },
+        {
+                "inputs": [
+                        {
+                                "internalType": "uint256",
+                                "name": "_poolId",
+                                "type": "uint256"
+                        },
+                        {
+                                "internalType": "uint256",
+                                "name": "_amount",
+                                "type": "uint256"
+                        }
+                ],
+                "name": "requestDeallocateFromPool",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+        },
+        {
+                "inputs": [
+                        {
+                                "internalType": "uint256",
+                                "name": "_poolId",
+                                "type": "uint256"
+                        }
+                ],
+                "name": "deallocateFromPool",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
         },
         {
                 "inputs": [

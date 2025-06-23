@@ -97,9 +97,19 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
       }
 
       if (toDeallocate.length > 0) {
-        const tx2 = await rm.deallocateCapital(toDeallocate)
-        setTxHash(tx2.hash)
-        await tx2.wait()
+        const signerAddr = await rm.signer.getAddress()
+        for (const id of toDeallocate) {
+          const pledge = await rm.underwriterPoolPledge(signerAddr, id)
+          if (pledge > 0) {
+            const reqTx = await rm.requestDeallocateFromPool(id, pledge)
+            setTxHash(reqTx.hash)
+            await reqTx.wait()
+
+            const deTx = await rm.deallocateFromPool(id)
+            setTxHash(deTx.hash)
+            await deTx.wait()
+          }
+        }
       }
 
       onClose()
