@@ -34,7 +34,9 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const [isRequestingWithdrawal, setIsRequestingWithdrawal] = useState(false)
   const [txHash, setTxHash] = useState("")
   const [pendingWithdrawal, setPendingWithdrawal] = useState(null)
+  const { maxWithdrawablePct } = useMaxWithdrawable()
 
+  
   useEffect(() => {
     refresh()
     refreshWithdrawal()
@@ -171,7 +173,6 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     0,
   )
 
-  const { maxWithdrawablePct } = useMaxWithdrawable()
   const maxWithdrawableAmount = shares * maxWithdrawablePct
   const maxWithdrawableValue = value * maxWithdrawablePct
 
