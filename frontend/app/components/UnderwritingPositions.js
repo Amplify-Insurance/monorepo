@@ -56,51 +56,82 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const unlockDays = Math.max(0, Math.ceil((unlockTimestamp - currentTimestamp) / 86400))
   const withdrawalReady = currentTimestamp >= unlockTimestamp
 
-  const underwritingPositions = useMemo(
-    () =>
-      (details || [])
-        .flatMap((d) =>
-          d.allocatedPoolIds.map((pid) => {
-            const pool = pools.find((pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid))
-            if (!pool) return null
-            const protocol = getTokenName(pool.id)
-            const amount = Number(
-              ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, pool.underlyingAssetDecimals ?? 6),
-            )
-            const pendingLossStr = d.pendingLosses?.[pid] ?? "0"
-            const pendingLoss = Number(ethers.utils.formatUnits(pendingLossStr, pool.underlyingAssetDecimals ?? 6))
-            const positionId = `${d.deployment}-${pid}`
-            const withdrawalRequest = withdrawalRequests[positionId]
-
-            return {
-              id: positionId,
-              deployment: d.deployment,
-              protocol,
-              type: getProtocolType(pool.id),
-              pool: pool.protocolTokenToCover,
-              poolName: getTokenName(pool.id),
-              poolId: pid,
-              amount,
-              nativeValue: amount,
-              usdValue: amount * (pool.tokenPriceUsd ?? 1),
-              pendingLoss,
-              pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
-              yield: Number(pool.underwriterYieldBps || 0) / 100,
-              status: withdrawalRequest
-                ? withdrawalRequest.readyDate <= Date.now()
-                  ? "withdrawal ready"
-                  : "withdrawal pending"
-                : "active",
-              withdrawalRequest,
-              withdrawalRequestShares: d.withdrawalRequestShares,
-              shares: d.masterShares,
-              yieldChoice: d.yieldChoice,
-            }
-          }),
+  const underwritingPositions = useMemo(() => {
+    const positions = []
+    for (const d of details || []) {
+      for (const pid of d.allocatedPoolIds) {
+        const pool = pools.find((pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid))
+        if (!pool) continue
+        const protocol = getTokenName(pool.id)
+        const amount = Number(
+          ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, pool.underlyingAssetDecimals ?? 6),
         )
-        .filter(Boolean),
-    [details, pools, withdrawalRequests],
-  )
+        const pendingLossStr = d.pendingLosses?.[pid] ?? "0"
+        const pendingLoss = Number(ethers.utils.formatUnits(pendingLossStr, pool.underlyingAssetDecimals ?? 6))
+        const positionId = `${d.deployment}-${pid}`
+        const withdrawalRequest = withdrawalRequests[positionId]
+        const tokenPriceUsd = pool.tokenPriceUsd ?? 1
+        const base = {
+          deployment: d.deployment,
+          protocol,
+          type: getProtocolType(pool.id),
+          pool: pool.protocolTokenToCover,
+          poolName: getTokenName(pool.id),
+          poolId: pid,
+          pendingLoss,
+          pendingLossUsd: pendingLoss * tokenPriceUsd,
+          yield: Number(pool.underwriterYieldBps || 0) / 100,
+          withdrawalRequestShares: d.withdrawalRequestShares,
+          shares: d.masterShares,
+          yieldChoice: d.yieldChoice,
+        }
+
+        if (
+          withdrawalRequest &&
+          withdrawalRequest.type === "partial" &&
+          withdrawalRequest.amount < amount
+        ) {
+          const remaining = amount - withdrawalRequest.amount
+          positions.push({
+            id: `${positionId}-active`,
+            ...base,
+            amount: remaining,
+            nativeValue: remaining,
+            usdValue: remaining * tokenPriceUsd,
+            status: "active",
+            withdrawalRequest: null,
+          })
+          positions.push({
+            id: `${positionId}-withdrawal`,
+            ...base,
+            amount: withdrawalRequest.amount,
+            nativeValue: withdrawalRequest.amount,
+            usdValue: withdrawalRequest.value,
+            status:
+              withdrawalRequest.readyDate <= Date.now()
+                ? "withdrawal ready"
+                : "withdrawal pending",
+            withdrawalRequest,
+          })
+        } else {
+          positions.push({
+            id: positionId,
+            ...base,
+            amount,
+            nativeValue: amount,
+            usdValue: amount * tokenPriceUsd,
+            status: withdrawalRequest
+              ? withdrawalRequest.readyDate <= Date.now()
+                ? "withdrawal ready"
+                : "withdrawal pending"
+              : "active",
+            withdrawalRequest,
+          })
+        }
+      }
+    }
+    return positions
+  }, [details, pools, withdrawalRequests])
 
   useEffect(() => {
     async function loadRewards() {
