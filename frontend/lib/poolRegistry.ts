@@ -31,3 +31,21 @@ export function getPoolRegistryWriter(address: string = DEFAULT_ADDRESS, deploym
   const signer = new ethers.Wallet(pk, getProvider(deployment))
   return new ethers.Contract(address, PoolRegistry, signer)
 }
+
+/**
+ * Fetch the claim fee for a pool from the PoolRegistry.
+ */
+export async function getClaimFeeBps(
+  poolId: number,
+  deployment?: string,
+): Promise<number> {
+  try {
+    const pr = getPoolRegistry(undefined, deployment)
+    const data = await pr.getPoolData(poolId)
+    const fee = data.claimFeeBps ?? data[6]
+    return Number(fee.toString())
+  } catch (err) {
+    console.error('Failed to load pool claim fee', err)
+    return 0
+  }
+}
