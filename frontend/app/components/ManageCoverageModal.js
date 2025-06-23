@@ -93,33 +93,46 @@ export default function ManageCoverageModal({
 
         const dec = await getUnderlyingAssetDecimals(depInfo.capitalPool)
 
-        const extraPremium =
-          actionType === "amount" || actionType === "both"
-            ?
-              ((Number.parseFloat(increaseAmount) || 0) *
-                (Number(premium) / 100) *
-                (actionType === "both" ? extendWeeks * 7 : 365)) /
-              365
-            : 0
-
-        const totalCost =
-          (actionType === "duration" || actionType === "both" ? extendCost : 0) +
-          extraPremium
-
-        const depositBn = ethers.utils.parseUnits(totalCost.toFixed(dec), dec)
-
-        const assetAddr = await getUnderlyingAssetAddress(depInfo.capitalPool)
-        const token = await getERC20WithSigner(assetAddr)
-        const addr = await token.signer.getAddress()
-        const allowance = await token.allowance(addr, depInfo.poolManager)
-        if (allowance.lt(depositBn)) {
-          const approveTx = await token.approve(depInfo.poolManager, depositBn)
-          await approveTx.wait()
+        // Handle coverage amount increase if selected
+        if (actionType === "amount" || actionType === "both") {
+          const increaseBn = ethers.utils.parseUnits(
+            increaseAmount,
+            dec
+          )
+          if (increaseBn.gt(0)) {
+            const incTx = await pm.increaseCover(policyId, increaseBn)
+            setTxHash(incTx.hash)
+            await incTx.wait()
+          }
         }
 
-        tx = await pm.addPremium(policyId, depositBn)
-        setTxHash(tx.hash)
-        await tx.wait()
+        // Handle premium top up when duration or both are selected
+        if (actionType === "duration" || actionType === "both") {
+          const extraPremium =
+            actionType === "both"
+              ? ((Number.parseFloat(increaseAmount) || 0) *
+                  (Number(premium) / 100) *
+                  (extendWeeks * 7)) /
+                365
+              : 0
+
+          const totalCost = extendCost + extraPremium
+
+          const depositBn = ethers.utils.parseUnits(totalCost.toFixed(dec), dec)
+
+          const assetAddr = await getUnderlyingAssetAddress(depInfo.capitalPool)
+          const token = await getERC20WithSigner(assetAddr)
+          const addr = await token.signer.getAddress()
+          const allowance = await token.allowance(addr, depInfo.poolManager)
+          if (allowance.lt(depositBn)) {
+            const approveTx = await token.approve(depInfo.poolManager, depositBn)
+            await approveTx.wait()
+          }
+
+          tx = await pm.addPremium(policyId, depositBn)
+          setTxHash(tx.hash)
+          await tx.wait()
+        }
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing")
         const cp = await getCapitalPoolWithSigner(depInfo.capitalPool)
