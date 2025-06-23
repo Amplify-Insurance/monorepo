@@ -13,6 +13,7 @@ import usePools from "../../hooks/usePools"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getCapitalPoolWithSigner, getUnderlyingAssetDecimals } from "../../lib/capitalPool"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { getDeployment } from "../config/deployments"
 
@@ -32,6 +33,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [isClaimingDistressed, setIsClaimingDistressed] = useState(false)
   const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
+  const [isRequesting, setIsRequesting] = useState(false)
   const [expandedRows, setExpandedRows] = useState([])
   const toggleRow = (id) => {
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -138,26 +140,44 @@ export default function UnderwritingPositions({ displayCurrency }) {
     setShowWithdrawalModal(true)
   }
 
-  const handleWithdrawalRequest = (withdrawalData) => {
-    const readyDate = Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days from now
-    setWithdrawalRequests((prev) => ({
-      ...prev,
-      [withdrawalData.positionId]: {
-        ...withdrawalData,
-        readyDate,
-        requestDate: Date.now(),
-      },
-    }))
-    setShowWithdrawalModal(false)
+  const handleWithdrawalRequest = async (withdrawalData) => {
+    if (!selectedPosition) return
+    setIsRequesting(true)
+    try {
+      const dep = getDeployment(selectedPosition.deployment)
+      const cp = await getCapitalPoolWithSigner(dep.capitalPool, dep.name)
+      const dec =
+        pools.find((p) => p.deployment === selectedPosition.deployment)?.underlyingAssetDecimals ?? 6
+      const amountBn = ethers.utils.parseUnits(withdrawalData.amount.toString(), dec)
+      const shares = await cp.valueToShares(amountBn)
+      const tx = await cp.requestWithdrawal(shares)
+      await tx.wait()
+
+      const readyDate = Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days from now
+      setWithdrawalRequests((prev) => ({
+        ...prev,
+        [withdrawalData.positionId]: {
+          ...withdrawalData,
+          readyDate,
+          requestDate: Date.now(),
+        },
+      }))
+      setShowWithdrawalModal(false)
+    } catch (err) {
+      console.error("Failed to request withdrawal", err)
+    } finally {
+      setIsRequesting(false)
+    }
   }
 
   const handleExecuteWithdrawal = async (position) => {
     setIsExecuting(true)
     try {
-      // Mock withdrawal execution
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const dep = getDeployment(position.deployment)
+      const cp = await getCapitalPoolWithSigner(dep.capitalPool, dep.name)
+      const tx = await cp.executeWithdrawal()
+      await tx.wait()
 
-      // Remove withdrawal request after execution
       setWithdrawalRequests((prev) => {
         const newRequests = { ...prev }
         delete newRequests[position.id]
@@ -872,7 +892,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
           </div>
         </div>
         {renderTables(protocolPositions, "Protocol Cover")}
-        {renderTables(stablecoinPositions, "Stablecoin Cover")}
+        {stablecoinPositions.some((p) => p.status === "active") &&
+          renderTables(stablecoinPositions, "Stablecoin Cover")}
         {hasDistressedAssets && (
           <div className="mt-4 flex justify-end">
             <button
@@ -948,6 +969,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
         onClose={() => setShowWithdrawalModal(false)}
         position={selectedPosition}
         onRequestWithdrawal={handleWithdrawalRequest}
+        isSubmitting={isRequesting}
         displayCurrency={displayCurrency}
       />
     </>
