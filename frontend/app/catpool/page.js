@@ -221,7 +221,7 @@ export default function CatPoolPage() {
 
           {/* My Deposits Section */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">My Deposits</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">My Cat Pool Deposits</h2>
             <CatPoolDeposits displayCurrency="USD" refreshTrigger={refreshTrigger} />
           </div>
         </div>
