@@ -1,13 +1,16 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
-import { ChevronDown, TrendingUp, Shield, DollarSign, Users, Check } from "lucide-react"
+import { ChevronDown, TrendingUp, DollarSign, Users, Check } from "lucide-react"
+import { ethers } from "ethers"
 import Image from "next/image"
 import CatPoolModal from "../components/CatPoolModal"
 import CatPoolDeposits from "../components/CatPoolDeposits"
 import { formatCurrency } from "../utils/formatting"
 import { getTokenLogo } from "../config/tokenNameMap"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
+import useCatPoolStats from "../../hooks/useCatPoolStats"
+import useAnalytics from "../../hooks/useAnalytics"
 
 const SUPPORTED_TOKENS = [
   { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC", name: "USD Coin" },
@@ -18,15 +21,16 @@ const SUPPORTED_TOKENS = [
 export default function CatPoolPage() {
   const { address } = useAccount()
   const { info, refresh } = useCatPoolUserInfo(address)
+  const { stats } = useCatPoolStats()
+  const { data: analytics } = useAnalytics()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState("deposit")
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [poolStats, setPoolStats] = useState({
-    totalLiquidity: 2500000,
-    apr: 12.5,
-    totalDepositors: 1247,
-    utilizationRate: 68.3,
+    totalLiquidity: 0,
+    apr: 0,
+    totalDepositors: 0,
   })
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
@@ -39,6 +43,16 @@ export default function CatPoolPage() {
     setModalMode(mode)
     setIsModalOpen(true)
   }
+
+  useEffect(() => {
+    const totalLiquidity = Number(
+      ethers.utils.formatUnits(stats.liquidUsdc || '0', 6),
+    )
+    const apr =
+      Number(ethers.utils.formatUnits(stats.apr || '0', 18)) * 100
+    const totalDepositors = analytics?.underwriterCount || 0
+    setPoolStats({ totalLiquidity, apr, totalDepositors })
+  }, [stats, analytics])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -93,19 +107,6 @@ export default function CatPoolPage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Utilization</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {poolStats.utilizationRate.toFixed(1)}%
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Main Content Layout */}
@@ -205,12 +206,14 @@ export default function CatPoolPage() {
                   >
                     Deposit {selectedToken.symbol}
                   </button>
-                  <button
-                    onClick={() => openModal("withdraw")}
-                    className="w-full py-4 px-6 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-xl transition-all duration-200 text-lg"
-                  >
-                    Withdraw {selectedToken.symbol}
-                  </button>
+                  {info && info.balance !== "0" && (
+                    <button
+                      onClick={() => openModal("withdraw")}
+                      className="w-full py-4 px-6 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-xl transition-all duration-200 text-lg"
+                    >
+                      Withdraw {selectedToken.symbol}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

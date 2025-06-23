@@ -4,7 +4,10 @@ import { useEffect, useState } from "react"
 import { ethers } from "ethers"
 import { formatCurrency } from "../utils/formatting"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
+import useCatPoolRewards from "../../hooks/useCatPoolRewards"
 import { TrendingUp, Gift, ExternalLink, Clock, X } from "lucide-react"
+import { getTokenName } from "../config/tokenNameMap"
+import { getCatPoolWithSigner } from "../../lib/catPool"
 import ClaimRewardsModal from "./ClaimRewardsModal"
 import RequestWithdrawalModal from "./RequestWithdrawalModal"
 import Link from "next/link"
@@ -12,7 +15,8 @@ import Link from "next/link"
 export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { address } = useAccount()
   const { info, refresh } = useCatPoolUserInfo(address)
-  const [pendingRewards, setPendingRewards] = useState("0")
+  const { rewards } = useCatPoolRewards(address)
+  const valueDecimals = 6
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
   const [showClaimModal, setShowClaimModal] = useState(false)
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
@@ -22,8 +26,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
 
   useEffect(() => {
     refresh()
-    // Simulate fetching pending rewards - replace with actual contract call
-    setPendingRewards("12.45")
+
 
     // Simulate pending withdrawal - replace with actual contract call
     // setPendingWithdrawal({
@@ -35,13 +38,14 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   }, [refreshTrigger])
 
   const handleClaimRewards = async () => {
+    if (!rewards || rewards.length === 0) return
     setIsClaimingRewards(true)
     try {
-      // TODO: Implement actual reward claiming logic
-      console.log("Claiming rewards...")
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate transaction
-      setTxHash("0x1234567890abcdef")
-      setPendingRewards("0")
+      const cp = await getCatPoolWithSigner()
+      const tokens = rewards.map((r) => r.token)
+      const tx = await cp.claimProtocolAssetRewards(tokens)
+      setTxHash(tx.hash)
+      await tx.wait()
       setShowClaimModal(false)
     } catch (error) {
       console.error("Failed to claim rewards:", error)
@@ -105,20 +109,18 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   } catch {
     value = Number(info.value || 0)
   }
-  const rewards = Number(pendingRewards)
+  const pendingRewardsValue = rewards.reduce(
+    (sum, r) => sum + Number(ethers.utils.formatUnits(r.amount, 18)),
+    0,
+  )
 
-  const rewardsData =
-    rewards > 0
-      ? [
-          {
-            symbol: "USDC",
-            token: "USDC",
-            amount: rewards.toFixed(2),
-            value: rewards,
-            type: "Cat Pool Rewards",
-          },
-        ]
-      : []
+  const rewardsData = rewards.map((r) => ({
+    symbol: getTokenName(r.token),
+    token: r.token,
+    amount: Number(ethers.utils.formatUnits(r.amount, 18)).toFixed(4),
+    value: Number(ethers.utils.formatUnits(r.amount, 18)),
+    type: "Cat Pool Rewards",
+  }))
 
   const daysUntilAvailable = pendingWithdrawal
     ? Math.ceil((pendingWithdrawal.availableAt - new Date()) / (1000 * 60 * 60 * 24))
@@ -140,7 +142,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {rewards > 0 && (
+              {pendingRewardsValue > 0 && (
                 <button
                   onClick={() => setShowClaimModal(true)}
                   className="flex items-center space-x-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
@@ -208,7 +210,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
               <div>
                 <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Pending Rewards</p>
                 <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                  {formatCurrency(rewards, "USD", displayCurrency)}
+                  {formatCurrency(pendingRewardsValue, "USD", displayCurrency)}
                 </p>
               </div>
             </div>
@@ -265,7 +267,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="text-sm font-medium text-gray-900 dark:text-white">
-                    +{formatCurrency(rewards, "USD", displayCurrency)}
+                    +{formatCurrency(pendingRewardsValue, "USD", displayCurrency)}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">Claimable</div>
                 </td>
@@ -283,7 +285,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="flex items-center justify-end space-x-2">
-                    {rewards > 0 && (
+                    {pendingRewardsValue > 0 && (
                       <button
                         onClick={() => setShowClaimModal(true)}
                         className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-md transition-colors"
