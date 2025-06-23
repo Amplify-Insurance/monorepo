@@ -320,6 +320,31 @@
 		"type": "event"
 	},
 	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "shareAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "WithdrawalRequested",
+		"type": "event"
+	},
+	{
 		"inputs": [],
 		"name": "CAT_POOL_REWARD_ID",
 		"outputs": [
@@ -335,6 +360,19 @@
 	{
 		"inputs": [],
 		"name": "MIN_USDC_AMOUNT",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "NOTICE_PERIOD",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -384,41 +422,41 @@
 		"stateMutability": "view",
 		"type": "function"
 	},
-        {
-                "inputs": [
-                        {
-                                "internalType": "address",
-                                "name": "protocolAsset",
-                                "type": "address"
-                        }
-                ],
-                "name": "claimProtocolAssetRewards",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-        },
-        {
-                "inputs": [
-                        {
-                                "internalType": "address",
-                                "name": "user",
-                                "type": "address"
-                        },
-                        {
-                                "internalType": "address",
-                                "name": "protocolAsset",
-                                "type": "address"
-                        }
-                ],
-                "name": "claimProtocolAssetRewardsFor",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-        },
-        {
-                "inputs": [
-                        {
-                                "internalType": "uint256",
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "protocolAsset",
+				"type": "address"
+			}
+		],
+		"name": "claimProtocolAssetRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "protocolAsset",
+				"type": "address"
+			}
+		],
+		"name": "claimProtocolAssetRewardsFor",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "usdcAmount",
 				"type": "uint256"
 			}
@@ -576,6 +614,19 @@
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "shareAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "requestWithdrawal",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "rewardDistributor",
 		"outputs": [
@@ -703,6 +754,44 @@
 		"name": "withdrawLiquidity",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "withdrawalRequestShares",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "withdrawalRequestTimestamp",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	}
 ]
