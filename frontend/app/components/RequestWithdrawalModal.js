@@ -11,6 +11,7 @@ export default function RequestWithdrawalModal({
   isSubmitting = false,
   userBalance = 0,
   userValue = 0,
+  maxWithdrawal = userBalance,
   displayCurrency = "USD",
 }) {
   const [withdrawalType, setWithdrawalType] = useState("partial")
@@ -20,17 +21,25 @@ export default function RequestWithdrawalModal({
   const handlePercentageClick = (percentage) => {
     setWithdrawalPercentage(percentage)
     const amount = (userBalance * percentage) / 100
-    setWithdrawalAmount(amount.toFixed(4))
+    const capped = Math.min(amount, maxWithdrawal)
+    setWithdrawalAmount(capped.toFixed(4))
   }
 
   const handleAmountChange = (value) => {
-    setWithdrawalAmount(value)
-    const percentage = (Number.parseFloat(value) / userBalance) * 100
-    setWithdrawalPercentage(Math.min(percentage, 100))
+    const num = Math.min(Number.parseFloat(value), maxWithdrawal)
+    if (!isNaN(num)) {
+      setWithdrawalAmount(num.toString())
+      const percentage = (num / userBalance) * 100
+      setWithdrawalPercentage(Math.min(percentage, 100))
+    } else {
+      setWithdrawalAmount("")
+      setWithdrawalPercentage(0)
+    }
   }
 
   const handleSubmit = () => {
-    const amount = withdrawalType === "full" ? userBalance : Number.parseFloat(withdrawalAmount)
+    const rawAmount = withdrawalType === "full" ? userBalance : Number.parseFloat(withdrawalAmount)
+    const amount = Math.min(rawAmount, maxWithdrawal)
     onRequestWithdrawal({
       type: withdrawalType,
       amount: amount,
@@ -38,8 +47,9 @@ export default function RequestWithdrawalModal({
     })
   }
 
-  const withdrawalValue =
-    withdrawalType === "full" ? userValue : (Number.parseFloat(withdrawalAmount || 0) / userBalance) * userValue
+  const effectiveAmount =
+    withdrawalType === "full" ? Math.min(userBalance, maxWithdrawal) : Number.parseFloat(withdrawalAmount || 0)
+  const withdrawalValue = (effectiveAmount / userBalance) * userValue
   const waitingPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
   return (
@@ -106,14 +116,14 @@ export default function RequestWithdrawalModal({
                   value={withdrawalAmount}
                   onChange={(e) => handleAmountChange(e.target.value)}
                   placeholder="0.00"
-                  max={userBalance}
+                  max={Math.min(userBalance, maxWithdrawal)}
                   step="0.0001"
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
                   <span className="text-sm text-gray-500 dark:text-gray-400">CATLP</span>
                   <button
-                    onClick={() => handleAmountChange(userBalance.toString())}
+                    onClick={() => handleAmountChange(Math.min(userBalance, maxWithdrawal).toString())}
                     className="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
                   >
                     MAX
@@ -122,6 +132,9 @@ export default function RequestWithdrawalModal({
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Available: {userBalance.toFixed(4)} CATLP ({formatCurrency(userValue, "USD", displayCurrency)})
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Max withdrawable: {maxWithdrawal.toFixed(4)} CATLP ({formatCurrency((maxWithdrawal / userBalance) * userValue, "USD", displayCurrency)})
               </p>
             </div>
 

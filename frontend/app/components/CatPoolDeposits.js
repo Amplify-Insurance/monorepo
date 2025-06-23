@@ -12,6 +12,7 @@ import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals } from "../../lib
 import ClaimRewardsModal from "./ClaimRewardsModal"
 import RequestWithdrawalModal from "./RequestWithdrawalModal"
 import Link from "next/link"
+import useMaxWithdrawable from "../../hooks/useMaxWithdrawable"
 
 export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { address } = useAccount()
@@ -127,6 +128,10 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     (sum, r) => sum + Number(ethers.utils.formatUnits(r.amount, 18)),
     0,
   )
+
+  const { maxWithdrawablePct } = useMaxWithdrawable()
+  const maxWithdrawableAmount = shares * maxWithdrawablePct
+  const maxWithdrawableValue = value * maxWithdrawablePct
 
   const rewardsData = rewards.map((r) => ({
     symbol: getTokenName(r.token),
@@ -348,6 +353,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
         isSubmitting={isRequestingWithdrawal}
         userBalance={shares}
         userValue={value}
+        maxWithdrawal={maxWithdrawableAmount}
         displayCurrency={displayCurrency}
       />
     </>
