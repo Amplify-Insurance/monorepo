@@ -25,7 +25,9 @@ export default function BondModal({ isOpen, onClose }) {
   // mirrors the behaviour of the Insurance Markets page so only the actual
   // deposit assets (e.g. USDC) show up in the dropdown.
   const tokens = pools
-    ? Array.from(new Set(pools.map((p) => p.deployment.toLowerCase()))).map((address) => ({
+    ? Array.from(
+        new Set(pools.map((p) => p.underlyingAsset.toLowerCase())),
+      ).map((address) => ({
         address,
         symbol: getUnderlyingTokenName(address),
       }))
@@ -64,14 +66,18 @@ export default function BondModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!selectedAsset) return
-    const first = pools.find((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase())
+    const first = pools.find(
+      (p) => p.underlyingAsset.toLowerCase() === selectedAsset.toLowerCase(),
+    )
     if (first) setSelectedProtocol(String(first.id))
     else setSelectedProtocol("")
   }, [selectedAsset, pools])
 
   useEffect(() => {
     if (!selectedProtocol && pools && pools.length > 0) {
-      const first = pools.find((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase())
+      const first = pools.find(
+        (p) => p.underlyingAsset.toLowerCase() === selectedAsset.toLowerCase(),
+      )
       if (first) setSelectedProtocol(String(first.id))
     }
   }, [pools, selectedProtocol, selectedAsset])
@@ -260,7 +266,11 @@ export default function BondModal({ isOpen, onClose }) {
         <div className="space-y-3">
           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Protocol</label>
           <CustomDropdown
-            options={pools.filter((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase()).map((p) => p.id)}
+            options={pools
+              .filter((p) =>
+                p.underlyingAsset.toLowerCase() === selectedAsset.toLowerCase(),
+              )
+              .map((p) => p.id)}
             value={selectedProtocol}
             onChange={setSelectedProtocol}
             isOpen={protocolDropdownOpen}
