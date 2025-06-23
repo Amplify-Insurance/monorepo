@@ -92,7 +92,21 @@ export default function ManageCoverageModal({
         const pm = await getPoolManagerWithSigner(depInfo.poolManager)
 
         const dec = await getUnderlyingAssetDecimals(depInfo.capitalPool)
-        const depositBn = ethers.utils.parseUnits(extendCost.toFixed(dec), dec)
+
+        const extraPremium =
+          actionType === "amount" || actionType === "both"
+            ?
+              ((Number.parseFloat(increaseAmount) || 0) *
+                (Number(premium) / 100) *
+                (actionType === "both" ? extendWeeks * 7 : 365)) /
+              365
+            : 0
+
+        const totalCost =
+          (actionType === "duration" || actionType === "both" ? extendCost : 0) +
+          extraPremium
+
+        const depositBn = ethers.utils.parseUnits(totalCost.toFixed(dec), dec)
 
         const assetAddr = await getUnderlyingAssetAddress(depInfo.capitalPool)
         const token = await getERC20WithSigner(assetAddr)
