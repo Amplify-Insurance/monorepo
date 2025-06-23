@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
 import { AlertTriangle, Info, Search, HelpCircle } from "lucide-react"
 import Image from "next/image"
@@ -11,6 +11,7 @@ import usePools from "../../hooks/usePools"
 import { getTokenName, getTokenLogo, getProtocolName} from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getClaimFeeBps } from "../../lib/poolRegistry"
 import { getERC20WithSigner } from "../../lib/erc20"
 import {
   Sheet,
@@ -29,6 +30,26 @@ export default function ClaimsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [claimInfoOpen, setClaimInfoOpen] = useState(false)
+  const [claimFeeBps, setClaimFeeBps] = useState(null)
+
+  useEffect(() => {
+    async function loadFee() {
+      try {
+        if (!selectedCoverage) {
+          setClaimFeeBps(null)
+          return
+        }
+        const fee = await getClaimFeeBps(
+          selectedCoverage.poolId,
+          selectedCoverage.deployment,
+        )
+        setClaimFeeBps(fee)
+      } catch (err) {
+        console.error('Failed to fetch claim fee', err)
+      }
+    }
+    loadFee()
+  }, [selectedCoverage?.poolId, selectedCoverage?.deployment])
 
 
   const coverages = policies
@@ -73,6 +94,7 @@ export default function ClaimsPage() {
 
     return {
       id: typeof p.id === 'object' ? ethers.BigNumber.from(p.id).toNumber() : p.id,
+      poolId: poolIdAsNumber,
       protocol: getProtocolName(pool.id),
       pool: pool.protocolTokenToCover,
       poolName: getTokenName(pool.protocolTokenToCover),
@@ -354,7 +376,7 @@ export default function ClaimsPage() {
                         </h3>
                         <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
                           <p>
-                            {`Making a claim will incur a ${selectedCoverage.claimFeeBps / 100}% fee on the claim value. This fee is non-refundable.`}
+                            {`Making a claim will incur a ${(claimFeeBps ?? selectedCoverage.claimFeeBps) / 100}% fee on the claim value. This fee is non-refundable.`}
                           </p>
                         </div>
                       </div>
@@ -394,9 +416,9 @@ export default function ClaimsPage() {
                             </div>
                           </div>
                           <div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{`Claim Fee (${selectedCoverage.claimFeeBps / 100}%)`}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{`Claim Fee (${(claimFeeBps ?? selectedCoverage.claimFeeBps) / 100}%)`}</div>
                             <div className="text-lg font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(selectedCoverage.coverageAmount * (selectedCoverage.claimFeeBps / 10000))}
+                              {formatCurrency(selectedCoverage.coverageAmount * ((claimFeeBps ?? selectedCoverage.claimFeeBps) / 10000))}
                             </div>
                           </div>
                         </div>
