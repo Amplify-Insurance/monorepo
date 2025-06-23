@@ -18,6 +18,7 @@ import useStakingInfo from "../../hooks/useStakingInfo"
 import usePastProposals from "../../hooks/usePastProposals"
 import useActiveProposals from "../../hooks/useActiveProposals"
 import useBondedAmount from "../../hooks/useBondedAmount"
+import useUserBonds from "../../hooks/useUserBonds"
 import { ethers } from "ethers"
 import { Vote, Shield, ExternalLink } from "lucide-react"
 import { formatCurrency } from "../utils/formatting"
@@ -99,40 +100,7 @@ export default function Dashboard() {
     }
   }
 
-  // Mock bond data - replace with actual data from hooks
-  const userBonds = [
-    {
-      id: 1,
-      poolId: "pool-1",
-      protocol: "Aave",
-      amount: "1000.00",
-      status: "Active",
-      depositDate: "2024-01-15",
-      maturityDate: "2024-07-15",
-      rewards: "45.50",
-    },
-    {
-      id: 2,
-      poolId: "pool-2",
-      protocol: "Compound",
-      amount: "750.00",
-      status: "Slashed",
-      depositDate: "2024-02-01",
-      maturityDate: "2024-08-01",
-      rewards: "0.00",
-      slashedAmount: "150.00",
-    },
-    {
-      id: 3,
-      poolId: "pool-3",
-      protocol: "Uniswap",
-      amount: "500.00",
-      status: "Matured",
-      depositDate: "2023-12-01",
-      maturityDate: "2024-06-01",
-      rewards: "67.25",
-    },
-  ]
+  const { bonds: userBonds = [] } = useUserBonds(address)
 
   // Prepare rewards data for modals
   const govRewardsData = pastProposals.map((proposal, index) => ({
