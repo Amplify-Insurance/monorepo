@@ -27,6 +27,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { request: withdrawalRequest, refresh: refreshWithdrawal, NOTICE_PERIOD } =
     useCatPoolWithdrawalRequest(address)
   const [valueDecimals, setValueDecimals] = useState(6)
+  const [shareDecimals, setShareDecimals] = useState(18)
   const [underlyingToken, setUnderlyingToken] = useState("")
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
   const [showClaimModal, setShowClaimModal] = useState(false)
@@ -47,6 +48,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
         setUnderlyingToken(addr)
         const dec = await getUsdcDecimals()
         setValueDecimals(Number(dec))
+        const shareDec = await getCatShareDecimals()
+        setShareDecimals(Number(shareDec))
       } catch (err) {
         console.error("Failed to fetch underlying token info", err)
       }
@@ -61,7 +64,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
         return
       }
       try {
-        const dec = await getCatShareDecimals()
+        const dec = shareDecimals
         const sharesHuman = Number(
           ethers.utils.formatUnits(withdrawalRequest.shares, dec),
         )
@@ -86,7 +89,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
       }
     }
     computeWithdrawal()
-  }, [withdrawalRequest, info, NOTICE_PERIOD, valueDecimals])
+  }, [withdrawalRequest, info, NOTICE_PERIOD, valueDecimals, shareDecimals])
 
   const handleClaimRewards = async () => {
     if (!rewards || rewards.length === 0) return
@@ -109,10 +112,9 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     setIsRequestingWithdrawal(true)
     try {
       const cp = await getCatPoolWithSigner()
-      const dec = await getCatShareDecimals()
       const sharesBn = ethers.utils.parseUnits(
-        withdrawalData.amount.toString(),
-        dec,
+        Number(withdrawalData.amount).toFixed(shareDecimals),
+        shareDecimals,
       )
       const tx = await cp.requestWithdrawal(sharesBn)
       setTxHash(tx.hash)
@@ -131,10 +133,9 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     if (!pendingWithdrawal) return
     try {
       const cp = await getCatPoolWithSigner()
-      const dec = await getCatShareDecimals()
       const sharesBn = ethers.utils.parseUnits(
-        pendingWithdrawal.amount.toString(),
-        dec,
+        Number(pendingWithdrawal.amount).toFixed(shareDecimals),
+        shareDecimals,
       )
       const tx = await cp.withdrawLiquidity(sharesBn)
       setTxHash(tx.hash)
@@ -161,7 +162,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     )
   }
 
-  const shares = Number(ethers.utils.formatUnits(info.balance || "0", 18))
+  const shares = Number(ethers.utils.formatUnits(info.balance || "0", shareDecimals))
   let value
   try {
     value = Number(ethers.utils.formatUnits(info.value || "0", valueDecimals))
