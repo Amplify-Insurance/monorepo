@@ -8,7 +8,12 @@ import useCatPoolRewards from "../../hooks/useCatPoolRewards"
 import Image from "next/image"
 import { TrendingUp, Gift, ExternalLink, Clock, X } from "lucide-react"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
-import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals } from "../../lib/catPool"
+import {
+  getCatPoolWithSigner,
+  getUsdcAddress,
+  getUsdcDecimals,
+  getCatShareDecimals,
+} from "../../lib/catPool"
 import ClaimRewardsModal from "./ClaimRewardsModal"
 import RequestWithdrawalModal from "./RequestWithdrawalModal"
 import Link from "next/link"
@@ -72,11 +77,16 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const handleRequestWithdrawal = async (withdrawalData) => {
     setIsRequestingWithdrawal(true)
     try {
-      // TODO: Implement actual withdrawal request logic
-      console.log("Requesting withdrawal:", withdrawalData)
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate transaction
+      const cp = await getCatPoolWithSigner()
+      const dec = await getCatShareDecimals()
+      const sharesBn = ethers.utils.parseUnits(
+        withdrawalData.amount.toString(),
+        dec,
+      )
+      const tx = await cp.requestWithdrawal(sharesBn)
+      setTxHash(tx.hash)
+      await tx.wait()
 
-      // Set pending withdrawal
       setPendingWithdrawal({
         amount: withdrawalData.amount,
         value: withdrawalData.value,
