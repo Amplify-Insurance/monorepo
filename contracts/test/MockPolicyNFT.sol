@@ -22,6 +22,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         uint128 premiumDeposit;
         uint128 lastDrainTime;
     }
+    
 
     // --- State for Mocking ---
 
@@ -50,6 +51,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         uint128 premium,
         uint128 lastDrain
     );
+    
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
     /**
