@@ -5,7 +5,6 @@ import { useAccount } from "wagmi"
 import MarketsTable from "../components/MarketsTable"
 import UnderwriterPanel from "../components/UnderwriterPanel"
 import CurrencyToggle from "../components/CurrencyToggle"
-// import ConnectWallet from "../components/ConnectWallet"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useSearchParams } from "next/navigation"
 

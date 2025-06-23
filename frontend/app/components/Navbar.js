@@ -3,7 +3,8 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Menu, X } from "lucide-react"
-import ConnectWallet from "./ConnectWallet"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
+
 import ThemeToggle from "./ThemeToggle"
 import CurrencyToggle from "./CurrencyToggle"
 import MobileNav from "./MobileNav"
@@ -78,7 +79,7 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-4">
             {/* <CurrencyToggle /> */}
             <ThemeToggle />
-            <ConnectWallet />
+            <ConnectButton />
           </div>
 
           {/* Mobile menu button */}
