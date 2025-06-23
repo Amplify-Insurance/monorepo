@@ -82,9 +82,7 @@ contract Committee is Ownable, ReentrancyGuard {
         require(_slashPercentageBps <= 10000, "Invalid slash bps");
         slashPercentageBps = _slashPercentageBps;
     }
-    
-    // ... (rest of the functions remain the same up to executeProposal) ...
-    
+        
     function createProposal(uint256 _poolId, ProposalType _pType, uint256 _bondAmount) external returns (uint256) {
         require(stakingContract.stakedBalance(msg.sender) > 0, "Must be a staker");
         require(!activeProposalForPool[_poolId], "Proposal already exists");
