@@ -10,6 +10,7 @@ export default function UnderwritingWithdrawalModal({
   onRequestWithdrawal,
   isSubmitting = false,
   position,
+  maxWithdrawAmount,
   displayCurrency = "USD",
 }) {
   const [withdrawalType, setWithdrawalType] = useState("partial")
@@ -84,6 +85,12 @@ export default function UnderwritingWithdrawalModal({
             </div>
           </div>
         </div>
+
+        {typeof maxWithdrawAmount === "number" && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Maximum withdrawable now: {maxWithdrawAmount.toFixed(2)} USDC
+          </p>
+        )}
 
         {/* Withdrawal Type Selection */}
         <div className="space-y-3">
