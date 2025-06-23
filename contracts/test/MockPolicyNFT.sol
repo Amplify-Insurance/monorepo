@@ -17,10 +17,13 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     struct PolicyInfo {
         uint256 poolId;
         uint256 coverage;
+        uint256 start;
         uint256 activation;
-        uint256 lastPaidUntil;
         uint128 premiumDeposit;
         uint128 lastDrainTime;
+        uint256 pendingIncrease;
+        uint256 increaseActivationTimestamp;
+        uint256 lastPaidUntil; // optional testing field
     }
     
 
@@ -101,10 +104,13 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         policies[id] = PolicyInfo({
             poolId: pid,
             coverage: coverage,
+            start: block.timestamp,
             activation: activation,
-            lastPaidUntil: paidUntil,
             premiumDeposit: premiumDeposit,
-            lastDrainTime: lastDrainTime
+            lastDrainTime: lastDrainTime,
+            pendingIncrease: 0,
+            increaseActivationTimestamp: 0,
+            lastPaidUntil: paidUntil
         });
         _owners[id] = owner;
     }
@@ -139,10 +145,13 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         policies[id] = PolicyInfo({
             poolId: _poolId,
             coverage: _coverage,
+            start: block.timestamp,
             activation: _activation,
-            lastPaidUntil: 0,
             premiumDeposit: _premiumDeposit,
-            lastDrainTime: _lastDrainTime
+            lastDrainTime: _lastDrainTime,
+            pendingIncrease: 0,
+            increaseActivationTimestamp: 0,
+            lastPaidUntil: 0
         });
         _mint(_owner, id);
         // Note: The PolicyMinted event is a custom event for testing purposes.
@@ -179,11 +188,14 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     function getPolicy(uint256 id) external view override returns (IPolicyNFT.Policy memory) {
         PolicyInfo memory p = policies[id];
         return IPolicyNFT.Policy({
-            poolId: p.poolId,
             coverage: p.coverage,
+            poolId: p.poolId,
+            start: p.start,
             activation: p.activation,
             premiumDeposit: p.premiumDeposit,
-            lastDrainTime: p.lastDrainTime
+            lastDrainTime: p.lastDrainTime,
+            pendingIncrease: p.pendingIncrease,
+            increaseActivationTimestamp: p.increaseActivationTimestamp
         });
     }
 
@@ -196,8 +208,25 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         return owner;
     }
 
-        function updatePremiumAccount(uint256 _policyId, uint128 _newDeposit, uint128 _newDrainTime) external override onlyCoverPool {
+    function updatePremiumAccount(uint256 _policyId, uint128 _newDeposit, uint128 _newDrainTime) external override onlyCoverPool {
         policies[_policyId].premiumDeposit = _newDeposit;
         policies[_policyId].lastDrainTime = _newDrainTime;
+    }
+
+    function addPendingIncrease(uint256 id, uint256 amount, uint256 activationTimestamp) external override onlyCoverPool {
+        PolicyInfo storage p = policies[id];
+        p.pendingIncrease = amount;
+        p.increaseActivationTimestamp = activationTimestamp;
+    }
+
+    function finalizeIncrease(uint256 id) external override onlyCoverPool {
+        PolicyInfo storage p = policies[id];
+        p.coverage += p.pendingIncrease;
+        p.pendingIncrease = 0;
+        p.increaseActivationTimestamp = 0;
+    }
+
+    function updateCoverage(uint256 id, uint256 newCoverage) external override onlyCoverPool {
+        policies[id].coverage = newCoverage;
     }
 }
