@@ -3,74 +3,67 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { AlertTriangle, Info, Shield, Clock, XCircle, CheckCircle } from "lucide-react"
-import { getCommitteeWithSigner } from "../../lib/committee"
+import { ethers } from "ethers"
+import { useAccount } from "wagmi"
+import { getCommittee, getCommitteeWithSigner } from "../../lib/committee"
+import { getTokenLogo, getProtocolName } from "../config/tokenNameMap"
+import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
+import { getTokenDecimals, getTokenSymbol } from "../../lib/erc20"
 import Modal from "./Modal"
 import { getTxExplorerUrl } from "../utils/explorer"
 import { formatDistanceToNow } from "date-fns"
 
 export default function UnstakeBondModal({ isOpen, onClose }) {
+  const { address } = useAccount()
+
   const [bonds, setBonds] = useState([])
   const [selectedBond, setSelectedBond] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [txHash, setTxHash] = useState("")
   const [loading, setLoading] = useState(true)
-
-  // Mock bond data - replace with actual contract calls
-  const mockBonds = [
-    {
-      id: 1,
-      poolId: "1",
-      amount: "5000.00",
-      symbol: "USDC",
-      protocol: "Aave",
-      depositDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-      status: "active", // active, slashed, expired
-      slashAmount: "0",
-      canWithdraw: true,
-      logo: "/placeholder.svg",
-    },
-    {
-      id: 2,
-      poolId: "2",
-      amount: "2500.00",
-      symbol: "USDT",
-      protocol: "Compound",
-      depositDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
-      status: "slashed",
-      slashAmount: "1250.00", // 50% slashed
-      canWithdraw: false,
-      logo: "/placeholder.svg",
-    },
-    {
-      id: 3,
-      poolId: "3",
-      amount: "10000.00",
-      symbol: "DAI",
-      protocol: "MakerDAO",
-      depositDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-      status: "active",
-      slashAmount: "0",
-      canWithdraw: true,
-      logo: "/placeholder.svg",
-    },
-  ]
+  const [symbol, setSymbol] = useState("")
+  const [decimals, setDecimals] = useState(18)
 
   useEffect(() => {
     if (isOpen) {
       loadUserBonds()
     }
-  }, [isOpen])
+  }, [isOpen, address])
 
   const loadUserBonds = async () => {
+    if (!address) return
     setLoading(true)
     try {
-      // TODO: Replace with actual contract calls to fetch user's bonds
-      // const committee = await getCommitteeWithSigner()
-      // const userAddress = await committee.signer.getAddress()
-      // const bonds = await committee.getUserBonds(userAddress)
+      const committee = getCommittee()
+      const dec = await getTokenDecimals(STAKING_TOKEN_ADDRESS)
+      const sym = await getTokenSymbol(STAKING_TOKEN_ADDRESS)
+      setDecimals(dec)
+      setSymbol(sym)
 
-      // For now, use mock data
-      setBonds(mockBonds)
+      const count = await committee.proposalCounter()
+      const items = []
+      for (let i = 1; i <= Number(count); i++) {
+        const p = await committee.proposals(i)
+        if (p.proposer.toLowerCase() !== address.toLowerCase()) continue
+        if (Number(p.pType) !== 1) continue
+        if (Number(p.status) === 6) continue
+        const amount = ethers.utils.formatUnits(p.bondAmount, dec)
+        const canWithdraw =
+          Number(p.status) === 5 && Date.now() / 1000 >= Number(p.challengeDeadline)
+        items.push({
+          id: Number(p.id),
+          poolId: Number(p.poolId),
+          amount,
+          symbol: sym,
+          protocol: getProtocolName(Number(p.poolId)),
+          depositDate: new Date(Number(p.creationTime) * 1000),
+          status: "active",
+          slashAmount: "0",
+          canWithdraw,
+          logo: getTokenLogo(STAKING_TOKEN_ADDRESS),
+        })
+      }
+      setBonds(items)
     } catch (err) {
       console.error("Failed to load user bonds", err)
       setBonds([])
@@ -85,7 +78,7 @@ export default function UnstakeBondModal({ isOpen, onClose }) {
     setIsSubmitting(true)
     try {
       const committee = await getCommitteeWithSigner()
-      const tx = await committee.withdrawBond(selectedBond.id)
+      const tx = await committee.resolvePauseBond(selectedBond.id)
       setTxHash(tx.hash)
       await tx.wait()
 
