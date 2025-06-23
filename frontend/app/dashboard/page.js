@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import CurrencyToggle from "../components/CurrencyToggle"
@@ -21,6 +21,8 @@ import useBondedAmount from "../../hooks/useBondedAmount"
 import useUserBonds from "../../hooks/useUserBonds"
 import { ethers } from "ethers"
 import { Vote, Shield, ExternalLink } from "lucide-react"
+import { getTokenName } from "../../lib/erc20"
+import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
 import { formatCurrency } from "../utils/formatting"
 import ClaimRewardsModal from "../components/ClaimRewardsModal"
 import UnstakeBondModal from "../components/UnstakeBondModal"
@@ -43,6 +45,19 @@ export default function Dashboard() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
   const [govTxHash, setGovTxHash] = useState("")
   const [bondTxHash, setBondTxHash] = useState("")
+  const [tokenName, setTokenName] = useState("")
+
+  useEffect(() => {
+    async function loadName() {
+      try {
+        const name = await getTokenName(STAKING_TOKEN_ADDRESS)
+        setTokenName(name)
+      } catch (err) {
+        console.error("Failed to load token name", err)
+      }
+    }
+    loadName()
+  }, [])
 
   const hasActiveCoverages = (policies || []).length > 0
   const hasUnderwritingPositions = (details?.allocatedPoolIds || []).length > 0
@@ -209,7 +224,9 @@ export default function Dashboard() {
                       <Vote className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">My Staked Gov Tokens</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {`My Staked ${tokenName || 'Gov Tokens'}`}
+                      </h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Your governance participation</p>
                     </div>
                   </div>

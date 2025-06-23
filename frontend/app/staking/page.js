@@ -14,6 +14,8 @@ import StakeModal from "../components/StakeModal"
 import UnstakeModal from "../components/UnstakeModal"
 import BondModal from "../components/BondModal"
 import UnstakeBondModal from "../components/UnstakeBondModal"
+import { getTokenName } from "../../lib/erc20"
+import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
 
 export default function StakingPage() {
   const { address, isConnected } = useAccount()
@@ -24,11 +26,22 @@ export default function StakingPage() {
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
   const [maxFeePercent, setMaxFeePercent] = useState(0)
+  const [tokenName, setTokenName] = useState("")
 
   const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
   const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
 
   useEffect(() => {
+    async function loadToken() {
+      try {
+        const name = await getTokenName(STAKING_TOKEN_ADDRESS)
+        setTokenName(name)
+      } catch (err) {
+        console.error('Failed to load token name', err)
+      }
+    }
+    loadToken()
+
     async function load() {
       try {
         const c = getCommittee()
@@ -71,7 +84,7 @@ export default function StakingPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Governance</h1>
               <p className="text-gray-600 dark:text-gray-300">
-                Stake tokens and deposit bonds to participate in protocol governance
+                {`Stake ${tokenName || 'tokens'} and deposit bonds to participate in protocol governance`}
               </p>
             </div>
           </div>
@@ -87,8 +100,12 @@ export default function StakingPage() {
                   <Vote className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Stake Voting Token</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Lock tokens to gain voting power</p>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {`Stake ${tokenName || 'Voting Token'}`}
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {`Lock ${tokenName || 'tokens'} to gain voting power`}
+                  </p>
                 </div>
               </div>
               <Sheet open={stakeInfoOpen} onOpenChange={setStakeInfoOpen}>
@@ -97,7 +114,7 @@ export default function StakingPage() {
                 </SheetTrigger>
                 <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
                   <SheetHeader>
-                    <SheetTitle>Stake Voting Token</SheetTitle>
+                    <SheetTitle>{`Stake ${tokenName || 'Voting Token'}`}</SheetTitle>
                   </SheetHeader>
                   <div className="mt-4 text-sm space-y-3">
                     <p>
