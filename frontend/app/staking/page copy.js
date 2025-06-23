@@ -11,18 +11,19 @@ import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../.
 import StakeModal from "../components/StakeModal"
 import UnstakeModal from "../components/UnstakeModal"
 import BondModal from "../components/BondModal"
-import UnstakeBondModal from "../components/UnstakeBondModal"
+import { getCommitteeWithSigner, getCommittee } from "../../lib/committee"
+import { getStakingWithSigner } from "../../lib/staking"
+import { formatPercentage } from "../utils/formatting"
 
 export default function StakingPage() {
   const { address, isConnected } = useAccount()
   const [stakeOpen, setStakeOpen] = useState(false)
   const [unstakeOpen, setUnstakeOpen] = useState(false)
   const [bondOpen, setBondOpen] = useState(false)
-  const [unstakeBondOpen, setUnstakeBondOpen] = useState(false)
   const [stakeInfoOpen, setStakeInfoOpen] = useState(false)
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
+  const [isUnstakingBond, setIsUnstakingBond] = useState(false)
   const [maxFeePercent, setMaxFeePercent] = useState(0)
-
   const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
   const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
 
@@ -38,6 +39,20 @@ export default function StakingPage() {
     }
     load()
   }, [])
+
+  const handleUnstakeBond = async () => {
+    setIsUnstakingBond(true)
+    try {
+      const staking = await getStakingWithSigner()
+      const tx = await staking.withdrawBond(0)
+      await tx.wait()
+    } catch (err) {
+      console.error('Withdraw bond failed', err)
+    } finally {
+      setIsUnstakingBond(false)
+    }
+  }
+
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
@@ -119,7 +134,7 @@ export default function StakingPage() {
                   <p className="font-medium mb-1">Benefits</p>
                   <ul className="text-xs space-y-1">
                     <li>• Vote on protocol proposals</li>
-                    <li>• Influence protocol direction</li>
+                    <li>• Earn rewards from claim fees</li>
                     <li>• Unstake anytime</li>
                   </ul>
                 </div>
@@ -162,11 +177,9 @@ export default function StakingPage() {
                   </SheetHeader>
                   <div className="mt-4 text-sm space-y-3">
                     <p>
-                      Depositing a bond triggers{" "}
-                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
-                        createProposal(poolId, 1, amount)
-                      </code>
-                      . The bond is tied to the selected risk pool and remains locked as collateral.
+                      Depositing a bond triggers{' '}
+                      <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">createProposal(poolId, 1, amount)</code>.
+                      The bond is tied to the selected risk pool and remains locked as collateral.
                     </p>
                     <p>Bonds encourage honest participation in governance by putting your own assets at risk.</p>
                     <p className="text-red-600 dark:text-red-400 font-medium">
@@ -192,27 +205,27 @@ export default function StakingPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setBondOpen(true)}
-                className="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                Deposit Bond
-              </button>
-              <button
-                onClick={() => setUnstakeBondOpen(true)}
-                className="w-full py-4 px-6 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                Withdraw Bond
-              </button>
+                <button
+                  onClick={() => setBondOpen(true)}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  Deposit Bond
+                </button>
+                <button
+                  onClick={handleUnstakeBond}
+                  disabled={isUnstakingBond}
+                  className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                >
+                  {isUnstakingBond ? 'Unstaking...' : 'Unstake Bond'}
+                </button>
+              </div>
             </div>
-          </div>
         </div>
 
         {/* Modals */}
         <StakeModal isOpen={stakeOpen} onClose={() => setStakeOpen(false)} />
         <UnstakeModal isOpen={unstakeOpen} onClose={() => setUnstakeOpen(false)} />
         <BondModal isOpen={bondOpen} onClose={() => setBondOpen(false)} />
-        <UnstakeBondModal isOpen={unstakeBondOpen} onClose={() => setUnstakeBondOpen(false)} />
 
         {/* Proposals Section */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { ethers } from "ethers"
 import Image from "next/image"
-import { AlertTriangle, Info, DollarSign, ChevronDown } from "lucide-react"
+import { AlertTriangle, Info, DollarSign, ChevronDown, Check } from "lucide-react"
 import { getCommittee, getCommitteeWithSigner } from "../../lib/committee"
 import Modal from "./Modal"
 import usePools from "../../hooks/usePools"
@@ -14,19 +14,9 @@ import usePools from "../../hooks/usePools"
 import { getUnderlyingTokenLogo, getUnderlyingTokenName } from "../config/tokenNameMap"
 import { getTxExplorerUrl } from "../utils/explorer"
 import useClaims from "../../hooks/useClaims"
-import {
-  getProtocolName,
-  getProtocolLogo,
-} from "../config/tokenNameMap"
-import {
-  STAKING_TOKEN_ADDRESS,
-  COMMITTEE_ADDRESS,
-} from "../config/deployments"
-import {
-  getERC20WithSigner,
-  getTokenDecimals,
-  getTokenSymbol,
-} from "../../lib/erc20"
+import { getProtocolName, getProtocolLogo } from "../config/tokenNameMap"
+import { STAKING_TOKEN_ADDRESS, COMMITTEE_ADDRESS } from "../config/deployments"
+import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/erc20"
 
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
@@ -35,12 +25,10 @@ export default function BondModal({ isOpen, onClose }) {
   // mirrors the behaviour of the Insurance Markets page so only the actual
   // deposit assets (e.g. USDC) show up in the dropdown.
   const tokens = pools
-    ? Array.from(new Set(pools.map((p) => p.deployment.toLowerCase()))).map(
-        (address) => ({
-          address,
-          symbol: getUnderlyingTokenName(address),
-        }),
-      )
+    ? Array.from(new Set(pools.map((p) => p.deployment.toLowerCase()))).map((address) => ({
+        address,
+        symbol: getUnderlyingTokenName(address),
+      }))
     : []
   const [selectedAsset, setSelectedAsset] = useState("")
   const [selectedProtocol, setSelectedProtocol] = useState("")
@@ -54,10 +42,8 @@ export default function BondModal({ isOpen, onClose }) {
   const [balance, setBalance] = useState("0")
   const [assetSymbol, setAssetSymbol] = useState("")
   const [feeShareBps, setFeeShareBps] = useState(0)
-  const [minBond, setMinBond] = useState("0")
-  const [maxBond, setMaxBond] = useState("0")
-  const [minFeeBps, setMinFeeBps] = useState(0)
-  const [maxFeeBps, setMaxFeeBps] = useState(0)
+  const [assetDropdownOpen, setAssetDropdownOpen] = useState(false)
+  const [protocolDropdownOpen, setProtocolDropdownOpen] = useState(false)
 
   const handleAmountChange = (e) => {
     const value = e.target.value
@@ -67,9 +53,8 @@ export default function BondModal({ isOpen, onClose }) {
   }
 
   const handleSetMax = () => {
-    setAmount(maxBond)
+    setAmount(balance)
   }
-
 
   useEffect(() => {
     if (!selectedAsset && tokens && tokens.length > 0) {
@@ -103,31 +88,23 @@ export default function BondModal({ isOpen, onClose }) {
         setSymbol(await getTokenSymbol(tokenAddress))
         setDecimals(dec)
       } catch (err) {
-        console.error('Failed to load staking token info', err)
+        console.error("Failed to load staking token info", err)
       }
     }
 
-    async function loadCommitteeParams() {
+    async function loadFeeShare() {
       try {
         const c = getCommittee()
-        const [minB, maxB, minFee, maxFee] = await Promise.all([
-          c.minBondAmount(),
-          c.maxBondAmount(),
-          c.minProposerFeeBps(),
-          c.maxProposerFeeBps(),
-        ])
-        setMinBond(ethers.utils.formatEther(minB))
-        setMaxBond(ethers.utils.formatEther(maxB))
-        setMinFeeBps(Number(minFee.toString()))
-        setMaxFeeBps(Number(maxFee.toString()))
+        const bps = await c.proposerFeeShareBps()
+        setFeeShareBps(Number(bps.toString()))
       } catch (err) {
-        console.error('Failed to load committee params', err)
+        console.error("Failed to load proposer fee share", err)
       }
     }
 
     if (isOpen) {
       loadTokenInfo()
-      loadCommitteeParams()
+      loadFeeShare()
     }
   }, [isOpen, tokenAddress])
 
@@ -135,24 +112,6 @@ export default function BondModal({ isOpen, onClose }) {
     if (!selectedAsset) return
     setAssetSymbol(getUnderlyingTokenName(selectedAsset))
   }, [selectedAsset])
-
-  // Calculate proposer fee share based on bond amount
-  useEffect(() => {
-    if (!amount) {
-      setFeeShareBps(0)
-      return
-    }
-    const amt = Number(amount)
-    const min = Number(minBond)
-    const max = Number(maxBond)
-    if (!min || !max) return
-    if (amt <= min) return setFeeShareBps(minFeeBps)
-    if (amt >= max) return setFeeShareBps(maxFeeBps)
-    const span = max - min
-    const bpsSpan = maxFeeBps - minFeeBps
-    const bps = minFeeBps + ((amt - min) * bpsSpan) / span
-    setFeeShareBps(bps)
-  }, [amount, minBond, maxBond, minFeeBps, maxFeeBps])
 
   // Calculate max payout based on claim fees for the selected pool
   useEffect(() => {
@@ -164,10 +123,7 @@ export default function BondModal({ isOpen, onClose }) {
       .filter((c) => Number(c.poolId) === Number(selectedProtocol))
       .reduce((sum, c) => {
         try {
-          return (
-            sum +
-            Number(ethers.utils.formatUnits(c.claimFee, dec))
-          )
+          return sum + Number(ethers.utils.formatUnits(c.claimFee, dec))
         } catch {
           return sum
         }
@@ -179,11 +135,7 @@ export default function BondModal({ isOpen, onClose }) {
 
   const handleSubmit = async () => {
     if (!amount || !selectedProtocol) return
-    if (
-      Number(amount) < Number(minBond) ||
-      Number(amount) > Number(maxBond)
-    )
-      return
+    if (Number(amount) < 1000) return
     const pool = pools.find((p) => String(p.id) === selectedProtocol)
     if (!pool) return
     setIsSubmitting(true)
@@ -209,16 +161,79 @@ export default function BondModal({ isOpen, onClose }) {
     }
   }
 
+  const CustomDropdown = ({
+    options,
+    value,
+    onChange,
+    isOpen,
+    setIsOpen,
+    placeholder,
+    getLabel,
+    getLogo,
+    renderOption,
+  }) => (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+      >
+        <div className="flex items-center space-x-3">
+          {value && (
+            <Image
+              src={getLogo(value) || "/placeholder.svg"}
+              alt={getLabel(value)}
+              width={24}
+              height={24}
+              className="rounded-full"
+            />
+          )}
+          <span className="text-gray-900 dark:text-gray-100 font-medium">{value ? getLabel(value) : placeholder}</span>
+        </div>
+        <ChevronDown
+          className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+          {options.map((option, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => {
+                onChange(option)
+                setIsOpen(false)
+              }}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 first:rounded-t-xl last:rounded-b-xl"
+            >
+              <div className="flex items-center space-x-3">
+                <Image
+                  src={getLogo(option) || "/placeholder.svg"}
+                  alt={getLabel(option)}
+                  width={24}
+                  height={24}
+                  className="rounded-full"
+                />
+                <span className="text-gray-900 dark:text-gray-100 font-medium">{getLabel(option)}</span>
+              </div>
+              {value === option && <Check className="w-4 h-4 text-blue-500" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Deposit Bond">
       <div className="space-y-6">
         {/* Warning Card */}
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-red-800 dark:text-red-200">
-              <p className="font-medium mb-1">Slashing Risk</p>
+              <p className="font-semibold mb-1">Slashing Risk</p>
               <p>
                 Your bond may be slashed if voting support is not achieved. Only deposit what you can afford to lose.
               </p>
@@ -226,77 +241,47 @@ export default function BondModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Asset being covered */}
+        {/* Asset Selection */}
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asset</label>
-          <div className="relative">
-            <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer">
-              <Image
-                src={getUnderlyingTokenLogo(selectedAsset) || "/placeholder.svg"}
-                alt={assetSymbol}
-                width={24}
-                height={24}
-                className="rounded-full"
-              />
-              <select
-                className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none cursor-pointer appearance-none"
-                value={selectedAsset}
-                onChange={(e) => setSelectedAsset(e.target.value)}
-              >
-                {tokens.map((t) => (
-                  <option key={t.address} value={t.address}>
-                    {t.symbol}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            </div>
-          </div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Asset</label>
+          <CustomDropdown
+            options={tokens.map((t) => t.address)}
+            value={selectedAsset}
+            onChange={setSelectedAsset}
+            isOpen={assetDropdownOpen}
+            setIsOpen={setAssetDropdownOpen}
+            placeholder="Select asset"
+            getLabel={(address) => getUnderlyingTokenName(address)}
+            getLogo={(address) => getUnderlyingTokenLogo(address)}
+          />
         </div>
 
         {/* Protocol Selection */}
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Protocol</label>
-          <div className="relative">
-            <div className="flex items-center space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer">
-              <Image
-                src={getProtocolLogo(selectedProtocol) || "/placeholder.svg"}
-                alt={getProtocolName(selectedProtocol)}
-                width={24}
-                height={24}
-                className="rounded-full"
-              />
-              <select
-                className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none cursor-pointer appearance-none"
-                value={selectedProtocol}
-                onChange={(e) => setSelectedProtocol(e.target.value)}
-              >
-                {pools
-                  .filter(
-                    (p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase(),
-                  )
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {getProtocolName(p.id)}
-                    </option>
-                  ))}
-              </select>
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            </div>
-          </div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Protocol</label>
+          <CustomDropdown
+            options={pools.filter((p) => p.deployment.toLowerCase() === selectedAsset.toLowerCase()).map((p) => p.id)}
+            value={selectedProtocol}
+            onChange={setSelectedProtocol}
+            isOpen={protocolDropdownOpen}
+            setIsOpen={setProtocolDropdownOpen}
+            placeholder="Select protocol"
+            getLabel={(id) => getProtocolName(id)}
+            getLogo={(id) => getProtocolLogo(id)}
+          />
         </div>
 
         {/* Bond Amount Input */}
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Bond Amount</label>
+            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Bond Amount</label>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              Balance: {Number.parseFloat(balance).toFixed(4)} {symbol} | Min: {Number.parseFloat(minBond).toFixed(2)} {symbol} | Max: {Number.parseFloat(maxBond).toFixed(2)} {symbol}
+              Balance: {Number.parseFloat(balance).toFixed(4)} {symbol}
             </div>
           </div>
 
           <div className="relative">
-            <div className="flex items-center justify-between p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800 focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20">
+            <div className="flex items-center justify-between p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-800 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200">
               <div className="flex-1">
                 <input
                   type="text"
@@ -310,28 +295,24 @@ export default function BondModal({ isOpen, onClose }) {
                 <button
                   type="button"
                   onClick={handleSetMax}
-                  className="px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-md transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-lg transition-colors duration-200"
                 >
                   MAX
                 </button>
                 <div className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {symbol || "TOKEN"}
-                  </span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{symbol || "TOKEN"}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Estimated Payout Info */}
+        {/* Max Payout Info */}
         {amount && Number.parseFloat(amount) > 0 && (
-          <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                Est. Payout ({(feeShareBps / 100).toFixed(2)}% of fees)
-              </span>
+              <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Max Payout</span>
             </div>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
               {maxPayout} {assetSymbol}
@@ -340,11 +321,11 @@ export default function BondModal({ isOpen, onClose }) {
         )}
 
         {/* Info Card */}
-        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-          <div className="flex items-start space-x-2">
-            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+          <div className="flex items-start space-x-3">
+            <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-amber-800 dark:text-amber-200">
-              <p className="font-medium mb-1">Bond Mechanics</p>
+              <p className="font-semibold mb-1">Bond Mechanics</p>
               <p>
                 Your bond remains locked as collateral until the protocol releases it. Bonds encourage honest
                 participation in governance decisions.
@@ -356,12 +337,7 @@ export default function BondModal({ isOpen, onClose }) {
         {/* Action Button */}
         <button
           onClick={handleSubmit}
-          disabled={
-            isSubmitting ||
-            !amount ||
-            Number.parseFloat(amount) < Number(minBond) ||
-            Number.parseFloat(amount) > Number(maxBond)
-          }
+          disabled={isSubmitting || !amount || Number.parseFloat(amount) < 1000}
           className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
         >
           {isSubmitting ? (
@@ -375,13 +351,8 @@ export default function BondModal({ isOpen, onClose }) {
         </button>
         {txHash && (
           <p className="text-xs text-center mt-2">
-            Transaction submitted.{' '}
-            <a
-              href={getTxExplorerUrl(txHash)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
+            Transaction submitted.{" "}
+            <a href={getTxExplorerUrl(txHash)} target="_blank" rel="noopener noreferrer" className="underline">
               View on block explorer
             </a>
           </p>
