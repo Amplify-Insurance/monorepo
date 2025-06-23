@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react' // Import useCallback
 import { ethers } from 'ethers'
 import { getCommittee } from '../lib/committee'
 import { STAKING_TOKEN_ADDRESS } from '../app/config/deployments'
@@ -9,8 +9,13 @@ export default function useUserBonds(address) {
   const [bonds, setBonds] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const load = async () => {
-    if (!address) return
+  // Wrap the 'load' function in useCallback
+  const load = useCallback(async () => {
+    if (!address) {
+      setBonds([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const committee = getCommittee()
@@ -21,49 +26,47 @@ export default function useUserBonds(address) {
       for (let i = 1; i <= Number(count); i++) {
         const p = await committee.proposals(i)
         if (p.proposer.toLowerCase() !== address.toLowerCase()) continue
-        if (Number(p.pType) !== 1) continue
-        if (Number(p.status) === 6) continue
+        if (Number(p.pType) !== 1) continue // Not a "Pause" proposal
 
-          const amount = ethers.utils.formatUnits(p.bondAmount, decimals)
-          const statusMap = {
-            0: 'Pending',
-            1: 'Active',
-            2: 'Succeeded',
-            3: 'Defeated',
-            4: 'Executed',
-            5: 'Challenged',
-            6: 'Resolved',
-          }
-          const status = statusMap[Number(p.status)] || 'Unknown'
-          const depositDate = new Date(Number(p.creationTime) * 1000)
-          const maturityDate = new Date(Number(p.challengeDeadline) * 1000)
-          const canWithdraw =
-            Number(p.status) === 5 && Date.now() / 1000 >= Number(p.challengeDeadline)
-          items.push({
-            id: Number(p.id),
-            poolId: Number(p.poolId),
-            protocol: getProtocolName(Number(p.poolId)),
-            amount,
-            symbol,
-            status,
-            depositDate,
-            maturityDate,
-            canWithdraw,
-            rewards: ethers.utils.formatEther(p.totalRewardFees),
-            slashedAmount: '0',
-          })
+        const amount = ethers.utils.formatUnits(p.bondAmount, decimals)
+        const statusMap = {
+          0: 'Active',
+          1: 'Defeated',
+          2: 'Challenged',
+          3: 'Executed',
         }
-        setBonds(items)
-      } catch (err) {
-        console.error('Failed to load user bonds', err)
-        setBonds([])
-      } finally {
-        setLoading(false)
+        const status = statusMap[Number(p.status)] || 'Unknown'
+        const depositDate = new Date(Number(p.creationTime) * 1000)
+        const maturityDate = new Date(Number(p.challengeDeadline) * 1000)
+        const canWithdraw = Number(p.status) === 3 && !p.bondWithdrawn
+        
+        items.push({
+          id: Number(p.id),
+          poolId: Number(p.poolId),
+          protocol: getProtocolName(Number(p.poolId)),
+          amount,
+          symbol,
+          status,
+          depositDate,
+          maturityDate,
+          canWithdraw,
+          rewards: ethers.utils.formatEther(p.totalRewardFees),
+          slashedAmount: '0',
+        })
       }
+      setBonds(items)
+    } catch (err) {
+      console.error('Failed to load user bonds', err)
+      setBonds([])
+    } finally {
+      setLoading(false)
     }
+  }, [address]) // `load` is re-created only when `address` changes
 
+  // useEffect now safely depends on the memoized `load` function
+  useEffect(() => {
     load()
-  }, [address])
+  }, [load])
 
   return { bonds, loading, reload: load }
 }

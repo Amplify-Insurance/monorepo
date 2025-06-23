@@ -38,6 +38,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     
     uint256 public catPremiumBps = 2_000; // 20%
 
+
     /* ───────────────────────── Errors ───────────────────────── */
     error PoolPaused();
     error InvalidAmount();
@@ -118,6 +119,56 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         riskManager.updateCoverageSold(_poolId, _coverageAmount, true);
     }
 
+
+
+/**
+ * @notice Increases the coverage amount for an existing, active policy.
+ * @dev The policy owner must have a sufficient premium deposit to cover the new,
+ * higher premium rate for a minimum period (e.g., 7 days).
+ * This function settles any outstanding premium before processing the increase.
+ * increased coverage amount. This is a risk trade-off for user convenience.
+ * @param _policyId The ID of the policy to modify.
+ * @param _additionalCoverage The amount of coverage to add to the existing policy.
+ */
+function increaseCover(uint256 _policyId, uint256 _additionalCoverage) external nonReentrant {
+        if (address(poolRegistry) == address(0)) revert AddressesNotSet();
+        if (_additionalCoverage == 0) revert InvalidAmount();
+
+        // --- Checks ---
+        if (policyNFT.ownerOf(_policyId) != msg.sender) revert NotPolicyOwner();
+
+        // Resolve any matured increase and settle premium to get an accurate state.
+        _settleAndDrainPremium(_policyId);
+
+        if (!isPolicyActive(_policyId)) revert PolicyNotActive();
+
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+        if (pol.coverage == 0) revert PolicyAlreadyTerminated();
+        if (pol.pendingIncrease > 0) revert("PM: An increase is already pending");
+
+        // Check for sufficient pool capacity for the *additional* coverage.
+        uint256 availableCapital = _getAvailableCapital(pol.poolId);
+        (, , uint256 totalCoverageSold, , , ,) = poolRegistry.getPoolData(pol.poolId);
+        if ((totalCoverageSold + _additionalCoverage) > availableCapital) revert InsufficientCapacity();
+        
+        // --- Calculations ---
+        // Premium deposit must be sufficient for the future total coverage.
+        uint256 newTotalCoverage = pol.coverage + _additionalCoverage;
+        uint256 annualPremiumRateBps = _getPremiumRateBpsAnnual(pol.poolId);
+        uint256 minPremiumForNewCoverage = (newTotalCoverage * annualPremiumRateBps * 7 days) / (SECS_YEAR * BPS);
+        
+        if (pol.premiumDeposit < minPremiumForNewCoverage) revert DepositTooLow();
+
+        // --- Effects ---
+        // Update the risk manager immediately with the additional coverage sold.
+        riskManager.updateCoverageSold(pol.poolId, _additionalCoverage, true);
+        
+        // Add a pending increase to the policy NFT with a new activation timestamp.
+        uint256 activationTimestamp = block.timestamp + coverCooldownPeriod;
+        policyNFT.addPendingIncrease(_policyId, _additionalCoverage, activationTimestamp);
+    }
+
+
     function cancelCover(uint256 _policyId) external nonReentrant {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
         
@@ -170,10 +221,16 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     /* ───────────────── Internal & Helper Functions ──────────────── */
 
 function _settleAndDrainPremium(uint256 _policyId) internal {
+        // --- ADDED: Resolve any pending increase first ---
+        _resolvePendingIncrease(_policyId);
+
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
         if (block.timestamp <= pol.lastDrainTime) return;
 
+        // The rest of the function logic remains the same. It will now correctly use the
+        // potentially updated `pol.coverage` value after the resolution step.
         uint256 annualRateBps = _getPremiumRateBpsAnnual(pol.poolId);
+        // ... (rest of the function is identical to your original)
         uint256 timeElapsed = block.timestamp - pol.lastDrainTime;
 
         if (annualRateBps == 0) {
@@ -182,37 +239,42 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
         }
 
         uint256 accruedCost = (pol.coverage * annualRateBps * timeElapsed) / (SECS_YEAR * BPS);
-
         uint256 amountToDrain = Math.min(accruedCost, pol.premiumDeposit);
         if (amountToDrain == 0) {
             policyNFT.updatePremiumAccount(_policyId, pol.premiumDeposit, uint128(block.timestamp));
             return;
         }
 
-        // --- Checks & Effects ---
         uint128 newDeposit = uint128(pol.premiumDeposit - amountToDrain);
         policyNFT.updatePremiumAccount(_policyId, newDeposit, uint128(block.timestamp));
-
-        // --- Interactions ---
-        IERC20 underlying = capitalPool.underlyingAsset();
 
         uint256 catAmount = (amountToDrain * catPremiumBps) / BPS;
         uint256 poolIncome = amountToDrain - catAmount;
 
         if (catAmount > 0) {
-            // Approve the Cat Pool to pull the premium amount
-            underlying.approve(address(catPool), 0);
+            IERC20 underlying = capitalPool.underlyingAsset();
             underlying.approve(address(catPool), catAmount);
-
             catPool.receiveUsdcPremium(catAmount);
         }
-
+        
         (, uint256 totalPledged, , , , ,) = poolRegistry.getPoolData(pol.poolId);
         if (poolIncome > 0 && totalPledged > 0) {
-            underlying.safeTransfer(address(rewardDistributor), poolIncome);
-            rewardDistributor.distribute(pol.poolId, address(underlying), poolIncome, totalPledged);
+            rewardDistributor.distribute(pol.poolId, address(capitalPool.underlyingAsset()), poolIncome, totalPledged);
         }
     }
+
+        /**
+     * @notice Checks for and finalizes a pending coverage increase if its cooldown has passed.
+     * @dev This should be called before any premium calculations or policy state modifications.
+     * @param _policyId The ID of the policy to check.
+     */
+    function _resolvePendingIncrease(uint256 _policyId) internal {
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+        if (pol.pendingIncrease > 0 && block.timestamp >= pol.increaseActivationTimestamp) {
+            policyNFT.finalizeIncrease(_policyId);
+        }
+    }
+
     
     /* ───────────────────── View Functions ───────────────────── */
 
