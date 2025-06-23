@@ -13,14 +13,12 @@ import usePools from "../../hooks/usePools"
 // dropdown.
 import { getUnderlyingTokenLogo, getUnderlyingTokenName } from "../config/tokenNameMap"
 import { getTxExplorerUrl } from "../utils/explorer"
-import useClaims from "../../hooks/useClaims"
 import { getProtocolName, getProtocolLogo } from "../config/tokenNameMap"
 import { STAKING_TOKEN_ADDRESS, COMMITTEE_ADDRESS } from "../config/deployments"
 import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/erc20"
 
 export default function BondModal({ isOpen, onClose }) {
   const { pools } = usePools()
-  const { claims } = useClaims()
   // Build a list of unique underlying assets across all deployments. This
   // mirrors the behaviour of the Insurance Markets page so only the actual
   // deposit assets (e.g. USDC) show up in the dropdown.
@@ -43,7 +41,10 @@ export default function BondModal({ isOpen, onClose }) {
   const [decimals, setDecimals] = useState(18)
   const [balance, setBalance] = useState("0")
   const [assetSymbol, setAssetSymbol] = useState("")
-  const [feeShareBps, setFeeShareBps] = useState(0)
+  const [minBond, setMinBond] = useState(0)
+  const [maxBond, setMaxBond] = useState(0)
+  const [minFeeBps, setMinFeeBps] = useState(0)
+  const [maxFeeBps, setMaxFeeBps] = useState(0)
   const [assetDropdownOpen, setAssetDropdownOpen] = useState(false)
   const [protocolDropdownOpen, setProtocolDropdownOpen] = useState(false)
 
@@ -98,19 +99,27 @@ export default function BondModal({ isOpen, onClose }) {
       }
     }
 
-    async function loadFeeShare() {
+    async function loadCommitteeParams() {
       try {
         const c = getCommittee()
-        const bps = await c.proposerFeeShareBps()
-        setFeeShareBps(Number(bps.toString()))
+        const [minB, maxB, minFee, maxFee] = await Promise.all([
+          c.minBondAmount(),
+          c.maxBondAmount(),
+          c.minProposerFeeBps(),
+          c.maxProposerFeeBps(),
+        ])
+        setMinBond(Number(ethers.utils.formatUnits(minB, 18)))
+        setMaxBond(Number(ethers.utils.formatUnits(maxB, 18)))
+        setMinFeeBps(Number(minFee.toString()))
+        setMaxFeeBps(Number(maxFee.toString()))
       } catch (err) {
-        console.error("Failed to load proposer fee share", err)
+        console.error("Failed to load committee params", err)
       }
     }
 
     if (isOpen) {
       loadTokenInfo()
-      loadFeeShare()
+      loadCommitteeParams()
     }
   }, [isOpen, tokenAddress])
 
@@ -119,29 +128,32 @@ export default function BondModal({ isOpen, onClose }) {
     setAssetSymbol(getUnderlyingTokenName(selectedAsset))
   }, [selectedAsset])
 
-  // Calculate max payout based on claim fees for the selected pool
+  // Update payout percentage based on deposit amount
   useEffect(() => {
-    const pool = pools.find((p) => String(p.id) === selectedProtocol)
-    if (!pool) return setMaxPayout("0")
-
-    const dec = pool.underlyingAssetDecimals ?? 18
-    const totalFees = claims
-      .filter((c) => Number(c.poolId) === Number(selectedProtocol))
-      .reduce((sum, c) => {
-        try {
-          return sum + Number(ethers.utils.formatUnits(c.claimFee, dec))
-        } catch {
-          return sum
-        }
-      }, 0)
-
-    const payout = (totalFees * feeShareBps) / 10000
-    setMaxPayout(payout.toFixed(4))
-  }, [selectedProtocol, claims, pools, feeShareBps])
+    const amt = parseFloat(amount)
+    if (!amount || isNaN(amt)) {
+      setMaxPayout("0")
+      return
+    }
+    if (minBond === 0 || maxBond === 0) {
+      setMaxPayout("0")
+      return
+    }
+    let bps
+    if (amt <= minBond) bps = minFeeBps
+    else if (amt >= maxBond) bps = maxFeeBps
+    else {
+      const span = maxBond - minBond
+      const bpsSpan = maxFeeBps - minFeeBps
+      bps = minFeeBps + ((amt - minBond) * bpsSpan) / span
+    }
+    setMaxPayout((bps / 100).toFixed(2))
+  }, [amount, minBond, maxBond, minFeeBps, maxFeeBps])
 
   const handleSubmit = async () => {
     if (!amount || !selectedProtocol) return
-    if (Number(amount) < 1000) return
+    const amt = parseFloat(amount)
+    if (isNaN(amt) || amt < minBond || amt > maxBond) return
     const pool = pools.find((p) => String(p.id) === selectedProtocol)
     if (!pool) return
     setIsSubmitting(true)
@@ -315,6 +327,9 @@ export default function BondModal({ isOpen, onClose }) {
               </div>
             </div>
           </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Min: {minBond} {symbol} • Max: {maxBond} {symbol}
+          </div>
         </div>
 
         {/* Max Payout Info */}
@@ -325,7 +340,7 @@ export default function BondModal({ isOpen, onClose }) {
               <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Max Payout</span>
             </div>
             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-              {maxPayout} {assetSymbol}
+              {maxPayout}%
             </span>
           </div>
         )}
@@ -347,7 +362,12 @@ export default function BondModal({ isOpen, onClose }) {
         {/* Action Button */}
         <button
           onClick={handleSubmit}
-          disabled={isSubmitting || !amount || Number.parseFloat(amount) < 1000}
+          disabled={
+            isSubmitting ||
+            !amount ||
+            parseFloat(amount) < minBond ||
+            parseFloat(amount) > maxBond
+          }
           className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
         >
           {isSubmitting ? (
