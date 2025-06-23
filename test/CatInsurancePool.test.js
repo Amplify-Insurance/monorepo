@@ -19,6 +19,7 @@ describe("CatInsurancePool", function () {
     // --- Constants ---
     const MIN_USDC_AMOUNT = 1000n; // matches CatInsurancePool.MIN_USDC_AMOUNT
     const CAT_POOL_REWARD_ID = ethers.MaxUint256;
+    const NOTICE_PERIOD = 30 * 24 * 60 * 60;
 
 
     beforeEach(async function () {
@@ -213,6 +214,8 @@ describe("CatInsurancePool", function () {
             const totalShares = await catShareToken.totalSupply();
             const usdcToWithdraw = (sharesToBurn * (await catPool.liquidUsdc())) / (totalShares - 1000n);
 
+            await catPool.connect(lp1).requestWithdrawal(sharesToBurn);
+            await time.increase(NOTICE_PERIOD);
             await expect(catPool.connect(lp1).withdrawLiquidity(sharesToBurn))
                 .to.emit(catPool, "CatLiquidityWithdrawn")
                 .withArgs(lp1.address, usdcToWithdraw, sharesToBurn);
@@ -230,6 +233,8 @@ describe("CatInsurancePool", function () {
             
             // Setup mocks for withdrawal
             const sharesToBurn = await catShareToken.balanceOf(lp1.address);
+            await catPool.connect(lp1).requestWithdrawal(sharesToBurn);
+            await time.increase(NOTICE_PERIOD);
             await mockAdapter.setTotalValueHeld(DEPOSIT_AMOUNT);
 
             await catPool.connect(lp1).withdrawLiquidity(sharesToBurn);
@@ -373,10 +378,10 @@ describe("CatInsurancePool", function () {
             ).to.be.revertedWith("CIP: Shares to burn must be positive");
         });
 
-        it("Should revert when withdrawing more shares than owned", async function () {
+        it("Should revert when requesting more shares than owned", async function () {
             await catPool.connect(lp1).depositLiquidity(MIN_USDC_AMOUNT);
             await expect(
-                catPool.connect(lp1).withdrawLiquidity(MIN_USDC_AMOUNT * 2n)
+                catPool.connect(lp1).requestWithdrawal(MIN_USDC_AMOUNT * 2n)
             ).to.be.revertedWith("CIP: Insufficient CatShare balance");
         });
 
@@ -494,6 +499,8 @@ describe("CatInsurancePool", function () {
         it("Should revert when withdrawal amount below minimum", async function () {
             const depositAmount = ethers.parseUnits("2000", 6);
             await catPool.connect(lp1).depositLiquidity(depositAmount);
+            await catPool.connect(lp1).requestWithdrawal(1);
+            await time.increase(NOTICE_PERIOD);
             await expect(catPool.connect(lp1).withdrawLiquidity(1))
                 .to.be.revertedWith("CIP: Withdrawal amount below minimum");
         });
@@ -508,6 +515,8 @@ describe("CatInsurancePool", function () {
             await mockAdapter.setTotalValueHeld(flushAmount * 4n); // Report more than actual balance
 
             const shares = await catShareToken.balanceOf(lp1.address);
+            await catPool.connect(lp1).requestWithdrawal(shares);
+            await time.increase(NOTICE_PERIOD);
             await expect(catPool.connect(lp1).withdrawLiquidity(shares))
                 .to.be.revertedWith("CIP: Adapter withdrawal failed");
         });
@@ -599,6 +608,9 @@ describe("CatInsurancePool", function () {
             // Move funds to the malicious adapter
             await mockAdapter.setTotalValueHeld(0); // Old adapter is empty
             await catPool.connect(owner).flushToAdapter(depositAmount);
+
+            await catPool.connect(lp1).requestWithdrawal(sharesToBurn);
+            await time.increase(NOTICE_PERIOD);
 
             await expect(catPool.connect(lp1).withdrawLiquidity(sharesToBurn))
                 .to.be.reverted;

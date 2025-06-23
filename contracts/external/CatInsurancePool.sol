@@ -30,6 +30,10 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     uint256 private constant INITIAL_SHARES_LOCKED = 1000;
     uint256 public constant CAT_POOL_REWARD_ID = type(uint256).max;
     uint256 public constant MIN_USDC_AMOUNT = 1e3; // 1 USDC assuming 6 decimals
+    uint256 public constant NOTICE_PERIOD = 30 days;
+
+    mapping(address => uint256) public withdrawalRequestTimestamp;
+    mapping(address => uint256) public withdrawalRequestShares;
 
     // --- Events (add an Initialized event) ---
     event Initialized();
@@ -39,6 +43,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     event DrawFromFund(uint256 requestedAmount, uint256 actualAmountSentToCapitalPool);
     event CatLiquidityDeposited(address indexed user, uint256 usdcAmount, uint256 catShareAmountMinted);
     event CatLiquidityWithdrawn(address indexed user, uint256 usdcAmountWithdrawn, uint256 catShareAmountBurned);
+    event WithdrawalRequested(address indexed user, uint256 shareAmount, uint256 timestamp);
     event ProtocolAssetReceivedForDistribution(address indexed token, uint256 amount);
     event ProtocolAssetRewardsClaimed(address indexed user, address indexed token, uint256 amount);
     event RiskManagerAddressSet(address indexed newRiskManagerAddress);
@@ -183,8 +188,33 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         emit CatLiquidityDeposited(msg.sender, usdcAmount, sharesToMint);
     }
 
+    function requestWithdrawal(uint256 shareAmount) external nonReentrant {
+        require(shareAmount > 0, "CIP: Invalid amount");
+        require(
+            catShareToken.balanceOf(msg.sender) >= shareAmount,
+            "CIP: Insufficient CatShare balance"
+        );
+        require(
+            withdrawalRequestShares[msg.sender] == 0,
+            "CIP: Withdrawal request pending"
+        );
+
+        withdrawalRequestShares[msg.sender] = shareAmount;
+        withdrawalRequestTimestamp[msg.sender] = block.timestamp;
+
+        emit WithdrawalRequested(msg.sender, shareAmount, block.timestamp);
+    }
+
     function withdrawLiquidity(uint256 catShareAmountBurn) external nonReentrant {
         require(catShareAmountBurn > 0, "CIP: Shares to burn must be positive");
+        uint256 requested = withdrawalRequestShares[msg.sender];
+        require(requested > 0, "CIP: No withdrawal request");
+        require(catShareAmountBurn == requested, "CIP: Amount mismatch");
+        require(
+            block.timestamp >= withdrawalRequestTimestamp[msg.sender] + NOTICE_PERIOD,
+            "CIP: Notice period active"
+        );
+
         uint256 userCatShareBalance = catShareToken.balanceOf(msg.sender);
         require(userCatShareBalance >= catShareAmountBurn, "CIP: Insufficient CatShare balance");
         
@@ -199,6 +229,8 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
         require(usdcToWithdraw >= MIN_USDC_AMOUNT, "CIP: Withdrawal amount below minimum");
 
         catShareToken.burn(msg.sender, catShareAmountBurn);
+        delete withdrawalRequestShares[msg.sender];
+        delete withdrawalRequestTimestamp[msg.sender];
 
         if (usdcToWithdraw <= idleUSDC) {
             idleUSDC -= usdcToWithdraw;
