@@ -20,8 +20,10 @@ import useActiveProposals from "../../hooks/useActiveProposals"
 import useBondedAmount from "../../hooks/useBondedAmount"
 import useUserBonds from "../../hooks/useUserBonds"
 import { ethers } from "ethers"
-import { Vote, Shield, ExternalLink } from "lucide-react"
+import Image from "next/image"
+import { Shield, ExternalLink } from "lucide-react"
 import { getTokenName } from "../../lib/erc20"
+import { getProtocolLogo, getTokenLogo } from "../config/tokenNameMap"
 import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
 import { formatCurrency } from "../utils/formatting"
 import ClaimRewardsModal from "../components/ClaimRewardsModal"
@@ -46,12 +48,14 @@ export default function Dashboard() {
   const [govTxHash, setGovTxHash] = useState("")
   const [bondTxHash, setBondTxHash] = useState("")
   const [tokenName, setTokenName] = useState("")
+  const [tokenLogo, setTokenLogo] = useState("")
 
   useEffect(() => {
     async function loadName() {
       try {
         const name = await getTokenName(STAKING_TOKEN_ADDRESS)
         setTokenName(name)
+        setTokenLogo(getTokenLogo(STAKING_TOKEN_ADDRESS))
       } catch (err) {
         console.error("Failed to load token name", err)
       }
@@ -220,8 +224,16 @@ export default function Dashboard() {
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-lg flex items-center justify-center">
-                      <Vote className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                      {tokenLogo && (
+                        <Image
+                          src={tokenLogo}
+                          alt={tokenName || 'Gov Token'}
+                          width={40}
+                          height={40}
+                          className="rounded-lg"
+                        />
+                      )}
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -407,10 +419,14 @@ export default function Dashboard() {
                       <tr key={bond.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center">
-                              <span className="text-white font-bold text-xs">
-                                {bond.protocol.slice(0, 2).toUpperCase()}
-                              </span>
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                              <Image
+                                src={getProtocolLogo(bond.poolId) || "/placeholder.svg"}
+                                alt={bond.protocol}
+                                width={40}
+                                height={40}
+                                className="rounded-full"
+                              />
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-900 dark:text-white">{bond.protocol}</p>
@@ -449,7 +465,9 @@ export default function Dashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {new Date(bond.maturityDate).toLocaleDateString()}
+                            {bond.maturityDate && bond.maturityDate.getTime() > 0
+                              ? bond.maturityDate.toLocaleDateString()
+                              : 'N/A'}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {bond.status === "Active" ? "Matures" : "Matured"}
