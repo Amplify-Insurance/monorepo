@@ -7,6 +7,13 @@ import { HelpCircle, Vote, Shield, Users } from "lucide-react"
 import ProposalsTable from "../components/ProposalsTable"
 import useActiveProposals from "../../hooks/useActiveProposals"
 import usePastProposals from "../../hooks/usePastProposals"
+import useStakingInfo from "../../hooks/useStakingInfo"
+import useUserBonds from "../../hooks/useUserBonds"
+import Image from "next/image"
+import Link from "next/link"
+import { getTokenLogo, getProtocolLogo } from "../config/tokenNameMap"
+import { formatCurrency } from "../utils/formatting"
+import { ethers } from "ethers"
 import { getCommittee } from "../../lib/committee"
 import { formatPercentage } from "../utils/formatting"
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "../../components/ui/sheet"
@@ -27,6 +34,10 @@ export default function StakingPage() {
   const [bondInfoOpen, setBondInfoOpen] = useState(false)
   const [maxFeePercent, setMaxFeePercent] = useState(0)
   const [tokenName, setTokenName] = useState("")
+  const [tokenLogo, setTokenLogo] = useState("")
+
+  const { info: stakingInfo } = useStakingInfo(address)
+  const { bonds: userBonds = [] } = useUserBonds(address)
 
   const { proposals: activeProposals, loading: loadingActive } = useActiveProposals()
   const { proposals: pastProposals, loading: loadingPast } = usePastProposals()
@@ -36,6 +47,7 @@ export default function StakingPage() {
       try {
         const name = await getTokenName(STAKING_TOKEN_ADDRESS)
         setTokenName(name)
+        setTokenLogo(getTokenLogo(STAKING_TOKEN_ADDRESS))
       } catch (err) {
         console.error('Failed to load token name', err)
       }
@@ -232,6 +244,86 @@ export default function StakingPage() {
         <UnstakeModal isOpen={unstakeOpen} onClose={() => setUnstakeOpen(false)} />
         <BondModal isOpen={bondOpen} onClose={() => setBondOpen(false)} />
         <UnstakeBondModal isOpen={unstakeBondOpen} onClose={() => setUnstakeBondOpen(false)} />
+
+        {stakingInfo && BigInt(stakingInfo.staked || "0") > 0n && (
+          <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                  {tokenLogo && (
+                    <Image src={tokenLogo} alt={tokenName || 'Gov Token'} width={40} height={40} className="rounded-lg" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{`My Staked ${tokenName || 'Gov Tokens'}`}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Your governance participation</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Amount Staked</p>
+                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{Number(ethers.utils.formatUnits(stakingInfo.staked || '0', 18)).toFixed(4)}</p>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Voting Power</p>
+                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                  {stakingInfo.totalStaked && BigInt(stakingInfo.totalStaked) > 0n
+                    ? (Number((BigInt(stakingInfo.staked) * 10000n) / BigInt(stakingInfo.totalStaked)) / 100).toFixed(2)
+                    : '0'}%
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {userBonds.length > 0 && (
+          <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-lg flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">My Bonds</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Your bonded positions</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-750">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bond Details</th>
+                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {userBonds.map((bond) => (
+                    <tr key={bond.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                            <Image src={getProtocolLogo(bond.poolId) || '/placeholder.svg'} alt={bond.protocol} width={40} height={40} className="rounded-full" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{bond.protocol}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Pool {bond.poolId}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        {formatCurrency(Number.parseFloat(bond.amount), 'USD', 'USD')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">{bond.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Proposals Section */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
