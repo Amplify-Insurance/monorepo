@@ -1,32 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { getCatPoolWithSigner } from '../lib/catPool'
 
-const STORAGE_PREFIX = 'catpool-withdrawal-'
 const NOTICE_PERIOD = 30 * 24 * 60 * 60 // 30 days in seconds
 
 export default function useCatPoolWithdrawalRequest(address) {
   const [request, setRequest] = useState(null)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!address) return
-    const data = localStorage.getItem(STORAGE_PREFIX + address.toLowerCase())
-    if (data) setRequest(JSON.parse(data))
+    try {
+      const cp = await getCatPoolWithSigner()
+      const [shares, ts] = await Promise.all([
+        cp.withdrawalRequestShares(address),
+        cp.withdrawalRequestTimestamp(address),
+      ])
+      if (shares && shares.gt(0)) {
+        setRequest({ shares, timestamp: ts.toNumber() })
+      } else {
+        setRequest(null)
+      }
+    } catch (err) {
+      console.error('Failed to load cat pool withdrawal request', err)
+    }
   }, [address])
 
-  const createRequest = (shares) => {
-    if (!address) return
-    const req = { timestamp: Math.floor(Date.now() / 1000), shares }
-    localStorage.setItem(
-      STORAGE_PREFIX + address.toLowerCase(),
-      JSON.stringify(req),
-    )
-    setRequest(req)
-  }
+  useEffect(() => {
+    load()
+  }, [load])
 
-  const clearRequest = () => {
-    if (!address) return
-    localStorage.removeItem(STORAGE_PREFIX + address.toLowerCase())
-    setRequest(null)
-  }
-
-  return { request, createRequest, clearRequest, NOTICE_PERIOD }
+  return { request, refresh: load, NOTICE_PERIOD }
 }

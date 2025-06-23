@@ -6,7 +6,7 @@ import { formatCurrency } from "../utils/formatting"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
 import useCatPoolRewards from "../../hooks/useCatPoolRewards"
 import Image from "next/image"
-import { TrendingUp, Gift, ExternalLink, Clock, X } from "lucide-react"
+import { TrendingUp, Gift, ExternalLink, Clock } from "lucide-react"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import {
   getCatPoolWithSigner,
@@ -18,11 +18,14 @@ import ClaimRewardsModal from "./ClaimRewardsModal"
 import RequestWithdrawalModal from "./RequestWithdrawalModal"
 import Link from "next/link"
 import useMaxWithdrawable from "../../hooks/useMaxWithdrawable"
+import useCatPoolWithdrawalRequest from "../../hooks/useCatPoolWithdrawalRequest"
 
 export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { address } = useAccount()
   const { info, refresh } = useCatPoolUserInfo(address)
   const { rewards } = useCatPoolRewards(address)
+  const { request: withdrawalRequest, refresh: refreshWithdrawal, NOTICE_PERIOD } =
+    useCatPoolWithdrawalRequest(address)
   const [valueDecimals, setValueDecimals] = useState(6)
   const [underlyingToken, setUnderlyingToken] = useState("")
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
@@ -34,6 +37,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
 
   useEffect(() => {
     refresh()
+    refreshWithdrawal()
 
     async function loadTokenInfo() {
       try {
@@ -46,16 +50,41 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
       }
     }
     loadTokenInfo()
-
-
-    // Simulate pending withdrawal - replace with actual contract call
-    // setPendingWithdrawal({
-    //   amount: 500.0,
-    //   value: 500.0,
-    //   requestedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
-    //   availableAt: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000), // 25 days from now
-    // })
   }, [refreshTrigger])
+
+  useEffect(() => {
+    async function computeWithdrawal() {
+      if (!withdrawalRequest || !info) {
+        setPendingWithdrawal(null)
+        return
+      }
+      try {
+        const dec = await getCatShareDecimals()
+        const sharesHuman = Number(
+          ethers.utils.formatUnits(withdrawalRequest.shares, dec),
+        )
+        const userShares = Number(
+          ethers.utils.formatUnits(info.balance || '0', dec),
+        )
+        const userValue = Number(
+          ethers.utils.formatUnits(info.value || '0', valueDecimals),
+        )
+        const valuePerShare = userShares > 0 ? userValue / userShares : 0
+        setPendingWithdrawal({
+          amount: sharesHuman,
+          value: sharesHuman * valuePerShare,
+          requestedAt: new Date(withdrawalRequest.timestamp * 1000),
+          availableAt: new Date(
+            (withdrawalRequest.timestamp + NOTICE_PERIOD) * 1000,
+          ),
+        })
+      } catch (err) {
+        console.error('Failed to compute withdrawal info', err)
+        setPendingWithdrawal(null)
+      }
+    }
+    computeWithdrawal()
+  }, [withdrawalRequest, info, NOTICE_PERIOD, valueDecimals])
 
   const handleClaimRewards = async () => {
     if (!rewards || rewards.length === 0) return
@@ -86,14 +115,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
       const tx = await cp.requestWithdrawal(sharesBn)
       setTxHash(tx.hash)
       await tx.wait()
-
-      setPendingWithdrawal({
-        amount: withdrawalData.amount,
-        value: withdrawalData.value,
-        requestedAt: new Date(),
-        availableAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      })
-
+      await refresh()
+      await refreshWithdrawal()
       setShowWithdrawalModal(false)
     } catch (error) {
       console.error("Failed to request withdrawal:", error)
@@ -102,14 +125,23 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     }
   }
 
-  const handleCancelWithdrawal = async () => {
+  const handleExecuteWithdrawal = async () => {
+    if (!pendingWithdrawal) return
     try {
-      // TODO: Implement actual withdrawal cancellation logic
-      console.log("Cancelling withdrawal...")
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate transaction
+      const cp = await getCatPoolWithSigner()
+      const dec = await getCatShareDecimals()
+      const sharesBn = ethers.utils.parseUnits(
+        pendingWithdrawal.amount.toString(),
+        dec,
+      )
+      const tx = await cp.withdrawLiquidity(sharesBn)
+      setTxHash(tx.hash)
+      await tx.wait()
+      await refresh()
+      await refreshWithdrawal()
       setPendingWithdrawal(null)
     } catch (error) {
-      console.error("Failed to cancel withdrawal:", error)
+      console.error('Failed to withdraw:', error)
     }
   }
 
@@ -142,6 +174,15 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { maxWithdrawablePct } = useMaxWithdrawable()
   const maxWithdrawableAmount = shares * maxWithdrawablePct
   const maxWithdrawableValue = value * maxWithdrawablePct
+
+  const remainingShares = pendingWithdrawal
+    ? Math.max(shares - pendingWithdrawal.amount, 0)
+    : shares
+  const remainingValue = pendingWithdrawal
+    ? Math.max(value - pendingWithdrawal.value, 0)
+    : value
+  const withdrawalReady =
+    pendingWithdrawal && pendingWithdrawal.availableAt <= new Date()
 
   const rewardsData = rewards.map((r) => ({
     symbol: getTokenName(r.token),
@@ -205,13 +246,6 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleCancelWithdrawal}
-                className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-md transition-colors"
-              >
-                <X className="w-3 h-3" />
-                <span>Cancel</span>
-              </button>
             </div>
           </div>
         )}
@@ -272,12 +306,13 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              <tr className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                      {underlyingToken && (
-                        <Image
+              {pendingWithdrawal && pendingWithdrawal.amount < shares && (
+                <tr className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                        {underlyingToken && (
+                          <Image
                           src={getTokenLogo(underlyingToken) || "/placeholder.svg"}
                           alt={getTokenName(underlyingToken)}
                           width={40}
@@ -289,16 +324,16 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">{shares.toFixed(4)}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
-                </td>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{remainingShares.toFixed(4)}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
+                  </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="text-sm font-medium text-gray-900 dark:text-white">
-                    {formatCurrency(value, "USD", displayCurrency)}
+                    {formatCurrency(remainingValue, "USD", displayCurrency)}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">Current Value</div>
                 </td>
@@ -309,16 +344,9 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                   <div className="text-xs text-gray-500 dark:text-gray-400">Claimable</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  {pendingWithdrawal ? (
-                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-                      <Clock className="w-3 h-3 mr-1" />
-                      Withdrawal Pending
-                    </div>
-                  ) : (
-                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                      Active
-                    </div>
-                  )}
+                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                    Active
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="flex items-center justify-end space-x-2">
@@ -339,7 +367,132 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                     </Link>
                   </div>
                 </td>
-              </tr>
+                </tr>
+              )}
+
+              {pendingWithdrawal && (
+                <tr className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                        {underlyingToken && (
+                          <Image
+                            src={getTokenLogo(underlyingToken) || "/placeholder.svg"}
+                            alt={getTokenName(underlyingToken)}
+                            width={40}
+                            height={40}
+                            className="rounded-full"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{pendingWithdrawal.amount.toFixed(4)}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(pendingWithdrawal.value, "USD", displayCurrency)}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Requested Value</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">-</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    {withdrawalReady ? (
+                      <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Withdrawal Ready
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Withdrawal Pending
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      {withdrawalReady && (
+                        <button
+                          onClick={handleExecuteWithdrawal}
+                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 rounded-md transition-colors"
+                        >
+                          Withdraw
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {!pendingWithdrawal && (
+                <tr className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                        {underlyingToken && (
+                          <Image
+                            src={getTokenLogo(underlyingToken) || "/placeholder.svg"}
+                            alt={getTokenName(underlyingToken)}
+                            width={40}
+                            height={40}
+                            className="rounded-full"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{shares.toFixed(4)}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(value, "USD", displayCurrency)}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Current Value</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      +{formatCurrency(pendingRewardsValue, "USD", displayCurrency)}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Claimable</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                      Active
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      {pendingRewardsValue > 0 && (
+                        <button
+                          onClick={() => setShowClaimModal(true)}
+                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-md transition-colors"
+                        >
+                          Claim
+                        </button>
+                      )}
+                      <Link
+                        href="/catpool"
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        Details
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
