@@ -41,6 +41,38 @@ export default function useActiveProposals() {
             votes: []
           })
         }
+
+        // --- Load vote details from the subgraph if available ---
+        try {
+          const url = process.env.NEXT_PUBLIC_SUBGRAPH_URL
+          if (url && items.length > 0) {
+            const ids = items.map((i) => i.id).join(',')
+            const query = `{ governanceProposals(where: { id_in: [${ids}] }) { id votes { id voter vote weight } } }`
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query })
+            })
+            const json = await res.json()
+            const voteMap = new Map()
+            for (const gp of json?.data?.governanceProposals || []) {
+              voteMap.set(
+                Number(gp.id),
+                gp.votes.map((v) => ({
+                  id: v.id,
+                  voter: v.voter,
+                  vote: Number(v.vote),
+                  weight: v.weight
+                }))
+              )
+            }
+            for (const item of items) {
+              item.votes = voteMap.get(item.id) || []
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load votes from subgraph', err)
+        }
         setProposals(items)
       } catch (err) {
         console.error('Failed to load active proposals', err)
