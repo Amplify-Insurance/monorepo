@@ -43,7 +43,8 @@ async function main() {
   await riskManager.waitForDeployment();
 
   const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
-  const policyNFT = await PolicyNFT.deploy(deployer.address);
+  // Pass zero address for PolicyManager placeholder; set actual address later
+  const policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, deployer.address);
   await policyNFT.waitForDeployment();
 
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
@@ -61,7 +62,7 @@ async function main() {
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
-  await policyNFT.setRiskManagerAddress(policyManager.target);
+  await policyNFT.setPolicyManagerAddress(policyManager.target);
 
   
   const CatShare = await ethers.getContractFactory("CatShare");
