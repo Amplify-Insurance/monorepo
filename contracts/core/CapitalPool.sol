@@ -87,6 +87,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     event SystemValueSynced(uint256 newTotalSystemValue, uint256 oldTotalSystemValue);
     event AdapterCallFailed(address indexed adapterAddress, string functionCalled, string reason);
     event UnderwriterNoticePeriodSet(uint256 newPeriod);
+    event WithdrawalRequestCancelled(address indexed user);
 
 
     /* ───────────────────── Constructor ─────────────────────────── */
@@ -172,6 +173,18 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         account.withdrawalRequestShares = _sharesToBurn;
         account.withdrawalRequestTimestamp = block.timestamp;
         emit WithdrawalRequested(msg.sender, _sharesToBurn, block.timestamp);
+    }
+
+    function cancelWithdrawalRequest() external nonReentrant {
+        UnderwriterAccount storage account = underwriterAccounts[msg.sender];
+        uint256 sharesToCancel = account.withdrawalRequestShares;
+        if (sharesToCancel == 0) revert NoWithdrawalRequest();
+        uint256 valueToCancel = sharesToValue(sharesToCancel);
+        account.withdrawalRequestShares = 0;
+        account.withdrawalRequestTimestamp = 0;
+        (bool success,) = riskManager.call(abi.encodeWithSignature("onWithdrawalCancelled(address,uint256)", msg.sender, valueToCancel));
+        require(success, "CP: RiskManager rejected cancellation");
+        emit WithdrawalRequestCancelled(msg.sender);
     }
 
     function executeWithdrawal() external nonReentrant {

@@ -252,6 +252,21 @@ describe("CapitalPool", function () {
           .to.be.revertedWithCustomError(capitalPool, "InvalidAmount");
       });
 
+      it("Should cancel a withdrawal request", async () => {
+        const account = await capitalPool.getUnderwriterAccount(user1.address);
+        const sharesToWithdraw = account.masterShares / 2n;
+        await capitalPool.connect(user1).requestWithdrawal(sharesToWithdraw);
+        await expect(capitalPool.connect(user1).cancelWithdrawalRequest())
+          .to.emit(capitalPool, "WithdrawalRequestCancelled");
+        const updated = await capitalPool.getUnderwriterAccount(user1.address);
+        expect(updated.withdrawalRequestShares).to.equal(0);
+      });
+
+      it("cancelWithdrawalRequest reverts when no request", async () => {
+        await expect(capitalPool.connect(user1).cancelWithdrawalRequest())
+          .to.be.revertedWithCustomError(capitalPool, "NoWithdrawalRequest");
+      });
+
       it("Should revert if RiskManager notification fails during executeWithdrawal", async () => {
         const sharesToBurn = (await capitalPool.getUnderwriterAccount(user1.address)).masterShares;
         await capitalPool.connect(user1).requestWithdrawal(sharesToBurn);
