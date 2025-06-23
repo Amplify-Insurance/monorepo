@@ -1,10 +1,11 @@
 "use client"
 import { useState, useEffect, Fragment, useMemo } from "react"
-import { TrendingUp, ChevronDown, ChevronUp } from "lucide-react"
+import { TrendingUp, ChevronDown, ChevronUp, Download } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
-import ManageCoverageModal from "./ManageCoverageModal"
+import IncreasePositionModal from "./IncreasePositionModal"
+import UnderwritingWithdrawalModal from "./UnderwritingWithdrawalModal"
 import ManageAllocationModal from "./ManageAllocationModal"
 import { useAccount } from "wagmi"
 import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
@@ -12,7 +13,6 @@ import usePools from "../../hooks/usePools"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { ethers } from "ethers"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
-import { getCapitalPoolWithSigner } from "../../lib/capitalPool"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { getDeployment } from "../config/deployments"
 
@@ -27,8 +27,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
     return 0n
   }
   const NOTICE_PERIOD = 600 // seconds
-  const [modalOpen, setModalOpen] = useState(false)
-  const [selectedPosition, setSelectedPosition] = useState(null)
   const [isClaiming, setIsClaiming] = useState(false)
   const [isClaimingAll, setIsClaimingAll] = useState(false)
   const [isClaimingDistressed, setIsClaimingDistressed] = useState(false)
@@ -39,6 +37,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
   const [showAllocModal, setShowAllocModal] = useState(false)
+  const [showIncreaseModal, setShowIncreaseModal] = useState(false)
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
+  const [selectedPosition, setSelectedPosition] = useState(null)
+  const [withdrawalRequests, setWithdrawalRequests] = useState({}) // Mock withdrawal requests
   const [rewardsMap, setRewardsMap] = useState({})
   const { address } = useAccount()
   const { details } = useUnderwriterDetails(address)
@@ -47,8 +49,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const adapters = useYieldAdapters(defaultDeployment)
 
   const unlockTimestamp =
-    Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) +
-    NOTICE_PERIOD
+    Number(ethers.utils.formatUnits(details?.[0]?.withdrawalRequestTimestamp || 0)) + NOTICE_PERIOD
   const currentTimestamp = Math.floor(Date.now() / 1000)
   const unlockDays = Math.max(0, Math.ceil((unlockTimestamp - currentTimestamp) / 86400))
   const withdrawalReady = currentTimestamp >= unlockTimestamp
@@ -58,20 +59,19 @@ export default function UnderwritingPositions({ displayCurrency }) {
       (details || [])
         .flatMap((d) =>
           d.allocatedPoolIds.map((pid) => {
-            const pool = pools.find(
-              (pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid),
-            )
+            const pool = pools.find((pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid))
             if (!pool) return null
             const protocol = getTokenName(pool.id)
             const amount = Number(
               ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, pool.underlyingAssetDecimals ?? 6),
             )
             const pendingLossStr = d.pendingLosses?.[pid] ?? "0"
-            const pendingLoss = Number(
-              ethers.utils.formatUnits(pendingLossStr, pool.underlyingAssetDecimals ?? 6),
-            )
+            const pendingLoss = Number(ethers.utils.formatUnits(pendingLossStr, pool.underlyingAssetDecimals ?? 6))
+            const positionId = `${d.deployment}-${pid}`
+            const withdrawalRequest = withdrawalRequests[positionId]
+
             return {
-              id: `${d.deployment}-${pid}`,
+              id: positionId,
               deployment: d.deployment,
               protocol,
               type: getProtocolType(pool.id),
@@ -84,12 +84,12 @@ export default function UnderwritingPositions({ displayCurrency }) {
               pendingLoss,
               pendingLossUsd: pendingLoss * (pool.tokenPriceUsd ?? 1),
               yield: Number(pool.underwriterYieldBps || 0) / 100,
-              status:
-                Number(ethers.utils.formatUnits(d.withdrawalRequestShares)) > 0
-                  ? withdrawalReady
-                    ? "withdrawal ready"
-                    : "requested withdrawal"
-                  : "active",
+              status: withdrawalRequest
+                ? withdrawalRequest.readyDate <= Date.now()
+                  ? "withdrawal ready"
+                  : "withdrawal pending"
+                : "active",
+              withdrawalRequest,
               withdrawalRequestShares: d.withdrawalRequestShares,
               shares: d.masterShares,
               yieldChoice: d.yieldChoice,
@@ -97,7 +97,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
           }),
         )
         .filter(Boolean),
-    [details, pools, withdrawalReady],
+    [details, pools, withdrawalRequests],
   )
 
   useEffect(() => {
@@ -128,9 +128,54 @@ export default function UnderwritingPositions({ displayCurrency }) {
 
   const hasDistressedAssets = underwritingPositions.some((p) => p.pendingLoss > 0)
 
-  const handleOpenModal = (position) => {
+  const handleIncreasePosition = (position) => {
     setSelectedPosition(position)
-    setModalOpen(true)
+    setShowIncreaseModal(true)
+  }
+
+  const handleRequestWithdrawal = (position) => {
+    setSelectedPosition(position)
+    setShowWithdrawalModal(true)
+  }
+
+  const handleWithdrawalRequest = (withdrawalData) => {
+    const readyDate = Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days from now
+    setWithdrawalRequests((prev) => ({
+      ...prev,
+      [withdrawalData.positionId]: {
+        ...withdrawalData,
+        readyDate,
+        requestDate: Date.now(),
+      },
+    }))
+    setShowWithdrawalModal(false)
+  }
+
+  const handleExecuteWithdrawal = async (position) => {
+    setIsExecuting(true)
+    try {
+      // Mock withdrawal execution
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Remove withdrawal request after execution
+      setWithdrawalRequests((prev) => {
+        const newRequests = { ...prev }
+        delete newRequests[position.id]
+        return newRequests
+      })
+    } catch (err) {
+      console.error("Failed to execute withdrawal", err)
+    } finally {
+      setIsExecuting(false)
+    }
+  }
+
+  const handleCancelWithdrawal = (position) => {
+    setWithdrawalRequests((prev) => {
+      const newRequests = { ...prev }
+      delete newRequests[position.id]
+      return newRequests
+    })
   }
 
   const handleClaimRewards = async (position) => {
@@ -216,19 +261,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
       console.error("Failed to claim all distressed assets", err)
     } finally {
       setIsClaimingAllDistressed(false)
-    }
-  }
-
-  const handleExecuteWithdrawal = async () => {
-    setIsExecuting(true)
-    try {
-      const dep = getDeployment(defaultDeployment)
-      const cp = await getCapitalPoolWithSigner(dep.capitalPool)
-      await (await cp.executeWithdrawal()).wait()
-    } catch (err) {
-      console.error("Failed to execute withdrawal", err)
-    } finally {
-      setIsExecuting(false)
     }
   }
 
@@ -368,6 +400,13 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                 )}
                               </div>
                             )}
+                            {position.withdrawalRequest && (
+                              <div className="mt-1 sm:hidden text-xs text-amber-600 dark:text-amber-400">
+                                Withdrawal:{" "}
+                                {Math.ceil((position.withdrawalRequest.readyDate - Date.now()) / (24 * 60 * 60 * 1000))}
+                                d remaining
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                             <div className="text-sm text-gray-900 dark:text-white">
@@ -393,15 +432,31 @@ export default function UnderwritingPositions({ displayCurrency }) {
                             </td>
                           )}
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                            <span
-                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                position.status === "requested withdrawal" || position.status === "withdrawal ready"
-                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                  : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400"
-                              }`}
-                            >
-                              {position.status}
-                            </span>
+                            <div className="flex flex-col space-y-1">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  position.status === "withdrawal pending"
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                                    : position.status === "withdrawal ready"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                      : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400"
+                                }`}
+                              >
+                                {position.status === "withdrawal pending"
+                                  ? "Withdrawal Pending"
+                                  : position.status === "withdrawal ready"
+                                    ? "Withdrawal Ready"
+                                    : "Active"}
+                              </span>
+                              {position.withdrawalRequest && position.status === "withdrawal pending" && (
+                                <span className="text-xs text-amber-600 dark:text-amber-400">
+                                  {Math.ceil(
+                                    (position.withdrawalRequest.readyDate - Date.now()) / (24 * 60 * 60 * 1000),
+                                  )}
+                                  d remaining
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
@@ -509,12 +564,17 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               <div className="mt-1">
                                                 <span
                                                   className={`px-2 py-1 text-xs rounded-full font-medium ${
-                                                    position.status === "requested withdrawal" || position.status === "withdrawal ready"
+                                                    position.status === "withdrawal pending" ||
+                                                    position.status === "withdrawal ready"
                                                       ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
                                                       : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400"
                                                   }`}
                                                 >
-                                                  {position.status}
+                                                  {position.status === "withdrawal pending"
+                                                    ? "Withdrawal Pending"
+                                                    : position.status === "withdrawal ready"
+                                                      ? "Withdrawal Ready"
+                                                      : "Active"}
                                                 </span>
                                               </div>
                                             </div>
@@ -555,14 +615,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                             </svg>
                                             Quick Actions
                                           </h4>
-                                          <div
-                                            className={`grid grid-cols-1 ${
-                                              toBigInt(position.withdrawalRequestShares) > 0n &&
-                                              toBigInt(position.withdrawalRequestShares) < toBigInt(position.shares)
-                                                ? 'sm:grid-cols-3'
-                                                : 'sm:grid-cols-2'
-                                            } gap-3`}
-                                          >
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <button
                                               className="group flex items-center justify-center gap-3 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                               onClick={() => handleClaimRewards(position)}
@@ -584,12 +637,21 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               {isClaiming ? "Claiming..." : "Claim Rewards"}
                                             </button>
 
-                                            {toBigInt(position.withdrawalRequestShares) >= toBigInt(position.shares) &&
-                                              toBigInt(position.withdrawalRequestShares) > 0n ? (
+                                            {position.status === "withdrawal ready" && (
                                               <button
                                                 className="group flex items-center justify-center gap-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                                onClick={handleExecuteWithdrawal}
-                                                disabled={isExecuting || !withdrawalReady}
+                                                onClick={() => handleExecuteWithdrawal(position)}
+                                                disabled={isExecuting}
+                                              >
+                                                <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                {isExecuting ? "Withdrawing..." : "Withdraw"}
+                                              </button>
+                                            )}
+
+                                            {position.status === "withdrawal pending" && (
+                                              <button
+                                                className="group flex items-center justify-center gap-3 py-3 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                                                onClick={() => handleCancelWithdrawal(position)}
                                               >
                                                 <svg
                                                   className="w-5 h-5 group-hover:scale-110 transition-transform"
@@ -601,61 +663,11 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
                                                     strokeWidth={2}
-                                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                                    d="M6 18L18 6M6 6l12 12"
                                                   />
                                                 </svg>
-                                                {isExecuting ? "Withdrawing..." : "Withdraw"}
+                                                Cancel Withdrawal
                                               </button>
-                                            ) : (
-                                              <>
-                                                <button
-                                                  className="group flex items-center justify-center gap-3 py-3 px-4 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-                                                  onClick={() => handleOpenModal(position)}
-                                                >
-                                                  <svg
-                                                    className="w-5 h-5 group-hover:scale-110 transition-transform"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                  >
-                                                    <path
-                                                      strokeLinecap="round"
-                                                      strokeLinejoin="round"
-                                                      strokeWidth={2}
-                                                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                                                    />
-                                                    <path
-                                                      strokeLinecap="round"
-                                                      strokeLinejoin="round"
-                                                      strokeWidth={2}
-                                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                                    />
-                                                  </svg>
-                                                  Manage Position
-                                                </button>
-                                                {toBigInt(position.withdrawalRequestShares) > 0n && (
-                                                  <button
-                                                    className="group flex items-center justify-center gap-3 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    onClick={handleExecuteWithdrawal}
-                                                    disabled={isExecuting || !withdrawalReady}
-                                                  >
-                                                    <svg
-                                                      className="w-5 h-5 group-hover:scale-110 transition-transform"
-                                                      fill="none"
-                                                      stroke="currentColor"
-                                                      viewBox="0 0 24 24"
-                                                    >
-                                                      <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                                                      />
-                                                    </svg>
-                                                    {isExecuting ? "Withdrawing..." : "Withdraw"}
-                                                  </button>
-                                                )}
-                                              </>
                                             )}
                                           </div>
                                         </div>
@@ -723,7 +735,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                                 {isClaimingDistressed ? "Claiming..." : "Claim Distressed"}
                                               </button>
                                             )}
-
                                           </div>
                                         </div>
 
@@ -750,8 +761,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               <p className="text-blue-800 dark:text-blue-400 text-xs leading-relaxed">
                                                 {position.status === "active" &&
                                                   "Your position is actively earning yield and providing coverage."}
-                                                {position.status === "requested withdrawal" &&
-                                                  `Withdrawal will be available in ${unlockDays} days.`}
+                                                {position.status === "withdrawal pending" &&
+                                                  `Withdrawal will be available in ${Math.ceil((position.withdrawalRequest.readyDate - Date.now()) / (24 * 60 * 60 * 1000))} days.`}
                                                 {position.status === "withdrawal ready" &&
                                                   "Withdrawal can now be executed."}
                                               </p>
@@ -822,95 +833,123 @@ export default function UnderwritingPositions({ displayCurrency }) {
   }
 
   return (
-    <div>
-      <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Deposited</div>
-            <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-              {formatCurrency(
-                displayCurrency === "native" ? totalDeposited : totalDepositedUsd,
-                "USD",
-                displayCurrency,
-              )}
+    <>
+      <div>
+        <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Deposited</div>
+              <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                {formatCurrency(
+                  displayCurrency === "native" ? totalDeposited : totalDepositedUsd,
+                  "USD",
+                  displayCurrency,
+                )}
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Underwritten</div>
-            <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-              {formatCurrency(
-                displayCurrency === "native" ? totalUnderwritten : totalUnderwrittenUsd,
-                "USD",
-                displayCurrency,
-              )}
+            <div>
+              <div className="text-sm text-blue-700 dark:text-blue-300">Total Value Underwritten</div>
+              <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                {formatCurrency(
+                  displayCurrency === "native" ? totalUnderwritten : totalUnderwrittenUsd,
+                  "USD",
+                  displayCurrency,
+                )}
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="text-sm text-blue-700 dark:text-blue-300">
-              Base Yield {baseAdapter ? `(${baseAdapter.name})` : ""}
+            <div>
+              <div className="text-sm text-blue-700 dark:text-blue-300">
+                Base Yield {baseAdapter ? `(${baseAdapter.name})` : ""}
+              </div>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {formatPercentage(baseYieldApr)}
+              </div>
             </div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatPercentage(baseYieldApr)}
+            <div>
+              <div className="text-sm text-blue-700 dark:text-blue-300">Total APR</div>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatPercentage(totalApr)}</div>
             </div>
-          </div>
-          <div>
-            <div className="text-sm text-blue-700 dark:text-blue-300">Total APR</div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatPercentage(totalApr)}</div>
           </div>
         </div>
-      </div>
-      {renderTables(protocolPositions, "Protocol Cover")}
-      {renderTables(stablecoinPositions, "Stablecoin Cover")}
-      {hasDistressedAssets && (
-        <div className="mt-4 flex justify-end">
+        {renderTables(protocolPositions, "Protocol Cover")}
+        {renderTables(stablecoinPositions, "Stablecoin Cover")}
+        {hasDistressedAssets && (
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={handleClaimAllDistressed}
+              disabled={isClaimingAllDistressed}
+              className="mr-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
+            >
+              {isClaimingAllDistressed ? "Claiming..." : "Claim All Distressed"}
+            </button>
+          </div>
+        )}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
-            onClick={handleClaimAllDistressed}
-            disabled={isClaimingAllDistressed}
-            className="mr-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
+            onClick={() => setShowAllocModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
           >
-            {isClaimingAllDistressed ? "Claiming..." : "Claim All Distressed"}
+            Edit Allocation
+          </button>
+          <button
+            onClick={() => {
+              const activePosition = underwritingPositions.find((p) => p.status === "active")
+              if (activePosition) {
+                setSelectedPosition(activePosition)
+                setShowIncreaseModal(true)
+              }
+            }}
+            disabled={!underwritingPositions.some((p) => p.status === "active")}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Increase Position
+          </button>
+          <button
+            onClick={() => {
+              const activePosition = underwritingPositions.find((p) => p.status === "active")
+              if (activePosition) {
+                setSelectedPosition(activePosition)
+                setShowWithdrawalModal(true)
+              }
+            }}
+            disabled={!underwritingPositions.some((p) => p.status === "active")}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Request Withdrawal
+          </button>
+          <button
+            onClick={handleClaimAllRewards}
+            disabled={isClaimingAll}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
+          >
+            {isClaimingAll ? "Claiming..." : "Claim All Rewards"}
           </button>
         </div>
-      )}
-      <div className="mt-4 flex justify-end">
-        <button
-          onClick={() => setShowAllocModal(true)}
-          className="mr-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-        >
-          Edit Allocation
-        </button>
-        <button
-          onClick={handleClaimAllRewards}
-          disabled={isClaimingAll}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
-        >
-          {isClaimingAll ? "Claiming..." : "Claim All Rewards"}
-        </button>
+
+        {showAllocModal && (
+          <ManageAllocationModal
+            isOpen={showAllocModal}
+            onClose={() => setShowAllocModal(false)}
+            deployment={defaultDeployment}
+          />
+        )}
       </div>
 
-      {/* Manage Position Modal */}
-      {selectedPosition && (
-        <ManageCoverageModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          type="position"
-          protocol={selectedPosition.protocol}
-          token={selectedPosition.pool}
-          amount={selectedPosition.amount}
-          yield={selectedPosition.yield}
-          shares={selectedPosition.shares}
-          poolId={selectedPosition.poolId}
-          yieldChoice={selectedPosition.yieldChoice}
-          deployment={selectedPosition.deployment}
-        />
-      )}
-      {showAllocModal && (
-        <ManageAllocationModal
-          isOpen={showAllocModal}
-          onClose={() => setShowAllocModal(false)}
-          deployment={defaultDeployment}
-        />
-      )}
-    </div>
+      {/* Modals */}
+      <IncreasePositionModal
+        isOpen={showIncreaseModal}
+        onClose={() => setShowIncreaseModal(false)}
+        position={selectedPosition}
+        displayCurrency={displayCurrency}
+      />
+
+      <UnderwritingWithdrawalModal
+        isOpen={showWithdrawalModal}
+        onClose={() => setShowWithdrawalModal(false)}
+        position={selectedPosition}
+        onRequestWithdrawal={handleWithdrawalRequest}
+        displayCurrency={displayCurrency}
+      />
+    </>
   )
 }

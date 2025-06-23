@@ -4,20 +4,34 @@ import { useEffect, useState } from "react"
 import { ethers } from "ethers"
 import { formatCurrency } from "../utils/formatting"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
-import { TrendingUp, Gift, ExternalLink } from "lucide-react"
-import Image from "next/image"
-import { getTokenLogo } from "../config/tokenNameMap"
+import { TrendingUp, Gift, ExternalLink, Clock, X } from "lucide-react"
+import ClaimRewardsModal from "./ClaimRewardsModal"
+import RequestWithdrawalModal from "./RequestWithdrawalModal"
+import Link from "next/link"
 
 export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { address } = useAccount()
   const { info, refresh } = useCatPoolUserInfo(address)
   const [pendingRewards, setPendingRewards] = useState("0")
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
+  const [showClaimModal, setShowClaimModal] = useState(false)
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
+  const [isRequestingWithdrawal, setIsRequestingWithdrawal] = useState(false)
+  const [txHash, setTxHash] = useState("")
+  const [pendingWithdrawal, setPendingWithdrawal] = useState(null)
 
   useEffect(() => {
     refresh()
     // Simulate fetching pending rewards - replace with actual contract call
     setPendingRewards("12.45")
+
+    // Simulate pending withdrawal - replace with actual contract call
+    // setPendingWithdrawal({
+    //   amount: 500.0,
+    //   value: 500.0,
+    //   requestedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+    //   availableAt: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000), // 25 days from now
+    // })
   }, [refreshTrigger])
 
   const handleClaimRewards = async () => {
@@ -26,11 +40,47 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
       // TODO: Implement actual reward claiming logic
       console.log("Claiming rewards...")
       await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate transaction
+      setTxHash("0x1234567890abcdef")
       setPendingRewards("0")
+      setShowClaimModal(false)
     } catch (error) {
       console.error("Failed to claim rewards:", error)
     } finally {
       setIsClaimingRewards(false)
+    }
+  }
+
+  const handleRequestWithdrawal = async (withdrawalData) => {
+    setIsRequestingWithdrawal(true)
+    try {
+      // TODO: Implement actual withdrawal request logic
+      console.log("Requesting withdrawal:", withdrawalData)
+      await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate transaction
+
+      // Set pending withdrawal
+      setPendingWithdrawal({
+        amount: withdrawalData.amount,
+        value: withdrawalData.value,
+        requestedAt: new Date(),
+        availableAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      })
+
+      setShowWithdrawalModal(false)
+    } catch (error) {
+      console.error("Failed to request withdrawal:", error)
+    } finally {
+      setIsRequestingWithdrawal(false)
+    }
+  }
+
+  const handleCancelWithdrawal = async () => {
+    try {
+      // TODO: Implement actual withdrawal cancellation logic
+      console.log("Cancelling withdrawal...")
+      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate transaction
+      setPendingWithdrawal(null)
+    } catch (error) {
+      console.error("Failed to cancel withdrawal:", error)
     }
   }
 
@@ -57,165 +107,225 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   }
   const rewards = Number(pendingRewards)
 
+  const rewardsData =
+    rewards > 0
+      ? [
+          {
+            symbol: "USDC",
+            token: "USDC",
+            amount: rewards.toFixed(2),
+            value: rewards,
+            type: "Cat Pool Rewards",
+          },
+        ]
+      : []
+
+  const daysUntilAvailable = pendingWithdrawal
+    ? Math.ceil((pendingWithdrawal.availableAt - new Date()) / (1000 * 60 * 60 * 24))
+    : 0
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-white" />
+    <>
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cat Pool Deposits</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Your liquidity positions</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cat Pool Deposits</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Your liquidity positions</p>
-            </div>
-          </div>
-          {rewards > 0 && (
-            <button
-              onClick={handleClaimRewards}
-              disabled={isClaimingRewards}
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-            >
-              {isClaimingRewards ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Claiming...</span>
-                </>
-              ) : (
-                <>
+            <div className="flex items-center space-x-2">
+              {rewards > 0 && (
+                <button
+                  onClick={() => setShowClaimModal(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                >
                   <Gift className="w-4 h-4" />
                   <span>Claim Rewards</span>
-                </>
+                </button>
               )}
-            </button>
-          )}
+              <button
+                onClick={() => setShowWithdrawalModal(true)}
+                disabled={!!pendingWithdrawal}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>Request Withdrawal</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+        {/* Pending Withdrawal Notice */}
+        {pendingWithdrawal && (
+          <div className="px-6 py-4 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
             <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Withdrawal Request Pending</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {formatCurrency(pendingWithdrawal.value, "USD", displayCurrency)} available in {daysUntilAvailable}{" "}
+                    days ({pendingWithdrawal.availableAt.toLocaleDateString()})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCancelWithdrawal}
+                className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-md transition-colors"
+              >
+                <X className="w-3 h-3" />
+                <span>Cancel</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <div>
                 <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Value</p>
                 <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
                   {formatCurrency(value, "USD", displayCurrency)}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+              <div>
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">LP Tokens</p>
+                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{shares.toFixed(4)}</p>
               </div>
             </div>
-          </div>
 
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-            <div className="flex items-center justify-between">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <div>
-                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">LP Tokens</p>
-                <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{shares.toFixed(4)}</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
-                <Image
-                  src={getTokenLogo("CATLP") || "/placeholder.svg"}
-                  alt="CATLP"
-                  width={24}
-                  height={24}
-                  className="rounded-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600 dark:text-green-400">Pending Rewards</p>
-                <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Pending Rewards</p>
+                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
                   {formatCurrency(rewards, "USD", displayCurrency)}
                 </p>
-              </div>
-              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                <Gift className="w-6 h-6 text-white" />
               </div>
             </div>
           </div>
         </div>
+
+        {/* Detailed Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-750">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Asset
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Balance
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Value
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Rewards
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tr className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">CAT</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{shares.toFixed(4)}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatCurrency(value, "USD", displayCurrency)}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Current Value</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    +{formatCurrency(rewards, "USD", displayCurrency)}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Claimable</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  {pendingWithdrawal ? (
+                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Withdrawal Pending
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                      Active
+                    </div>
+                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="flex items-center justify-end space-x-2">
+                    {rewards > 0 && (
+                      <button
+                        onClick={() => setShowClaimModal(true)}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-md transition-colors"
+                      >
+                        Claim
+                      </button>
+                    )}
+                    <Link
+                      href="/catpool"
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3 mr-1" />
+                      Details
+                    </Link>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Detailed Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 dark:bg-gray-750">
-            <tr>
-              <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Asset
-              </th>
-              <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Balance
-              </th>
-              <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Value
-              </th>
-              <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Rewards
-              </th>
-              <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            <tr className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">CAT</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
-                  </div>
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">{shares.toFixed(4)}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {formatCurrency(value, "USD", displayCurrency)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Current Value</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                  +{formatCurrency(rewards, "USD", displayCurrency)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Claimable</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="flex items-center justify-end space-x-2">
-                  {rewards > 0 && (
-                    <button
-                      onClick={handleClaimRewards}
-                      disabled={isClaimingRewards}
-                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-md transition-colors disabled:opacity-50"
-                    >
-                      {isClaimingRewards ? "Claiming..." : "Claim"}
-                    </button>
-                  )}
-                  <button className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors">
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Details
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <ClaimRewardsModal
+        isOpen={showClaimModal}
+        onClose={() => setShowClaimModal(false)}
+        title="Claim Cat Pool Rewards"
+        description="Claim your pending rewards from the Cat Pool liquidity provision."
+        rewards={rewardsData}
+        onClaim={handleClaimRewards}
+        isSubmitting={isClaimingRewards}
+        txHash={txHash}
+      />
+
+      <RequestWithdrawalModal
+        isOpen={showWithdrawalModal}
+        onClose={() => setShowWithdrawalModal(false)}
+        onRequestWithdrawal={handleRequestWithdrawal}
+        isSubmitting={isRequestingWithdrawal}
+        userBalance={shares}
+        userValue={value}
+        displayCurrency={displayCurrency}
+      />
+    </>
   )
 }
