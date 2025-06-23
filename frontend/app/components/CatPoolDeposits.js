@@ -267,7 +267,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <div>
                 <p className="text-sm font-medium text-blue-600 dark:text-blue-400">LP Tokens</p>
-                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{shares.toFixed(4)}</p>
+                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{shares.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p>
               </div>
             </div>
 
@@ -295,6 +295,9 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                 </th>
                 <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Value
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Requested
                 </th>
                 <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Rewards
@@ -330,15 +333,16 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{remainingShares.toFixed(4)}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
-                  </td>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{remainingShares.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="text-sm font-medium text-gray-900 dark:text-white">
                     {formatCurrency(remainingValue, "USD", displayCurrency)}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">Current Value</div>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">-</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="text-sm font-medium text-gray-900 dark:text-white">
                     +{formatCurrency(pendingRewardsValue, "USD", displayCurrency)}
@@ -394,17 +398,19 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{pendingWithdrawal.amount.toFixed(4)}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(pendingWithdrawal.value, "USD", displayCurrency)}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Requested Value</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">-</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{pendingWithdrawal.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatCurrency(pendingWithdrawal.value, "USD", displayCurrency)}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Requested Value</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  {pendingWithdrawal.requestedAt.toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
                     {withdrawalReady ? (
                       <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
                         <Clock className="w-3 h-3 mr-1" />
@@ -454,19 +460,20 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{shares.toFixed(4)}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(value, "USD", displayCurrency)}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Current Value</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      +{formatCurrency(pendingRewardsValue, "USD", displayCurrency)}
-                    </div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{shares.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">LP Tokens</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatCurrency(value, "USD", displayCurrency)}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Current Value</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">-</td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    +{formatCurrency(pendingRewardsValue, "USD", displayCurrency)}
+                  </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">Claimable</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">

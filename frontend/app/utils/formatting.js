@@ -3,26 +3,31 @@
 // Format currency values with K, M, B suffixes
 export const formatCurrency = (value, currency = "usd", displayCurrency = "usd") => {
   if (displayCurrency === "usd") {
-    // Handle null or undefined values
-    if (value === null || typeof value === 'undefined') {
+    if (value === null || typeof value === "undefined") {
       return "$0.00";
     }
 
+    const fmt = (val, digits = 2) =>
+      Number(val).toLocaleString("en-US", {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      });
+
     if (value >= 1e9) {
-      return `$${(value / 1e9).toFixed(2)}B`; // Increased precision for larger numbers
+      return `$${fmt(value / 1e9)}B`;
     } else if (value >= 1e6) {
-      return `$${(value / 1e6).toFixed(2)}M`; // Increased precision for larger numbers
+      return `$${fmt(value / 1e6)}M`;
     } else if (value >= 1e3) {
-      return `$${(value / 1e3).toFixed(2)}K`;
+      return `$${fmt(value / 1e3)}K`;
     } else if (value < 1 && value > 0) {
-      return `$${value.toFixed(4)}`; // Show more precision for small decimal values
+      return `$${fmt(value, 4)}`;
     } else {
-      return `$${value.toFixed(2)}`; // Default to 2 decimal places for numbers like $123.45
+      return `$${fmt(value)}`;
     }
   } else {
-    // For native display, return the amount with the token symbol
-    // Consider adding precision here as well
-    return `${value.toFixed(4)} ${currency.toUpperCase()}`;
+    return `${Number(value).toLocaleString(undefined, {
+      maximumFractionDigits: 4,
+    })} ${currency.toUpperCase()}`;
   }
 };
 
