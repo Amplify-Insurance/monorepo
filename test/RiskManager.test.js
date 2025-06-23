@@ -499,6 +499,22 @@ const MAX_ALLOCATIONS = 5;
                 expect(pool2.capitalPendingWithdrawal).to.equal(amount);
             });
 
+            it("onWithdrawalCancelled should unmark pending withdrawal", async function () {
+                const amount = ethers.parseUnits("500", 6);
+                await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);
+                await mockPoolRegistry.setPoolCount(2);
+                await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
+                await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1, POOL_ID_2]);
+
+                await mockCapitalPool.triggerOnWithdrawalRequested(riskManager.target, underwriter1.address, amount);
+                await mockCapitalPool.triggerOnWithdrawalCancelled(riskManager.target, underwriter1.address, amount);
+
+                const pool1 = await mockPoolRegistry.pools(POOL_ID_1);
+                const pool2 = await mockPoolRegistry.pools(POOL_ID_2);
+                expect(pool1.capitalPendingWithdrawal).to.equal(0);
+                expect(pool2.capitalPendingWithdrawal).to.equal(0);
+            });
+
             it("onCapitalWithdrawn should handle full withdrawal", async function () {
                 const amount = ethers.parseUnits("1000", 6);
                 await mockCapitalPool.triggerOnCapitalDeposited(riskManager.target, underwriter1.address, amount);

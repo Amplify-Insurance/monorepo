@@ -372,6 +372,21 @@ contract RiskManager is Ownable, ReentrancyGuard {
         }
     }
 
+    function onWithdrawalCancelled(address _underwriter, uint256 _principalComponent) external {
+        if(msg.sender != address(capitalPool)) revert NotCapitalPool();
+        uint256[] memory allocations = underwriterAllocations[_underwriter];
+        for (uint i = 0; i < allocations.length; i++) {
+            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], _principalComponent, false);
+            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(allocations[i]);
+            rewardDistributor.updateUserState(
+                _underwriter,
+                allocations[i],
+                address(protocolToken),
+                underwriterPoolPledge[_underwriter][allocations[i]]
+            );
+        }
+    }
+
     function onCapitalWithdrawn(address _underwriter, uint256 _principalComponentRemoved, bool _isFullWithdrawal) external {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         _realizeLossesForAllPools(_underwriter);

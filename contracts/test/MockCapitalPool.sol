@@ -155,4 +155,9 @@ contract MockCapitalPool is Ownable {
         (bool ok,) = rm.call(abi.encodeWithSignature("onWithdrawalRequested(address,uint256)", u, amt));
         require(ok, "call failed");
     }
+
+    function triggerOnWithdrawalCancelled(address rm, address u, uint256 amt) external {
+        (bool ok,) = rm.call(abi.encodeWithSignature("onWithdrawalCancelled(address,uint256)", u, amt));
+        require(ok, "call failed");
+    }
 }
