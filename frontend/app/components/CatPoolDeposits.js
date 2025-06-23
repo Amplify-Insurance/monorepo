@@ -5,9 +5,10 @@ import { ethers } from "ethers"
 import { formatCurrency } from "../utils/formatting"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
 import useCatPoolRewards from "../../hooks/useCatPoolRewards"
+import Image from "next/image"
 import { TrendingUp, Gift, ExternalLink, Clock, X } from "lucide-react"
-import { getTokenName } from "../config/tokenNameMap"
-import { getCatPoolWithSigner } from "../../lib/catPool"
+import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
+import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals } from "../../lib/catPool"
 import ClaimRewardsModal from "./ClaimRewardsModal"
 import RequestWithdrawalModal from "./RequestWithdrawalModal"
 import Link from "next/link"
@@ -16,7 +17,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const { address } = useAccount()
   const { info, refresh } = useCatPoolUserInfo(address)
   const { rewards } = useCatPoolRewards(address)
-  const valueDecimals = 6
+  const [valueDecimals, setValueDecimals] = useState(6)
+  const [underlyingToken, setUnderlyingToken] = useState("")
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
   const [showClaimModal, setShowClaimModal] = useState(false)
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
@@ -26,6 +28,18 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
 
   useEffect(() => {
     refresh()
+
+    async function loadTokenInfo() {
+      try {
+        const addr = await getUsdcAddress()
+        setUnderlyingToken(addr)
+        const dec = await getUsdcDecimals()
+        setValueDecimals(Number(dec))
+      } catch (err) {
+        console.error("Failed to fetch underlying token info", err)
+      }
+    }
+    loadTokenInfo()
 
 
     // Simulate pending withdrawal - replace with actual contract call
@@ -246,8 +260,16 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
               <tr className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">CAT</span>
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                      {underlyingToken && (
+                        <Image
+                          src={getTokenLogo(underlyingToken) || "/placeholder.svg"}
+                          alt={getTokenName(underlyingToken)}
+                          width={40}
+                          height={40}
+                          className="rounded-full"
+                        />
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
