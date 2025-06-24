@@ -289,25 +289,32 @@ This project is licensed under the **Business Source License 1.1**. See [LICENSE
 
 ```mermaid
 graph TD
-    A[Underwriters Deposit Funds] --> B[Funds Allocated into Yield Strategy]
-    B --> C[Base Yield Earned on Deposits]
-    B --> D[Funds Available for Insurance Coverage]
-    D --> E[Insurance Premiums Paid by Policyholders]
-    E --> F[Premiums Earned by Underwriters]
-    F --> G[Total Yield: Base Yield + Premiums]
+  %% Phase 1: De-allocating from a Risk Pool
+  subgraph "Phase 1: De-allocating from a Risk Pool (RiskManager Contract)"
+    A[Start: Underwriter wants to withdraw capital from a pool]
+      --> B[1. Calls requestDeallocateFromPool(poolId, amount)]
+    B --> C[Contract fetches pool data:<br>totalPledged (All LP capital)<br>totalSold (Live policy coverage)<br>pendingWithdrawal (Other LPs withdrawing)]
+    C --> D{<b>Is amount ≤ freeCapital?</b><br><br><i>// freeCapital = totalPledged − totalSold − pendingWithdrawal</i>}
+    D -- No: Not Enough Free Capital --> E[<font color="red">REJECTED</font><br>Transaction reverts with InsufficientFreeCapital error]
+    E --> F([<b>Withdrawal Blocked</b><br>Capital is locked to back live policies.])
+    D -- Yes: Enough Free Capital --> G[<font color="orange">ACCEPTED</font><br>Request is logged and notice period timer starts]
+    G --> H[Underwriter must wait for the deallocationNoticePeriod to end]
+    H --> I[2. After waiting, calls deallocateFromPool(poolId)]
+    I --> J{Is Notice Period over?}
+    J -- No --> K[REJECTED<br>Transaction reverts with NoticePeriodActive error]
+    K --> H
+    J -- Yes --> L[<font color="green">SUCCESS</font><br>Capital is de-allocated from the risk pool]
+  end
 
-    subgraph Underwriter's Activities
-        A --> H[Select Protocols to Insure]
-        H --> D
-    end
+  %% Phase 2: Withdrawing from the System
+  subgraph "Phase 2: Withdrawing from the System (CapitalPool Contract)"
+    L --> M[Capital is now considered 'free' inside the main CapitalPool]
+    M --> N[3. Underwriter calls executeWithdrawal() on the CapitalPool contract]
+    N --> O([<b>Funds Returned</b><br>Underwriter receives their capital])
+  end
 
-    subgraph Policyholder's Activities
-        I[Policyholders Purchase Insurance]
-        I --> E
-        I --> J[Specify Premium Rates]
-        J --> K[Compete for Coverage]
-        K --> L[Adjust Premium Rates Based on Supply and Demand]
-    end
+  style F fill:#ffeded,stroke:#ff5555,stroke-width:2px
+  style O fill:#e8f5e9,stroke:#55a65a,stroke-width:2px
 ```
 
 
