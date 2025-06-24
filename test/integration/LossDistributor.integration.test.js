@@ -315,6 +315,8 @@ describe("LossDistributor Integration", function () {
     const BIG = ethers.parseUnits("150000", 6);
     const policyBig = await mintPolicy(riskManager, policyNFT, claimant, POOL_ID, BIG);
     await protocolToken.mint(claimant.address, BIG);
+    // Reset approval to satisfy the ResetApproveERC20 requirement
+    await protocolToken.connect(claimant).approve(riskManager.target, 0);
     await protocolToken.connect(claimant).approve(riskManager.target, BIG);
     await riskManager.connect(nonParty).processClaim(policyBig);
 
