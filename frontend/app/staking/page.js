@@ -326,7 +326,7 @@ export default function StakingPage() {
         )}
 
         {/* Proposals Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
               <Vote className="w-4 h-4 text-purple-600 dark:text-purple-400" />
