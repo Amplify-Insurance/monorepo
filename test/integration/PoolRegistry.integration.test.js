@@ -20,7 +20,7 @@ async function deployFixture() {
     kink: ethers.parseUnits("0.8", 18),
   };
 
-  return { owner, riskManager, registry, token, rateModel };
+  return { owner, riskManager, other, registry, token, rateModel };
 }
 
 describe("PoolRegistry integration", function () {
@@ -191,5 +191,74 @@ describe("PoolRegistry integration", function () {
     expect(capitalList[idxA]).to.equal(amountA);
     expect(capitalList[idxB]).to.equal(amountB);
     expect(total).to.equal(amountA + amountB);
+  });
+
+  it("prevents non-risk manager from modifying pools", async function () {
+    const { other, registry, token, rateModel } = await deployFixture();
+
+    await expect(
+      registry.connect(other).addProtocolRiskPool(token.target, rateModel, 0)
+    ).to.be.revertedWith("PR: Not RiskManager");
+
+    const [, riskManager] = await ethers.getSigners();
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const adapter = ethers.Wallet.createRandom().address;
+    await expect(
+      registry.connect(other).updateCapitalAllocation(0, adapter, 1, true)
+    ).to.be.revertedWith("PR: Not RiskManager");
+  });
+
+  it("reverts when owner sets risk manager to zero address", async function () {
+    const { owner, registry } = await deployFixture();
+
+    await expect(
+      registry.connect(owner).setRiskManager(ethers.ZeroAddress)
+    ).to.be.revertedWith("PR: Zero address");
+  });
+
+  it("reverts when using an invalid pool id", async function () {
+    const { riskManager, registry } = await deployFixture();
+
+    const invalidId = 99;
+    const adapter = ethers.Wallet.createRandom().address;
+
+    await expect(registry.getPoolData(invalidId)).to.be.reverted;
+    await expect(
+      registry
+        .connect(riskManager)
+        .updateCapitalAllocation(invalidId, adapter, 1, true)
+    ).to.be.reverted;
+  });
+
+  it("removes adapters from the middle correctly", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const adapters = [
+      ethers.Wallet.createRandom().address,
+      ethers.Wallet.createRandom().address,
+      ethers.Wallet.createRandom().address,
+    ];
+
+    const amt = ethers.parseUnits("10", 18);
+    for (const a of adapters) {
+      await registry
+        .connect(riskManager)
+        .updateCapitalAllocation(0, a, amt, true);
+    }
+
+    await registry
+      .connect(riskManager)
+      .updateCapitalAllocation(0, adapters[1], amt, false);
+
+    const active = await registry.getPoolActiveAdapters(0);
+    expect(active).to.deep.equal([adapters[0], adapters[2]]);
+    expect(await registry.getCapitalPerAdapter(0, adapters[1])).to.equal(0);
   });
 });
