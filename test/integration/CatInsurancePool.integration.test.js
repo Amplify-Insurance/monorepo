@@ -12,15 +12,15 @@ describe("CatInsurancePool Integration", function () {
   beforeEach(async () => {
     [owner, riskManager, policyManager, capitalPool, lp1, lp2] = await ethers.getSigners();
 
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
-    usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
-    rewardToken = await MockERC20.deploy("Reward Token", "RWT", 18);
+    const Token = await ethers.getContractFactory("ResetApproveERC20");
+    usdc = await Token.deploy("USD Coin", "USDC", 6);
+    rewardToken = await Token.deploy("Reward Token", "RWT", 18);
 
     const CatShare = await ethers.getContractFactory("CatShare");
     catShare = await CatShare.deploy();
 
-    const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
-    adapter = await MockYieldAdapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
+    const Adapter = await ethers.getContractFactory("SimpleYieldAdapter");
+    adapter = await Adapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
 
     const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
     rewardDistributor = await RewardDistributor.deploy(riskManager.address);
@@ -45,6 +45,11 @@ describe("CatInsurancePool Integration", function () {
     await usdc.connect(lp1).approve(catPool.target, ethers.MaxUint256);
     await usdc.mint(lp2.address, ethers.parseUnits("10000", 6));
     await usdc.connect(lp2).approve(catPool.target, ethers.MaxUint256);
+  });
+
+  it("initializes only once and locks initial shares", async function () {
+    expect(await catShare.balanceOf(catPool.target)).to.equal(1000n);
+    await expect(catPool.initialize()).to.be.revertedWith("CIP: Already initialized");
   });
 
   it("distributes protocol assets via RewardDistributor and allows claiming", async function () {
@@ -89,6 +94,10 @@ describe("CatInsurancePool Integration", function () {
     expect(await adapter.totalValueHeld()).to.equal(depositAmount - drawAmount);
   });
 
+  it("reverts when deposit below minimum", async function () {
+    await expect(catPool.connect(lp1).depositLiquidity(0)).to.be.revertedWith("CIP: Amount below minimum");
+  });
+
   it("mints shares based on adapter balance after yield", async function () {
     const depositAmount = ethers.parseUnits("1000", 6);
     await catPool.connect(lp1).depositLiquidity(depositAmount);
@@ -118,6 +127,14 @@ describe("CatInsurancePool Integration", function () {
     await expect(catPool.connect(lp1).withdrawLiquidity(shares))
       .to.emit(catPool, "CatLiquidityWithdrawn")
       .withArgs(lp1.address, depositAmount, shares);
+  });
+
+  it("reverts withdrawal before notice period", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    const shares = await catShare.balanceOf(lp1.address);
+    await catPool.connect(lp1).requestWithdrawal(shares);
+    await expect(catPool.connect(lp1).withdrawLiquidity(shares)).to.be.revertedWith("CIP: Notice period active");
   });
 
   it("distributes rewards to multiple depositors", async function () {
@@ -205,14 +222,40 @@ describe("CatInsurancePool Integration", function () {
       .withArgs(lp1.address, rewardToken.target, expected);
   });
 
+  it("owner can update contract addresses", async function () {
+    const newRM = lp1.address;
+    const newPM = lp2.address;
+    const newCP = riskManager.address;
+    const NewRDFactory = await ethers.getContractFactory("RewardDistributor");
+    const newRD = await NewRDFactory.deploy(owner.address);
+
+    await expect(catPool.connect(owner).setRiskManagerAddress(newRM))
+      .to.emit(catPool, "RiskManagerAddressSet")
+      .withArgs(newRM);
+    await expect(catPool.connect(owner).setPolicyManagerAddress(newPM))
+      .to.emit(catPool, "PolicyManagerAddressSet")
+      .withArgs(newPM);
+    await expect(catPool.connect(owner).setCapitalPoolAddress(newCP))
+      .to.emit(catPool, "CapitalPoolAddressSet")
+      .withArgs(newCP);
+    await expect(catPool.connect(owner).setRewardDistributor(newRD.target))
+      .to.emit(catPool, "RewardDistributorSet")
+      .withArgs(newRD.target);
+
+    expect(await catPool.riskManagerAddress()).to.equal(newRM);
+    expect(await catPool.policyManagerAddress()).to.equal(newPM);
+    expect(await catPool.capitalPoolAddress()).to.equal(newCP);
+    expect(await catPool.rewardDistributor()).to.equal(newRD.target);
+  });
+
   it("owner can switch adapters and funds are moved", async function () {
     const depositAmount = ethers.parseUnits("1000", 6);
     await catPool.connect(lp1).depositLiquidity(depositAmount);
     await catPool.connect(owner).flushToAdapter(depositAmount);
     await adapter.setTotalValueHeld(depositAmount);
 
-    const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
-    const newAdapter = await MockYieldAdapter.deploy(
+    const AdapterFactory = await ethers.getContractFactory("SimpleYieldAdapter");
+    const newAdapter = await AdapterFactory.deploy(
       usdc.target,
       ethers.ZeroAddress,
       owner.address
