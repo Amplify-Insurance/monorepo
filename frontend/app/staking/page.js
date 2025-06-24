@@ -314,7 +314,7 @@ export default function StakingPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        {formatCurrency(Number.parseFloat(bond.amount), 'USD', 'USD')}
+                        {Number.parseFloat(bond.amount)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">{bond.status}</td>
                     </tr>
