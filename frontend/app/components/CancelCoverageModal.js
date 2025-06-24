@@ -67,7 +67,7 @@ export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
     try {
       const dep = getDeployment(coverage.deployment)
       const pm = await getPolicyManagerWithSigner(dep.policyManager)
-      const tx = await pm.cancelCover(coverage.id, { gasLimit: 500000 })
+      const tx = await pm.cancelCover(coverage.policyId, { gasLimit: 500000 })
       setTxHash(tx.hash)
       await tx.wait()
       onClose(true)
@@ -95,7 +95,7 @@ export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
             <div className="font-medium text-gray-900 dark:text-white">
               {protocolName} {tokenName}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Coverage ID #{coverage.id}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Coverage ID #{coverage.policyId}</div>
           </div>
         </div>
 
