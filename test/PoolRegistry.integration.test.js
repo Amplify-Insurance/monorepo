@@ -96,4 +96,56 @@ describe("PoolRegistry integration", function () {
     poolData = await registry.getPoolData(0);
     expect(poolData.isPaused).to.be.false;
   });
+
+  it("updates pending withdrawal and coverage sold counts", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const amt = ethers.parseUnits("500", 18);
+
+    // pending withdrawal increase/decrease
+    await registry.connect(riskManager).updateCapitalPendingWithdrawal(0, amt, true);
+    let pool = await registry.getPoolData(0);
+    expect(pool.capitalPendingWithdrawal).to.equal(amt);
+
+    await registry.connect(riskManager).updateCapitalPendingWithdrawal(0, amt, false);
+    pool = await registry.getPoolData(0);
+    expect(pool.capitalPendingWithdrawal).to.equal(0);
+
+    // coverage sold increase/decrease
+    await registry.connect(riskManager).updateCoverageSold(0, amt, true);
+    pool = await registry.getPoolData(0);
+    expect(pool.totalCoverageSold).to.equal(amt);
+
+    await registry.connect(riskManager).updateCoverageSold(0, amt, false);
+    pool = await registry.getPoolData(0);
+    expect(pool.totalCoverageSold).to.equal(0);
+  });
+
+  it("stores a fee recipient and isolates multiple pools", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry.connect(riskManager).addProtocolRiskPool(token.target, rateModel, 0);
+    await registry.connect(riskManager).addProtocolRiskPool(token.target, rateModel, 0);
+
+    const recipient = ethers.Wallet.createRandom().address;
+    await registry.connect(riskManager).setFeeRecipient(0, recipient);
+
+    expect((await registry.getPoolData(0)).feeRecipient).to.equal(recipient);
+    expect((await registry.getPoolData(1)).feeRecipient).to.equal(ethers.ZeroAddress);
+
+    const amount = ethers.parseUnits("100", 18);
+    const adapter0 = ethers.Wallet.createRandom().address;
+    const adapter1 = ethers.Wallet.createRandom().address;
+    await registry.connect(riskManager).updateCapitalAllocation(0, adapter0, amount, true);
+    await registry.connect(riskManager).updateCapitalAllocation(1, adapter1, amount, true);
+
+    const pool0 = await registry.getPoolData(0);
+    const pool1 = await registry.getPoolData(1);
+    expect(pool0.totalCapitalPledgedToPool).to.equal(amount);
+    expect(pool1.totalCapitalPledgedToPool).to.equal(amount);
+  });
 });
