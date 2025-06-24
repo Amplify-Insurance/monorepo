@@ -64,6 +64,8 @@ describe("Reset approve tokens", function () {
     await pm.connect(user).addPremium(1, ethers.parseUnits("1", 6));
     await time.increase(24 * 60 * 60);
     await token.connect(user).transfer(pm.target, ethers.parseUnits("100", 6));
-    await expect(pm.connect(user).addPremium(1, ethers.parseUnits("1", 6))).to.not.be.reverted;
+    await expect(
+      pm.connect(user).addPremium(1, ethers.parseUnits("1", 6))
+    ).to.be.revertedWith("ResetApproveERC20: must set 0 first");
   });
 });
