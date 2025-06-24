@@ -1,33 +1,42 @@
 // SPDX-License-Identifier: BUSL-1.1
+
+// IPolicyNFT.sol (Updated Version)
 pragma solidity ^0.8.20;
 
-
 interface IPolicyNFT {
-    // CORRECTED: The mint function needs to accept the new premium fields
-    function mint(address _owner, uint256 _poolId, uint256 _coverage, uint256 _activation, uint128 _premiumDeposit, uint128 _lastDrainTime) external returns (uint256);
-    
-    function burn(uint256 _policyId) external;
-    function ownerOf(uint256 _policyId) external view returns (address);
-    function getPolicy(uint256 _policyId) external view returns (Policy memory);
-    
-    // DEPRECATED in new model, but kept for compatibility during transition if needed
-    function updateLastPaid(uint256 _policyId, uint256 _newLastPaid) external;
-
-    // ADDED: The missing function declaration
-    function updatePremiumAccount(uint256 _policyId, uint128 _newDeposit, uint128 _newDrainTime) external;
-    function addPendingIncrease(uint256 id, uint256 amount, uint256 activationTimestamp) external;
-    function finalizeIncrease(uint256 id) external;
-    function updateCoverage(uint256 id, uint256 newCoverage) external;
-
-    // This struct definition is correct as-is
     struct Policy {
-        uint256 coverage;                   // Currently active liability
-        uint256 poolId;
-        uint256 start;
-        uint256 activation;                 // Activation for the initial coverage
+        uint96 poolId;
+        // REMOVED: No longer tracked in the NFT
+        // uint128 pendingIncrease;
+        // uint128 increaseActivationTimestamp;
+        uint128 coverage;
+        uint128 activation;
         uint128 premiumDeposit;
         uint128 lastDrainTime;
-        uint256 pendingIncrease;            // The amount of coverage being added
-        uint256 increaseActivationTimestamp; // Timestamp when the pendingIncrease becomes active
     }
+
+    event PolicyMinted(address indexed owner, uint256 indexed policyId);
+    event PolicyUpdated(uint256 indexed policyId);
+    event PolicyBurned(uint256 indexed policyId);
+
+    function mint(
+        address owner,
+        uint256 poolId,
+        uint256 coverage,
+        uint256 activationTimestamp,
+        uint128 premiumDeposit,
+        uint128 lastDrainTime
+    ) external returns (uint256 policyId);
+    
+    // NEW: A single function to finalize multiple matured increases at once.
+    function finalizeIncreases(uint256 policyId, uint256 totalAmountToAdd) external;
+    
+    function burn(uint256 policyId) external;
+    function ownerOf(uint256 policyId) external view returns (address);
+    function getPolicy(uint256 policyId) external view returns (Policy memory);
+    function updatePremiumAccount(uint256 policyId, uint128 newDeposit, uint128 newDrainTime) external;
+
+    // REMOVED: These functions are no longer needed as the logic is in PolicyManager
+    // function addPendingIncrease(uint256 policyId, uint256 amount, uint256 activationTimestamp) external;
+    // function finalizeIncrease(uint256 policyId) external;
 }
