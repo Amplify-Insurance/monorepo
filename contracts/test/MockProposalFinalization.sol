@@ -17,4 +17,6 @@ contract MockProposalFinalization {
     function callRecordVote(address staking, address voter, uint256 proposalId) external {
         IStakingContract(staking).recordVote(voter, proposalId);
     }
+
+    function updateVoteWeight(address, uint256, uint256) external {}
 }

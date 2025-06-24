@@ -3,6 +3,10 @@ pragma solidity ^0.8.20;
 import "../interfaces/IStakingContract.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+interface ICommitteeExtended {
+    function updateVoteWeight(address voter, uint256 proposalId, uint256 newWeight) external;
+}
+
 contract MockCommitteeStaking is IStakingContract {
     IERC20 public immutable override governanceToken;
     mapping(address => uint256) private balances;
@@ -26,5 +30,9 @@ contract MockCommitteeStaking is IStakingContract {
     function recordVote(address voter, uint256 proposalId) external override {
         lastProposal[voter] = proposalId;
         lastVoteTime[voter] = block.timestamp;
+    }
+
+    function callUpdateWeight(address committee, address voter, uint256 proposalId, uint256 newWeight) external {
+        ICommitteeExtended(committee).updateVoteWeight(voter, proposalId, newWeight);
     }
 }
