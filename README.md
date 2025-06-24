@@ -291,7 +291,7 @@ This project is licensed under the **Business Source License 1.1**. See [LICENSE
 
 graph TD;
     subgraph "Phase 1: De-allocating from a Risk Pool (RiskManager Contract)"
-        A[Start: Underwriter wants to withdraw capital from a pool] --> B[1. Calls requestDeallocateFromPool(poolId, amount)];
+        A[Start: Underwriter wants to withdraw capital from a pool] --> B[1. Calls requestDeallocateFromPool&#40;poolId, amount&#41;];
         B --> C[Contract fetches pool data:<br/>- totalPledged (All LP capital)<br/>- totalSold (Live policy coverage)<br/>- pendingWithdrawal (Other LPs withdrawing)];
         C --> D{<b>Is amount <= freeCapital?</b> <br/><br/><i>// freeCapital = totalPledged - totalSold - pendingWithdrawal</i>};
 
@@ -300,7 +300,7 @@ graph TD;
 
         D -->|Yes: Enough Free Capital| G[<font color=orange>ACCEPTED</font><br/>Request is logged and a notice period timer starts];
         G --> H[Underwriter must wait for the<br/>deallocationNoticePeriod to end];
-        H --> I[2. After waiting, calls deallocateFromPool(poolId)];
+        H --> I[2. After waiting, calls deallocateFromPool&#40;poolId&#41;];
         I --> J{Is Notice Period over?};
 
         J -->|No| K[REJECTED<br/>Transaction reverts with NoticePeriodActive error];
@@ -311,7 +311,7 @@ graph TD;
 
     subgraph "Phase 2: Withdrawing from the System (CapitalPool Contract)"
         L --> M[Capital is now considered 'free' inside the main CapitalPool];
-        M --> N[3. Underwriter calls executeWithdrawal()<br/>on the CapitalPool contract];
+        M --> N[3. Underwriter calls executeWithdrawal&#40;&#41;<br/>on the CapitalPool contract];
         N --> O([<b>Funds Returned</b><br/>Underwriter receives their capital]);
     end
 
