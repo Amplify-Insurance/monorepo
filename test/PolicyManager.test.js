@@ -879,6 +879,139 @@ describe("PolicyManager", function () {
             });
         });
 
+        describe("increaseCover()", function () {
+            const POLICY_ID = 1;
+            const ADDITIONAL_COVERAGE = ethers.parseUnits("5000", 6);
+
+            beforeEach(async function () {
+                const now = await time.latest();
+                const rateModel = { base: 100, slope1: 200, slope2: 500, kink: 8000 };
+                await mockPoolRegistry.setRateModel(POOL_ID, rateModel);
+                await policyManager.connect(owner).setCoverCooldownPeriod(COOLDOWN_PERIOD);
+                await mockPoolRegistry.setPoolData(
+                    POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("100000", 6),
+                    COVERAGE_AMOUNT,
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    0,
+                    now,
+                    INITIAL_PREMIUM_DEPOSIT,
+                    now
+                );
+            });
+
+            it("Should successfully request additional coverage", async function () {
+                const tx = await policyManager.connect(user1).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE);
+                const receipt = await tx.wait();
+                const block = await ethers.provider.getBlock(receipt.blockNumber);
+
+                await expect(tx)
+                    .to.emit(mockRiskManager, "CoverageUpdated")
+                    .withArgs(POOL_ID, ADDITIONAL_COVERAGE, true);
+
+                const info = await mockPolicyNFT.policies(POLICY_ID);
+                expect(info.pendingIncrease).to.equal(ADDITIONAL_COVERAGE);
+                expect(info.increaseActivationTimestamp).to.equal(block.timestamp + COOLDOWN_PERIOD);
+            });
+
+            it("Should revert when additional coverage is zero", async function () {
+                await expect(
+                    policyManager.connect(user1).increaseCover(POLICY_ID, 0)
+                ).to.be.revertedWithCustomError(policyManager, "InvalidAmount");
+            });
+
+            it("Should revert if caller is not the policy owner", async function () {
+                await expect(
+                    policyManager.connect(user2).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE)
+                ).to.be.revertedWithCustomError(policyManager, "NotPolicyOwner");
+            });
+
+            it("Should revert when policy is not active", async function () {
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    0,
+                    await time.latest(),
+                    0,
+                    await time.latest()
+                );
+
+                await expect(
+                    policyManager.connect(user1).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE)
+                ).to.be.revertedWithCustomError(policyManager, "PolicyNotActive");
+            });
+
+            it("Should revert when deposit is insufficient for new coverage", async function () {
+                const now = await time.latest();
+                await mockPolicyNFT.mock_setPolicy(
+                    POLICY_ID,
+                    user1.address,
+                    POOL_ID,
+                    COVERAGE_AMOUNT,
+                    0,
+                    now,
+                    ethers.parseUnits("1", 6),
+                    now
+                );
+
+                await expect(
+                    policyManager.connect(user1).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE)
+                ).to.be.revertedWithCustomError(policyManager, "DepositTooLow");
+            });
+
+            it("Should revert when pool lacks available capital", async function () {
+                await mockPoolRegistry.setPoolData(
+                    POOL_ID,
+                    mockUsdc.target,
+                    ethers.parseUnits("15000", 6),
+                    ethers.parseUnits("12000", 6),
+                    0,
+                    false,
+                    owner.address,
+                    0
+                );
+
+                await expect(
+                    policyManager.connect(user1).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE)
+                ).to.be.revertedWithCustomError(policyManager, "InsufficientCapacity");
+            });
+
+            it("Should finalize matured increase before applying a new one", async function () {
+                await policyManager.connect(user1).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE);
+                await time.increase(COOLDOWN_PERIOD + 1);
+
+                const NEW_ADD = ethers.parseUnits("1000", 6);
+                const tx = await policyManager.connect(user1).increaseCover(POLICY_ID, NEW_ADD);
+                const receipt = await tx.wait();
+                const block = await ethers.provider.getBlock(receipt.blockNumber);
+
+                const info = await mockPolicyNFT.policies(POLICY_ID);
+                expect(info.coverage).to.equal(COVERAGE_AMOUNT + ADDITIONAL_COVERAGE);
+                expect(info.pendingIncrease).to.equal(NEW_ADD);
+                expect(info.increaseActivationTimestamp).to.equal(block.timestamp + COOLDOWN_PERIOD);
+            });
+
+            it("Should revert if an increase is already pending", async function () {
+                await policyManager.connect(user1).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE);
+                await expect(
+                    policyManager.connect(user1).increaseCover(POLICY_ID, ADDITIONAL_COVERAGE)
+                ).to.be.revertedWith("PM: An increase is already pending");
+            });
+        });
+
         describe("lapsePolicy()", function() {
             const POLICY_ID = 1;
 
