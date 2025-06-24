@@ -21,8 +21,8 @@ describe("RiskManager Integration", function () {
     usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
     await usdc.mint(underwriter.address, PLEDGE_AMOUNT);
 
-    const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
-    adapter = await MockYieldAdapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
+    const SimpleAdapter = await ethers.getContractFactory("SimpleYieldAdapter");
+    adapter = await SimpleAdapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
 
     const RiskManager = await ethers.getContractFactory("RiskManager");
     riskManager = await RiskManager.deploy(owner.address);
@@ -138,5 +138,78 @@ describe("RiskManager Integration", function () {
     await expect(
       riskManager.connect(liquidator).liquidateInsolventUnderwriter(underwriter.address)
     ).to.be.revertedWithCustomError(riskManager, "UnderwriterNotInsolvent");
+  });
+
+  it("committee can pause and unpause a pool", async function () {
+    await riskManager.connect(committee).reportIncident(POOL_ID, true);
+    let [, , , , isPaused] = await poolRegistry.getPoolData(POOL_ID);
+    expect(isPaused).to.equal(true);
+    await riskManager.connect(committee).reportIncident(POOL_ID, false);
+    [, , , , isPaused] = await poolRegistry.getPoolData(POOL_ID);
+    expect(isPaused).to.equal(false);
+  });
+
+  it("committee can update pool fee recipient", async function () {
+    await riskManager.connect(committee).setPoolFeeRecipient(POOL_ID, nonParty.address);
+    const [, , , , , feeRecipient] = await poolRegistry.getPoolData(POOL_ID);
+    expect(feeRecipient).to.equal(nonParty.address);
+  });
+
+  it("underwriter can deallocate after requesting", async function () {
+    await riskManager.connect(owner).setDeallocationNoticePeriod(0);
+    await riskManager.connect(underwriter).requestDeallocateFromPool(POOL_ID, PLEDGE_AMOUNT);
+    await riskManager.connect(underwriter).deallocateFromPool(POOL_ID);
+    expect(await riskManager.isAllocatedToPool(underwriter.address, POOL_ID)).to.equal(false);
+  });
+
+  it("claims premium rewards after distribution", async function () {
+    const reward = ethers.parseUnits("100", 6);
+    const [, totalPledged] = await poolRegistry.getPoolData(POOL_ID);
+    await usdc.mint(rewardDistributor.target, reward);
+    const rm = await impersonate(riskManager.target);
+    await rewardDistributor.connect(rm).distribute(POOL_ID, usdc.target, reward, totalPledged);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+    const before = await usdc.balanceOf(underwriter.address);
+    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    const after = await usdc.balanceOf(underwriter.address);
+    expect(after).to.be.gt(before);
+  });
+
+  it("processes a claim and pays out", async function () {
+    const COVERAGE = ethers.parseUnits("2000", 6);
+    const PREMIUM = ethers.parseUnits("10", 6);
+    await usdc.mint(nonParty.address, COVERAGE + PREMIUM);
+    await usdc.connect(nonParty).approve(policyManager.target, PREMIUM);
+    await policyManager.connect(nonParty).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+    await policyNFT.connect(owner).setPolicyManagerAddress(riskManager.target);
+    await usdc.connect(nonParty).approve(riskManager.target, COVERAGE);
+    await expect(riskManager.connect(nonParty).processClaim(1)).to.not.be.reverted;
+    await expect(policyNFT.ownerOf(1)).to.be.revertedWithCustomError(policyNFT, "ERC721NonexistentToken");
+    const [, , sold] = await poolRegistry.getPoolData(POOL_ID);
+    expect(sold).to.equal(0);
+  });
+
+  it("claims distressed assets from cat pool", async function () {
+    const depositAmt = ethers.parseUnits("100", 6);
+    await usdc.mint(nonParty.address, depositAmt);
+    await usdc.connect(nonParty).approve(catPool.target, depositAmt);
+    await catPool.connect(nonParty).depositLiquidity(depositAmt);
+
+    const reward = ethers.parseUnits("50", 6);
+    await usdc.mint(rewardDistributor.target, reward);
+    const totalShares = await (await ethers.getContractAt("CatShare", await catPool.catShareToken())).totalSupply();
+    const rm = await impersonate(riskManager.target);
+    await rewardDistributor.connect(rm).distribute(
+      await catPool.CAT_POOL_REWARD_ID(),
+      usdc.target,
+      reward,
+      totalShares
+    );
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    const before = await usdc.balanceOf(nonParty.address);
+    await riskManager.connect(nonParty).claimDistressedAssets(POOL_ID);
+    const after = await usdc.balanceOf(nonParty.address);
+    expect(after).to.be.gt(before);
   });
 });
