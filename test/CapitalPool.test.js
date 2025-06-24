@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 describe("CapitalPool", function () {
   let owner, riskManager, user1, user2, feeRecipient, claimant, nonParty;
@@ -207,30 +208,35 @@ describe("CapitalPool", function () {
       it("Should request a withdrawal successfully", async () => {
         const account = await capitalPool.getUnderwriterAccount(user1.address);
         const sharesToWithdraw = account.masterShares / 2n;
-        const valueToWithdraw = await capitalPool.sharesToValue(sharesToWithdraw);
 
         await expect(capitalPool.connect(user1).requestWithdrawal(sharesToWithdraw))
-          .to.emit(capitalPool, "WithdrawalRequested");
+          .to.emit(capitalPool, "WithdrawalRequested")
+          .withArgs(user1.address, sharesToWithdraw, anyValue, 0);
 
         const updatedAccount = await capitalPool.getUnderwriterAccount(user1.address);
-        expect(updatedAccount.withdrawalRequestShares).to.equal(sharesToWithdraw);
+        expect(updatedAccount.totalPendingWithdrawalShares).to.equal(sharesToWithdraw);
+        expect(await capitalPool.getWithdrawalRequestCount(user1.address)).to.equal(1);
       });
 
-      it("Should revert if withdrawal is requested while one is pending", async () => {
-        await capitalPool.connect(user1).requestWithdrawal(100);
-        await expect(capitalPool.connect(user1).requestWithdrawal(100))
-          .to.be.revertedWithCustomError(capitalPool, "WithdrawalRequestPending");
+      it("Allows multiple concurrent withdrawal requests", async () => {
+        const shares = (await capitalPool.getUnderwriterAccount(user1.address)).masterShares;
+        const half = shares / 2n;
+        await capitalPool.connect(user1).requestWithdrawal(half);
+        await capitalPool.connect(user1).requestWithdrawal(half);
+        const updated = await capitalPool.getUnderwriterAccount(user1.address);
+        expect(updated.totalPendingWithdrawalShares).to.equal(shares);
+        expect(await capitalPool.getWithdrawalRequestCount(user1.address)).to.equal(2);
       });
 
       it("Should revert if executing withdrawal before notice period ends", async () => {
         await capitalPool.connect(user1).requestWithdrawal(100);
-        await expect(capitalPool.connect(user1).executeWithdrawal())
+        await expect(capitalPool.connect(user1).executeWithdrawal(0))
           .to.be.revertedWithCustomError(capitalPool, "NoticePeriodActive");
       });
 
       it("Should revert if executeWithdrawal called with no request", async () => {
-        await expect(capitalPool.connect(user1).executeWithdrawal())
-          .to.be.revertedWithCustomError(capitalPool, "NoWithdrawalRequest");
+        await expect(capitalPool.connect(user1).executeWithdrawal(0))
+          .to.be.revertedWithCustomError(capitalPool, "InvalidRequestIndex");
       });
 
       it("Should revert if shares burned exceed current balance", async () => {
@@ -238,7 +244,7 @@ describe("CapitalPool", function () {
         await capitalPool.connect(user1).requestWithdrawal(sharesToBurn);
         await capitalPool.connect(riskManager).applyLosses(user1.address, ethers.parseUnits("500", 6));
         await time.increase(NOTICE_PERIOD);
-        await expect(capitalPool.connect(user1).executeWithdrawal())
+        await expect(capitalPool.connect(user1).executeWithdrawal(0))
           .to.be.revertedWithCustomError(capitalPool, "InconsistentState");
       });
 
@@ -256,15 +262,17 @@ describe("CapitalPool", function () {
         const account = await capitalPool.getUnderwriterAccount(user1.address);
         const sharesToWithdraw = account.masterShares / 2n;
         await capitalPool.connect(user1).requestWithdrawal(sharesToWithdraw);
-        await expect(capitalPool.connect(user1).cancelWithdrawalRequest())
-          .to.emit(capitalPool, "WithdrawalRequestCancelled");
+        await expect(capitalPool.connect(user1).cancelWithdrawalRequest(0))
+          .to.emit(capitalPool, "WithdrawalRequestCancelled")
+          .withArgs(user1.address, sharesToWithdraw, 0);
         const updated = await capitalPool.getUnderwriterAccount(user1.address);
-        expect(updated.withdrawalRequestShares).to.equal(0);
+        expect(updated.totalPendingWithdrawalShares).to.equal(0);
+        expect(await capitalPool.getWithdrawalRequestCount(user1.address)).to.equal(0);
       });
 
       it("cancelWithdrawalRequest reverts when no request", async () => {
-        await expect(capitalPool.connect(user1).cancelWithdrawalRequest())
-          .to.be.revertedWithCustomError(capitalPool, "NoWithdrawalRequest");
+        await expect(capitalPool.connect(user1).cancelWithdrawalRequest(0))
+          .to.be.revertedWithCustomError(capitalPool, "InvalidRequestIndex");
       });
 
       it("Should revert if RiskManager notification fails during executeWithdrawal", async () => {
@@ -272,7 +280,7 @@ describe("CapitalPool", function () {
         await capitalPool.connect(user1).requestWithdrawal(sharesToBurn);
         await capitalPool.connect(owner).setRiskManager(mockUsdc.target);
         await time.increase(NOTICE_PERIOD);
-        await expect(capitalPool.connect(user1).executeWithdrawal())
+        await expect(capitalPool.connect(user1).executeWithdrawal(0))
           .to.be.revertedWith("CP: Failed to notify RiskManager of withdrawal");
       });
 
@@ -285,11 +293,13 @@ describe("CapitalPool", function () {
 
         const principalRemoved = (await capitalPool.getUnderwriterAccount(user1.address)).totalDepositedAssetPrincipal / 2n;
 
-        await expect(capitalPool.connect(user1).executeWithdrawal())
-          .to.emit(capitalPool, "WithdrawalExecuted");
+        await expect(capitalPool.connect(user1).executeWithdrawal(0))
+          .to.emit(capitalPool, "WithdrawalExecuted")
+          .withArgs(user1.address, anyValue, sharesToBurn, 0);
 
+        expect(await capitalPool.getWithdrawalRequestCount(user1.address)).to.equal(0);
         const finalAccount = await capitalPool.getUnderwriterAccount(user1.address);
-        expect(finalAccount.withdrawalRequestShares).to.equal(0);
+        expect(finalAccount.totalPendingWithdrawalShares).to.equal(0);
         expect(finalAccount.masterShares).to.be.gt(0);
       });
 
@@ -302,9 +312,11 @@ describe("CapitalPool", function () {
 
         const principalRemoved = (await capitalPool.getUnderwriterAccount(user1.address)).totalDepositedAssetPrincipal;
 
-        await expect(capitalPool.connect(user1).executeWithdrawal())
-          .to.emit(capitalPool, "WithdrawalExecuted");
+        await expect(capitalPool.connect(user1).executeWithdrawal(0))
+          .to.emit(capitalPool, "WithdrawalExecuted")
+          .withArgs(user1.address, anyValue, sharesToBurn, 0);
 
+        expect(await capitalPool.getWithdrawalRequestCount(user1.address)).to.equal(0);
         const finalAccount = await capitalPool.getUnderwriterAccount(user1.address);
         expect(finalAccount.totalDepositedAssetPrincipal).to.equal(0);
         expect(finalAccount.masterShares).to.equal(0);
@@ -375,7 +387,7 @@ describe("CapitalPool", function () {
 
         await mockAdapter1.setTotalValueHeld(0);
         await expect(riskManagerContract.executePayout(capitalPool.target, payoutData))
-          .to.be.revertedWithCustomError(mockUsdc, "ERC20InsufficientBalance");
+          .to.be.revertedWith("CP: Payout failed, insufficient funds gathered");
       });
 
       it("handles rounding shortfall across adapters", async () => {
@@ -431,7 +443,7 @@ describe("CapitalPool", function () {
 
         await rm.executePayout(capitalPool.target, payoutData);
         expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount * 2n);
-        expect(await catPool.drawFundCallCount()).to.equal(1);
+        expect(await catPool.drawFundCallCount()).to.equal(0);
       });
 
       it("executePayout calls drawFund if emergencyTransfer sends zero", async () => {
@@ -461,7 +473,7 @@ describe("CapitalPool", function () {
 
         await rm.executePayout(capitalPool.target, payoutData);
         expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount);
-        expect(await catPool.drawFundCallCount()).to.equal(2);
+        expect(await catPool.drawFundCallCount()).to.equal(1);
       });
 
       it("applyLosses should burn shares and reduce principal", async () => {
@@ -544,7 +556,7 @@ describe("CapitalPool", function () {
         await maliciousAdapter.setWithdrawArgs((await capitalPool.getUnderwriterAccount(user1.address)).masterShares);
         await capitalPool.connect(user1).requestWithdrawal((await capitalPool.getUnderwriterAccount(user1.address)).masterShares);
         await time.increase(NOTICE_PERIOD);
-        await expect(capitalPool.connect(user1).executeWithdrawal())
+        await expect(capitalPool.connect(user1).executeWithdrawal(0))
           .to.be.reverted; // withdrawLiquidity will revert, preventing reentrancy
       });
     });

@@ -81,7 +81,7 @@ describe("CapitalPool Integration", function () {
     const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
     await capitalPool.connect(user).requestWithdrawal(shares);
     await time.increase(1);
-    await capitalPool.connect(user).executeWithdrawal();
+    await capitalPool.connect(user).executeWithdrawal(0);
     expect(await token.balanceOf(user.address)).to.equal(ethers.parseUnits("1000", 6));
     expect(await riskManager.underwriterTotalPledge(user.address)).to.equal(0);
   });
@@ -92,7 +92,7 @@ describe("CapitalPool Integration", function () {
     const halfShares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares / 2n;
     await capitalPool.connect(user).requestWithdrawal(halfShares);
     await time.increase(1);
-    await capitalPool.connect(user).executeWithdrawal();
+    await capitalPool.connect(user).executeWithdrawal(0);
     const remaining = await riskManager.underwriterTotalPledge(user.address);
     expect(remaining).to.equal(amt / 2n);
   });
@@ -181,11 +181,17 @@ describe("CapitalPool Integration", function () {
     const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
     await capitalPool.connect(user).requestWithdrawal(shares);
     await capitalPool.setRiskManager(adapter.target);
-    await expect(capitalPool.connect(user).cancelWithdrawalRequest()).to.be.revertedWith("CP: RiskManager rejected cancellation");
+    await expect(capitalPool.connect(user).cancelWithdrawalRequest(0)).to.be.revertedWith(
+      "CP: RiskManager rejected withdrawal cancellation"
+    );
   });
   it("prevents changing yield platform without withdrawal", async () => {
     const amt = ethers.parseUnits("100", 6);
     await capitalPool.connect(user).deposit(amt, PLATFORM_AAVE);
+    const Adapter = await ethers.getContractFactory("SimpleYieldAdapter");
+    const otherAdapter = await Adapter.deploy(token.target, ethers.ZeroAddress, owner.address);
+    await otherAdapter.setDepositor(capitalPool.target);
+    await capitalPool.setBaseYieldAdapter(2, otherAdapter.target);
     await expect(capitalPool.connect(user).deposit(amt, 2)).to.be.revertedWith(
       "CP: Cannot change yield platform; withdraw first."
     );
@@ -196,12 +202,12 @@ describe("CapitalPool Integration", function () {
     await capitalPool.connect(user).deposit(1, PLATFORM_AAVE);
     const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
     await capitalPool.connect(user).requestWithdrawal(shares);
-    await expect(capitalPool.connect(user).executeWithdrawal()).to.be.revertedWithCustomError(
+    await expect(capitalPool.connect(user).executeWithdrawal(0)).to.be.revertedWithCustomError(
       capitalPool,
       "NoticePeriodActive"
     );
     await time.increase(10);
-    await capitalPool.connect(user).executeWithdrawal();
+    await capitalPool.connect(user).executeWithdrawal(0);
   });
 
   it("reverts when RiskManager call fails on executeWithdrawal", async () => {
@@ -210,7 +216,7 @@ describe("CapitalPool Integration", function () {
     await capitalPool.connect(user).requestWithdrawal(shares);
     await capitalPool.setRiskManager(adapter.target);
     await time.increase(1);
-    await expect(capitalPool.connect(user).executeWithdrawal()).to.be.revertedWith(
+    await expect(capitalPool.connect(user).executeWithdrawal(0)).to.be.revertedWith(
       "CP: Failed to notify RiskManager of withdrawal"
     );
   });
@@ -240,9 +246,10 @@ describe("CapitalPool Integration", function () {
     await capitalPool.connect(user).deposit(amt, PLATFORM_AAVE);
     const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
     await capitalPool.connect(user).requestWithdrawal(shares);
-    await capitalPool.connect(user).cancelWithdrawalRequest();
+    await capitalPool.connect(user).cancelWithdrawalRequest(0);
     const account = await capitalPool.getUnderwriterAccount(user.address);
-    expect(account.withdrawalRequestShares).to.equal(0);
+    expect(account.totalPendingWithdrawalShares).to.equal(0);
+    expect(await capitalPool.getWithdrawalRequestCount(user.address)).to.equal(0);
   });
 
   it("reverts if losses applied after withdrawal request", async () => {
@@ -259,7 +266,7 @@ describe("CapitalPool Integration", function () {
     await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
 
     await time.increase(1);
-    await expect(capitalPool.connect(user).executeWithdrawal()).to.be.revertedWithCustomError(
+    await expect(capitalPool.connect(user).executeWithdrawal(0)).to.be.revertedWithCustomError(
       capitalPool,
       "InconsistentState"
     );
