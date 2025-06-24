@@ -104,7 +104,10 @@ export default function PoolDetailsPage() {
     [pools, poolId, token],
   )
 
-  const { config: reserveConfig } = useReserveConfig(pool?.deployment)
+  const { config: reserveConfig } = useReserveConfig(
+    pool?.deployment,
+    pool?.id
+  )
 
   console.log(pool, reserveConfig, "reserveConfig")
 
