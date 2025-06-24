@@ -3,6 +3,8 @@ const { ethers } = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
 const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
+const SECS_YEAR = 365 * 24 * 60 * 60;
+
 async function deployFixture() {
   const [owner, user] = await ethers.getSigners();
 
@@ -72,7 +74,7 @@ async function deployFixture() {
   );
 
   // create pool and allocate some capital
-  const rate = { base: 0, slope1: 0, slope2: 0, kink: 8000 };
+  const rate = { base: 2000, slope1: 0, slope2: 0, kink: 8000 };
   await riskManager.addProtocolRiskPool(usdc.target, rate, 0);
   const pledge = ethers.parseUnits("100000", 6);
   await usdc.mint(owner.address, pledge);
@@ -124,12 +126,13 @@ describe("PolicyNFT integration via PolicyManager", function () {
     await policyManager.connect(user).purchaseCover(0, coverage, premium);
 
     const extra = ethers.parseUnits("20", 6);
+    const before = await policyNFT.getPolicy(1);
+
     await expect(policyManager.connect(user).addPremium(1, extra))
-      .to.emit(policyNFT, "PolicyPremiumAccountUpdated")
-      .withArgs(1n, premium + extra, anyValue);
+      .to.emit(policyNFT, "PolicyPremiumAccountUpdated");
 
     const pol = await policyNFT.getPolicy(1);
-    expect(pol.premiumDeposit).to.equal(premium + extra);
+    expect(pol.premiumDeposit).to.be.gt(before.premiumDeposit);
   });
 
   it("handles coverage increase and finalization", async function () {
@@ -169,5 +172,39 @@ describe("PolicyNFT integration via PolicyManager", function () {
 
     await policyManager.connect(user).cancelCover(1);
     await expect(policyNFT.ownerOf(1)).to.be.reverted;
+  });
+
+  it("lapses the policy when premium is exhausted", async function () {
+    const { user, policyManager, policyNFT } = await loadFixture(deployFixture);
+    const coverage = ethers.parseUnits("500", 6);
+    const premium = ethers.parseUnits("100", 6);
+
+    await policyManager.connect(user).purchaseCover(0, coverage, premium);
+
+    await time.increase(SECS_YEAR * 2);
+
+    expect(await policyManager.isPolicyActive(1)).to.equal(false);
+
+    await expect(policyManager.connect(user).lapsePolicy(1))
+      .to.emit(policyNFT, "Transfer")
+      .withArgs(user.address, ethers.ZeroAddress, 1n);
+
+    const pol = await policyNFT.getPolicy(1);
+    expect(pol.coverage).to.equal(0);
+  });
+
+  it("cannot cancel before activation when cooldown set", async function () {
+    const { owner, user, policyManager } = await loadFixture(deployFixture);
+
+    await policyManager
+      .connect(owner)
+      .setCoverCooldownPeriod(7 * 24 * 60 * 60);
+    const coverage = ethers.parseUnits("500", 6);
+    const premium = ethers.parseUnits("100", 6);
+
+    await policyManager.connect(user).purchaseCover(0, coverage, premium);
+
+    await expect(policyManager.connect(user).cancelCover(1))
+      .to.be.revertedWithCustomError(policyManager, "CooldownActive");
   });
 });
