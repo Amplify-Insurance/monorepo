@@ -183,4 +183,55 @@ describe("CapitalPool Integration", function () {
     await capitalPool.setRiskManager(adapter.target);
     await expect(capitalPool.connect(user).cancelWithdrawalRequest()).to.be.revertedWith("CP: RiskManager rejected cancellation");
   });
+  it("prevents changing yield platform without withdrawal", async () => {
+    const amt = ethers.parseUnits("100", 6);
+    await capitalPool.connect(user).deposit(amt, PLATFORM_AAVE);
+    await expect(capitalPool.connect(user).deposit(amt, 2)).to.be.revertedWith(
+      "CP: Cannot change yield platform; withdraw first."
+    );
+  });
+
+  it("enforces notice period before withdrawal execution", async () => {
+    await capitalPool.setUnderwriterNoticePeriod(10);
+    await capitalPool.connect(user).deposit(1, PLATFORM_AAVE);
+    const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
+    await capitalPool.connect(user).requestWithdrawal(shares);
+    await expect(capitalPool.connect(user).executeWithdrawal()).to.be.revertedWithCustomError(
+      capitalPool,
+      "NoticePeriodActive"
+    );
+    await time.increase(10);
+    await capitalPool.connect(user).executeWithdrawal();
+  });
+
+  it("reverts when RiskManager call fails on executeWithdrawal", async () => {
+    await capitalPool.connect(user).deposit(1, PLATFORM_AAVE);
+    const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
+    await capitalPool.connect(user).requestWithdrawal(shares);
+    await capitalPool.setRiskManager(adapter.target);
+    await time.increase(1);
+    await expect(capitalPool.connect(user).executeWithdrawal()).to.be.revertedWith(
+      "CP: Failed to notify RiskManager of withdrawal"
+    );
+  });
+
+  it("setBaseYieldAdapter reverts if asset mismatched", async () => {
+    const Token = await ethers.getContractFactory("ResetApproveERC20");
+    const other = await Token.deploy("OTHER", "OTHER", 6);
+    const Adapter = await ethers.getContractFactory("SimpleYieldAdapter");
+    const otherAdapter = await Adapter.deploy(other.target, ethers.ZeroAddress, owner.address);
+    await otherAdapter.setDepositor(capitalPool.target);
+    await expect(capitalPool.setBaseYieldAdapter(2, otherAdapter.target)).to.be.revertedWith(
+      "CP: Adapter asset mismatch"
+    );
+  });
+
+  it("setBaseYieldAdapter restricted to owner", async () => {
+    const Adapter = await ethers.getContractFactory("SimpleYieldAdapter");
+    const newAdapter = await Adapter.deploy(token.target, ethers.ZeroAddress, owner.address);
+    await newAdapter.setDepositor(capitalPool.target);
+    await expect(capitalPool.connect(user).setBaseYieldAdapter(2, newAdapter.target))
+      .to.be.revertedWithCustomError(capitalPool, "OwnableUnauthorizedAccount")
+      .withArgs(user.address);
+  });
 });
