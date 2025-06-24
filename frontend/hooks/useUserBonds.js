@@ -3,7 +3,7 @@ import { ethers } from 'ethers'
 import { getCommittee } from '../lib/committee'
 import { STAKING_TOKEN_ADDRESS } from '../app/config/deployments'
 import { getTokenDecimals, getTokenSymbol } from '../lib/erc20'
-import { getProtocolName } from '../app/config/tokenNameMap'
+import { getProtocolName, getProtocolLogo } from '../app/config/tokenNameMap'
 
 export default function useUserBonds(address) {
   const [bonds, setBonds] = useState([])
@@ -44,6 +44,7 @@ export default function useUserBonds(address) {
           id: Number(p.id),
           poolId: Number(p.poolId),
           protocol: getProtocolName(Number(p.poolId)),
+          protocolLogo: getProtocolLogo(Number(p.poolId)),
           amount,
           symbol,
           status,

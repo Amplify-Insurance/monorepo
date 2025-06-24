@@ -5,7 +5,6 @@ import Image from "next/image"
 import { AlertTriangle, Info, Shield, Clock, XCircle, CheckCircle } from "lucide-react"
 import { useAccount } from "wagmi"
 import { getCommitteeWithSigner } from "../../lib/committee"
-import { getTokenLogo } from "../config/tokenNameMap"
 import useUserBonds from "../../hooks/useUserBonds"
 import Modal from "./Modal"
 import { getTxExplorerUrl } from "../utils/explorer"
@@ -121,8 +120,8 @@ export default function UnstakeBondModal({ isOpen, onClose }) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <Image
-                        src={bond.logo || "/placeholder.svg"}
-                        alt={bond.symbol}
+                        src={bond.protocolLogo || "/placeholder.svg"}
+                        alt={bond.protocol}
                         width={32}
                         height={32}
                         className="rounded-full"
