@@ -154,4 +154,109 @@ describe("RewardDistributor Integration", function () {
     const after = await usdc.balanceOf(underwriter.address);
     expect(after - before).to.equal(expected);
   });
+
+  it("accrues rewards after withdrawal", async function () {
+    const {
+      owner,
+      riskManager,
+      rewardDistributor,
+      poolRegistry,
+      capitalPool,
+      usdc,
+      underwriter,
+    } = await loadFixture(deployFixture);
+
+    let [, totalPledged] = await poolRegistry.getPoolData(POOL_ID);
+    let rm = await impersonate(riskManager.target);
+    await rewardDistributor
+      .connect(rm)
+      .distribute(POOL_ID, usdc.target, REWARD_AMOUNT, totalPledged);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [
+      riskManager.target,
+    ]);
+    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+
+    const withdraw = ethers.parseUnits("400", 6);
+    await capitalPool.triggerOnCapitalWithdrawn(
+      riskManager.target,
+      underwriter.address,
+      withdraw,
+      false
+    );
+    await poolRegistry.connect(owner).setPoolData(
+      POOL_ID,
+      usdc.target,
+      PLEDGE_AMOUNT - withdraw,
+      0,
+      0,
+      false,
+      owner.address,
+      0
+    );
+
+    [, totalPledged] = await poolRegistry.getPoolData(POOL_ID);
+    rm = await impersonate(riskManager.target);
+    await rewardDistributor
+      .connect(rm)
+      .distribute(POOL_ID, usdc.target, REWARD_AMOUNT, totalPledged);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [
+      riskManager.target,
+    ]);
+
+    const pledgeNow = await riskManager.underwriterPoolPledge(
+      underwriter.address,
+      POOL_ID
+    );
+    const expected = await rewardDistributor.pendingRewards(
+      underwriter.address,
+      POOL_ID,
+      usdc.target,
+      pledgeNow
+    );
+    const before = await usdc.balanceOf(underwriter.address);
+    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    const after = await usdc.balanceOf(underwriter.address);
+    expect(after - before).to.equal(expected);
+  });
+
+  it("allows catPool to claim rewards for user", async function () {
+    const {
+      rewardDistributor,
+      poolRegistry,
+      riskManager,
+      catPool,
+      usdc,
+      underwriter,
+    } = await loadFixture(deployFixture);
+
+    const [, totalPledged] = await poolRegistry.getPoolData(POOL_ID);
+    const rm = await impersonate(riskManager.target);
+    await rewardDistributor
+      .connect(rm)
+      .distribute(POOL_ID, usdc.target, REWARD_AMOUNT, totalPledged);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [
+      riskManager.target,
+    ]);
+
+    const pledgeNow = await riskManager.underwriterPoolPledge(
+      underwriter.address,
+      POOL_ID
+    );
+    const expected = await rewardDistributor.pendingRewards(
+      underwriter.address,
+      POOL_ID,
+      usdc.target,
+      pledgeNow
+    );
+
+    const cp = await impersonate(catPool.target);
+    await rewardDistributor
+      .connect(cp)
+      .claimForCatPool(underwriter.address, POOL_ID, usdc.target, pledgeNow);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [
+      catPool.target,
+    ]);
+
+    expect(await usdc.balanceOf(underwriter.address)).to.equal(expected);
+  });
 });
