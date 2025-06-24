@@ -233,12 +233,14 @@ export default function CoverageModal({
   }
 
   /* ───── UI ───── */
+  const isStablecoin =
+    protocol && tokenName && protocol.trim().toLowerCase() === tokenName.trim().toLowerCase()
+  const modalTitle = `${
+    type === "purchase" ? "Purchase Coverage" : "Provide Coverage"
+  } - ${isStablecoin ? tokenName : `${protocol} ${tokenName}`}`
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`${type === "purchase" ? "Purchase Coverage" : "Provide Coverage"} - ${protocol} ${tokenName}`}
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle}>
       <div className="space-y-6">
         {/* Amount input */}
         <div>
