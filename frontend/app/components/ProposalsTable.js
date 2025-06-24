@@ -318,13 +318,13 @@ export default function ProposalsTable({ proposals, loading }) {
                                   <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
                                   <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Voting Active</span>
                                 </div>
-                                <button onClick={() => handleVoteClick(p.id, 1)} disabled={isSubmitting} className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed">
+                                <button onClick={() => handleVoteClick(p.id, 2)} disabled={isSubmitting} className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed">
                                   Vote For
                                 </button>
-                                <button onClick={() => handleVoteClick(p.id, 0)} disabled={isSubmitting} className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed">
+                                <button onClick={() => handleVoteClick(p.id, 1)} disabled={isSubmitting} className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed">
                                   Vote Against
                                 </button>
-                                <button onClick={() => handleVoteClick(p.id, 2)} disabled={isSubmitting} className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed">
+                                <button onClick={() => handleVoteClick(p.id, 3)} disabled={isSubmitting} className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors duration-200 disabled:cursor-not-allowed">
                                   Abstain
                                 </button>
                               </div>

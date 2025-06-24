@@ -11,7 +11,7 @@ import usePools from "../../hooks/usePools"
 // rather than the protocol token being covered. Use the same token mapping as
 // the Insurance Markets page so only unique underlying assets show up in the
 // dropdown.
-import { getUnderlyingTokenLogo, getUnderlyingTokenName } from "../config/tokenNameMap"
+import { getUnderlyingTokenLogo, getUnderlyingTokenName, getTokenName, getTokenLogo } from "../config/tokenNameMap"
 import { getTxExplorerUrl } from "../utils/explorer"
 import { getProtocolName, getProtocolLogo } from "../config/tokenNameMap"
 import { STAKING_TOKEN_ADDRESS, COMMITTEE_ADDRESS } from "../config/deployments"
@@ -27,7 +27,7 @@ export default function BondModal({ isOpen, onClose }) {
         new Set(pools.map((p) => p.underlyingAsset.toLowerCase())),
       ).map((address) => ({
         address,
-        symbol: getUnderlyingTokenName(address),
+        symbol: getTokenName(address),
       }))
     : []
   const [selectedAsset, setSelectedAsset] = useState("")
@@ -125,7 +125,7 @@ export default function BondModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!selectedAsset) return
-    setAssetSymbol(getUnderlyingTokenName(selectedAsset))
+    setAssetSymbol(getTokenName(selectedAsset))
   }, [selectedAsset])
 
   // Update payout percentage based on deposit amount
@@ -269,8 +269,8 @@ export default function BondModal({ isOpen, onClose }) {
             isOpen={assetDropdownOpen}
             setIsOpen={setAssetDropdownOpen}
             placeholder="Select asset"
-            getLabel={(address) => getUnderlyingTokenName(address)}
-            getLogo={(address) => getUnderlyingTokenLogo(address)}
+            getLabel={(address) => getTokenName(address)}
+            getLogo={(address) => getTokenLogo(address)}
           />
         </div>
 

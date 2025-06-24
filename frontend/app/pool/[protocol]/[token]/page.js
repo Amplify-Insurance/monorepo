@@ -106,6 +106,8 @@ export default function PoolDetailsPage() {
 
   const { config: reserveConfig } = useReserveConfig(pool?.deployment)
 
+  console.log(pool, reserveConfig, "reserveConfig")
+
   const market = useMemo(
     () =>
       poolId != null
