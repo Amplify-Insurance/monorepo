@@ -9,25 +9,50 @@ async function deployFixture() {
   const MockERC20 = await ethers.getContractFactory("MockERC20");
   const usdc = await MockERC20.deploy("USD", "USD", 6);
 
+  const CatShare = await ethers.getContractFactory("CatShare");
+  const catShare = await CatShare.deploy();
+
+  const YieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
+  const adapter = await YieldAdapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
+
+  const CapitalPool = await ethers.getContractFactory("CapitalPool");
+  const capitalPool = await CapitalPool.deploy(owner.address, usdc.target);
+  await adapter.setDepositor(capitalPool.target);
+  await capitalPool.setBaseYieldAdapter(3, adapter.target); // OTHER_YIELD
+
+  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+  const rewardDistributor = await RewardDistributor.deploy(owner.address);
+
+  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const catPool = await CatPool.deploy(usdc.target, catShare.target, ethers.ZeroAddress, owner.address);
+  await catShare.transferOwnership(catPool.target);
+  await catPool.initialize();
+  await rewardDistributor.setCatPool(catPool.target);
+
+  const LossDistributor = await ethers.getContractFactory("LossDistributor");
+  const lossDistributor = await LossDistributor.deploy(owner.address);
+
   const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
   const policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, owner.address);
 
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
   const policyManager = await PolicyManager.deploy(policyNFT.target, owner.address);
 
-  // allow PolicyManager to manage PolicyNFT
+  const RiskManager = await ethers.getContractFactory("RiskManager");
+  const riskManager = await RiskManager.deploy(owner.address);
+
+  const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
+  const poolRegistry = await PoolRegistry.deploy(owner.address, riskManager.target);
+
   await policyNFT.setPolicyManagerAddress(policyManager.target);
 
-  const MockPoolRegistry = await ethers.getContractFactory("MockPoolRegistry");
-  const poolRegistry = await MockPoolRegistry.deploy();
-  const MockCapitalPool = await ethers.getContractFactory("MockCapitalPool");
-  const capitalPool = await MockCapitalPool.deploy(owner.address, usdc.target);
-  const MockCatInsurancePool = await ethers.getContractFactory("MockCatInsurancePool");
-  const catPool = await MockCatInsurancePool.deploy(owner.address);
-  const MockRewardDistributor = await ethers.getContractFactory("MockRewardDistributor");
-  const rewardDistributor = await MockRewardDistributor.deploy();
-  const MockRiskManager = await ethers.getContractFactory("MockRiskManagerHook");
-  const riskManager = await MockRiskManager.deploy();
+  await capitalPool.setRiskManager(riskManager.target);
+  await catPool.setPolicyManagerAddress(policyManager.target);
+  await catPool.setCapitalPoolAddress(capitalPool.target);
+  await catPool.setRiskManagerAddress(riskManager.target);
+  await catPool.setRewardDistributor(rewardDistributor.target);
+  await rewardDistributor.setRiskManager(policyManager.target);
+  await lossDistributor.setRiskManager(riskManager.target);
 
   await policyManager.setAddresses(
     poolRegistry.target,
@@ -37,19 +62,23 @@ async function deployFixture() {
     riskManager.target
   );
 
-  // simple pool setup with zero premium rate
-  await poolRegistry.setPoolCount(1);
-  await poolRegistry.setPoolData(
-    0,
-    usdc.target,
-    ethers.parseUnits("100000", 6),
-    0,
-    0,
-    false,
-    owner.address,
-    0
+  await riskManager.setAddresses(
+    capitalPool.target,
+    poolRegistry.target,
+    policyManager.target,
+    catPool.target,
+    lossDistributor.target,
+    rewardDistributor.target
   );
-  await poolRegistry.setRateModel(0, { base: 0, slope1: 0, slope2: 0, kink: 8000 });
+
+  // create pool and allocate some capital
+  const rate = { base: 0, slope1: 0, slope2: 0, kink: 8000 };
+  await riskManager.addProtocolRiskPool(usdc.target, rate, 0);
+  const pledge = ethers.parseUnits("100000", 6);
+  await usdc.mint(owner.address, pledge);
+  await usdc.approve(capitalPool.target, pledge);
+  await capitalPool.deposit(pledge, 3);
+  await riskManager.allocateCapital([0]);
 
   // fund user and approve
   await usdc.mint(user.address, ethers.parseUnits("1000", 6));
