@@ -90,4 +90,52 @@ describe("Committee Integration", function () {
         await committee.connect(proposer).claimReward(1);
         expect(await ethers.provider.getBalance(proposer.address)).to.be.gt(propBalBefore);
     });
+
+    it("clears active proposal after unpause execution", async function () {
+        await committee.connect(proposer).createProposal(1, 0, 0);
+        await committee.connect(proposer).vote(1, 2);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+
+        expect(await committee.activeProposalForPool(1)).to.equal(false);
+        expect(await committee.isProposalFinalized(1)).to.equal(true);
+    });
+
+    it("returns bond when fees are received", async function () {
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await committee.connect(proposer).vote(1, 2);
+        await committee.connect(voter).vote(1, 2);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+        await riskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+        await time.increase(CHALLENGE_PERIOD + 1);
+
+        const before = await govToken.balanceOf(proposer.address);
+        await expect(committee.resolvePauseBond(1))
+            .to.emit(committee, "BondResolved").withArgs(1, false);
+        const after = await govToken.balanceOf(proposer.address);
+
+        expect(after - before).to.equal(BOND);
+        expect(await committee.activeProposalForPool(1)).to.equal(false);
+    });
+
+    it("slashes bond when no fees are received", async function () {
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await committee.connect(proposer).vote(1, 2);
+        await committee.connect(voter).vote(1, 2);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+        await time.increase(CHALLENGE_PERIOD + 1);
+
+        const before = await govToken.balanceOf(proposer.address);
+        await expect(committee.resolvePauseBond(1))
+            .to.emit(committee, "BondResolved").withArgs(1, true);
+        const after = await govToken.balanceOf(proposer.address);
+
+        expect(after).to.equal(before); // bond was slashed
+        expect(await committee.activeProposalForPool(1)).to.equal(false);
+    });
 });
