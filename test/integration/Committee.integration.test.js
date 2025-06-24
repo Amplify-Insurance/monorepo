@@ -1,9 +1,16 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
-const MockERC20 = "contracts/test/MockERC20.sol:MockERC20";
-const MockRiskManager = "contracts/test/MockCommitteeRiskManager.sol:MockCommitteeRiskManager";
+const GovToken = "contracts/tokens/CatShare.sol:CatShare";
+const RiskManager = "contracts/core/RiskManager.sol:RiskManager";
+const PoolRegistry = "contracts/core/PoolRegistry.sol:PoolRegistry";
+const CapitalPool = "contracts/core/CapitalPool.sol:CapitalPool";
+const CatInsurancePool = "contracts/external/CatInsurancePool.sol:CatInsurancePool";
+const LossDistributor = "contracts/utils/LossDistributor.sol:LossDistributor";
+const RewardDistributor = "contracts/utils/RewardDistributor.sol:RewardDistributor";
+const PolicyNFT = "contracts/tokens/PolicyNFT.sol:PolicyNFT";
+const PolicyManager = "contracts/core/PolicyManager.sol:PolicyManager";
 
 // Integration tests exercising Committee with the real StakingContract
 
@@ -15,19 +22,53 @@ describe("Committee Integration", function () {
     const BOND = ethers.parseEther("1000");
 
     let owner, proposer, voter, nonStaker;
-    let govToken, staking, riskManager, committee;
+    let govToken, staking, riskManager, committee, poolRegistry;
 
-    beforeEach(async function () {
+    async function deployFixture() {
         [owner, proposer, voter, nonStaker] = await ethers.getSigners();
 
-        const TokenFactory = await ethers.getContractFactory(MockERC20);
-        govToken = await TokenFactory.deploy("Gov", "GOV", 18);
+        const Token = await ethers.getContractFactory(GovToken);
+        govToken = await Token.deploy();
+
+        const usdc = await Token.deploy();
 
         const StakingFactory = await ethers.getContractFactory("StakingContract");
         staking = await StakingFactory.deploy(govToken.target, owner.address);
 
-        const RiskFactory = await ethers.getContractFactory(MockRiskManager);
-        riskManager = await RiskFactory.deploy();
+        const RMFactory = await ethers.getContractFactory(RiskManager);
+        riskManager = await RMFactory.deploy(owner.address);
+
+        const RegistryFactory = await ethers.getContractFactory(PoolRegistry);
+        poolRegistry = await RegistryFactory.deploy(owner.address, riskManager.target);
+
+        const CapitalPoolFactory = await ethers.getContractFactory(CapitalPool);
+        const capitalPool = await CapitalPoolFactory.deploy(owner.address, usdc.target);
+
+        const CatPoolFactory = await ethers.getContractFactory(CatInsurancePool);
+        const catPool = await CatPoolFactory.deploy(usdc.target, govToken.target, ethers.ZeroAddress, owner.address);
+
+        const LossFactory = await ethers.getContractFactory(LossDistributor);
+        const lossDistributor = await LossFactory.deploy(riskManager.target);
+
+        const RewardFactory = await ethers.getContractFactory(RewardDistributor);
+        const rewardDistributor = await RewardFactory.deploy(riskManager.target);
+        await rewardDistributor.setCatPool(catPool.target);
+
+        const NFTFactory = await ethers.getContractFactory(PolicyNFT);
+        const policyNFT = await NFTFactory.deploy(owner.address, owner.address);
+
+        const PMFactory = await ethers.getContractFactory(PolicyManager);
+        const policyManager = await PMFactory.deploy(policyNFT.target, owner.address);
+        await policyNFT.setPolicyManagerAddress(policyManager.target);
+
+        await riskManager.setAddresses(
+            capitalPool.target,
+            poolRegistry.target,
+            policyManager.target,
+            catPool.target,
+            lossDistributor.target,
+            rewardDistributor.target
+        );
 
         const CommitteeFactory = await ethers.getContractFactory("Committee");
         committee = await CommitteeFactory.deploy(
@@ -39,7 +80,12 @@ describe("Committee Integration", function () {
             SLASH_BPS
         );
 
-        await staking.connect(owner).setCommitteeAddress(committee.target);
+        await staking.setCommitteeAddress(committee.target);
+        await riskManager.setCommittee(committee.target);
+
+        const rate = { base: 0, slope1: 0, slope2: 0, kink: 0 };
+        await riskManager.addProtocolRiskPool(usdc.target, rate, 0);
+        await riskManager.addProtocolRiskPool(usdc.target, rate, 0);
 
         for (const user of [proposer, voter, nonStaker]) {
             await govToken.mint(user.address, ethers.parseEther("2000"));
@@ -49,9 +95,12 @@ describe("Committee Integration", function () {
 
         await staking.connect(proposer).stake(ethers.parseEther("1000"));
         await staking.connect(voter).stake(ethers.parseEther("500"));
-    });
+
+        return { owner, proposer, voter, nonStaker };
+    }
 
     it("locks stake after voting until proposal finalized", async function () {
+        await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 1, BOND);
         await committee.connect(proposer).vote(1, 2);
         await committee.connect(voter).vote(1, 2);
@@ -68,6 +117,9 @@ describe("Committee Integration", function () {
         await committee.resolvePauseBond(1);
 
         expect(await committee.isProposalFinalized(1)).to.equal(true);
+        const [, , , , isPaused, feeRecipient] = await poolRegistry.getPoolData(1);
+        expect(isPaused).to.equal(true);
+        expect(feeRecipient).to.equal(committee.target);
 
         await expect(staking.connect(proposer).unstake(ethers.parseEther("1000")))
             .to.emit(staking, "Unstaked").withArgs(proposer.address, ethers.parseEther("1000"));
@@ -76,13 +128,18 @@ describe("Committee Integration", function () {
     });
 
     it("distributes rewards using stake weight", async function () {
+        await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 1, BOND);
         await committee.connect(proposer).vote(1, 2);
         await committee.connect(voter).vote(1, 2);
 
         await time.increase(VOTING_PERIOD + 1);
         await committee.executeProposal(1);
-        await riskManager.sendFees(committee.target, 1, { value: ethers.parseEther("5") });
+        await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+        await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+        const rm = await ethers.getSigner(riskManager.target);
+        await committee.connect(rm).receiveFees(1, { value: ethers.parseEther("5") });
+        await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
         await time.increase(CHALLENGE_PERIOD + 1);
         await committee.resolvePauseBond(1);
 
@@ -92,6 +149,7 @@ describe("Committee Integration", function () {
     });
 
     it("clears active proposal after unpause execution", async function () {
+        await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 0, 0);
         await committee.connect(proposer).vote(1, 2);
 
@@ -100,16 +158,23 @@ describe("Committee Integration", function () {
 
         expect(await committee.activeProposalForPool(1)).to.equal(false);
         expect(await committee.isProposalFinalized(1)).to.equal(true);
+        const [, , , , isPaused] = await poolRegistry.getPoolData(1);
+        expect(isPaused).to.equal(false);
     });
 
     it("returns bond when fees are received", async function () {
+        await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 1, BOND);
         await committee.connect(proposer).vote(1, 2);
         await committee.connect(voter).vote(1, 2);
 
         await time.increase(VOTING_PERIOD + 1);
         await committee.executeProposal(1);
-        await riskManager.sendFees(committee.target, 1, { value: ethers.parseEther("1") });
+        await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+        await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+        const rm = await ethers.getSigner(riskManager.target);
+        await committee.connect(rm).receiveFees(1, { value: ethers.parseEther("1") });
+        await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
         await time.increase(CHALLENGE_PERIOD + 1);
 
         const before = await govToken.balanceOf(proposer.address);
@@ -122,6 +187,7 @@ describe("Committee Integration", function () {
     });
 
     it("slashes bond when no fees are received", async function () {
+        await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 1, BOND);
         await committee.connect(proposer).vote(1, 2);
         await committee.connect(voter).vote(1, 2);
@@ -140,18 +206,21 @@ describe("Committee Integration", function () {
     });
 
     it("reverts when a non-staker tries to create a proposal", async function () {
+        await loadFixture(deployFixture);
         await expect(
             committee.connect(nonStaker).createProposal(2, 1, BOND)
         ).to.be.revertedWith("Must be a staker");
     });
 
     it("reverts when unpause proposal includes a bond", async function () {
+        await loadFixture(deployFixture);
         await expect(
             committee.connect(proposer).createProposal(2, 0, BOND)
         ).to.be.revertedWith("No bond for unpause");
     });
 
     it("reverts when creating a second proposal for the same pool", async function () {
+        await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 1, BOND);
         await expect(
             committee.connect(voter).createProposal(1, 1, BOND)
@@ -159,6 +228,7 @@ describe("Committee Integration", function () {
     });
 
     it("reverts if executing before the voting period ends", async function () {
+        await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 1, BOND);
         await expect(committee.executeProposal(1)).to.be.revertedWith("Voting not over");
     });
