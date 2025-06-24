@@ -267,4 +267,131 @@ describe("LossDistributor Integration", function () {
     expect(await lossDistributor.poolLossTrackers(POOL_ID)).to.equal(expected1);
     expect(await lossDistributor.poolLossTrackers(SECOND_POOL_ID)).to.equal(expected2);
   });
+
+  async function deployTwoUnderwriterFixture() {
+    const base = await deployFixture();
+    const signers = await ethers.getSigners();
+    const secondUnderwriter = signers[6];
+
+    const SECOND_PLEDGE = ethers.parseUnits("50000", 6);
+    await base.capitalPool.triggerOnCapitalDeposited(
+      base.riskManager.target,
+      secondUnderwriter.address,
+      SECOND_PLEDGE
+    );
+    await base.capitalPool.setUnderwriterAdapterAddress(
+      secondUnderwriter.address,
+      base.adapter.address
+    );
+    await base.riskManager.connect(secondUnderwriter).allocateCapital([base.POOL_ID]);
+
+    const total = base.TOTAL_PLEDGE + SECOND_PLEDGE;
+    await base.poolRegistry.setPayoutData([base.adapter.address], [total], total);
+
+    return {
+      ...base,
+      secondUnderwriter,
+      SECOND_PLEDGE,
+      TOTAL_PLEDGE_TWO: total,
+    };
+  }
+
+  it("applies losses proportionally across multiple underwriters", async function () {
+    const {
+      riskManager,
+      lossDistributor,
+      capitalPool,
+      underwriter,
+      secondUnderwriter,
+      nonParty,
+      POOL_ID,
+      POLICY_ID,
+      COVERAGE,
+      TOTAL_PLEDGE,
+      SECOND_PLEDGE,
+      TOTAL_PLEDGE_TWO,
+    } = await loadFixture(deployTwoUnderwriterFixture);
+
+    await riskManager.connect(nonParty).processClaim(POLICY_ID);
+
+    const expectedTracker = (COVERAGE * PRECISION) / TOTAL_PLEDGE_TWO;
+    const expectedLoss1 = (TOTAL_PLEDGE * COVERAGE) / TOTAL_PLEDGE_TWO;
+    const expectedLoss2 = (SECOND_PLEDGE * COVERAGE) / TOTAL_PLEDGE_TWO;
+
+    expect(await lossDistributor.poolLossTrackers(POOL_ID)).to.equal(expectedTracker);
+
+    await capitalPool.triggerOnCapitalWithdrawn(
+      riskManager.target,
+      underwriter.address,
+      TOTAL_PLEDGE,
+      true
+    );
+    expect(await capitalPool.applyLossesCallCount()).to.equal(1);
+    expect(await capitalPool.last_applyLosses_underwriter()).to.equal(underwriter.address);
+    expect(await capitalPool.last_applyLosses_principalLossAmount()).to.equal(expectedLoss1);
+    expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(0n);
+
+    await capitalPool.triggerOnCapitalWithdrawn(
+      riskManager.target,
+      secondUnderwriter.address,
+      SECOND_PLEDGE,
+      true
+    );
+
+    expect(await capitalPool.applyLossesCallCount()).to.equal(2);
+    expect(await capitalPool.last_applyLosses_underwriter()).to.equal(secondUnderwriter.address);
+    expect(await capitalPool.last_applyLosses_principalLossAmount()).to.equal(expectedLoss2);
+    expect(await riskManager.underwriterTotalPledge(secondUnderwriter.address)).to.equal(0n);
+  });
+
+  async function deployUnderwriterAfterClaimFixture() {
+    const base = await deployFixture();
+    const signers = await ethers.getSigners();
+    const newUnderwriter = signers[6];
+
+    await base.riskManager.connect(base.nonParty).processClaim(base.POLICY_ID);
+
+    const NEW_PLEDGE = ethers.parseUnits("50000", 6);
+    await base.capitalPool.triggerOnCapitalDeposited(
+      base.riskManager.target,
+      newUnderwriter.address,
+      NEW_PLEDGE
+    );
+    await base.capitalPool.setUnderwriterAdapterAddress(newUnderwriter.address, base.adapter.address);
+    await base.riskManager.connect(newUnderwriter).allocateCapital([base.POOL_ID]);
+
+    return { ...base, newUnderwriter, NEW_PLEDGE };
+  }
+
+  it("new underwriters joining after a claim inherit existing loss tracker", async function () {
+    const {
+      riskManager,
+      lossDistributor,
+      capitalPool,
+      newUnderwriter,
+      nonParty,
+      POOL_ID,
+      POLICY_ID,
+      COVERAGE,
+      TOTAL_PLEDGE,
+      NEW_PLEDGE,
+    } = await loadFixture(deployUnderwriterAfterClaimFixture);
+
+    const expectedTracker = (COVERAGE * PRECISION) / TOTAL_PLEDGE;
+    expect(await lossDistributor.poolLossTrackers(POOL_ID)).to.equal(expectedTracker);
+    const expectedLoss = (NEW_PLEDGE * COVERAGE) / TOTAL_PLEDGE;
+    expect(
+      await lossDistributor.getPendingLosses(newUnderwriter.address, POOL_ID, NEW_PLEDGE)
+    ).to.equal(expectedLoss);
+
+    await capitalPool.triggerOnCapitalWithdrawn(
+      riskManager.target,
+      newUnderwriter.address,
+      NEW_PLEDGE,
+      true
+    );
+    expect(await capitalPool.applyLossesCallCount()).to.equal(1);
+    expect(await capitalPool.last_applyLosses_principalLossAmount()).to.equal(expectedLoss);
+    expect(await riskManager.underwriterTotalPledge(newUnderwriter.address)).to.equal(0n);
+  });
 });
