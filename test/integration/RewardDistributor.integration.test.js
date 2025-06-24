@@ -308,4 +308,58 @@ describe("RewardDistributor Integration", function () {
       rewardDistributor.claimForCatPool(underwriter.address, POOL_ID, usdc.target, PLEDGE_AMOUNT)
     ).to.be.revertedWith("RD: Not CatPool");
   });
+
+  it("owner can set new catPool and allow claiming", async function () {
+    const {
+      owner,
+      rewardDistributor,
+      riskManager,
+      poolRegistry,
+      usdc,
+      underwriter,
+      adapter,
+    } = await loadFixture(deployFixture);
+
+    const CatShare = await ethers.getContractFactory("CatShare");
+    const newShare = await CatShare.deploy();
+    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const newCatPool = await CatPool.deploy(usdc.target, newShare.target, adapter.target, owner.address);
+
+    await expect(rewardDistributor.connect(owner).setCatPool(newCatPool.target))
+      .to.emit(rewardDistributor, "CatPoolSet")
+      .withArgs(newCatPool.target);
+
+    const [, totalPledged] = await poolRegistry.getPoolData(POOL_ID);
+    const rm = await impersonate(riskManager.target);
+    await rewardDistributor.connect(rm).distribute(POOL_ID, usdc.target, REWARD_AMOUNT, totalPledged);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    const pledge = await riskManager.underwriterPoolPledge(underwriter.address, POOL_ID);
+    const expected = await rewardDistributor.pendingRewards(underwriter.address, POOL_ID, usdc.target, pledge);
+    const cp = await impersonate(newCatPool.target);
+    await rewardDistributor.connect(cp).claimForCatPool(underwriter.address, POOL_ID, usdc.target, pledge);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [newCatPool.target]);
+
+    expect(await usdc.balanceOf(underwriter.address)).to.equal(expected);
+  });
+
+  it("owner can set new riskManager and privileges transfer", async function () {
+    const { owner, rewardDistributor, riskManager, usdc } = await loadFixture(deployFixture);
+    const RiskManager = await ethers.getContractFactory("RiskManager");
+    const newRM = await RiskManager.deploy(owner.address);
+
+    await rewardDistributor.connect(owner).setRiskManager(newRM.target);
+
+    const oldRM = await impersonate(riskManager.target);
+    await expect(
+      rewardDistributor.connect(oldRM).distribute(POOL_ID, usdc.target, 1, 1)
+    ).to.be.revertedWith("RD: Not RiskManager");
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    const rm = await impersonate(newRM.target);
+    await expect(
+      rewardDistributor.connect(rm).distribute(POOL_ID, usdc.target, 0, 0)
+    ).to.not.be.reverted;
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [newRM.target]);
+  });
 });
