@@ -234,4 +234,40 @@ describe("CapitalPool Integration", function () {
       .to.be.revertedWithCustomError(capitalPool, "OwnableUnauthorizedAccount")
       .withArgs(user.address);
   });
+
+  it("allows cancelling a withdrawal request", async () => {
+    const amt = ethers.parseUnits("150", 6);
+    await capitalPool.connect(user).deposit(amt, PLATFORM_AAVE);
+    const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
+    await capitalPool.connect(user).requestWithdrawal(shares);
+    await capitalPool.connect(user).cancelWithdrawalRequest();
+    const account = await capitalPool.getUnderwriterAccount(user.address);
+    expect(account.withdrawalRequestShares).to.equal(0);
+  });
+
+  it("reverts if losses applied after withdrawal request", async () => {
+    const amt = ethers.parseUnits("400", 6);
+    await capitalPool.connect(user).deposit(amt, PLATFORM_AAVE);
+    const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
+    await capitalPool.connect(user).requestWithdrawal(shares);
+
+    const loss = ethers.parseUnits("100", 6);
+    await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+    await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000"]);
+    const rm = await ethers.getSigner(riskManager.target);
+    await capitalPool.connect(rm).applyLosses(user.address, loss);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    await time.increase(1);
+    await expect(capitalPool.connect(user).executeWithdrawal()).to.be.revertedWithCustomError(
+      capitalPool,
+      "InconsistentState"
+    );
+  });
+
+  it("returns correct adapter address for underwriter", async () => {
+    const amt = ethers.parseUnits("50", 6);
+    await capitalPool.connect(user).deposit(amt, PLATFORM_AAVE);
+    expect(await capitalPool.getUnderwriterAdapterAddress(user.address)).to.equal(adapter.target);
+  });
 });
