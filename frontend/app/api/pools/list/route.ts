@@ -8,6 +8,7 @@ import {
   getUnderlyingAssetAddress,
   getUnderlyingAssetDecimals,
 } from "../../../../lib/capitalPool";
+import bnToString from "../../../../lib/bnToString";
 import { ethers } from "ethers";
 import deployments from "../../../config/deployments";
 
@@ -27,43 +28,6 @@ const BPS = 10_000n;
  * (e.g. `rateModel`), we keep the named‑key object instead of an index array so
  * callers can reference `rateModel.base` rather than guessing positions.
  */
-function bnToString(value: any): any {
-  // 1️⃣ Native bigint ────────────────────────────
-  if (typeof value === "bigint") return value.toString();
-
-  // 2️⃣ ethers.js BigNumber ─────────────────────
-  if (value && typeof value === "object" && value._isBigNumber) {
-    return value.toString();
-  }
-
-  // 3️⃣ Array (may also have named props) ───────
-  if (Array.isArray(value)) {
-    const hasNamedKeys = Object.keys(value).some((k) => isNaN(Number(k)));
-
-    if (hasNamedKeys) {
-      // Convert to a plain object of the named keys only.
-      return Object.fromEntries(
-        Object.entries(value)
-          .filter(([k]) => isNaN(Number(k)))
-          .map(([k, v]) => [k, bnToString(v)])
-      );
-    }
-
-    // Pure, positional array → recurse element‑wise.
-    return value.map(bnToString);
-  }
-
-  // 4️⃣ Plain object ─────────────────────────────
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([k]) => isNaN(Number(k))) // drop numeric keys
-        .map(([k, v]) => [k, bnToString(v)])
-    );
-  }
-
-  return value;
-}
 
 /**
  * Pool‑utilisation helper used by the premium‑rate function.
