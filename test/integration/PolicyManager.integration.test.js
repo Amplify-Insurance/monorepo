@@ -108,4 +108,55 @@ describe("PolicyManager Integration", function () {
     expect(trackerAfter).to.be.gt(trackerBefore);
     expect(userBalAfter).to.be.gt(userBalBefore);
   });
+
+  it("drains accrued premium when adding more", async function () {
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    await time.increase(30 * 24 * 60 * 60);
+
+    const infoBefore = await policyNFT.getPolicy(1);
+    const catBefore = await catPool.idleUSDC();
+    const trackerBefore = await rewardDistributor.poolRewardTrackers(POOL_ID, usdc.target);
+
+    const ADDITIONAL = ethers.parseUnits("50", 6);
+    await policyManager.connect(user).addPremium(1, ADDITIONAL);
+
+    const infoAfter = await policyNFT.getPolicy(1);
+    const catAfter = await catPool.idleUSDC();
+    const trackerAfter = await rewardDistributor.poolRewardTrackers(POOL_ID, usdc.target);
+
+    expect(infoAfter.premiumDeposit).to.be.lt(infoBefore.premiumDeposit + ADDITIONAL);
+    expect(infoAfter.lastDrainTime).to.be.gt(infoBefore.lastDrainTime);
+    expect(catAfter).to.be.gt(catBefore);
+    expect(trackerAfter).to.be.gt(trackerBefore);
+  });
+
+  it("finalizes coverage increase after cooldown", async function () {
+    await policyManager.connect(owner).setCoverCooldownPeriod(24 * 60 * 60);
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    const ADD_COVER = ethers.parseUnits("5000", 6);
+    await expect(policyManager.connect(user).increaseCover(1, ADD_COVER))
+      .to.emit(riskManager, "CoverageUpdated")
+      .withArgs(POOL_ID, ADD_COVER, true);
+
+    await time.increase(24 * 60 * 60 + 1);
+    await policyManager.connect(user).addPremium(1, ethers.parseUnits("1", 6));
+
+    const info = await policyNFT.getPolicy(1);
+    expect(info.coverage).to.equal(COVERAGE + ADD_COVER);
+    expect(info.pendingIncrease).to.equal(0);
+  });
+
+  it("lapses policy when premium is exhausted", async function () {
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    await time.increase(SECS_YEAR * 2);
+
+    await expect(policyManager.connect(user).lapsePolicy(1))
+      .to.emit(riskManager, "CoverageUpdated")
+      .withArgs(POOL_ID, COVERAGE, false);
+
+    await expect(policyNFT.ownerOf(1)).to.be.revertedWithCustomError(policyNFT, "ERC721NonexistentToken");
+  });
 });
