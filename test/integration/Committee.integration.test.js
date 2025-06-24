@@ -296,4 +296,129 @@ describe("Committee Integration", function () {
             committee.connect(nonStaker).claimReward(1)
         ).to.be.revertedWith("Must have voted 'For' to claim rewards");
     });
+
+    it("updates vote weight when unstaking mid-vote", async function () {
+        const UNSTAKE_LOCK_PERIOD = 7 * 24 * 60 * 60; // from StakingContract
+
+        async function deployLongVotingFixture() {
+            const LONG_VOTING_PERIOD = VOTING_PERIOD * 2;
+            [owner, proposer, voter, nonStaker] = await ethers.getSigners();
+
+            const Token = await ethers.getContractFactory(GovToken);
+            govToken = await Token.deploy();
+
+            const usdc = await Token.deploy();
+
+            const StakingFactory = await ethers.getContractFactory("StakingContract");
+            staking = await StakingFactory.deploy(govToken.target, owner.address);
+
+            const RMFactory = await ethers.getContractFactory(RiskManager);
+            riskManager = await RMFactory.deploy(owner.address);
+
+            const RegistryFactory = await ethers.getContractFactory(PoolRegistry);
+            poolRegistry = await RegistryFactory.deploy(owner.address, riskManager.target);
+
+            const CapitalPoolFactory = await ethers.getContractFactory(CapitalPool);
+            const capitalPool = await CapitalPoolFactory.deploy(owner.address, usdc.target);
+
+            const CatPoolFactory = await ethers.getContractFactory(CatInsurancePool);
+            const catPool = await CatPoolFactory.deploy(usdc.target, govToken.target, ethers.ZeroAddress, owner.address);
+
+            const LossFactory = await ethers.getContractFactory(LossDistributor);
+            const lossDistributor = await LossFactory.deploy(riskManager.target);
+
+            const RewardFactory = await ethers.getContractFactory(RewardDistributor);
+            const rewardDistributor = await RewardFactory.deploy(riskManager.target);
+            await rewardDistributor.setCatPool(catPool.target);
+
+            const NFTFactory = await ethers.getContractFactory(PolicyNFT);
+            const policyNFT = await NFTFactory.deploy(owner.address, owner.address);
+
+            const PMFactory = await ethers.getContractFactory(PolicyManager);
+            const policyManager = await PMFactory.deploy(policyNFT.target, owner.address);
+            await policyNFT.setPolicyManagerAddress(policyManager.target);
+
+            await riskManager.setAddresses(
+                capitalPool.target,
+                poolRegistry.target,
+                policyManager.target,
+                catPool.target,
+                lossDistributor.target,
+                rewardDistributor.target
+            );
+
+            const CommitteeFactory = await ethers.getContractFactory("Committee");
+            committee = await CommitteeFactory.deploy(
+                riskManager.target,
+                staking.target,
+                LONG_VOTING_PERIOD,
+                CHALLENGE_PERIOD,
+                QUORUM_BPS,
+                SLASH_BPS
+            );
+
+            await staking.setCommitteeAddress(committee.target);
+            await riskManager.setCommittee(committee.target);
+
+            const rate = { base: 0, slope1: 0, slope2: 0, kink: 0 };
+            await riskManager.addProtocolRiskPool(usdc.target, rate, 0);
+            await riskManager.addProtocolRiskPool(usdc.target, rate, 0);
+
+            for (const user of [proposer, voter, nonStaker]) {
+                await govToken.mint(user.address, ethers.parseEther("2000"));
+                await govToken.connect(user).approve(staking.target, ethers.MaxUint256);
+                await govToken.connect(user).approve(committee.target, ethers.MaxUint256);
+            }
+
+            await staking.connect(proposer).stake(ethers.parseEther("1000"));
+            await staking.connect(voter).stake(ethers.parseEther("500"));
+
+            return { proposer };
+        }
+
+        await loadFixture(deployLongVotingFixture);
+        await committee.connect(proposer).createProposal(1, 0, 0);
+        await committee.connect(proposer).vote(1, 2);
+
+        const before = await committee.proposals(1);
+        expect(before.forVotes).to.equal(ethers.parseEther("1000"));
+
+        await time.increase(UNSTAKE_LOCK_PERIOD + 1);
+        await staking.connect(proposer).unstake(ethers.parseEther("500"));
+
+        const after = await committee.proposals(1);
+        expect(after.forVotes).to.equal(ethers.parseEther("500"));
+    });
+
+    it("accumulates multiple fee deposits", async function () {
+        await loadFixture(deployFixture);
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await committee.connect(proposer).vote(1, 2);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+
+        await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+        await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+        const rm = await ethers.getSigner(riskManager.target);
+        await committee.connect(rm).receiveFees(1, { value: ethers.parseEther("1") });
+        await committee.connect(rm).receiveFees(1, { value: ethers.parseEther("2") });
+        await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+        await time.increase(CHALLENGE_PERIOD + 1);
+        await committee.resolvePauseBond(1);
+
+        const proposal = await committee.proposals(1);
+        expect(proposal.totalRewardFees).to.equal(ethers.parseEther("3"));
+    });
+
+    it("reverts when bond amount outside range", async function () {
+        await loadFixture(deployFixture);
+        await expect(
+            committee.connect(proposer).createProposal(1, 1, BOND - 1n)
+        ).to.be.revertedWith("Invalid bond");
+        await expect(
+            committee.connect(proposer).createProposal(1, 1, ethers.parseEther("2501"))
+        ).to.be.revertedWith("Invalid bond");
+    });
 });
