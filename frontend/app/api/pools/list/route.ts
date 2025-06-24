@@ -1,7 +1,7 @@
 // app/api/pools/route.ts
 import { NextResponse } from "next/server";
 import { getPoolRegistry } from "../../../../lib/poolRegistry";
-import { getPoolManager } from "../../../../lib/poolManager";
+import { getPolicyManager } from "../../../../lib/policyManager";
 import { getPriceOracle } from "../../../../lib/priceOracle";
 import { getMulticallReader } from "../../../../lib/multicallReader";
 import {
@@ -110,7 +110,7 @@ export async function GET() {
   const allPools: any[] = [];
   for (const dep of deployments) {
     const poolRegistry = getPoolRegistry(dep.poolRegistry, dep.name);
-    const poolManager = getPoolManager(dep.poolManager, dep.name);
+    const policyManager = getPolicyManager(dep.policyManager, dep.name);
     const priceOracle = getPriceOracle(dep.priceOracle, dep.name);
     try {
       /* 1️⃣ How many pools exist? */
@@ -132,7 +132,7 @@ export async function GET() {
       /* 2️⃣ Fetch catastrophe premium bps */
       let catPremiumBps: bigint = 2000n; // default
       try {
-        const raw = await poolManager.catPremiumBps();
+        const raw = await policyManager.catPremiumBps();
         catPremiumBps = BigInt(raw.toString());
       } catch {
         // ignore – fallback already set

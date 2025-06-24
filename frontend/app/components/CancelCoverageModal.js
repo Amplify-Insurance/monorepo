@@ -5,7 +5,7 @@ import Modal from "./Modal"
 import Image from "next/image"
 import { getDeployment } from "../config/deployments"
 import { getProtocolLogo, getProtocolName, getTokenName } from "../config/tokenNameMap"
-import { getPoolManagerWithSigner } from "../../lib/poolManager"
+import { getPolicyManagerWithSigner } from "../../lib/policyManager"
 import { getTxExplorerUrl } from "../utils/explorer"
 import { ethers } from "ethers"
 
@@ -66,7 +66,7 @@ export default function CancelCoverageModal({ isOpen, onClose, coverage }) {
     setIsSubmitting(true)
     try {
       const dep = getDeployment(coverage.deployment)
-      const pm = await getPoolManagerWithSigner(dep.poolManager)
+      const pm = await getPolicyManagerWithSigner(dep.policyManager)
       const tx = await pm.cancelCover(coverage.id, { gasLimit: 500000 })
       setTxHash(tx.hash)
       await tx.wait()

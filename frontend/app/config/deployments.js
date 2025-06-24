@@ -11,7 +11,7 @@ try {
     capitalPool: item.CapitalPool,
     catInsurancePool: item.CatInsurancePool,
     poolRegistry: item.PoolRegistry,
-    poolManager: item.PolicyManager,
+    policyManager: item.PolicyManager,
     priceOracle: item.PriceOracle,
     multicallReader: item.MulticallReader,
     lossDistributor: item.LossDistributor,

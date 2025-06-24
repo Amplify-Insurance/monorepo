@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Info, Plus, Minus } from "lucide-react"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
-import { getPoolManagerWithSigner } from "../../lib/poolManager"
+import { getPolicyManagerWithSigner } from "../../lib/policyManager"
 import { getCapitalPoolWithSigner, getUnderlyingAssetAddress, getUnderlyingAssetDecimals } from "../../lib/capitalPool"
 import { getERC20WithSigner } from "../../lib/erc20"
 import useUsdPrice from "../../hooks/useUsdPrice"
@@ -89,7 +89,7 @@ export default function ManageCoverageModal({
       let tx
       if (type === "coverage") {
         if (!policyId) throw new Error("policyId required")
-        const pm = await getPoolManagerWithSigner(depInfo.poolManager)
+        const pm = await getPolicyManagerWithSigner(depInfo.policyManager)
 
         const dec = await getUnderlyingAssetDecimals(depInfo.capitalPool)
 
@@ -123,9 +123,9 @@ export default function ManageCoverageModal({
           const assetAddr = await getUnderlyingAssetAddress(depInfo.capitalPool)
           const token = await getERC20WithSigner(assetAddr)
           const addr = await token.signer.getAddress()
-          const allowance = await token.allowance(addr, depInfo.poolManager)
+          const allowance = await token.allowance(addr, depInfo.policyManager)
           if (allowance.lt(depositBn)) {
-            const approveTx = await token.approve(depInfo.poolManager, depositBn)
+            const approveTx = await token.approve(depInfo.policyManager, depositBn)
             await approveTx.wait()
           }
 
