@@ -394,4 +394,62 @@ describe("LossDistributor Integration", function () {
     expect(await capitalPool.last_applyLosses_principalLossAmount()).to.equal(expectedLoss);
     expect(await riskManager.underwriterTotalPledge(newUnderwriter.address)).to.equal(0n);
   });
+
+  async function deployZeroCapitalFixture() {
+    const base = await deployFixture();
+    await base.capitalPool.triggerOnCapitalWithdrawn(
+      base.riskManager.target,
+      base.underwriter.address,
+      base.TOTAL_PLEDGE,
+      true
+    );
+    await base.poolRegistry.setPayoutData([base.adapter.address], [0], 0);
+    return base;
+  }
+
+  it("does not track losses when pool has no capital", async function () {
+    const { riskManager, lossDistributor, nonParty, POLICY_ID, POOL_ID } = await loadFixture(
+      deployZeroCapitalFixture
+    );
+
+    await expect(riskManager.connect(nonParty).processClaim(POLICY_ID)).to.not.be.reverted;
+    expect(await lossDistributor.poolLossTrackers(POOL_ID)).to.equal(0n);
+  });
+
+  it("handles claim exceeding pool pledge", async function () {
+    const {
+      riskManager,
+      lossDistributor,
+      capitalPool,
+      policyNFT,
+      protocolToken,
+      claimant,
+      underwriter,
+      adapter,
+      nonParty,
+      POOL_ID,
+      TOTAL_PLEDGE,
+    } = await loadFixture(deployFixture);
+
+    const BIG_COVERAGE = ethers.parseUnits("150000", 6);
+    await policyNFT.mock_setPolicy(1, claimant.address, POOL_ID, BIG_COVERAGE, 0, 0, 0, 0);
+    await protocolToken.mint(claimant.address, BIG_COVERAGE);
+    await protocolToken.connect(claimant).approve(riskManager.target, ethers.MaxUint256);
+
+    await riskManager.connect(nonParty).processClaim(1);
+
+    const expectedTracker = (BIG_COVERAGE * PRECISION) / TOTAL_PLEDGE;
+    expect(await lossDistributor.poolLossTrackers(POOL_ID)).to.equal(expectedTracker);
+
+    await capitalPool.triggerOnCapitalWithdrawn(
+      riskManager.target,
+      underwriter.address,
+      TOTAL_PLEDGE,
+      true
+    );
+
+    expect(await capitalPool.applyLossesCallCount()).to.equal(1);
+    expect(await capitalPool.last_applyLosses_principalLossAmount()).to.equal(BIG_COVERAGE);
+    expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(0n);
+  });
 });
