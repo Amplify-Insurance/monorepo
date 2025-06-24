@@ -159,4 +159,42 @@ describe("PolicyManager Integration", function () {
 
     await expect(policyNFT.ownerOf(1)).to.be.revertedWithCustomError(policyNFT, "ERC721NonexistentToken");
   });
+
+  it("cannot cancel cover during cooldown", async function () {
+    await policyManager.connect(owner).setCoverCooldownPeriod(7 * 24 * 60 * 60);
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    await expect(policyManager.connect(user).cancelCover(1))
+      .to.be.revertedWithCustomError(policyManager, "CooldownActive");
+  });
+
+  it("increase cover reverts when deposit insufficient", async function () {
+    const MIN_PREMIUM = ethers.parseUnits("2", 6);
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, MIN_PREMIUM);
+    await policyManager.connect(owner).setCoverCooldownPeriod(1);
+    const ADD = ethers.parseUnits("5000", 6);
+
+    await expect(policyManager.connect(user).increaseCover(1, ADD))
+      .to.be.revertedWithCustomError(policyManager, "DepositTooLow");
+  });
+
+  it("addPremium reverts on zero amount", async function () {
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+    await expect(policyManager.connect(user).addPremium(1, 0))
+      .to.be.revertedWithCustomError(policyManager, "InvalidAmount");
+  });
+
+  it("cannot lapse an active policy", async function () {
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    await expect(policyManager.connect(user).lapsePolicy(1))
+      .to.be.revertedWithCustomError(policyManager, "PolicyIsActive");
+  });
+
+  it("increase cover reverts with zero amount", async function () {
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    await expect(policyManager.connect(user).increaseCover(1, 0))
+      .to.be.revertedWithCustomError(policyManager, "InvalidAmount");
+  });
 });
