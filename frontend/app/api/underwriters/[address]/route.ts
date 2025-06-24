@@ -113,11 +113,11 @@ export async function GET(
 
         details.push({
           deployment: dep.name,
-          totalDepositedAssetPrincipal: account[0],
-          yieldChoice: account[1],
-          masterShares: account[2],
-          withdrawalRequestTimestamp,
-          withdrawalRequestShares,
+          totalDepositedAssetPrincipal: account[0].toString(),
+          yieldChoice: account[1].toString(),
+          masterShares: account[2].toString(),
+          withdrawalRequestTimestamp: withdrawalRequestTimestamp.toString(),
+          withdrawalRequestShares: withdrawalRequestShares.toString(),
           allocatedPoolIds,
           pendingLosses,
         })
