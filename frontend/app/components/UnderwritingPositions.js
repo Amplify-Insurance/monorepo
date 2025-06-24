@@ -34,6 +34,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
   const [isRequesting, setIsRequesting] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
   const [expandedRows, setExpandedRows] = useState([])
   const toggleRow = (id) => {
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -221,12 +222,24 @@ export default function UnderwritingPositions({ displayCurrency }) {
     }
   }
 
-  const handleCancelWithdrawal = (position) => {
-    setWithdrawalRequests((prev) => {
-      const newRequests = { ...prev }
-      delete newRequests[position.id]
-      return newRequests
-    })
+  const handleCancelWithdrawal = async (position) => {
+    setIsCancelling(true)
+    try {
+      const dep = getDeployment(position.deployment)
+      const cp = await getCapitalPoolWithSigner(dep.capitalPool, dep.name)
+      const tx = await cp.cancelWithdrawalRequest()
+      await tx.wait()
+
+      setWithdrawalRequests((prev) => {
+        const newRequests = { ...prev }
+        delete newRequests[position.id]
+        return newRequests
+      })
+    } catch (err) {
+      console.error("Failed to cancel withdrawal", err)
+    } finally {
+      setIsCancelling(false)
+    }
   }
 
   const handleClaimRewards = async (position) => {
@@ -697,8 +710,9 @@ export default function UnderwritingPositions({ displayCurrency }) {
 
                                             {position.status === "withdrawal pending" && (
                                               <button
-                                                className="group flex items-center justify-center gap-3 py-3 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                                                className="group flex items-center justify-center gap-3 py-3 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                                 onClick={() => handleCancelWithdrawal(position)}
+                                                disabled={isCancelling}
                                               >
                                                 <svg
                                                   className="w-5 h-5 group-hover:scale-110 transition-transform"
@@ -713,7 +727,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                                     d="M6 18L18 6M6 6l12 12"
                                                   />
                                                 </svg>
-                                                Cancel Withdrawal
+                                                {isCancelling ? "Cancelling..." : "Cancel Withdrawal"}
                                               </button>
                                             )}
                                           </div>
