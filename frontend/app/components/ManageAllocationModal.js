@@ -8,7 +8,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { formatPercentage } from "../utils/formatting"
-import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getRiskManagerWithSigner, getRiskManager } from "../../lib/riskManager"
 import { getDeployment } from "../config/deployments"
 import { YieldPlatform } from "../config/yieldPlatforms"
 import { getTxExplorerUrl } from "../utils/explorer"
@@ -48,6 +48,21 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [txHash, setTxHash] = useState("")
   const [showWithdrawalNotice, setShowWithdrawalNotice] = useState(false)
+  const [selectionLimit, setSelectionLimit] = useState(4)
+
+  useEffect(() => {
+    async function loadLimit() {
+      try {
+        const dep = getDeployment(selectedDeployment)
+        const rm = getRiskManager(dep.riskManager, dep.name)
+        const lim = await rm.maxAllocationsPerUnderwriter()
+        setSelectionLimit(Number(lim.toString()))
+      } catch (err) {
+        console.error("Failed to load selection limit", err)
+      }
+    }
+    if (selectedDeployment) loadLimit()
+  }, [selectedDeployment])
 
   useEffect(() => {
     if (details) {
@@ -75,8 +90,8 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
       }
     } else {
       // Selecting - check if we're at the limit
-      if (selectedPools.length >= 4) {
-        return // Don't allow more than 4 selections
+      if (selectedPools.length >= selectionLimit) {
+        return // Don't allow more than the limit
       }
       setSelectedPools((prev) => [...prev, id])
     }
@@ -207,10 +222,10 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
           </svg>
           <div>
             <p className="text-sm text-blue-800 dark:text-blue-300">
-              <strong>Selection Limit:</strong> You can select up to 4 protocols to underwrite.
+              <strong>Selection Limit:</strong> You can select up to {selectionLimit} protocols to underwrite.
             </p>
             <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
-              Currently selected: {selectedPools.length}/4
+              Currently selected: {selectedPools.length}/{selectionLimit}
             </p>
           </div>
         </div>
@@ -260,7 +275,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
           poolsForDeployment.map((pool) => {
             const yieldRate = Number(pool.underwriterYieldBps || 0) / 100
             const isSelected = selectedPools.includes(pool.id)
-            const isDisabled = !isSelected && selectedPools.length >= 4
+            const isDisabled = !isSelected && selectedPools.length >= selectionLimit
             const poolType = getProtocolType(pool.id)
 
             return (
