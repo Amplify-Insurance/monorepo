@@ -108,4 +108,71 @@ describe("CapitalPool Integration", function () {
     await expect(rm.executePayout(capitalPool.target, payout)).to.not.be.reverted;
     expect(await token.balanceOf(user.address)).to.equal(payoutAmount);
   });
+
+  it("handles multiple deposits and share accounting after yield", async () => {
+    const first = ethers.parseUnits("1000", 6);
+    await capitalPool.connect(user).deposit(first, PLATFORM_AAVE);
+
+    const yieldGain = ethers.parseUnits("100", 6);
+    await token.mint(adapter.target, yieldGain);
+    await adapter.setTotalValueHeld(first + yieldGain);
+
+    await capitalPool.syncYieldAndAdjustSystemValue();
+
+    const msBefore = await capitalPool.totalMasterSharesSystem();
+    const tvBefore = await capitalPool.totalSystemValue();
+
+    const second = ethers.parseUnits("500", 6);
+    await token.mint(user.address, second);
+    await token.connect(user).approve(capitalPool.target, ethers.MaxUint256);
+    const expectedShares = (second * msBefore) / tvBefore;
+    await expect(capitalPool.connect(user).deposit(second, PLATFORM_AAVE))
+      .to.emit(capitalPool, "Deposit")
+      .withArgs(user.address, second, expectedShares, PLATFORM_AAVE);
+
+    const account = await capitalPool.getUnderwriterAccount(user.address);
+    expect(account.masterShares).to.equal(first + expectedShares);
+  });
+
+  it("syncs yield and updates system value", async () => {
+    const amount = ethers.parseUnits("1000", 6);
+    await capitalPool.connect(user).deposit(amount, PLATFORM_AAVE);
+
+    const gain = ethers.parseUnits("50", 6);
+    await token.mint(adapter.target, gain);
+    await adapter.setTotalValueHeld(amount + gain);
+
+    await expect(capitalPool.syncYieldAndAdjustSystemValue())
+      .to.emit(capitalPool, "SystemValueSynced")
+      .withArgs(amount + gain, amount);
+    expect(await capitalPool.totalSystemValue()).to.equal(amount + gain);
+  });
+
+  it("applyLosses reduces principal and burns shares", async () => {
+    const CatPool = await ethers.getContractFactory("MockCatInsurancePool");
+    const cat = await CatPool.deploy(owner.address);
+    const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+    const rm = await RM.deploy(cat.target);
+    await cat.setCoverPoolAddress(capitalPool.target);
+    await capitalPool.setRiskManager(rm.target);
+
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await capitalPool.connect(user).deposit(depositAmount, PLATFORM_AAVE);
+
+    const loss = ethers.parseUnits("300", 6);
+    await expect(rm.applyLossesOnPool(capitalPool.target, user.address, loss))
+      .to.emit(capitalPool, "LossesApplied")
+      .withArgs(user.address, loss, false);
+
+    const account = await capitalPool.getUnderwriterAccount(user.address);
+    expect(account.totalDepositedAssetPrincipal).to.equal(depositAmount - loss);
+    expect(account.masterShares).to.equal(depositAmount - loss);
+  });
+
+  it("reverts on invalid deposit parameters", async () => {
+    await expect(capitalPool.connect(user).deposit(0, PLATFORM_AAVE))
+      .to.be.revertedWithCustomError(capitalPool, "InvalidAmount");
+    await expect(capitalPool.connect(user).deposit(100, 2))
+      .to.be.revertedWithCustomError(capitalPool, "AdapterNotConfigured");
+  });
 });
