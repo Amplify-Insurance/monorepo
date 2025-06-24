@@ -44,64 +44,109 @@ export default function ActiveCoverages({ displayCurrency }) {
   const now = Math.floor(Date.now() / 1000)
 
   const activeCoverages = policies
-    .map((p) => {
-      // Convert poolId from hex to a number for comparison
+    .flatMap((p) => {
       const policyPoolId = p.poolId?.hex ? Number.parseInt(p.poolId.hex, 16) : null
-      if (policyPoolId === null) return null
+      if (policyPoolId === null) return []
 
       const pool = pools.find((pl) => pl.deployment === p.deployment && Number(pl.id) === policyPoolId)
-      if (!pool) return null
+      if (!pool) return []
 
       const protocol = getProtocolName(pool.id)
       const protocolLogo = getProtocolLogo(pool.id)
-
-      // ethers.utils.formatUnits can often handle BigNumber objects directly,
-      // but it's safer to pass the hex value.
       const decimals = pool.underlyingAssetDecimals ?? underlyingDec
+
       const coverageAmount = Number(ethers.utils.formatUnits(p.coverage.hex, decimals))
+      const pendingIncrease = p.pendingIncrease?.hex
+        ? Number(ethers.utils.formatUnits(p.pendingIncrease.hex, decimals))
+        : 0
 
       const capacity = Number(
         ethers.utils.formatUnits(BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold), decimals),
       )
 
-      // Convert timestamps from hex to numbers
-      const activationHex = p.activation?.hex || p.start?.hex || "0x0"
+      const activationTs = Number.parseInt(p.activation?.hex || p.start?.hex || "0x0", 16)
+      const increaseActivationTs = Number.parseInt(p.increaseActivationTimestamp?.hex || "0x0", 16)
       const expiryHex = p.lastPaidUntil?.hex || "0x0"
-
-      const activationTs = Number.parseInt(activationHex, 16)
       let expiryTs = Number.parseInt(expiryHex, 16)
 
-      if (!expiryTs) {
+      const computeExpiry = (covAmount) => {
+        if (expiryTs) return expiryTs
         const deposit = Number(ethers.utils.formatUnits(p.premiumDeposit?.hex || "0", decimals))
         const lastDrainTs = Number.parseInt(p.lastDrainTime?.hex || "0x0", 16)
         const rate = Number(pool.premiumRateBps || 0) / 100
-        const perSecond = rate > 0 ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0
+        const perSecond = rate > 0 ? (covAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0
         if (perSecond > 0) {
-          expiryTs = Math.floor(lastDrainTs + deposit / perSecond)
+          return Math.floor(lastDrainTs + deposit / perSecond)
         }
+        return 0
       }
 
-      let status = "active"
-      if (now < activationTs) status = "pending"
-      else if (expiryTs && now > expiryTs) status = "expired"
-
-      return {
-        id: p.id,
+      const baseCoverage = {
+        policyId: p.id,
         deployment: p.deployment,
         protocol,
         protocolLogo,
         type: getProtocolType(pool.id),
         pool: pool.protocolTokenToCover,
         poolName: getTokenName(pool.protocolTokenToCover),
-        coverageAmount,
         premium: Number(pool.premiumRateBps || 0) / 100,
-        status,
         capacity,
-        activation: activationTs,
-        expiry: expiryTs,
       }
+
+      const rows = []
+
+      if (pendingIncrease > 0 && increaseActivationTs <= now) {
+        // Cooldown passed - merge
+        const totalCov = coverageAmount + pendingIncrease
+        const expiry = computeExpiry(totalCov)
+        let status = "active"
+        if (now < activationTs) status = "pending"
+        else if (expiry && now > expiry) status = "expired"
+
+        rows.push({
+          ...baseCoverage,
+          id: `${p.id}-merged`,
+          coverageAmount: totalCov,
+          status,
+          activation: activationTs,
+          expiry,
+        })
+      } else {
+        // Current active coverage row
+        const expiryActive = computeExpiry(coverageAmount)
+        let status = "active"
+        if (now < activationTs) status = "pending"
+        else if (expiryActive && now > expiryActive) status = "expired"
+
+        rows.push({
+          ...baseCoverage,
+          id: `${p.id}-active`,
+          coverageAmount,
+          status,
+          activation: activationTs,
+          expiry: expiryActive,
+        })
+
+        // Pending increase row if not yet active
+        if (pendingIncrease > 0) {
+          const expiryPending = computeExpiry(pendingIncrease)
+          let pStatus = "pending"
+          if (increaseActivationTs && increaseActivationTs <= now) pStatus = "active"
+
+          rows.push({
+            ...baseCoverage,
+            id: `${p.id}-pending`,
+            coverageAmount: pendingIncrease,
+            status: pStatus,
+            activation: increaseActivationTs,
+            expiry: expiryPending,
+          })
+        }
+      }
+
+      return rows
     })
-    .filter(Boolean)
+    .filter((x) => x)
 
   console.log("Processed Coverage data:", activeCoverages) // For debugging the processed data
 
@@ -665,7 +710,7 @@ export default function ActiveCoverages({ displayCurrency }) {
           amount={selectedCoverage.coverageAmount}
           premium={selectedCoverage.premium}
           capacity={selectedCoverage.capacity}
-          policyId={selectedCoverage.id}
+          policyId={selectedCoverage.policyId}
           deployment={selectedCoverage.deployment}
           expiry={selectedCoverage.expiry}
         />
