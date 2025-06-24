@@ -150,4 +150,89 @@ describe("CatInsurancePool Integration", function () {
       .to.emit(catPool, "ProtocolAssetRewardsClaimed")
       .withArgs(lp2.address, rewardToken.target, expected2);
   });
+
+  it("flushes idle USDC to adapter", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+
+    const flushAmount = ethers.parseUnits("600", 6);
+    await expect(catPool.connect(owner).flushToAdapter(flushAmount))
+      .to.emit(catPool, "DepositToAdapter")
+      .withArgs(flushAmount);
+
+    expect(await catPool.idleUSDC()).to.equal(depositAmount - flushAmount);
+    expect(await adapter.totalValueHeld()).to.equal(flushAmount);
+  });
+
+  it("policyManager can send premiums to CatPool", async function () {
+    const premium = ethers.parseUnits("50", 6);
+    await usdc.mint(policyManager.address, premium);
+    await usdc.connect(policyManager).approve(catPool.target, premium);
+
+    await expect(catPool.connect(policyManager).receiveUsdcPremium(premium))
+      .to.emit(catPool, "UsdcPremiumReceived")
+      .withArgs(premium);
+
+    expect(await catPool.idleUSDC()).to.equal(premium);
+  });
+
+  it("riskManager claims rewards for user", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+
+    const rewardAmount = ethers.parseEther("25");
+    await rewardToken.mint(riskManager.address, rewardAmount);
+    await rewardToken.connect(riskManager).approve(catPool.target, rewardAmount);
+    await catPool
+      .connect(riskManager)
+      .receiveProtocolAssetsForDistribution(rewardToken.target, rewardAmount);
+
+    await rewardToken.mint(riskManager.address, rewardAmount);
+    await rewardToken
+      .connect(riskManager)
+      .transfer(rewardDistributor.target, rewardAmount);
+
+    const totalSupply = await catShare.totalSupply();
+    const userShares = await catShare.balanceOf(lp1.address);
+    const expected = (rewardAmount * userShares) / totalSupply;
+
+    await expect(
+      catPool
+        .connect(riskManager)
+        .claimProtocolAssetRewardsFor(lp1.address, rewardToken.target)
+    )
+      .to.emit(catPool, "ProtocolAssetRewardsClaimed")
+      .withArgs(lp1.address, rewardToken.target, expected);
+  });
+
+  it("owner can switch adapters and funds are moved", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    await catPool.connect(owner).flushToAdapter(depositAmount);
+    await adapter.setTotalValueHeld(depositAmount);
+
+    const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
+    const newAdapter = await MockYieldAdapter.deploy(
+      usdc.target,
+      ethers.ZeroAddress,
+      owner.address
+    );
+    await newAdapter.setDepositor(catPool.target);
+
+    await expect(catPool.connect(owner).setAdapter(newAdapter.target))
+      .to.emit(catPool, "AdapterChanged")
+      .withArgs(newAdapter.target);
+
+    expect(await catPool.idleUSDC()).to.equal(depositAmount);
+    expect(await newAdapter.totalValueHeld()).to.equal(0);
+  });
+
+  it("liquidUsdc sums idle and adapter balances", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    await catPool.connect(owner).flushToAdapter(depositAmount);
+    await adapter.setTotalValueHeld(depositAmount * 2n);
+
+    expect(await catPool.liquidUsdc()).to.equal(depositAmount * 2n);
+  });
 });
