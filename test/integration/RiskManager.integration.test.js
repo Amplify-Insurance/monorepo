@@ -212,4 +212,50 @@ describe("RiskManager Integration", function () {
     const after = await usdc.balanceOf(nonParty.address);
     expect(after).to.be.gt(before);
   });
+
+  it("only owner can set committee", async function () {
+    await expect(
+      riskManager.connect(nonParty).setCommittee(nonParty.address)
+    )
+      .to.be.revertedWithCustomError(riskManager, "OwnableUnauthorizedAccount")
+      .withArgs(nonParty.address);
+    await expect(riskManager.connect(owner).setCommittee(nonParty.address))
+      .to.emit(riskManager, "CommitteeSet")
+      .withArgs(nonParty.address);
+  });
+
+  it("reverts allocation when no capital pledged", async function () {
+    await expect(
+      riskManager.connect(nonParty).allocateCapital([POOL_ID])
+    ).to.be.revertedWithCustomError(riskManager, "NoCapitalToAllocate");
+  });
+
+  it("reverts allocation for invalid pool id", async function () {
+    await expect(
+      riskManager.connect(underwriter).allocateCapital([1])
+    ).to.be.revertedWith("Invalid poolId");
+  });
+
+  it("only policy manager can update coverage sold", async function () {
+    await expect(
+      riskManager.connect(nonParty).updateCoverageSold(POOL_ID, 100, true)
+    ).to.be.revertedWithCustomError(riskManager, "NotPolicyManager");
+    const pm = await impersonate(policyManager.target);
+    await riskManager.connect(pm).updateCoverageSold(POOL_ID, 100, true);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [policyManager.target]);
+    const [, , sold] = await poolRegistry.getPoolData(POOL_ID);
+    expect(sold).to.equal(100);
+  });
+
+  it("tracks pending withdrawals via hooks", async function () {
+    const shares =
+      (await capitalPool.getUnderwriterAccount(underwriter.address)).masterShares / 2n;
+    const expected = await capitalPool.sharesToValue(shares);
+    await capitalPool.connect(underwriter).requestWithdrawal(shares);
+    let [, , , pending] = await poolRegistry.getPoolData(POOL_ID);
+    expect(pending).to.equal(expected);
+    await capitalPool.connect(underwriter).cancelWithdrawalRequest();
+    [, , , pending] = await poolRegistry.getPoolData(POOL_ID);
+    expect(pending).to.equal(0);
+  });
 });
