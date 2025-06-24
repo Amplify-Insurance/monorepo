@@ -90,4 +90,50 @@ describe("Committee Integration", function () {
         await committee.connect(proposer).claimReward(1);
         expect(await ethers.provider.getBalance(proposer.address)).to.be.gt(propBalBefore);
     });
+
+    it("slashes bond when proposal is defeated", async function () {
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await committee.connect(voter).vote(1, 1); // vote against
+
+        await time.increase(VOTING_PERIOD + 1);
+        const beforeBal = await govToken.balanceOf(proposer.address);
+        await committee.connect(owner).executeProposal(1);
+
+        const proposal = await committee.proposals(1);
+        expect(proposal.status).to.equal(3); // Defeated
+        expect(await committee.activeProposalForPool(1)).to.equal(false);
+
+        const refund = BOND - (BOND * BigInt(SLASH_BPS)) / 10000n;
+        const afterBal = await govToken.balanceOf(proposer.address);
+        expect(afterBal - beforeBal).to.equal(refund);
+    });
+
+    it("slashes entire bond if challenge ends without fees", async function () {
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await committee.connect(proposer).vote(1, 2);
+        await committee.connect(voter).vote(1, 2);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+        await time.increase(CHALLENGE_PERIOD + 1);
+        await committee.resolvePauseBond(1);
+
+        const proposal = await committee.proposals(1);
+        expect(proposal.status).to.equal(6); // Resolved
+        expect(await govToken.balanceOf(proposer.address)).to.equal(0);
+    });
+
+    it("executes an unpause proposal", async function () {
+        await committee.connect(proposer).createProposal(1, 0, 0);
+        await committee.connect(proposer).vote(1, 2);
+        await committee.connect(voter).vote(1, 2);
+
+        await time.increase(VOTING_PERIOD + 1);
+        const tx = await committee.executeProposal(1);
+        await expect(tx).to.emit(riskManager, "IncidentReported").withArgs(1, false);
+
+        const proposal = await committee.proposals(1);
+        expect(proposal.status).to.equal(4); // Executed
+        expect(await committee.activeProposalForPool(1)).to.equal(false);
+    });
 });

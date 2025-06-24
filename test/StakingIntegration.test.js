@@ -69,7 +69,8 @@ describe("StakingContract Integration", function () {
     await expect(staking.connect(staker).unstake(STAKE))
       .to.emit(staking, "Unstaked")
       .withArgs(staker.address, STAKE);
-    expect(await staking.lastVotedProposal(staker.address)).to.equal(0);
+    // vote record should remain until the proposal is finalized
+    expect(await staking.lastVotedProposal(staker.address)).to.equal(1);
   });
 
   it("clears vote record when unstaking after proposal execution", async function () {
