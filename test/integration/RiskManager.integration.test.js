@@ -4,7 +4,7 @@ const { ethers } = require("hardhat");
 // Integration test using real LossDistributor and RewardDistributor
 
 describe("RiskManager Integration", function () {
-    let owner, committee, underwriter, nonParty;
+    let owner, committee, underwriter, liquidator, nonParty;
     let riskManager, poolRegistry, capitalPool, policyNFT, catPool;
     let lossDistributor, rewardDistributor, policyManager, usdc;
 
@@ -13,7 +13,7 @@ describe("RiskManager Integration", function () {
     const LOSS_AMOUNT = ethers.parseUnits("1000", 6);
 
     beforeEach(async function () {
-        [owner, committee, underwriter, nonParty] = await ethers.getSigners();
+        [owner, committee, underwriter, liquidator, nonParty] = await ethers.getSigners();
 
         const MockERC20 = await ethers.getContractFactory("MockERC20");
         usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
@@ -83,5 +83,48 @@ describe("RiskManager Integration", function () {
         expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(expectedPledge);
         expect(await capitalPool.applyLossesCallCount()).to.equal(1);
         expect(await capitalPool.last_applyLosses_principalLossAmount()).to.equal(LOSS_AMOUNT);
+    });
+
+    it("liquidates an insolvent underwriter", async function () {
+        const SHARES = 1n;
+        const shareValue = ethers.parseUnits("9000", 6);
+        await capitalPool.setUnderwriterAccount(underwriter.address, SHARES);
+        await capitalPool.setSharesToValue(SHARES, shareValue);
+
+        // distribute loss larger than share value
+        const loss = shareValue + 1n;
+        await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+        const rm = await ethers.getSigner(riskManager.target);
+        await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+        await lossDistributor.connect(rm).distributeLoss(POOL_ID, loss, PLEDGE_AMOUNT);
+        await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+        await expect(riskManager.connect(liquidator).liquidateInsolventUnderwriter(underwriter.address))
+            .to.emit(riskManager, "UnderwriterLiquidated")
+            .withArgs(liquidator.address, underwriter.address);
+
+        expect(await capitalPool.applyLossesCallCount()).to.equal(1);
+        expect(await capitalPool.last_applyLosses_principalLossAmount()).to.equal(loss);
+        const expectedPledge = PLEDGE_AMOUNT - loss;
+        expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(expectedPledge);
+        expect(await lossDistributor.getPendingLosses(underwriter.address, POOL_ID, PLEDGE_AMOUNT)).to.equal(0);
+    });
+
+    it("reverts liquidation when underwriter is solvent", async function () {
+        const SHARES = 1n;
+        const shareValue = ethers.parseUnits("9000", 6);
+        await capitalPool.setUnderwriterAccount(underwriter.address, SHARES);
+        await capitalPool.setSharesToValue(SHARES, shareValue);
+
+        const loss = shareValue - 1n;
+        await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+        const rm = await ethers.getSigner(riskManager.target);
+        await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+        await lossDistributor.connect(rm).distributeLoss(POOL_ID, loss, PLEDGE_AMOUNT);
+        await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+        await expect(
+            riskManager.connect(liquidator).liquidateInsolventUnderwriter(underwriter.address)
+        ).to.be.revertedWithCustomError(riskManager, "UnderwriterNotInsolvent");
     });
 });
