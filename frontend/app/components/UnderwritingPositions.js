@@ -133,6 +133,27 @@ export default function UnderwritingPositions({ displayCurrency }) {
     return positions
   }, [details, pools, withdrawalRequests])
 
+  const maxUtilization = useMemo(() => {
+    let max = 0
+    for (const pos of underwritingPositions) {
+      const pool = pools.find(
+        (pl) => pl.deployment === pos.deployment && Number(pl.id) === Number(pos.poolId),
+      )
+      if (!pool) continue
+      const dec = pool.underlyingAssetDecimals ?? 6
+      const pledged = Number(ethers.utils.formatUnits(pool.totalCapitalPledgedToPool || 0, dec))
+      const sold = Number(ethers.utils.formatUnits(pool.totalCoverageSold || 0, dec))
+      const pending = Number(ethers.utils.formatUnits(pool.capitalPendingWithdrawal || 0, dec))
+      if (pledged === 0) continue
+      const util = (sold + pending) / pledged
+      if (util > max) max = util
+    }
+    return max
+  }, [underwritingPositions, pools])
+
+  const maxWithdrawRatio = Math.max(0, 1 - maxUtilization)
+  const maxWithdrawAmount = selectedPosition ? selectedPosition.amount * maxWithdrawRatio : 0
+
   useEffect(() => {
     async function loadRewards() {
       if (!address) return
@@ -999,6 +1020,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
         isOpen={showWithdrawalModal}
         onClose={() => setShowWithdrawalModal(false)}
         position={selectedPosition}
+        maxWithdrawAmount={maxWithdrawAmount}
         onRequestWithdrawal={handleWithdrawalRequest}
         isSubmitting={isRequesting}
         displayCurrency={displayCurrency}
