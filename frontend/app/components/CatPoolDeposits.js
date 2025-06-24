@@ -8,6 +8,7 @@ import useCatPoolRewards from "../../hooks/useCatPoolRewards"
 import Image from "next/image"
 import { TrendingUp, Gift, ExternalLink, Clock } from "lucide-react"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
+import { getTokenSymbol, getTokenName as getErc20TokenName } from "../../lib/erc20"
 import {
   getCatPoolWithSigner,
   getUsdcAddress,
@@ -29,6 +30,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
   const [valueDecimals, setValueDecimals] = useState(6)
   const [shareDecimals, setShareDecimals] = useState(18)
   const [underlyingToken, setUnderlyingToken] = useState("")
+  const [underlyingSymbol, setUnderlyingSymbol] = useState("")
+  const [underlyingName, setUnderlyingName] = useState("")
   const [isClaimingRewards, setIsClaimingRewards] = useState(false)
   const [showClaimModal, setShowClaimModal] = useState(false)
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
@@ -46,10 +49,16 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
       try {
         const addr = await getUsdcAddress()
         setUnderlyingToken(addr)
-        const dec = await getUsdcDecimals()
+        const [dec, shareDec, symbol, name] = await Promise.all([
+          getUsdcDecimals(),
+          getCatShareDecimals(),
+          getTokenSymbol(addr),
+          getErc20TokenName(addr),
+        ])
         setValueDecimals(Number(dec))
-        const shareDec = await getCatShareDecimals()
         setShareDecimals(Number(shareDec))
+        setUnderlyingSymbol(symbol)
+        setUnderlyingName(name)
       } catch (err) {
         console.error("Failed to fetch underlying token info", err)
       }
@@ -327,8 +336,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{underlyingSymbol}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{underlyingName}</p>
                       </div>
                     </div>
                   </td>
@@ -392,8 +401,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{underlyingSymbol}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{underlyingName}</p>
                       </div>
                     </div>
                   </td>
@@ -454,8 +463,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">CATLP</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Cat Pool LP Token</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{underlyingSymbol}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{underlyingName}</p>
                       </div>
                     </div>
                   </td>
