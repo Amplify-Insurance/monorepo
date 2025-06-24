@@ -202,4 +202,53 @@ describe("PolicyManager Integration", function () {
     await expect(policyManager.connect(user).increaseCover(1, 0))
       .to.be.revertedWithCustomError(policyManager, "InvalidAmount");
   });
+
+  it("reverts purchase when pool is paused", async function () {
+    await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+    const rm = await ethers.getSigner(riskManager.target);
+    await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+    await poolRegistry.connect(rm).setPauseState(POOL_ID, true);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    await expect(
+      policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM)
+    ).to.be.revertedWithCustomError(policyManager, "PoolPaused");
+  });
+
+  it("reverts purchase when capital unavailable", async function () {
+    await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+    const rm = await ethers.getSigner(riskManager.target);
+    await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+    await poolRegistry.connect(rm).updateCapitalPendingWithdrawal(
+      POOL_ID,
+      ethers.parseUnits("100000", 6),
+      true
+    );
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    await expect(
+      policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM)
+    ).to.be.revertedWithCustomError(policyManager, "InsufficientCapacity");
+  });
+
+  it("cannot cancel cover by non owner", async function () {
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    await expect(policyManager.connect(owner).cancelCover(1))
+      .to.be.revertedWithCustomError(policyManager, "NotPolicyOwner");
+  });
+
+  it("tracks active status based on premium balance", async function () {
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    expect(await policyManager.isPolicyActive(1)).to.equal(true);
+    await time.increase(SECS_YEAR * 2);
+    expect(await policyManager.isPolicyActive(1)).to.equal(false);
+  });
+
+  it("reverts purchase with zero coverage", async function () {
+    await expect(
+      policyManager.connect(user).purchaseCover(POOL_ID, 0, PREMIUM)
+    ).to.be.revertedWithCustomError(policyManager, "InvalidAmount");
+  });
 });
