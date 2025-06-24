@@ -288,10 +288,9 @@ This project is licensed under the **Business Source License 1.1**. See [LICENSE
 ## Underwriter Capital Flow
 
 ```mermaid
-
 graph TD
   %% Phase 1: De-allocating from a Risk Pool
-  subgraph Phase 1: De-allocating from a Risk Pool (RiskManager Contract)
+  subgraph "Phase 1: De-allocating from a Risk Pool (RiskManager Contract)"
     A[Start: Underwriter wants to withdraw capital from a pool]
       --> B[1. Calls requestDeallocateFromPool(poolId, amount)]
     B --> C[Contract fetches pool data:<br>totalPledged (All LP capital)<br>totalSold (Live policy coverage)<br>pendingWithdrawal (Other LPs withdrawing)]
@@ -308,7 +307,7 @@ graph TD
   end
 
   %% Phase 2: Withdrawing from the System
-  subgraph Phase 2: Withdrawing from the System (CapitalPool Contract)
+  subgraph "Phase 2: Withdrawing from the System (CapitalPool Contract)"
     L --> M[Capital is now considered 'free' inside the main CapitalPool]
     M --> N[3. Underwriter calls executeWithdrawal() on the CapitalPool contract]
     N --> O([<b>Funds Returned</b><br>Underwriter receives their capital])
@@ -316,7 +315,6 @@ graph TD
 
   style F fill:#ffeded,stroke:#ff5555,stroke-width:2px
   style O fill:#e8f5e9,stroke:#55a65a,stroke-width:2px
-
 ```
 
 
