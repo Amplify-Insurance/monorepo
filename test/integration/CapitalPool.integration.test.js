@@ -175,4 +175,43 @@ describe("CapitalPool Integration", function () {
     await expect(capitalPool.connect(user).deposit(100, 2))
       .to.be.revertedWithCustomError(capitalPool, "AdapterNotConfigured");
   });
+
+  it("reverts when RiskManager call fails on deposit", async () => {
+    const RM = await ethers.getContractFactory("MockRiskManagerFull");
+    const rm = await RM.deploy();
+    await capitalPool.setRiskManager(rm.target);
+    await rm.setRevertOnDeposit(true);
+    await expect(capitalPool.connect(user).deposit(1, PLATFORM_AAVE))
+      .to.be.revertedWith("CP: Failed to notify RiskManager of deposit");
+  });
+
+  it("notifies RiskManager on withdrawal cancellation", async () => {
+    const RM = await ethers.getContractFactory("MockRiskManagerFull");
+    const rm = await RM.deploy();
+    await capitalPool.setRiskManager(rm.target);
+
+    const amount = ethers.parseUnits("100", 6);
+    await capitalPool.connect(user).deposit(amount, PLATFORM_AAVE);
+    const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
+    const expectedValue = await capitalPool.sharesToValue(shares);
+
+    await capitalPool.connect(user).requestWithdrawal(shares);
+    await expect(capitalPool.connect(user).cancelWithdrawalRequest())
+      .to.emit(rm, "WithdrawalCancelled")
+      .withArgs(user.address, expectedValue);
+  });
+
+  it("reverts when RiskManager rejects cancellation", async () => {
+    const RM = await ethers.getContractFactory("MockRiskManagerFull");
+    const rm = await RM.deploy();
+    await capitalPool.setRiskManager(rm.target);
+
+    const amount = ethers.parseUnits("100", 6);
+    await capitalPool.connect(user).deposit(amount, PLATFORM_AAVE);
+    const shares = (await capitalPool.getUnderwriterAccount(user.address)).masterShares;
+    await capitalPool.connect(user).requestWithdrawal(shares);
+    await rm.setRevertOnCancel(true);
+    await expect(capitalPool.connect(user).cancelWithdrawalRequest())
+      .to.be.revertedWith("CP: RiskManager rejected cancellation");
+  });
 });
