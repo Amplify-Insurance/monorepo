@@ -290,31 +290,35 @@ This project is licensed under the **Business Source License 1.1**. See [LICENSE
 ```mermaid
 graph TD
   %% Phase 1: De-allocating from a Risk Pool
-  subgraph "Phase 1: De-allocating from a Risk Pool (RiskManager Contract)"
+  subgraph Phase1 ["Phase 1: De-allocating from a Risk Pool (RiskManager Contract)"]
     A[Start: Underwriter wants to withdraw capital from a pool]
-      --> B[1. Calls requestDeallocateFromPool(poolId, amount)]
-    B --> C[Contract fetches pool data:<br>totalPledged (All LP capital)<br>totalSold (Live policy coverage)<br>pendingWithdrawal (Other LPs withdrawing)]
-    C --> D{<b>Is amount ≤ freeCapital?</b><br><br><i>// freeCapital = totalPledged − totalSold − pendingWithdrawal</i>}
-    D -- No: Not Enough Free Capital --> E[<font color="red">REJECTED</font><br>Transaction reverts with InsufficientFreeCapital error]
-    E --> F([<b>Withdrawal Blocked</b><br>Capital is locked to back live policies.])
-    D -- Yes: Enough Free Capital --> G[<font color="orange">ACCEPTED</font><br>Request is logged and notice period timer starts]
+    A --> B[1. Calls requestDeallocateFromPool poolId, amount]
+    B --> C[Contract fetches pool data:<br/>totalPledged All LP capital<br/>totalSold Live policy coverage<br/>pendingWithdrawal Other LPs withdrawing]
+    C --> D{Is amount ≤ freeCapital?<br/><br/>freeCapital = totalPledged − totalSold − pendingWithdrawal}
+    D -->|No: Not Enough Free Capital| E[REJECTED<br/>Transaction reverts with InsufficientFreeCapital error]
+    E --> F[Withdrawal Blocked<br/>Capital is locked to back live policies]
+    D -->|Yes: Enough Free Capital| G[ACCEPTED<br/>Request is logged and notice period timer starts]
     G --> H[Underwriter must wait for the deallocationNoticePeriod to end]
-    H --> I[2. After waiting, calls deallocateFromPool(poolId)]
+    H --> I[2. After waiting, calls deallocateFromPool poolId]
     I --> J{Is Notice Period over?}
-    J -- No --> K[REJECTED<br>Transaction reverts with NoticePeriodActive error]
+    J -->|No| K[REJECTED<br/>Transaction reverts with NoticePeriodActive error]
     K --> H
-    J -- Yes --> L[<font color="green">SUCCESS</font><br>Capital is de-allocated from the risk pool]
+    J -->|Yes| L[SUCCESS<br/>Capital is de-allocated from the risk pool]
   end
 
   %% Phase 2: Withdrawing from the System
-  subgraph "Phase 2: Withdrawing from the System (CapitalPool Contract)"
+  subgraph Phase2 ["Phase 2: Withdrawing from the System (CapitalPool Contract)"]
     L --> M[Capital is now considered 'free' inside the main CapitalPool]
-    M --> N[3. Underwriter calls executeWithdrawal() on the CapitalPool contract]
-    N --> O([<b>Funds Returned</b><br>Underwriter receives their capital])
+    M --> N[3. Underwriter calls executeWithdrawal on the CapitalPool contract]
+    N --> O[Funds Returned<br/>Underwriter receives their capital]
   end
 
-  style F fill:#ffeded,stroke:#ff5555,stroke-width:2px
-  style O fill:#e8f5e9,stroke:#55a65a,stroke-width:2px
+  %% Styling
+  classDef rejected fill:#ffeded,stroke:#ff5555,stroke-width:2px
+  classDef success fill:#e8f5e9,stroke:#55a65a,stroke-width:2px
+  
+  class F rejected
+  class O success
 ```
 
 
