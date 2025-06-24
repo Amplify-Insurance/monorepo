@@ -1,14 +1,16 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 /** Integration tests for CatInsurancePool using the real RewardDistributor */
 describe("CatInsurancePool Integration", function () {
-  let owner, riskManager, policyManager, capitalPool, lp1;
+  let owner, riskManager, policyManager, capitalPool, lp1, lp2;
   let usdc, rewardToken;
   let catShare, adapter, rewardDistributor, catPool;
+  const NOTICE_PERIOD = 30 * 24 * 60 * 60; // 30 days
 
   beforeEach(async () => {
-    [owner, riskManager, policyManager, capitalPool, lp1] = await ethers.getSigners();
+    [owner, riskManager, policyManager, capitalPool, lp1, lp2] = await ethers.getSigners();
 
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
@@ -41,6 +43,8 @@ describe("CatInsurancePool Integration", function () {
 
     await usdc.mint(lp1.address, ethers.parseUnits("10000", 6));
     await usdc.connect(lp1).approve(catPool.target, ethers.MaxUint256);
+    await usdc.mint(lp2.address, ethers.parseUnits("10000", 6));
+    await usdc.connect(lp2).approve(catPool.target, ethers.MaxUint256);
   });
 
   it("distributes protocol assets via RewardDistributor and allows claiming", async function () {
@@ -83,5 +87,67 @@ describe("CatInsurancePool Integration", function () {
 
     expect(await usdc.balanceOf(capitalPool.address)).to.equal(drawAmount);
     expect(await adapter.totalValueHeld()).to.equal(depositAmount - drawAmount);
+  });
+
+  it("mints shares based on adapter balance after yield", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    await catPool.connect(owner).flushToAdapter(depositAmount);
+    await adapter.setTotalValueHeld(depositAmount * 110n / 100n); // 10% yield
+
+    const totalSupply = await catShare.totalSupply();
+    const totalValue = await catPool.liquidUsdc();
+
+    await catPool.connect(lp2).depositLiquidity(depositAmount);
+
+    const effectiveSupply = totalSupply - 1000n; // exclude locked shares
+    const expectedShares = (depositAmount * effectiveSupply) / totalValue;
+    expect(await catShare.balanceOf(lp2.address)).to.equal(expectedShares);
+  });
+
+  it("allows withdrawing after notice pulling from adapter", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    await catPool.connect(owner).flushToAdapter(depositAmount);
+    await adapter.setTotalValueHeld(depositAmount);
+
+    const shares = await catShare.balanceOf(lp1.address);
+    await catPool.connect(lp1).requestWithdrawal(shares);
+    await time.increase(NOTICE_PERIOD);
+
+    await expect(catPool.connect(lp1).withdrawLiquidity(shares))
+      .to.emit(catPool, "CatLiquidityWithdrawn")
+      .withArgs(lp1.address, depositAmount, shares);
+  });
+
+  it("distributes rewards to multiple depositors", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    await catPool.connect(lp2).depositLiquidity(depositAmount);
+
+    const rewardAmount = ethers.parseEther("100");
+    await rewardToken.mint(riskManager.address, rewardAmount);
+    await rewardToken.connect(riskManager).approve(catPool.target, rewardAmount);
+
+    await catPool.connect(riskManager).receiveProtocolAssetsForDistribution(rewardToken.target, rewardAmount);
+
+    await rewardToken.mint(riskManager.address, rewardAmount);
+    await rewardToken.connect(riskManager).transfer(rewardDistributor.target, rewardAmount);
+
+    const totalSupply = await catShare.totalSupply();
+    const user1Shares = await catShare.balanceOf(lp1.address);
+    const user2Shares = await catShare.balanceOf(lp2.address);
+    const expected1 = (rewardAmount * user1Shares) / totalSupply;
+    const expected2 = (rewardAmount * user2Shares) / totalSupply;
+
+    expect(await catPool.getPendingProtocolAssetRewards(lp1.address, rewardToken.target)).to.equal(expected1);
+    expect(await catPool.getPendingProtocolAssetRewards(lp2.address, rewardToken.target)).to.equal(expected2);
+
+    await expect(catPool.connect(lp1).claimProtocolAssetRewards(rewardToken.target))
+      .to.emit(catPool, "ProtocolAssetRewardsClaimed")
+      .withArgs(lp1.address, rewardToken.target, expected1);
+    await expect(catPool.connect(lp2).claimProtocolAssetRewards(rewardToken.target))
+      .to.emit(catPool, "ProtocolAssetRewardsClaimed")
+      .withArgs(lp2.address, rewardToken.target, expected2);
   });
 });
