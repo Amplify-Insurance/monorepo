@@ -235,10 +235,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
       const dep = getDeployment(position.deployment)
       const rm = await getRiskManagerWithSigner(dep.riskManager)
       if (typeof rm.claimPremiumRewards === "function") {
-        await (await rm.claimPremiumRewards(position.poolId)).wait()
+        await (await rm.claimPremiumRewards([position.poolId])).wait()
       }
       if (typeof rm.claimDistressedAssets === "function") {
-        await (await rm.claimDistressedAssets(position.poolId)).wait()
+        await (await rm.claimDistressedAssets([position.poolId])).wait()
       }
     } catch (err) {
       console.error("Failed to claim rewards", err)
@@ -258,13 +258,11 @@ export default function UnderwritingPositions({ displayCurrency }) {
       for (const [depName, ids] of Object.entries(grouped)) {
         const dep = getDeployment(depName)
         const rm = await getRiskManagerWithSigner(dep.riskManager)
-        for (const id of ids) {
-          if (typeof rm.claimPremiumRewards === "function") {
-            await (await rm.claimPremiumRewards(id)).wait()
-          }
-          if (typeof rm.claimDistressedAssets === "function") {
-            await (await rm.claimDistressedAssets(id)).wait()
-          }
+        if (typeof rm.claimPremiumRewards === "function") {
+          await (await rm.claimPremiumRewards(ids)).wait()
+        }
+        if (typeof rm.claimDistressedAssets === "function") {
+          await (await rm.claimDistressedAssets(ids)).wait()
         }
       }
     } catch (err) {
@@ -280,7 +278,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
       const dep = getDeployment(position.deployment)
       const rm = await getRiskManagerWithSigner(dep.riskManager)
       if (typeof rm.claimDistressedAssets === "function") {
-        await (await rm.claimDistressedAssets(position.poolId)).wait()
+        await (await rm.claimDistressedAssets([position.poolId])).wait()
       }
     } catch (err) {
       console.error("Failed to claim distressed assets", err)
@@ -302,10 +300,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
       for (const [depName, ids] of Object.entries(grouped)) {
         const dep = getDeployment(depName)
         const rm = await getRiskManagerWithSigner(dep.riskManager)
-        for (const id of ids) {
-          if (typeof rm.claimDistressedAssets === "function") {
-            await (await rm.claimDistressedAssets(id)).wait()
-          }
+        if (typeof rm.claimDistressedAssets === "function") {
+          await (await rm.claimDistressedAssets(ids)).wait()
         }
       }
     } catch (err) {

@@ -746,9 +746,9 @@
         {
                 "inputs": [
                         {
-                                "internalType": "uint256",
-                                "name": "_poolId",
-                                "type": "uint256"
+                                "internalType": "uint256[]",
+                                "name": "_poolIds",
+                                "type": "uint256[]"
                         },
                         {
                                 "internalType": "uint256",
@@ -764,9 +764,9 @@
         {
                 "inputs": [
                         {
-                                "internalType": "uint256",
-                                "name": "_poolId",
-                                "type": "uint256"
+                                "internalType": "uint256[]",
+                                "name": "_poolIds",
+                                "type": "uint256[]"
                         }
                 ],
                 "name": "deallocateFromPool",
@@ -777,9 +777,9 @@
         {
                 "inputs": [
                         {
-                                "internalType": "uint256",
-                                "name": "_poolId",
-                                "type": "uint256"
+                                "internalType": "uint256[]",
+                                "name": "_poolIds",
+                                "type": "uint256[]"
                         }
                 ],
                 "name": "claimPremiumRewards",
@@ -790,9 +790,9 @@
         {
                 "inputs": [
                         {
-                                "internalType": "uint256",
-                                "name": "_poolId",
-                                "type": "uint256"
+                                "internalType": "uint256[]",
+                                "name": "_poolIds",
+                                "type": "uint256[]"
                         }
                 ],
                 "name": "claimDistressedAssets",

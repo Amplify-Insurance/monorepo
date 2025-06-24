@@ -651,7 +651,7 @@ const MAX_ALLOCATIONS = 5;
                 await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
                 await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
 
-                await riskManager.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                await riskManager.connect(underwriter1).claimPremiumRewards([POOL_ID_1]);
                 expect(await mockRewardDistributor.claimCallCount()).to.equal(1);
                 expect(await mockRewardDistributor.lastClaimUser()).to.equal(underwriter1.address);
                 expect(await mockRewardDistributor.lastClaimPledge()).to.equal(amount);
@@ -659,7 +659,7 @@ const MAX_ALLOCATIONS = 5;
 
             it("claimDistressedAssets should call the cat pool", async function () {
                 await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, 0, 0, 0, false, committee.address, 0);
-                await riskManager.connect(nonParty).claimDistressedAssets(POOL_ID_1);
+                await riskManager.connect(nonParty).claimDistressedAssets([POOL_ID_1]);
                 expect(await mockCatPool.claimProtocolRewardsCallCount()).to.equal(1);
                 expect(await mockCatPool.last_claimProtocolToken()).to.equal(mockUsdc.target);
                 expect(await mockCatPool.last_claimUser()).to.equal(nonParty.address);
@@ -706,7 +706,7 @@ const MAX_ALLOCATIONS = 5;
                 await realRM.connect(underwriter1).allocateCapital([POOL_ID_1]);
 
                 await distribute(reward, first);
-                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                await realRM.connect(underwriter1).claimPremiumRewards([POOL_ID_1]);
 
                 await mockCapitalPool.triggerOnCapitalDeposited(realRM.target, underwriter1.address, second);
                 await mockPoolRegistry.connect(owner).setPoolData(POOL_ID_1, mockUsdc.target, first + second, 0, 0, false, committee.address, 0);
@@ -716,7 +716,7 @@ const MAX_ALLOCATIONS = 5;
                 const pledgeNow = await realRM.underwriterPoolPledge(underwriter1.address, POOL_ID_1);
                 const expected = await realRD.pendingRewards(underwriter1.address, POOL_ID_1, mockUsdc.target, pledgeNow);
                 const before = await mockUsdc.balanceOf(underwriter1.address);
-                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                await realRM.connect(underwriter1).claimPremiumRewards([POOL_ID_1]);
                 const after = await mockUsdc.balanceOf(underwriter1.address);
                 expect(after - before).to.equal(expected);
             });
@@ -732,7 +732,7 @@ const MAX_ALLOCATIONS = 5;
                 await realRM.connect(underwriter1).allocateCapital([POOL_ID_1]);
 
                 await distribute(reward, pledge);
-                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                await realRM.connect(underwriter1).claimPremiumRewards([POOL_ID_1]);
 
                 await mockLossDistributor.setPendingLoss(underwriter1.address, POOL_ID_1, 0);
                 await mockCapitalPool.triggerOnCapitalWithdrawn(realRM.target, underwriter1.address, withdraw, false);
@@ -742,7 +742,7 @@ const MAX_ALLOCATIONS = 5;
                 const pledgeNow = await realRM.underwriterPoolPledge(underwriter1.address, POOL_ID_1);
                 const expected = await realRD.pendingRewards(underwriter1.address, POOL_ID_1, mockUsdc.target, pledgeNow);
                 const before = await mockUsdc.balanceOf(underwriter1.address);
-                await realRM.connect(underwriter1).claimPremiumRewards(POOL_ID_1);
+                await realRM.connect(underwriter1).claimPremiumRewards([POOL_ID_1]);
                 const after = await mockUsdc.balanceOf(underwriter1.address);
                 expect(after - before).to.equal(expected);
             });
