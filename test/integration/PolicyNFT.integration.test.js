@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 async function deployFixture() {
   const [owner, user] = await ethers.getSigners();
@@ -58,6 +59,20 @@ async function deployFixture() {
 }
 
 describe("PolicyNFT integration via PolicyManager", function () {
+  it("emits event when manager address updated", async function () {
+    const { owner, policyNFT, policyManager } = await loadFixture(deployFixture);
+
+    await expect(
+      policyNFT.connect(owner).setPolicyManagerAddress(owner.address)
+    )
+      .to.emit(policyNFT, "PolicyManagerAddressSet")
+      .withArgs(owner.address);
+
+    expect(await policyNFT.policyManagerContract()).to.equal(owner.address);
+
+    // set back for subsequent operations
+    await policyNFT.setPolicyManagerAddress(policyManager.target);
+  });
   it("mints a policy when purchasing cover", async function () {
     const { user, policyManager, policyNFT } = await loadFixture(deployFixture);
     const coverage = ethers.parseUnits("500", 6);
@@ -80,7 +95,9 @@ describe("PolicyNFT integration via PolicyManager", function () {
     await policyManager.connect(user).purchaseCover(0, coverage, premium);
 
     const extra = ethers.parseUnits("20", 6);
-    await policyManager.connect(user).addPremium(1, extra);
+    await expect(policyManager.connect(user).addPremium(1, extra))
+      .to.emit(policyNFT, "PolicyPremiumAccountUpdated")
+      .withArgs(1n, premium + extra, anyValue);
 
     const pol = await policyNFT.getPolicy(1);
     expect(pol.premiumDeposit).to.equal(premium + extra);
@@ -94,7 +111,9 @@ describe("PolicyNFT integration via PolicyManager", function () {
     await policyManager.connect(user).purchaseCover(0, coverage, premium);
 
     const inc = ethers.parseUnits("200", 6);
-    await policyManager.connect(user).increaseCover(1, inc);
+    await expect(policyManager.connect(user).increaseCover(1, inc))
+      .to.emit(policyNFT, "PendingIncreaseAdded")
+      .withArgs(1n, inc, anyValue);
 
     let pol = await policyNFT.getPolicy(1);
     expect(pol.pendingIncrease).to.equal(inc);
@@ -102,7 +121,9 @@ describe("PolicyNFT integration via PolicyManager", function () {
 
     await time.increaseTo(activation + 1n);
     const extra = ethers.parseUnits("5", 6);
-    await policyManager.connect(user).addPremium(1, extra);
+    await expect(policyManager.connect(user).addPremium(1, extra))
+      .to.emit(policyNFT, "PolicyCoverageIncreased")
+      .withArgs(1n, coverage + inc);
 
     pol = await policyNFT.getPolicy(1);
     expect(pol.coverage).to.equal(coverage + inc);
