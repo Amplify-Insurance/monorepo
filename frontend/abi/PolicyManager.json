@@ -196,6 +196,19 @@
 		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newPeriod",
+				"type": "uint256"
+			}
+		],
+		"name": "CoverCooldownPeriodSet",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
 				"indexed": true,
 				"internalType": "address",
 				"name": "previousOwner",
@@ -214,19 +227,6 @@
 	{
 		"inputs": [],
 		"name": "BPS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-                "name": "coverCooldownPeriod",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -318,6 +318,37 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "coverCooldownPeriod",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_additionalCoverage",
+				"type": "uint256"
+			}
+		],
+		"name": "increaseCover",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -495,6 +526,19 @@
 			}
 		],
 		"name": "setCatPremiumShareBps",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_newPeriod",
+				"type": "uint256"
+			}
+		],
+		"name": "setCoverCooldownPeriod",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
