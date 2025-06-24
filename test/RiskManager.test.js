@@ -115,6 +115,18 @@ const MAX_ALLOCATIONS = 5;
                 .to.be.revertedWith("Invalid max");
         });
 
+        it("Should update deallocation notice period", async function () {
+            await expect(riskManager.connect(owner).setDeallocationNoticePeriod(42))
+                .to.emit(riskManager, "DeallocationNoticePeriodSet").withArgs(42);
+            expect(await riskManager.deallocationNoticePeriod()).to.equal(42);
+        });
+
+        it("Should restrict deallocation notice period change to owner", async function () {
+            await expect(
+                riskManager.connect(nonParty).setDeallocationNoticePeriod(1)
+            ).to.be.revertedWithCustomError(riskManager, "OwnableUnauthorizedAccount");
+        });
+
         it("Should restrict addProtocolRiskPool to owner", async function () {
             const model = { base: 0, slope1: 0, slope2: 0, kink: 0 };
             await riskManager.connect(owner).setAddresses(
@@ -203,6 +215,59 @@ const MAX_ALLOCATIONS = 5;
                 await mockCapitalPool.setUnderwriterAdapterAddress(underwriter1.address, nonParty.address);
                 await riskManager.connect(underwriter1).allocateCapital([POOL_ID_1]);
                 await riskManager.connect(owner).setDeallocationNoticePeriod(0);
+            });
+
+            it("Should emit DeallocationRequested when requesting deallocation", async function () {
+                const tx = await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE);
+                const block = await ethers.provider.getBlock(tx.blockNumber);
+                await expect(tx)
+                    .to.emit(riskManager, "DeallocationRequested")
+                    .withArgs(underwriter1.address, POOL_ID_1, HALF_PLEDGE, block.timestamp);
+                expect(
+                    await riskManager.deallocationRequestAmount(underwriter1.address, POOL_ID_1)
+                ).to.equal(HALF_PLEDGE);
+            });
+
+            it("Should revert if request amount exceeds pledge", async function () {
+                const tooMuch = PLEDGE_AMOUNT + 1n;
+                await expect(
+                    riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, tooMuch)
+                ).to.be.revertedWith("Amount exceeds pledge");
+            });
+
+            it("Should revert if there is not enough free capital", async function () {
+                await mockPoolRegistry.connect(owner).setPoolData(
+                    POOL_ID_1,
+                    mockUsdc.target,
+                    PLEDGE_AMOUNT,
+                    HALF_PLEDGE,
+                    HALF_PLEDGE,
+                    false,
+                    ethers.ZeroAddress,
+                    0
+                );
+                await expect(
+                    riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE)
+                ).to.be.revertedWithCustomError(riskManager, "InsufficientFreeCapital");
+            });
+
+            it("Should revert if a request is already pending", async function () {
+                await riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE);
+                await expect(
+                    riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, HALF_PLEDGE)
+                ).to.be.revertedWithCustomError(riskManager, "DeallocationRequestPending");
+            });
+
+            it("Should revert if pool id is invalid when requesting", async function () {
+                await expect(
+                    riskManager.connect(underwriter1).requestDeallocateFromPool(99, HALF_PLEDGE)
+                ).to.be.revertedWith("Invalid poolId");
+            });
+
+            it("Should revert if amount is zero when requesting", async function () {
+                await expect(
+                    riskManager.connect(underwriter1).requestDeallocateFromPool(POOL_ID_1, 0)
+                ).to.be.revertedWith("Invalid amount");
             });
 
             it("Should allow an underwriter to deallocate from a pool with no losses", async function() {
