@@ -1,0 +1,99 @@
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+// Simple fixture to deploy PoolRegistry and a mock token
+async function deployFixture() {
+  const [owner, riskManager, other] = await ethers.getSigners();
+
+  const MockERC20 = await ethers.getContractFactory("MockERC20");
+  const token = await MockERC20.deploy("Mock Token", "MTK", 18);
+  await token.waitForDeployment();
+
+  const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
+  const registry = await PoolRegistry.deploy(owner.address, riskManager.address);
+  await registry.waitForDeployment();
+
+  const rateModel = {
+    base: ethers.parseUnits("1", 18),
+    slope1: ethers.parseUnits("2", 18),
+    slope2: ethers.parseUnits("3", 18),
+    kink: ethers.parseUnits("0.8", 18),
+  };
+
+  return { owner, riskManager, registry, token, rateModel };
+}
+
+describe("PoolRegistry integration", function () {
+  it("allows risk manager to create a pool and stores data", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 500);
+    const poolId = 0;
+
+    expect(poolId).to.equal(0);
+    expect(await registry.getPoolCount()).to.equal(1);
+
+    const poolData = await registry.getPoolData(poolId);
+    expect(poolData.protocolTokenToCover).to.equal(token.target);
+    expect(poolData.totalCapitalPledgedToPool).to.equal(0);
+    expect(poolData.totalCoverageSold).to.equal(0);
+    expect(poolData.isPaused).to.be.false;
+    expect(poolData.feeRecipient).to.equal(ethers.ZeroAddress);
+    expect(poolData.claimFeeBps).to.equal(500);
+
+    const rm = await registry.getPoolRateModel(poolId);
+    expect(rm.base).to.equal(rateModel.base);
+    expect(rm.slope1).to.equal(rateModel.slope1);
+    expect(rm.slope2).to.equal(rateModel.slope2);
+    expect(rm.kink).to.equal(rateModel.kink);
+  });
+
+  it("handles capital allocation and deallocation", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const adapter = ethers.Wallet.createRandom().address;
+    const amount = ethers.parseUnits("1000", 18);
+
+    await registry
+      .connect(riskManager)
+      .updateCapitalAllocation(0, adapter, amount, true);
+
+    let poolData = await registry.getPoolData(0);
+    expect(poolData.totalCapitalPledgedToPool).to.equal(amount);
+    expect(await registry.getCapitalPerAdapter(0, adapter)).to.equal(amount);
+    let adapters = await registry.getPoolActiveAdapters(0);
+    expect(adapters).to.deep.equal([adapter]);
+
+    await registry
+      .connect(riskManager)
+      .updateCapitalAllocation(0, adapter, amount, false);
+
+    poolData = await registry.getPoolData(0);
+    expect(poolData.totalCapitalPledgedToPool).to.equal(0);
+    expect(await registry.getCapitalPerAdapter(0, adapter)).to.equal(0);
+    adapters = await registry.getPoolActiveAdapters(0);
+    expect(adapters).to.have.lengthOf(0);
+  });
+
+  it("allows pausing and unpausing of a pool", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    await registry.connect(riskManager).setPauseState(0, true);
+    let poolData = await registry.getPoolData(0);
+    expect(poolData.isPaused).to.be.true;
+
+    await registry.connect(riskManager).setPauseState(0, false);
+    poolData = await registry.getPoolData(0);
+    expect(poolData.isPaused).to.be.false;
+  });
+});
