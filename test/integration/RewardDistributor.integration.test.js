@@ -10,11 +10,12 @@ async function deployFixture() {
   const [owner, committee, underwriter] = await ethers.getSigners();
 
   // --- Deploy tokens and adapter ---
-  const MockERC20 = await ethers.getContractFactory("MockERC20");
-  const usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
+  const Token = await ethers.getContractFactory("ResetApproveERC20");
+  const usdc = await Token.deploy("USD Coin", "USDC", 6);
+  await usdc.mint(owner.address, ethers.parseUnits("1000000", 6));
 
-  const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
-  const adapter = await MockYieldAdapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
+  const Adapter = await ethers.getContractFactory("SimpleYieldAdapter");
+  const adapter = await Adapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
 
   // --- Deploy core protocol contracts ---
   const CatShare = await ethers.getContractFactory("CatShare");
@@ -264,5 +265,47 @@ describe("RewardDistributor Integration", function () {
     ]);
 
     expect(await usdc.balanceOf(underwriter.address)).to.equal(expected);
+  });
+
+  it("only risk manager can distribute rewards", async function () {
+    const { rewardDistributor } = await loadFixture(deployFixture);
+    await expect(
+      rewardDistributor.distribute(POOL_ID, ethers.ZeroAddress, 1, 1)
+    ).to.be.revertedWith("RD: Not RiskManager");
+  });
+
+  it("rewards accumulate over multiple distributions", async function () {
+    const {
+      riskManager,
+      rewardDistributor,
+      poolRegistry,
+      usdc,
+      underwriter,
+    } = await loadFixture(deployFixture);
+
+    let [, totalPledged] = await poolRegistry.getPoolData(POOL_ID);
+    let rm = await impersonate(riskManager.target);
+    await rewardDistributor.connect(rm).distribute(POOL_ID, usdc.target, REWARD_AMOUNT, totalPledged);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    [, totalPledged] = await poolRegistry.getPoolData(POOL_ID);
+    rm = await impersonate(riskManager.target);
+    await rewardDistributor.connect(rm).distribute(POOL_ID, usdc.target, REWARD_AMOUNT, totalPledged);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
+    const pledge = await riskManager.underwriterPoolPledge(underwriter.address, POOL_ID);
+    const expected = await rewardDistributor.pendingRewards(underwriter.address, POOL_ID, usdc.target, pledge);
+    expect(expected).to.equal(REWARD_AMOUNT * 2n);
+    const before = await usdc.balanceOf(underwriter.address);
+    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    const after = await usdc.balanceOf(underwriter.address);
+    expect(after - before).to.equal(expected);
+  });
+
+  it("claimForCatPool restricted to CatPool", async function () {
+    const { rewardDistributor, usdc, underwriter } = await loadFixture(deployFixture);
+    await expect(
+      rewardDistributor.claimForCatPool(underwriter.address, POOL_ID, usdc.target, PLEDGE_AMOUNT)
+    ).to.be.revertedWith("RD: Not CatPool");
   });
 });
