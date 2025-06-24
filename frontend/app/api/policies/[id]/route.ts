@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { policyNft } from '../../../../lib/policyNft'
 import { getPoolRegistry } from '@/lib/poolRegistry'
 import { getPolicyManager } from '@/lib/policyManager'
+import bnToString from '../../../../lib/bnToString'
 import deployments from '../../../config/deployments'
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -38,9 +39,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       id: Number(id),
       deployment,
       policy: {
-        ...policy,
-        pendingIncrease,
-        increaseActivationTimestamp,
+        ...bnToString(policy),
+        pendingIncrease: bnToString(pendingIncrease),
+        increaseActivationTimestamp: bnToString(increaseActivationTimestamp),
       },
     })
   } catch (err: any) {

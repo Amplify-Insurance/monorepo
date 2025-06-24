@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { policyNft } from '@/lib/policyNft'
 import { getPoolRegistry } from '@/lib/poolRegistry'
 import { getPolicyManager } from '@/lib/policyManager'
+import bnToString from '../../../../../lib/bnToString'
 import deployments from '../../../../config/deployments'
 
 export async function GET(
@@ -49,9 +50,11 @@ export async function GET(
           policies.push({
             id: Number(i),
             deployment,
-            ...p,
-            pendingIncrease,
-            increaseActivationTimestamp,
+            ...bnToString(p),
+            pendingIncrease: bnToString(pendingIncrease),
+            increaseActivationTimestamp: bnToString(
+              increaseActivationTimestamp,
+            ),
           })
         }
       } catch {
