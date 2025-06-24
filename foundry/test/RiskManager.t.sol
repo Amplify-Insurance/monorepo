@@ -139,8 +139,10 @@ function testDeallocateRealizesLoss() public {
 function testClaimPremiumRewards() public {
     cp.triggerOnCapitalDeposited(address(rm), underwriter, 1000);
     pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
+    uint256[] memory ids = new uint256[](1);
+    ids[0] = 0;
     vm.prank(underwriter);
-    rm.claimPremiumRewards(0);
+    rm.claimPremiumRewards(ids);
     assertEq(rd.claimCallCount(), 1);
     assertEq(rd.lastClaimUser(), underwriter);
     assertEq(rd.lastClaimPoolId(), 0);
@@ -150,8 +152,10 @@ function testClaimPremiumRewards() public {
 
 function testClaimDistressedAssets() public {
     pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
+    uint256[] memory ids2 = new uint256[](1);
+    ids2[0] = 0;
     vm.prank(underwriter);
-    rm.claimDistressedAssets(0);
+    rm.claimDistressedAssets(ids2);
     assertEq(cat.claimProtocolRewardsCallCount(), 1);
     assertEq(cat.last_claimProtocolToken(), address(token));
 }

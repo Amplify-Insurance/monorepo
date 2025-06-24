@@ -125,7 +125,7 @@ describe("RewardDistributor Integration", function () {
     const pledgeNow = await riskManager.underwriterPoolPledge(underwriter.address, POOL_ID);
     const expected = await rewardDistributor.pendingRewards(underwriter.address, POOL_ID, usdc.target, pledgeNow);
     const before = await usdc.balanceOf(underwriter.address);
-    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    await riskManager.connect(underwriter).claimPremiumRewards([POOL_ID]);
     const after = await usdc.balanceOf(underwriter.address);
     expect(after - before).to.equal(expected);
   });
@@ -146,7 +146,7 @@ describe("RewardDistributor Integration", function () {
     let rm = await impersonate(riskManager.target);
     await rewardDistributor.connect(rm).distribute(POOL_ID, usdc.target, REWARD_AMOUNT, totalPledged);
     await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
-    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    await riskManager.connect(underwriter).claimPremiumRewards([POOL_ID]);
 
     const extra = ethers.parseUnits("500", 6);
     await usdc.mint(underwriter.address, extra);
@@ -164,7 +164,7 @@ describe("RewardDistributor Integration", function () {
     const pledgeNow = await riskManager.underwriterPoolPledge(underwriter.address, POOL_ID);
     const expected = await rewardDistributor.pendingRewards(underwriter.address, POOL_ID, usdc.target, pledgeNow);
     const before = await usdc.balanceOf(underwriter.address);
-    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    await riskManager.connect(underwriter).claimPremiumRewards([POOL_ID]);
     const after = await usdc.balanceOf(underwriter.address);
     expect(after - before).to.equal(expected);
   });
@@ -189,7 +189,7 @@ describe("RewardDistributor Integration", function () {
     await ethers.provider.send("hardhat_stopImpersonatingAccount", [
       riskManager.target,
     ]);
-    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    await riskManager.connect(underwriter).claimPremiumRewards([POOL_ID]);
 
     const withdraw = ethers.parseUnits("400", 6);
     const cpSigner = await impersonate(capitalPool.target);
@@ -221,7 +221,7 @@ describe("RewardDistributor Integration", function () {
       pledgeNow
     );
     const before = await usdc.balanceOf(underwriter.address);
-    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    await riskManager.connect(underwriter).claimPremiumRewards([POOL_ID]);
     const after = await usdc.balanceOf(underwriter.address);
     expect(after - before).to.equal(expected);
   });
@@ -297,7 +297,7 @@ describe("RewardDistributor Integration", function () {
     const expected = await rewardDistributor.pendingRewards(underwriter.address, POOL_ID, usdc.target, pledge);
     expect(expected).to.equal(REWARD_AMOUNT * 2n);
     const before = await usdc.balanceOf(underwriter.address);
-    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    await riskManager.connect(underwriter).claimPremiumRewards([POOL_ID]);
     const after = await usdc.balanceOf(underwriter.address);
     expect(after - before).to.equal(expected);
   });

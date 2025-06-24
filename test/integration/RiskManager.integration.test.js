@@ -170,7 +170,7 @@ describe("RiskManager Integration", function () {
     await rewardDistributor.connect(rm).distribute(POOL_ID, usdc.target, reward, totalPledged);
     await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
     const before = await usdc.balanceOf(underwriter.address);
-    await riskManager.connect(underwriter).claimPremiumRewards(POOL_ID);
+    await riskManager.connect(underwriter).claimPremiumRewards([POOL_ID]);
     const after = await usdc.balanceOf(underwriter.address);
     expect(after).to.be.gt(before);
   });
@@ -208,7 +208,7 @@ describe("RiskManager Integration", function () {
     await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
 
     const before = await usdc.balanceOf(nonParty.address);
-    await riskManager.connect(nonParty).claimDistressedAssets(POOL_ID);
+    await riskManager.connect(nonParty).claimDistressedAssets([POOL_ID]);
     const after = await usdc.balanceOf(nonParty.address);
     expect(after).to.be.gt(before);
   });
