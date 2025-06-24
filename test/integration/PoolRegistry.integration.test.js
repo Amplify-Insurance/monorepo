@@ -148,4 +148,48 @@ describe("PoolRegistry integration", function () {
     expect(pool0.totalCapitalPledgedToPool).to.equal(amount);
     expect(pool1.totalCapitalPledgedToPool).to.equal(amount);
   });
+
+  it("allows owner to change risk manager and new manager gains permissions", async function () {
+    const { owner, riskManager, registry, token, rateModel } = await deployFixture();
+
+    const [, , newRM] = await ethers.getSigners();
+
+    await registry.connect(riskManager).addProtocolRiskPool(token.target, rateModel, 0);
+
+    await expect(registry.connect(owner).setRiskManager(newRM.address)).to.not.be.reverted;
+
+    await expect(
+      registry.connect(newRM).updateCoverageSold(0, 1, true)
+    ).to.not.be.reverted;
+
+    await expect(
+      registry.connect(riskManager).updateCoverageSold(0, 1, true)
+    ).to.be.revertedWith("PR: Not RiskManager");
+  });
+
+  it("returns payout data for adapters correctly", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry.connect(riskManager).addProtocolRiskPool(token.target, rateModel, 0);
+
+    const adapterA = ethers.Wallet.createRandom().address;
+    const adapterB = ethers.Wallet.createRandom().address;
+    const amountA = ethers.parseUnits("50", 18);
+    const amountB = ethers.parseUnits("75", 18);
+
+    await registry.connect(riskManager).updateCapitalAllocation(0, adapterA, amountA, true);
+    await registry.connect(riskManager).updateCapitalAllocation(0, adapterB, amountB, true);
+
+    const [adapters, capitalPerAdapter, total] = await registry.getPoolPayoutData(0);
+
+    const adapterList = Array.from(adapters);
+    const capitalList = Array.from(capitalPerAdapter);
+
+    expect(adapterList).to.have.members([adapterA, adapterB]);
+    const idxA = adapterList.indexOf(adapterA);
+    const idxB = adapterList.indexOf(adapterB);
+    expect(capitalList[idxA]).to.equal(amountA);
+    expect(capitalList[idxB]).to.equal(amountB);
+    expect(total).to.equal(amountA + amountB);
+  });
 });
