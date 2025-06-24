@@ -354,13 +354,13 @@ export default function UnderwritingPositions({ displayCurrency }) {
                         scope="col"
                         className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
-                        Protocol
+                        {positions[0].type === "stablecoin" ? "Insured Token" : "Protocol"}
                       </th>
                       <th
                         scope="col"
                         className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
-                        Pool
+                        {positions[0].type === "stablecoin" ? "Reserve Token" : "Pool"}
                       </th>
                       <th
                         scope="col"
