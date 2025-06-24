@@ -17,8 +17,8 @@ describe("PolicyManager Integration", function () {
   beforeEach(async () => {
     [owner, user] = await ethers.getSigners();
 
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
-    usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
+    const USDCoin = await ethers.getContractFactory("USDCoin");
+    usdc = await USDCoin.deploy();
 
     const CatShare = await ethers.getContractFactory("CatShare");
     const catShare = await CatShare.deploy();
@@ -250,5 +250,27 @@ describe("PolicyManager Integration", function () {
     await expect(
       policyManager.connect(user).purchaseCover(POOL_ID, 0, PREMIUM)
     ).to.be.revertedWithCustomError(policyManager, "InvalidAmount");
+  });
+
+  it("reverts purchase when premium below minimum", async function () {
+    const lowPremium = ethers.parseUnits("1", 6);
+    await expect(
+      policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, lowPremium)
+    ).to.be.revertedWithCustomError(policyManager, "DepositTooLow");
+  });
+
+  it("reverts second coverage increase if one is pending", async function () {
+    await policyManager.connect(owner).setCoverCooldownPeriod(24 * 60 * 60);
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+
+    await policyManager
+      .connect(user)
+      .increaseCover(1, ethers.parseUnits("100", 6));
+
+    await expect(
+      policyManager
+        .connect(user)
+        .increaseCover(1, ethers.parseUnits("50", 6))
+    ).to.be.revertedWith("PM: An increase is already pending");
   });
 });
