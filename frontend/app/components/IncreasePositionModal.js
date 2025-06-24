@@ -95,7 +95,7 @@ export default function IncreasePositionModal({ isOpen, onClose, position, displ
   if (!position) return null
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Increase Position - ${position.protocol}`}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Increase Position`}>
       <div className="space-y-6">
         {/* Current Position Info */}
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">

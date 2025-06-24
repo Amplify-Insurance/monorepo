@@ -17,7 +17,7 @@ export default function VoteConfirmationModal({
 
   const getVoteTypeInfo = () => {
     switch (voteType) {
-      case 1:
+      case 2:
         return {
           label: "Vote For",
           color: "text-green-700 dark:text-green-300",
@@ -25,7 +25,7 @@ export default function VoteConfirmationModal({
           borderColor: "border-green-200 dark:border-green-800",
           buttonColor: "bg-green-600 hover:bg-green-700",
         }
-      case 0:
+      case 1:
         return {
           label: "Vote Against",
           color: "text-red-700 dark:text-red-300",
@@ -33,7 +33,7 @@ export default function VoteConfirmationModal({
           borderColor: "border-red-200 dark:border-red-800",
           buttonColor: "bg-red-600 hover:bg-red-700",
         }
-      case 2:
+      case 3:
         return {
           label: "Abstain",
           color: "text-gray-700 dark:text-gray-300",

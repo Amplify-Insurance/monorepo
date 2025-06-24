@@ -284,7 +284,7 @@ export default function BondModal({ isOpen, onClose }) {
               )
               .map((p) => p.id)}
             value={selectedProtocol}
-            onChange={setSelectedProtocol}
+            onChange={(val) => setSelectedProtocol(String(val))}
             isOpen={protocolDropdownOpen}
             setIsOpen={setProtocolDropdownOpen}
             placeholder="Select protocol"
