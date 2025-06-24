@@ -9,16 +9,48 @@ const SLASH_BPS = 500; // 5%
 const UNSTAKE_LOCK_PERIOD = 7 * 24 * 60 * 60; // from StakingContract
 
 async function deployFixture() {
-  const [owner, riskManager, staker] = await ethers.getSigners();
+  const [owner, , staker] = await ethers.getSigners();
 
-  const ERC20 = await ethers.getContractFactory("MockERC20");
-  const token = await ERC20.deploy("Governance", "GOV", 18);
+  // Use real CatShare token instead of MockERC20
+  const Token = await ethers.getContractFactory("CatShare");
+  const token = await Token.deploy();
 
   const Staking = await ethers.getContractFactory("StakingContract");
   const staking = await Staking.deploy(token.target, owner.address);
 
-  const RiskManager = await ethers.getContractFactory("MockCommitteeRiskManager");
-  const rm = await RiskManager.deploy();
+  const RiskManager = await ethers.getContractFactory("RiskManager");
+  const rm = await RiskManager.deploy(owner.address);
+
+  const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
+  const registry = await PoolRegistry.deploy(owner.address, rm.target);
+
+  const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
+  const policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, owner.address);
+
+  const PolicyManager = await ethers.getContractFactory("PolicyManager");
+  const policyManager = await PolicyManager.deploy(policyNFT.target, owner.address);
+  await policyNFT.setPolicyManagerAddress(policyManager.target);
+
+  const CapitalPool = await ethers.getContractFactory("CapitalPool");
+  const capitalPool = await CapitalPool.deploy(owner.address, token.target);
+
+  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const catPool = await CatPool.deploy(token.target, token.target, ethers.ZeroAddress, owner.address);
+
+  const LossDistributor = await ethers.getContractFactory("LossDistributor");
+  const lossDist = await LossDistributor.deploy(rm.target);
+
+  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+  const rewardDist = await RewardDistributor.deploy(rm.target);
+
+  await rm.setAddresses(
+    capitalPool.target,
+    registry.target,
+    policyManager.target,
+    catPool.target,
+    lossDist.target,
+    rewardDist.target
+  );
 
   const Committee = await ethers.getContractFactory("Committee");
   const committee = await Committee.deploy(
@@ -30,8 +62,12 @@ async function deployFixture() {
     SLASH_BPS
   );
 
-  // link staking contract with the committee
   await staking.setCommitteeAddress(committee.target);
+  await rm.setCommittee(committee.target);
+
+  const rateModel = { base: 0, slope1: 0, slope2: 0, kink: 0 };
+  await rm.addProtocolRiskPool(token.target, rateModel, 0);
+  await rm.addProtocolRiskPool(token.target, rateModel, 0);
 
   await token.mint(staker.address, ethers.parseEther("3000"));
   await token.connect(staker).approve(staking.target, ethers.MaxUint256);
@@ -90,16 +126,47 @@ describe("StakingContract Integration", function () {
   });
 
   async function deployLongVotingFixture() {
-    const [owner, riskManager, staker] = await ethers.getSigners();
+    const [owner, , staker] = await ethers.getSigners();
 
-    const ERC20 = await ethers.getContractFactory("MockERC20");
-    const token = await ERC20.deploy("Governance", "GOV", 18);
+    const Token = await ethers.getContractFactory("CatShare");
+    const token = await Token.deploy();
 
     const Staking = await ethers.getContractFactory("StakingContract");
     const staking = await Staking.deploy(token.target, owner.address);
 
-    const RiskManager = await ethers.getContractFactory("MockCommitteeRiskManager");
-    const rm = await RiskManager.deploy();
+    const RiskManager = await ethers.getContractFactory("RiskManager");
+    const rm = await RiskManager.deploy(owner.address);
+
+    const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
+    const registry = await PoolRegistry.deploy(owner.address, rm.target);
+
+    const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
+    const policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, owner.address);
+
+    const PolicyManager = await ethers.getContractFactory("PolicyManager");
+    const policyManager = await PolicyManager.deploy(policyNFT.target, owner.address);
+    await policyNFT.setPolicyManagerAddress(policyManager.target);
+
+    const CapitalPool = await ethers.getContractFactory("CapitalPool");
+    const capitalPool = await CapitalPool.deploy(owner.address, token.target);
+
+    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const catPool = await CatPool.deploy(token.target, token.target, ethers.ZeroAddress, owner.address);
+
+    const LossDistributor = await ethers.getContractFactory("LossDistributor");
+    const lossDist = await LossDistributor.deploy(rm.target);
+
+    const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+    const rewardDist = await RewardDistributor.deploy(rm.target);
+
+    await rm.setAddresses(
+      capitalPool.target,
+      registry.target,
+      policyManager.target,
+      catPool.target,
+      lossDist.target,
+      rewardDist.target
+    );
 
     const LONG_VOTING_PERIOD = UNSTAKE_LOCK_PERIOD * 2;
     const Committee = await ethers.getContractFactory("Committee");
@@ -113,6 +180,11 @@ describe("StakingContract Integration", function () {
     );
 
     await staking.setCommitteeAddress(committee.target);
+    await rm.setCommittee(committee.target);
+
+    const rateModel = { base: 0, slope1: 0, slope2: 0, kink: 0 };
+    await rm.addProtocolRiskPool(token.target, rateModel, 0);
+    await rm.addProtocolRiskPool(token.target, rateModel, 0);
 
     await token.mint(staker.address, ethers.parseEther("3000"));
     await token.connect(staker).approve(staking.target, ethers.MaxUint256);
