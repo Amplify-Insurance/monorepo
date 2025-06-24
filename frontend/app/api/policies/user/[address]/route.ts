@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { policyNft } from '@/lib/policyNft'
 import { getPoolRegistry } from '@/lib/poolRegistry'
+import { getPolicyManager } from '@/lib/policyManager'
 import deployments from '../../../../config/deployments'
 
 export async function GET(
@@ -22,17 +23,36 @@ export async function GET(
         if (owner.toLowerCase() === addr) {
           const p = await policyNft.getPolicy(i)
           let deployment: string | null = null
+          let deploymentInfo: any = null
           for (const dep of deployments) {
             const pr = getPoolRegistry(dep.poolRegistry)
             try {
               const count = await pr.getPoolCount()
               if (BigInt(p.poolId) < count) {
                 deployment = dep.name
+                deploymentInfo = dep
                 break
               }
             } catch {}
           }
-          policies.push({ id: Number(i), deployment, ...p })
+          let pendingIncrease = 0n
+          let increaseActivationTimestamp = 0n
+          if (deploymentInfo) {
+            try {
+              const pm = getPolicyManager(deploymentInfo.policyManager, deploymentInfo.name)
+              const pending = await pm.pendingCoverIncreases(i, 0)
+              pendingIncrease = BigInt(pending.amount)
+              increaseActivationTimestamp = BigInt(pending.activationTimestamp)
+            } catch {}
+          }
+
+          policies.push({
+            id: Number(i),
+            deployment,
+            ...p,
+            pendingIncrease,
+            increaseActivationTimestamp,
+          })
         }
       } catch {
         /* token burned / does not exist — ignore */
