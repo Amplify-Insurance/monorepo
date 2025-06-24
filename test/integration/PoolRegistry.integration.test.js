@@ -92,10 +92,14 @@ describe("PoolRegistry integration", function () {
     await registry.connect(riskManager).setPauseState(0, true);
     let poolData = await registry.getPoolData(0);
     expect(poolData.isPaused).to.be.true;
+    const poolStruct = await registry.protocolRiskPools(0);
+    expect(poolStruct.pauseTimestamp).to.be.gt(0);
 
     await registry.connect(riskManager).setPauseState(0, false);
     poolData = await registry.getPoolData(0);
     expect(poolData.isPaused).to.be.false;
+    const poolStructAfter = await registry.protocolRiskPools(0);
+    expect(poolStructAfter.pauseTimestamp).to.equal(0);
   });
 
   it("updates pending withdrawal and coverage sold counts", async function () {
@@ -150,6 +154,19 @@ describe("PoolRegistry integration", function () {
     expect(pool1.totalCapitalPledgedToPool).to.equal(amount);
   });
 
+  it("allows resetting the fee recipient", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry.connect(riskManager).addProtocolRiskPool(token.target, rateModel, 0);
+
+    const recipient = ethers.Wallet.createRandom().address;
+    await registry.connect(riskManager).setFeeRecipient(0, recipient);
+    expect((await registry.getPoolData(0)).feeRecipient).to.equal(recipient);
+
+    await registry.connect(riskManager).setFeeRecipient(0, ethers.ZeroAddress);
+    expect((await registry.getPoolData(0)).feeRecipient).to.equal(ethers.ZeroAddress);
+  });
+
   it("allows owner to change risk manager and new manager gains permissions", async function () {
     const { owner, riskManager, registry, token, rateModel } = await deployFixture();
 
@@ -166,6 +183,23 @@ describe("PoolRegistry integration", function () {
     await expect(
       registry.connect(riskManager).updateCoverageSold(0, 1, true)
     ).to.be.revertedWith("PR: Not RiskManager");
+  });
+
+  it("prevents non-owner from changing the risk manager", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    const [, nonOwner] = await ethers.getSigners();
+
+    await registry.connect(riskManager).addProtocolRiskPool(token.target, rateModel, 0);
+
+    await expect(
+      registry.connect(nonOwner).setRiskManager(nonOwner.address)
+    ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
+
+    // ensure original manager still has permissions
+    await expect(
+      registry.connect(riskManager).updateCoverageSold(0, 1, true)
+    ).to.not.be.reverted;
   });
 
   it("returns payout data for adapters correctly", async function () {
@@ -192,6 +226,17 @@ describe("PoolRegistry integration", function () {
     expect(capitalList[idxA]).to.equal(amountA);
     expect(capitalList[idxB]).to.equal(amountB);
     expect(total).to.equal(amountA + amountB);
+  });
+
+  it("returns empty payout data when no adapters", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry.connect(riskManager).addProtocolRiskPool(token.target, rateModel, 0);
+
+    const [adapters, amounts, total] = await registry.getPoolPayoutData(0);
+    expect(adapters).to.deep.equal([]);
+    expect(amounts).to.deep.equal([]);
+    expect(total).to.equal(0);
   });
 
   it("prevents non-risk manager from modifying pools", async function () {
