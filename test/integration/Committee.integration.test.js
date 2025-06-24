@@ -14,11 +14,11 @@ describe("Committee Integration", function () {
     const SLASH_BPS = 500;
     const BOND = ethers.parseEther("1000");
 
-    let owner, proposer, voter;
+    let owner, proposer, voter, nonStaker;
     let govToken, staking, riskManager, committee;
 
     beforeEach(async function () {
-        [owner, proposer, voter] = await ethers.getSigners();
+        [owner, proposer, voter, nonStaker] = await ethers.getSigners();
 
         const TokenFactory = await ethers.getContractFactory(MockERC20);
         govToken = await TokenFactory.deploy("Gov", "GOV", 18);
@@ -41,7 +41,7 @@ describe("Committee Integration", function () {
 
         await staking.connect(owner).setCommitteeAddress(committee.target);
 
-        for (const user of [proposer, voter]) {
+        for (const user of [proposer, voter, nonStaker]) {
             await govToken.mint(user.address, ethers.parseEther("2000"));
             await govToken.connect(user).approve(staking.target, ethers.MaxUint256);
             await govToken.connect(user).approve(committee.target, ethers.MaxUint256);
@@ -137,5 +137,29 @@ describe("Committee Integration", function () {
 
         expect(after).to.equal(before); // bond was slashed
         expect(await committee.activeProposalForPool(1)).to.equal(false);
+    });
+
+    it("reverts when a non-staker tries to create a proposal", async function () {
+        await expect(
+            committee.connect(nonStaker).createProposal(2, 1, BOND)
+        ).to.be.revertedWith("Must be a staker");
+    });
+
+    it("reverts when unpause proposal includes a bond", async function () {
+        await expect(
+            committee.connect(proposer).createProposal(2, 0, BOND)
+        ).to.be.revertedWith("No bond for unpause");
+    });
+
+    it("reverts when creating a second proposal for the same pool", async function () {
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await expect(
+            committee.connect(voter).createProposal(1, 1, BOND)
+        ).to.be.revertedWith("Proposal already exists");
+    });
+
+    it("reverts if executing before the voting period ends", async function () {
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await expect(committee.executeProposal(1)).to.be.revertedWith("Voting not over");
     });
 });
