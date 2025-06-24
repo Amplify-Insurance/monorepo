@@ -141,7 +141,7 @@ describe("LossDistributor Integration", function () {
     const account = await capitalPool.getUnderwriterAccount(underwriter.address);
     await capitalPool.connect(underwriter).requestWithdrawal(account.masterShares);
     await time.increase(1);
-    await expect(capitalPool.connect(underwriter).executeWithdrawal())
+    await expect(capitalPool.connect(underwriter).executeWithdrawal(0))
       .to.emit(capitalPool, "LossesApplied")
       .withArgs(underwriter.address, COVERAGE, true);
     expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(0);
@@ -170,7 +170,7 @@ describe("LossDistributor Integration", function () {
     const half = account.masterShares / 2n;
     await capitalPool.connect(underwriter).requestWithdrawal(half);
     await time.increase(1);
-    await expect(capitalPool.connect(underwriter).executeWithdrawal())
+    await expect(capitalPool.connect(underwriter).executeWithdrawal(0))
       .to.emit(capitalPool, "LossesApplied")
       .withArgs(underwriter.address, COVERAGE, true);
     expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(0);
@@ -248,14 +248,14 @@ describe("LossDistributor Integration", function () {
     const acc1 = await capitalPool.getUnderwriterAccount(underwriter.address);
     await capitalPool.connect(underwriter).requestWithdrawal(acc1.masterShares);
     await time.increase(1);
-    await expect(capitalPool.connect(underwriter).executeWithdrawal())
+    await expect(capitalPool.connect(underwriter).executeWithdrawal(0))
       .to.emit(capitalPool, "LossesApplied")
       .withArgs(underwriter.address, expectedLoss1, true);
 
     const acc2 = await capitalPool.getUnderwriterAccount(secondUnderwriter.address);
     await capitalPool.connect(secondUnderwriter).requestWithdrawal(acc2.masterShares);
     await time.increase(1);
-    await expect(capitalPool.connect(secondUnderwriter).executeWithdrawal())
+    await expect(capitalPool.connect(secondUnderwriter).executeWithdrawal(0))
       .to.emit(capitalPool, "LossesApplied")
       .withArgs(secondUnderwriter.address, expectedLoss2, true);
 
@@ -288,7 +288,7 @@ describe("LossDistributor Integration", function () {
     const acc = await capitalPool.getUnderwriterAccount(secondUnderwriter.address);
     await capitalPool.connect(secondUnderwriter).requestWithdrawal(acc.masterShares);
     await time.increase(1);
-    await expect(capitalPool.connect(secondUnderwriter).executeWithdrawal())
+    await expect(capitalPool.connect(secondUnderwriter).executeWithdrawal(0))
       .to.emit(capitalPool, "LossesApplied")
       .withArgs(secondUnderwriter.address, expectedLoss, true);
   });
@@ -298,7 +298,7 @@ describe("LossDistributor Integration", function () {
     const acc = await base.capitalPool.getUnderwriterAccount(base.underwriter.address);
     await base.capitalPool.connect(base.underwriter).requestWithdrawal(acc.masterShares);
     await time.increase(1);
-    await base.capitalPool.connect(base.underwriter).executeWithdrawal();
+    await base.capitalPool.connect(base.underwriter).executeWithdrawal(0);
     return base;
   }
 
@@ -326,7 +326,7 @@ describe("LossDistributor Integration", function () {
     const acc = await capitalPool.getUnderwriterAccount(underwriter.address);
     await capitalPool.connect(underwriter).requestWithdrawal(acc.masterShares);
     await time.increase(1);
-    await expect(capitalPool.connect(underwriter).executeWithdrawal())
+    await expect(capitalPool.connect(underwriter).executeWithdrawal(0))
       .to.emit(capitalPool, "LossesApplied")
       .withArgs(underwriter.address, TOTAL_PLEDGE, true);
     expect(await riskManager.underwriterTotalPledge(underwriter.address)).to.equal(0);
