@@ -6,13 +6,13 @@ const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 async function deployFixture() {
   const [owner, user] = await ethers.getSigners();
 
-  const MockERC20 = await ethers.getContractFactory("MockERC20");
-  const usdc = await MockERC20.deploy("USD", "USD", 6);
+  const TestToken = await ethers.getContractFactory("ResetApproveERC20");
+  const usdc = await TestToken.deploy("USD Coin", "USDC", 6);
 
   const CatShare = await ethers.getContractFactory("CatShare");
   const catShare = await CatShare.deploy();
 
-  const YieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
+  const YieldAdapter = await ethers.getContractFactory("SimpleYieldAdapter");
   const adapter = await YieldAdapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
 
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
