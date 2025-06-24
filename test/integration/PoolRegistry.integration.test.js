@@ -1,12 +1,13 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-// Simple fixture to deploy PoolRegistry and a mock token
+// Simple fixture to deploy PoolRegistry and a real ERC20 token
 async function deployFixture() {
   const [owner, riskManager, other] = await ethers.getSigners();
 
-  const MockERC20 = await ethers.getContractFactory("MockERC20");
-  const token = await MockERC20.deploy("Mock Token", "MTK", 18);
+  // Use the actual CatShare token contract instead of a mock
+  const CatShare = await ethers.getContractFactory("CatShare");
+  const token = await CatShare.deploy();
   await token.waitForDeployment();
 
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
