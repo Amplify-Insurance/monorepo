@@ -4,8 +4,8 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("PolicyManager Integration", function () {
   let owner, user;
-  let usdc, poolRegistry, capitalPool, catPool, rewardDistributor, riskManager;
-  let policyNFT, policyManager;
+  let usdc, poolRegistry, capitalPool, catPool, rewardDistributor, lossDistributor;
+  let riskManager, policyNFT, policyManager;
 
   const POOL_ID = 0;
   const COVERAGE = ethers.parseUnits("10000", 6);
@@ -20,32 +20,21 @@ describe("PolicyManager Integration", function () {
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
 
-    const MockPoolRegistry = await ethers.getContractFactory("MockPoolRegistry");
-    poolRegistry = await MockPoolRegistry.deploy();
-    await poolRegistry.setPoolCount(1);
-    await poolRegistry.setPoolData(
-      POOL_ID,
-      usdc.target,
-      ethers.parseUnits("100000", 6),
-      0,
-      0,
-      false,
-      owner.address,
-      0
-    );
-    await poolRegistry.setRateModel(POOL_ID, RATE_MODEL);
-
-    const MockCapitalPool = await ethers.getContractFactory("MockCapitalPool");
-    capitalPool = await MockCapitalPool.deploy(owner.address, usdc.target);
-
     const CatShare = await ethers.getContractFactory("CatShare");
     const catShare = await CatShare.deploy();
 
-    const MockYieldAdapter = await ethers.getContractFactory("MockYieldAdapter");
-    const adapter = await MockYieldAdapter.deploy(usdc.target, ethers.ZeroAddress, owner.address);
+    const RiskManager = await ethers.getContractFactory("RiskManager");
+    riskManager = await RiskManager.deploy(owner.address);
+
+    const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
+    poolRegistry = await PoolRegistry.deploy(owner.address, riskManager.target);
+
+    const CapitalPool = await ethers.getContractFactory("CapitalPool");
+    capitalPool = await CapitalPool.deploy(owner.address, usdc.target);
+    await capitalPool.setRiskManager(riskManager.target);
 
     const CatPool = await ethers.getContractFactory("CatInsurancePool");
-    catPool = await CatPool.deploy(usdc.target, catShare.target, adapter.target, owner.address);
+    catPool = await CatPool.deploy(usdc.target, catShare.target, ethers.ZeroAddress, owner.address);
     await catShare.transferOwnership(catPool.target);
     await catPool.initialize();
 
@@ -53,8 +42,8 @@ describe("PolicyManager Integration", function () {
     rewardDistributor = await RewardDistributor.deploy(owner.address);
     await rewardDistributor.setCatPool(catPool.target);
 
-    const MockRiskManagerHook = await ethers.getContractFactory("MockRiskManagerHook");
-    riskManager = await MockRiskManagerHook.deploy();
+    const LossDistributor = await ethers.getContractFactory("LossDistributor");
+    lossDistributor = await LossDistributor.deploy(riskManager.target);
 
     const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
     policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, owner.address);
@@ -77,15 +66,31 @@ describe("PolicyManager Integration", function () {
       riskManager.target
     );
 
+    await riskManager.setAddresses(
+      capitalPool.target,
+      poolRegistry.target,
+      policyManager.target,
+      catPool.target,
+      lossDistributor.target,
+      rewardDistributor.target
+    );
+
+    // create pool and seed capital
+    await riskManager.addProtocolRiskPool(usdc.target, RATE_MODEL, 0);
+    await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+    const rm = await ethers.getSigner(riskManager.target);
+    await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+    await poolRegistry.connect(rm).updateCapitalAllocation(POOL_ID, owner.address, ethers.parseUnits("100000", 6), true);
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+
     await usdc.mint(user.address, ethers.parseUnits("1000", 6));
     await usdc.connect(user).approve(policyManager.target, ethers.MaxUint256);
   });
 
   it("purchases cover and mints a policy", async function () {
-    const tx = await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
-    await expect(tx)
-      .to.emit(riskManager, "CoverageUpdated")
-      .withArgs(POOL_ID, COVERAGE, true);
+    await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
+    const [, , totalSold] = await poolRegistry.getPoolData(POOL_ID);
+    expect(totalSold).to.equal(COVERAGE);
     expect(await policyNFT.nextId()).to.equal(2);
   });
 
@@ -136,9 +141,7 @@ describe("PolicyManager Integration", function () {
     await policyManager.connect(user).purchaseCover(POOL_ID, COVERAGE, PREMIUM);
 
     const ADD_COVER = ethers.parseUnits("5000", 6);
-    await expect(policyManager.connect(user).increaseCover(1, ADD_COVER))
-      .to.emit(riskManager, "CoverageUpdated")
-      .withArgs(POOL_ID, ADD_COVER, true);
+    await policyManager.connect(user).increaseCover(1, ADD_COVER);
 
     await time.increase(24 * 60 * 60 + 1);
     await policyManager.connect(user).addPremium(1, ethers.parseUnits("1", 6));
@@ -146,6 +149,8 @@ describe("PolicyManager Integration", function () {
     const info = await policyNFT.getPolicy(1);
     expect(info.coverage).to.equal(COVERAGE + ADD_COVER);
     expect(info.pendingIncrease).to.equal(0);
+    const [, , totalSold] = await poolRegistry.getPoolData(POOL_ID);
+    expect(totalSold).to.equal(COVERAGE + ADD_COVER);
   });
 
   it("lapses policy when premium is exhausted", async function () {
@@ -153,9 +158,9 @@ describe("PolicyManager Integration", function () {
 
     await time.increase(SECS_YEAR * 2);
 
-    await expect(policyManager.connect(user).lapsePolicy(1))
-      .to.emit(riskManager, "CoverageUpdated")
-      .withArgs(POOL_ID, COVERAGE, false);
+    await policyManager.connect(user).lapsePolicy(1);
+    const [, , totalSold] = await poolRegistry.getPoolData(POOL_ID);
+    expect(totalSold).to.equal(0);
 
     await expect(policyNFT.ownerOf(1)).to.be.revertedWithCustomError(policyNFT, "ERC721NonexistentToken");
   });
