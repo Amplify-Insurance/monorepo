@@ -227,9 +227,73 @@ describe("Committee Integration", function () {
         ).to.be.revertedWith("Proposal already exists");
     });
 
+    it("defeats proposal if quorum not met", async function () {
+        await loadFixture(deployFixture);
+        await committee.connect(voter).createProposal(1, 1, BOND);
+        await committee.connect(voter).vote(1, 2);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+
+        const proposal = await committee.proposals(1);
+        expect(proposal.status).to.equal(3); // Defeated
+        expect(await committee.activeProposalForPool(1)).to.equal(false);
+
+        const refund = BOND - (BOND * BigInt(SLASH_BPS) / 10000n);
+        expect(await govToken.balanceOf(voter.address)).to.equal(
+            ethers.parseEther("2000") - ethers.parseEther("500") - BOND + refund
+        );
+    });
+
+    it("defeats proposal on tie vote", async function () {
+        await loadFixture(deployFixture);
+        await staking.connect(nonStaker).stake(ethers.parseEther("1000"));
+
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await committee.connect(proposer).vote(1, 2);
+        await committee.connect(nonStaker).vote(1, 1);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+
+        const proposal = await committee.proposals(1);
+        expect(proposal.status).to.equal(3); // Defeated
+        expect(await committee.activeProposalForPool(1)).to.equal(false);
+    });
+
     it("reverts if executing before the voting period ends", async function () {
         await loadFixture(deployFixture);
         await committee.connect(proposer).createProposal(1, 1, BOND);
         await expect(committee.executeProposal(1)).to.be.revertedWith("Voting not over");
+    });
+
+    it("only allows RiskManager to call receiveFees", async function () {
+        await loadFixture(deployFixture);
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await expect(
+            committee.connect(proposer).receiveFees(1, { value: ethers.parseEther("1") })
+        ).to.be.revertedWith("Committee: Not RiskManager");
+    });
+
+    it("reverts reward claim for non 'For' voter", async function () {
+        await loadFixture(deployFixture);
+        await committee.connect(proposer).createProposal(1, 1, BOND);
+        await committee.connect(proposer).vote(1, 2);
+        await committee.connect(voter).vote(1, 2);
+        await committee.connect(nonStaker).vote(1, 1);
+
+        await time.increase(VOTING_PERIOD + 1);
+        await committee.executeProposal(1);
+        await ethers.provider.send("hardhat_impersonateAccount", [riskManager.target]);
+        await ethers.provider.send("hardhat_setBalance", [riskManager.target, "0x1000000000000000000"]);
+        const rm = await ethers.getSigner(riskManager.target);
+        await committee.connect(rm).receiveFees(1, { value: ethers.parseEther("1") });
+        await ethers.provider.send("hardhat_stopImpersonatingAccount", [riskManager.target]);
+        await time.increase(CHALLENGE_PERIOD + 1);
+        await committee.resolvePauseBond(1);
+
+        await expect(
+            committee.connect(nonStaker).claimReward(1)
+        ).to.be.revertedWith("Must have voted 'For' to claim rewards");
     });
 });
