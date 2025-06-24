@@ -168,4 +168,69 @@ describe("StakingContract Integration", function () {
       "NotCommittee"
     );
   });
+
+  it("tracks vote timestamp when voting", async function () {
+    const { staker, staking, committee } = await loadFixture(deployFixture);
+
+    await staking.connect(staker).stake(STAKE);
+    await committee.connect(staker).createProposal(1, 0, 0);
+    await committee.connect(staker).vote(1, 2);
+
+    expect(await staking.lastVoteTime(staker.address)).to.be.gt(0);
+  });
+
+  it("clears vote timestamp after unstaking post execution", async function () {
+    const { staker, staking, committee } = await loadFixture(deployFixture);
+
+    await staking.connect(staker).stake(STAKE);
+    await committee.connect(staker).createProposal(1, 0, 0);
+    await committee.connect(staker).vote(1, 2);
+
+    await time.increase(VOTING_PERIOD + 1);
+    await committee.executeProposal(1);
+
+    await staking.connect(staker).unstake(STAKE);
+
+    expect(await staking.lastVoteTime(staker.address)).to.equal(0);
+  });
+
+  it("reverts if a non-committee calls recordVote", async function () {
+    const { staker, staking } = await loadFixture(deployFixture);
+
+    await expect(
+      staking.connect(staker).recordVote(staker.address, 1)
+    ).to.be.revertedWithCustomError(staking, "NotCommittee");
+  });
+
+  it("reverts if committee slashes more than staked", async function () {
+    const { staker, staking, committee } = await loadFixture(deployFixture);
+
+    await staking.connect(staker).stake(STAKE);
+
+    await ethers.provider.send("hardhat_impersonateAccount", [committee.target]);
+    const committeeSigner = await ethers.getSigner(committee.target);
+    await ethers.provider.send("hardhat_setBalance", [committee.target, "0x1000000000000000000"]);
+
+    await expect(
+      staking.connect(committeeSigner).slash(staker.address, STAKE + 1n)
+    ).to.be.revertedWithCustomError(staking, "InsufficientStakedBalance");
+
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [committee.target]);
+  });
+
+  it("reverts if committee slashes zero amount", async function () {
+    const { staker, staking, committee } = await loadFixture(deployFixture);
+
+    await staking.connect(staker).stake(STAKE);
+
+    await ethers.provider.send("hardhat_impersonateAccount", [committee.target]);
+    const committeeSigner = await ethers.getSigner(committee.target);
+    await ethers.provider.send("hardhat_setBalance", [committee.target, "0x1000000000000000000"]);
+
+    await expect(
+      staking.connect(committeeSigner).slash(staker.address, 0)
+    ).to.be.revertedWithCustomError(staking, "InvalidAmount");
+
+    await ethers.provider.send("hardhat_stopImpersonatingAccount", [committee.target]);
+  });
 });
