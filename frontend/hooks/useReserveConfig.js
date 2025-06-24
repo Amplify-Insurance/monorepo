@@ -4,7 +4,7 @@ import { getCapitalPool } from '../lib/capitalPool'
 import { getPolicyManager } from '../lib/policyManager'
 import deployments from '../app/config/deployments'
 
-export default function useReserveConfig(deployment) {
+export default function useReserveConfig(deployment, poolId = 0) {
   const [config, setConfig] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -18,7 +18,7 @@ export default function useReserveConfig(deployment) {
         const pm = getPolicyManager(dep.policyManager, dep.name)
         const [cooldown, poolData, notice] = await Promise.all([
           pm.coverCooldownPeriod(),
-          pr.getPoolData(0),
+          pr.getPoolData(poolId),
           cp.underwriterNoticePeriod(),
         ])
         const claimFee = poolData.claimFeeBps ?? poolData[6]
@@ -34,7 +34,7 @@ export default function useReserveConfig(deployment) {
       }
     }
     load()
-  }, [deployment])
+  }, [deployment, poolId])
 
   return { config, loading }
 }
