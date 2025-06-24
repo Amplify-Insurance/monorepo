@@ -278,4 +278,60 @@ describe("CatInsurancePool Integration", function () {
 
     expect(await catPool.liquidUsdc()).to.equal(depositAmount * 2n);
   });
+
+  it("reverts when non risk manager draws funds", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    await expect(catPool.connect(owner).drawFund(1)).to.be.revertedWith(
+      "CIP: Caller is not the RiskManager"
+    );
+  });
+
+  it("flushToAdapter fails if amount exceeds idle", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    const tooMuch = depositAmount + 1n;
+    await expect(
+      catPool.connect(owner).flushToAdapter(tooMuch)
+    ).to.be.revertedWith("CIP: Amount exceeds idle USDC");
+  });
+
+  it("claimProtocolAssetRewards reverts with no rewards", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    await expect(
+      catPool.connect(lp1).claimProtocolAssetRewards(rewardToken.target)
+    ).to.be.revertedWith("CIP: No rewards to claim for this asset");
+  });
+
+  it("claim rewards reverts when distributor unset", async function () {
+    const CatShare = await ethers.getContractFactory("CatShare");
+    const share = await CatShare.deploy();
+    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const pool = await CatPool.deploy(usdc.target, share.target, adapter.target, owner.address);
+    await share.transferOwnership(pool.target);
+    await pool.initialize();
+    await pool.setRiskManagerAddress(riskManager.address);
+    await pool.setPolicyManagerAddress(policyManager.address);
+    await pool.setCapitalPoolAddress(capitalPool.address);
+    await adapter.setDepositor(pool.target);
+
+    await usdc.connect(lp1).approve(pool.target, ethers.MaxUint256);
+    await usdc.mint(lp1.address, ethers.parseUnits("1000", 6));
+    await pool.connect(lp1).depositLiquidity(ethers.parseUnits("1000", 6));
+
+    await expect(
+      pool.connect(lp1).claimProtocolAssetRewards(rewardToken.target)
+    ).to.be.revertedWith("CIP: Reward distributor not set");
+  });
+
+  it("prevents duplicate withdrawal requests", async function () {
+    const depositAmount = ethers.parseUnits("1000", 6);
+    await catPool.connect(lp1).depositLiquidity(depositAmount);
+    const shares = await catShare.balanceOf(lp1.address);
+    await catPool.connect(lp1).requestWithdrawal(shares);
+    await expect(
+      catPool.connect(lp1).requestWithdrawal(shares)
+    ).to.be.revertedWith("CIP: Withdrawal request pending");
+  });
 });
