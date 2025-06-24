@@ -305,6 +305,56 @@ describe("PolicyNFT", function () {
         "PolicyNFT: An increase is already pending"
       );
     });
+
+    it("Reverts if manager address not set when adding", async function () {
+      const { policyNFT, policyManager } = await loadFixture(deployFixture);
+      await expect(
+        policyNFT.connect(policyManager).addPendingIncrease(1, 100, 0)
+      ).to.be.revertedWith("PolicyNFT: PolicyManager address not set");
+    });
+
+    it("Reverts if caller is not manager when adding", async function () {
+      const { owner, policyNFT, policyManager, other, user } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setPolicyManagerAddress(policyManager.address);
+      await policyNFT.connect(policyManager).mint(user.address, 1, 1000, 0, 0, 0);
+      await expect(
+        policyNFT.connect(other).addPendingIncrease(1, 100, 0)
+      ).to.be.revertedWith("PolicyNFT: Caller is not the authorized PolicyManager");
+    });
+
+    it("Reverts if policy does not exist when adding", async function () {
+      const { owner, policyNFT, policyManager } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setPolicyManagerAddress(policyManager.address);
+      await expect(
+        policyNFT.connect(policyManager).addPendingIncrease(1, 100, 0)
+      ).to.be.revertedWith("PolicyNFT: Policy does not exist");
+    });
+
+    it("Reverts if manager address not set when finalizing", async function () {
+      const { policyNFT, policyManager } = await loadFixture(deployFixture);
+      await expect(
+        policyNFT.connect(policyManager).finalizeIncrease(1)
+      ).to.be.revertedWith("PolicyNFT: PolicyManager address not set");
+    });
+
+    it("Reverts if caller is not manager when finalizing", async function () {
+      const { owner, policyNFT, policyManager, other, user } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setPolicyManagerAddress(policyManager.address);
+      await policyNFT.connect(policyManager).mint(user.address, 1, 1000, 0, 0, 0);
+      await policyNFT.connect(policyManager).addPendingIncrease(1, 100, 0);
+      await expect(
+        policyNFT.connect(other).finalizeIncrease(1)
+      ).to.be.revertedWith("PolicyNFT: Caller is not the authorized PolicyManager");
+    });
+
+    it("Reverts if no pending increase when finalizing", async function () {
+      const { owner, policyNFT, policyManager, user } = await loadFixture(deployFixture);
+      await policyNFT.connect(owner).setPolicyManagerAddress(policyManager.address);
+      await policyNFT.connect(policyManager).mint(user.address, 1, 1000, 0, 0, 0);
+      await expect(
+        policyNFT.connect(policyManager).finalizeIncrease(1)
+      ).to.be.revertedWith("PolicyNFT: No pending increase");
+    });
   });
 
   describe("getPolicy", function () {
