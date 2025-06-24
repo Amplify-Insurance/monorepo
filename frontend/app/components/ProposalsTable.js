@@ -6,6 +6,9 @@ import { ChevronDown, ChevronUp } from "lucide-react"
 // loaded from the subgraph.
 import { getCommitteeWithSigner } from "../../lib/committee"
 import { getStakingWithSigner } from "../../lib/staking"
+import { getTokenDecimals } from "../../lib/erc20"
+import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
+import { ethers } from "ethers"
 import { useAccount } from "wagmi"
 import VoteConfirmationModal from "./VoteConfirmationModal"
 import usePools from "../../hooks/usePools"
@@ -26,12 +29,23 @@ export default function ProposalsTable({ proposals, loading }) {
     setExpanded((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const handleVoteClick = (proposalId, voteType) => {
+  const handleVoteClick = async (proposalId, voteType) => {
     const proposal = proposals.find((p) => p.id === proposalId)
     setPendingVote({ proposalId, voteType, proposal })
-    // In a real app, you'd fetch the user's actual voting power from the contract
-    // For now, we'll use a placeholder value
-    setVotingPower(1000) // This should be fetched from the staking contract
+
+    try {
+      const staking = await getStakingWithSigner()
+      const addr = await staking.signer.getAddress()
+      const [bal, dec] = await Promise.all([
+        staking.stakedBalance(addr),
+        getTokenDecimals(STAKING_TOKEN_ADDRESS),
+      ])
+      setVotingPower(Number(ethers.utils.formatUnits(bal, dec)))
+    } catch (err) {
+      console.error("Failed to load voting power", err)
+      setVotingPower(0)
+    }
+
     setShowVoteModal(true)
   }
 
