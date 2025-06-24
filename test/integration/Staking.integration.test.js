@@ -9,7 +9,7 @@ const SLASH_BPS = 500; // 5%
 const UNSTAKE_LOCK_PERIOD = 7 * 24 * 60 * 60; // from StakingContract
 
 async function deployFixture() {
-  const [owner, , staker] = await ethers.getSigners();
+  const [owner, other, staker] = await ethers.getSigners();
 
   // Use real CatShare token instead of MockERC20
   const Token = await ethers.getContractFactory("CatShare");
@@ -72,9 +72,80 @@ async function deployFixture() {
   await token.mint(staker.address, ethers.parseEther("3000"));
   await token.connect(staker).approve(staking.target, ethers.MaxUint256);
   await token.connect(staker).approve(committee.target, ethers.MaxUint256);
+  await token.mint(other.address, ethers.parseEther("3000"));
+  await token.connect(other).approve(staking.target, ethers.MaxUint256);
+  await token.connect(other).approve(committee.target, ethers.MaxUint256);
 
-  return { owner, staker, token, staking, committee };
+  return { owner, other, staker, token, staking, committee };
 }
+
+async function deployNoCommitteeFixture() {
+  const [owner, other, staker] = await ethers.getSigners();
+
+  const Token = await ethers.getContractFactory("CatShare");
+  const token = await Token.deploy();
+
+  const Staking = await ethers.getContractFactory("StakingContract");
+  const staking = await Staking.deploy(token.target, owner.address);
+
+  const RiskManager = await ethers.getContractFactory("RiskManager");
+  const rm = await RiskManager.deploy(owner.address);
+
+  const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
+  const registry = await PoolRegistry.deploy(owner.address, rm.target);
+
+  const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
+  const policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, owner.address);
+
+  const PolicyManager = await ethers.getContractFactory("PolicyManager");
+  const policyManager = await PolicyManager.deploy(policyNFT.target, owner.address);
+  await policyNFT.setPolicyManagerAddress(policyManager.target);
+
+  const CapitalPool = await ethers.getContractFactory("CapitalPool");
+  const capitalPool = await CapitalPool.deploy(owner.address, token.target);
+
+  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const catPool = await CatPool.deploy(token.target, token.target, ethers.ZeroAddress, owner.address);
+
+  const LossDistributor = await ethers.getContractFactory("LossDistributor");
+  const lossDist = await LossDistributor.deploy(rm.target);
+
+  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+  const rewardDist = await RewardDistributor.deploy(rm.target);
+
+  await rm.setAddresses(
+    capitalPool.target,
+    registry.target,
+    policyManager.target,
+    catPool.target,
+    lossDist.target,
+    rewardDist.target
+  );
+
+  const Committee = await ethers.getContractFactory("Committee");
+  const committee = await Committee.deploy(
+    rm.target,
+    staking.target,
+    VOTING_PERIOD,
+    CHALLENGE_PERIOD,
+    QUORUM_BPS,
+    SLASH_BPS
+  );
+
+  const rateModel = { base: 0, slope1: 0, slope2: 0, kink: 0 };
+  await rm.addProtocolRiskPool(token.target, rateModel, 0);
+  await rm.addProtocolRiskPool(token.target, rateModel, 0);
+
+  await token.mint(staker.address, ethers.parseEther("3000"));
+  await token.mint(other.address, ethers.parseEther("3000"));
+  await token.connect(staker).approve(staking.target, ethers.MaxUint256);
+  await token.connect(staker).approve(committee.target, ethers.MaxUint256);
+  await token.connect(other).approve(staking.target, ethers.MaxUint256);
+  await token.connect(other).approve(committee.target, ethers.MaxUint256);
+
+  return { owner, other, staker, token, staking, committee };
+}
+
 
 describe("StakingContract Integration", function () {
   const STAKE = ethers.parseEther("100");
@@ -126,7 +197,7 @@ describe("StakingContract Integration", function () {
   });
 
   async function deployLongVotingFixture() {
-    const [owner, , staker] = await ethers.getSigners();
+    const [owner, other, staker] = await ethers.getSigners();
 
     const Token = await ethers.getContractFactory("CatShare");
     const token = await Token.deploy();
@@ -189,8 +260,11 @@ describe("StakingContract Integration", function () {
     await token.mint(staker.address, ethers.parseEther("3000"));
     await token.connect(staker).approve(staking.target, ethers.MaxUint256);
     await token.connect(staker).approve(committee.target, ethers.MaxUint256);
+    await token.mint(other.address, ethers.parseEther("3000"));
+    await token.connect(other).approve(staking.target, ethers.MaxUint256);
+    await token.connect(other).approve(committee.target, ethers.MaxUint256);
 
-    return { owner, staker, token, staking, committee, LONG_VOTING_PERIOD };
+    return { owner, other, staker, token, staking, committee, LONG_VOTING_PERIOD };
   }
 
   it("updates committee vote weight when unstaking mid-vote", async function () {
@@ -304,5 +378,62 @@ describe("StakingContract Integration", function () {
     ).to.be.revertedWithCustomError(staking, "InvalidAmount");
 
     await ethers.provider.send("hardhat_stopImpersonatingAccount", [committee.target]);
+  });
+  it("allows owner to set committee address once", async function () {
+    const { owner, other, staking, committee } = await loadFixture(deployNoCommitteeFixture);
+
+    await expect(staking.connect(owner).setCommitteeAddress(committee.target))
+      .to.emit(staking, "CommitteeAddressSet")
+      .withArgs(committee.target);
+    await expect(staking.connect(other).setCommitteeAddress(other.address))
+      .to.be.revertedWithCustomError(staking, "OwnableUnauthorizedAccount");
+    await expect(staking.connect(owner).setCommitteeAddress(other.address))
+      .to.be.revertedWith("Committee address already set");
+  });
+
+  it("reverts when committee address is zero", async function () {
+    const { owner, staking } = await loadFixture(deployNoCommitteeFixture);
+    await expect(staking.connect(owner).setCommitteeAddress(ethers.ZeroAddress))
+      .to.be.revertedWithCustomError(staking, "ZeroAddress");
+  });
+
+  it("tracks stake and unstake balances", async function () {
+    const { staker, token, staking } = await loadFixture(deployFixture);
+    const balBefore = await token.balanceOf(staker.address);
+    await expect(staking.connect(staker).stake(STAKE))
+      .to.emit(staking, "Staked")
+      .withArgs(staker.address, STAKE);
+    expect(await staking.totalStaked()).to.equal(STAKE);
+    await expect(staking.connect(staker).unstake(STAKE))
+      .to.emit(staking, "Unstaked")
+      .withArgs(staker.address, STAKE);
+    expect(await staking.totalStaked()).to.equal(0);
+    expect(await token.balanceOf(staker.address)).to.equal(balBefore);
+  });
+
+  it("reverts if staking zero", async function () {
+    const { staker, staking } = await loadFixture(deployFixture);
+    await expect(staking.connect(staker).stake(0))
+      .to.be.revertedWithCustomError(staking, "InvalidAmount");
+  });
+
+  it("reverts if unstaking zero or too much", async function () {
+    const { staker, staking } = await loadFixture(deployFixture);
+    await staking.connect(staker).stake(STAKE);
+    await expect(staking.connect(staker).unstake(0))
+      .to.be.revertedWithCustomError(staking, "InvalidAmount");
+    await expect(staking.connect(staker).unstake(STAKE + 1n))
+      .to.be.revertedWithCustomError(staking, "InsufficientStakedBalance");
+  });
+
+  it("tracks total staked across users", async function () {
+    const { staker, other, staking } = await loadFixture(deployFixture);
+    const otherStake = ethers.parseEther("50");
+    await staking.connect(staker).stake(STAKE);
+    await staking.connect(other).stake(otherStake);
+    expect(await staking.totalStaked()).to.equal(STAKE + otherStake);
+    await staking.connect(staker).unstake(STAKE);
+    await staking.connect(other).unstake(otherStake);
+    expect(await staking.totalStaked()).to.equal(0);
   });
 });
