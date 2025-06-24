@@ -117,23 +117,66 @@ contract Committee is Ownable, ReentrancyGuard {
         Proposal storage p = proposals[_proposalId];
         require(p.status == ProposalStatus.Active, "Proposal not active");
         require(block.timestamp < p.votingDeadline, "Voting ended");
-        require(p.votes[msg.sender] == VoteOption.None, "Already voted");
         require(_vote != VoteOption.None, "Invalid vote option");
 
+        VoteOption previousVote = p.votes[msg.sender];
+        uint256 previousWeight = p.voterWeight[msg.sender];
+        uint256 currentWeight = stakingContract.stakedBalance(msg.sender);
+
+        // Adjust tallies for previous vote if it exists
+        if (previousVote == VoteOption.For) {
+            p.forVotes -= previousWeight;
+        } else if (previousVote == VoteOption.Against) {
+            p.againstVotes -= previousWeight;
+        }
+
+        // Record new vote and weight
         p.votes[msg.sender] = _vote;
-        uint256 weight = stakingContract.stakedBalance(msg.sender);
-        
-        p.voterWeight[msg.sender] = weight;
+        p.voterWeight[msg.sender] = currentWeight;
 
         stakingContract.recordVote(msg.sender, _proposalId);
 
         if (_vote == VoteOption.For) {
-            p.forVotes += weight;
+            p.forVotes += currentWeight;
         } else {
-            p.againstVotes += weight;
+            p.againstVotes += currentWeight;
         }
 
-        emit Voted(_proposalId, msg.sender, _vote, weight);
+        emit Voted(_proposalId, msg.sender, _vote, currentWeight);
+    }
+
+    function updateVoteWeight(address _voter, uint256 _proposalId, uint256 _newWeight) external {
+        require(msg.sender == address(stakingContract), "Not staking contract");
+        Proposal storage p = proposals[_proposalId];
+        if (p.status != ProposalStatus.Active || block.timestamp >= p.votingDeadline) {
+            return;
+        }
+
+        VoteOption voteChoice = p.votes[_voter];
+        if (voteChoice == VoteOption.None) {
+            return;
+        }
+
+        uint256 prevWeight = p.voterWeight[_voter];
+        if (prevWeight == _newWeight) {
+            return;
+        }
+
+        if (voteChoice == VoteOption.For) {
+            if (_newWeight > prevWeight) {
+                p.forVotes += _newWeight - prevWeight;
+            } else {
+                p.forVotes -= prevWeight - _newWeight;
+            }
+        } else {
+            if (_newWeight > prevWeight) {
+                p.againstVotes += _newWeight - prevWeight;
+            } else {
+                p.againstVotes -= prevWeight - _newWeight;
+            }
+        }
+
+        p.voterWeight[_voter] = _newWeight;
     }
 
     /**

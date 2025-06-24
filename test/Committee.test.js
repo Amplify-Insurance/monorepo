@@ -138,10 +138,21 @@ describe("Committee", function () {
             expect(await mockStakingContract.lastProposal(voter1.address)).to.equal(1);
         });
         
-        it("Should revert if trying to vote twice", async function() {
+        it("Should allow voters to change their vote before deadline", async function() {
             await committee.connect(voter1).vote(1, 2);
-            await expect(committee.connect(voter1).vote(1, 2))
-                .to.be.revertedWith("Already voted");
+            await committee.connect(voter1).vote(1, 1);
+            const proposal = await committee.proposals(1);
+            const weight = await mockStakingContract.stakedBalance(voter1.address);
+            expect(proposal.forVotes).to.equal(0);
+            expect(proposal.againstVotes).to.equal(weight);
+        });
+
+        it("Should update vote weight when stake decreases", async function() {
+            await committee.connect(voter1).vote(1, 2);
+            await mockStakingContract.setBalance(voter1.address, ethers.parseEther("200"));
+            await mockStakingContract.callUpdateWeight(committee.target, voter1.address, 1, ethers.parseEther("200"));
+            const proposal = await committee.proposals(1);
+            expect(proposal.forVotes).to.equal(ethers.parseEther("200"));
         });
 
         it("Should revert if voting after the deadline", async function() {

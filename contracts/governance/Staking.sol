@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface ICommittee {
     function isProposalFinalized(uint256 proposalId) external view returns (bool);
+    function updateVoteWeight(address voter, uint256 proposalId, uint256 newWeight) external;
 }
 
 /**
@@ -85,8 +86,12 @@ contract StakingContract is Ownable {
         uint256 proposalId = lastVotedProposal[msg.sender];
         if (proposalId != 0) {
             bool finalized = ICommittee(committeeAddress).isProposalFinalized(proposalId);
-            if (!finalized && block.timestamp < lastVoteTime[msg.sender] + UNSTAKE_LOCK_PERIOD) {
-                revert VoteLockActive();
+            if (!finalized) {
+                if (block.timestamp < lastVoteTime[msg.sender] + UNSTAKE_LOCK_PERIOD) {
+                    revert VoteLockActive();
+                }
+                uint256 newBalance = stakedBalance[msg.sender] - _amount;
+                ICommittee(committeeAddress).updateVoteWeight(msg.sender, proposalId, newBalance);
             } else {
                 lastVotedProposal[msg.sender] = 0;
                 lastVoteTime[msg.sender] = 0;
