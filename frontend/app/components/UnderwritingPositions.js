@@ -81,7 +81,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
           pendingLoss,
           pendingLossUsd: pendingLoss * tokenPriceUsd,
           yield: Number(pool.underwriterYieldBps || 0) / 100,
-          withdrawalRequestShares: d.withdrawalRequestShares,
+          withdrawalRequestShares: d.totalPendingWithdrawalShares,
           shares: d.masterShares,
           yieldChoice: d.yieldChoice,
         }

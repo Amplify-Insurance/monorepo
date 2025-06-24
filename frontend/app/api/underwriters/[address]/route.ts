@@ -34,7 +34,25 @@ export async function GET(
 
         const account = baseResults[0].success
           ? cp.interface.decodeFunctionResult('getUnderwriterAccount', baseResults[0].returnData)
-          : [0n, 0n, 0n, 0n, 0n]
+          : [0n, 0n, 0n, 0n]
+
+        // Fetch notice period and withdrawal request data directly
+        const [noticePeriod, requestCount] = await Promise.all([
+          cp.underwriterNoticePeriod(),
+          cp.getWithdrawalRequestCount(addr),
+        ])
+
+        let withdrawalRequestTimestamp = 0n
+        let withdrawalRequestShares = 0n
+        if (requestCount > 0n) {
+          try {
+            const req = await cp.withdrawalRequests(addr, 0)
+            withdrawalRequestShares = req.shares
+            if (req.unlockTimestamp > noticePeriod) {
+              withdrawalRequestTimestamp = req.unlockTimestamp - noticePeriod
+            }
+          } catch {}
+        }
 
         let poolCount = 0n
         if (baseResults[1].success) {
@@ -98,8 +116,8 @@ export async function GET(
           totalDepositedAssetPrincipal: account[0],
           yieldChoice: account[1],
           masterShares: account[2],
-          withdrawalRequestTimestamp: account[3],
-          withdrawalRequestShares: account[4],
+          withdrawalRequestTimestamp,
+          withdrawalRequestShares,
           allocatedPoolIds,
           pendingLosses,
         })
