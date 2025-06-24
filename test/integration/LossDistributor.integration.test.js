@@ -7,9 +7,9 @@ const PRECISION = 10n ** 18n;
 async function deployFixture() {
   const [owner, committee, underwriter, claimant, adapter, nonParty] = await ethers.getSigners();
 
-  const MockERC20 = await ethers.getContractFactory("MockERC20");
-  const usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
-  const protocolToken = await MockERC20.deploy("Protocol", "PTKN", 6);
+  const Token = await ethers.getContractFactory("ResetApproveERC20");
+  const usdc = await Token.deploy("USD Coin", "USDC", 6);
+  const protocolToken = await Token.deploy("Protocol", "PTKN", 6);
   await protocolToken.mint(claimant.address, ethers.parseUnits("100000", 6));
 
   const CapitalPool = await ethers.getContractFactory("MockCapitalPool");
@@ -166,6 +166,7 @@ describe("LossDistributor Integration", function () {
     const POLICY_ID_2 = 2;
     const COVERAGE_2 = ethers.parseUnits("20000", 6);
     await policyNFT.mock_setPolicy(POLICY_ID_2, claimant.address, POOL_ID, COVERAGE_2, 0, 0, 0, 0);
+    await protocolToken.connect(claimant).approve(riskManager.target, 0);
     await protocolToken.connect(claimant).approve(riskManager.target, ethers.MaxUint256);
     await riskManager.connect(nonParty).processClaim(POLICY_ID_2);
 
@@ -234,6 +235,7 @@ describe("LossDistributor Integration", function () {
     const POLICY_ID_2 = 2;
     const COVERAGE_2 = ethers.parseUnits("30000", 6);
     await policyNFT.mock_setPolicy(POLICY_ID_2, claimant.address, SECOND_POOL_ID, COVERAGE_2, 0, 0, 0, 0);
+    await protocolToken.connect(claimant).approve(riskManager.target, 0);
     await protocolToken.connect(claimant).approve(riskManager.target, ethers.MaxUint256);
 
     return {
@@ -434,6 +436,7 @@ describe("LossDistributor Integration", function () {
     const BIG_COVERAGE = ethers.parseUnits("150000", 6);
     await policyNFT.mock_setPolicy(1, claimant.address, POOL_ID, BIG_COVERAGE, 0, 0, 0, 0);
     await protocolToken.mint(claimant.address, BIG_COVERAGE);
+    await protocolToken.connect(claimant).approve(riskManager.target, 0);
     await protocolToken.connect(claimant).approve(riskManager.target, ethers.MaxUint256);
 
     await riskManager.connect(nonParty).processClaim(1);
