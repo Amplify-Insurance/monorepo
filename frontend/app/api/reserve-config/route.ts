@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPoolRegistry } from '../../../lib/poolRegistry'
 import { getCapitalPool } from '../../../lib/capitalPool'
 import { getMulticallReader } from '../../../lib/multicallReader'
-import { getPoolManager } from '../../../lib/poolManager'
+import { getPolicyManager } from '../../../lib/policyManager'
 
 import deployments from '../../config/deployments'
 
@@ -13,12 +13,12 @@ export async function GET(req: Request) {
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0]
     const pr = getPoolRegistry(dep.poolRegistry, dep.name)
     const cp = getCapitalPool(dep.capitalPool, dep.name)
-    const pm = getPoolManager(dep.poolManager, dep.name)
+    const pm = getPolicyManager(dep.policyManager, dep.name)
 
     const multicall = getMulticallReader(dep.multicallReader, dep.name)
 
     const calls = [
-      { target: dep.poolManager, callData: pm.interface.encodeFunctionData('coverCooldownPeriod') },
+      { target: dep.policyManager, callData: pm.interface.encodeFunctionData('coverCooldownPeriod') },
       { target: dep.poolRegistry, callData: pr.interface.encodeFunctionData('getPoolData', [0]) },
       { target: dep.capitalPool, callData: cp.interface.encodeFunctionData('underwriterNoticePeriod') },
     ]

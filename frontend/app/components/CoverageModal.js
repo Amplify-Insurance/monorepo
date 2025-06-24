@@ -6,7 +6,7 @@ import { Info } from "lucide-react"
 import { ethers } from "ethers" // v5 namespace import
 import { useAccount } from "wagmi"
 import { getRiskManagerWithSigner } from "../../lib/riskManager"
-import { getPoolManagerWithSigner } from "../../lib/poolManager"
+import { getPolicyManagerWithSigner } from "../../lib/policyManager"
 import {
   getCapitalPoolWithSigner,
   getUnderlyingAssetDecimals,
@@ -166,8 +166,8 @@ export default function CoverageModal({
       const signerAddress = await tokenContract.signer.getAddress()
 
       if (type === "purchase") {
-        const pm = await getPoolManagerWithSigner(dep.poolManager)
-        const pmAddress = dep.poolManager
+        const pm = await getPolicyManagerWithSigner(dep.policyManager)
+        const pmAddress = dep.policyManager
 
         const amountBn = ethers.utils.parseUnits(amount, dec) // coverage amount
 

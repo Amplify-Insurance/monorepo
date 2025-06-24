@@ -292,12 +292,12 @@ graph TD
     Underwriter -->|deposit USDC| CapitalPool
     CapitalPool -->|invest| YieldAdapter
     YieldAdapter -->|yield| CapitalPool
-    Policyholder -->|buy policy| PoolManager
-    PoolManager -->|mint NFT| PolicyNFT
-    PoolManager -->|notify| RiskManager
-    Policyholder -->|pay premium| PoolManager
-    PoolManager -->|rewards| RewardDistributor
-    PoolManager -->|share| CatInsurancePool
+    Policyholder -->|buy policy| PolicyManager
+    PolicyManager -->|mint NFT| PolicyNFT
+    PolicyManager -->|notify| RiskManager
+    Policyholder -->|pay premium| PolicyManager
+    PolicyManager -->|rewards| RewardDistributor
+    PolicyManager -->|share| CatInsurancePool
 ```
 
 ## Distressed Capital Flow During Claims
