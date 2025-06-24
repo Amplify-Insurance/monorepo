@@ -239,6 +239,30 @@ describe("PoolRegistry integration", function () {
     expect(total).to.equal(0);
   });
 
+  it("reflects adapter removal in payout data", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const adapter = ethers.Wallet.createRandom().address;
+    const amount = ethers.parseUnits("100", 18);
+
+    await registry
+      .connect(riskManager)
+      .updateCapitalAllocation(0, adapter, amount, true);
+
+    await registry
+      .connect(riskManager)
+      .updateCapitalAllocation(0, adapter, amount, false);
+
+    const [adapters, amounts, total] = await registry.getPoolPayoutData(0);
+    expect(adapters).to.deep.equal([]);
+    expect(amounts).to.deep.equal([]);
+    expect(total).to.equal(0);
+  });
+
   it("prevents non-risk manager from modifying pools", async function () {
     const { other, registry, token, rateModel } = await deployFixture();
 
@@ -277,6 +301,17 @@ describe("PoolRegistry integration", function () {
         .connect(riskManager)
         .updateCapitalAllocation(invalidId, adapter, 1, true)
     ).to.be.reverted;
+    await expect(
+      registry
+        .connect(riskManager)
+        .updateCapitalPendingWithdrawal(invalidId, 1, true)
+    ).to.be.reverted;
+    await expect(
+      registry.connect(riskManager).updateCoverageSold(invalidId, 1, true)
+    ).to.be.reverted;
+    await expect(
+      registry.connect(riskManager).setPauseState(invalidId, true)
+    ).to.be.reverted;
   });
 
   it("removes adapters from the middle correctly", async function () {
@@ -306,5 +341,59 @@ describe("PoolRegistry integration", function () {
     const active = await registry.getPoolActiveAdapters(0);
     expect(active).to.deep.equal([adapters[0], adapters[2]]);
     expect(await registry.getCapitalPerAdapter(0, adapters[1])).to.equal(0);
+  });
+
+  it("reverts on arithmetic underflow for allocations", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const adapter = ethers.Wallet.createRandom().address;
+    const amount = ethers.parseUnits("50", 18);
+    await registry
+      .connect(riskManager)
+      .updateCapitalAllocation(0, adapter, amount, true);
+
+    await expect(
+      registry
+        .connect(riskManager)
+        .updateCapitalAllocation(0, adapter, amount + 1n, false)
+    ).to.be.revertedWithPanic(0x11);
+  });
+
+  it("reverts on arithmetic underflow for pending withdrawals", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const amount = ethers.parseUnits("25", 18);
+    await registry
+      .connect(riskManager)
+      .updateCapitalPendingWithdrawal(0, amount, true);
+
+    await expect(
+      registry
+        .connect(riskManager)
+        .updateCapitalPendingWithdrawal(0, amount + 1n, false)
+    ).to.be.revertedWithPanic(0x11);
+  });
+
+  it("reverts on arithmetic underflow for coverage sold", async function () {
+    const { riskManager, registry, token, rateModel } = await deployFixture();
+
+    await registry
+      .connect(riskManager)
+      .addProtocolRiskPool(token.target, rateModel, 0);
+
+    const amount = ethers.parseUnits("10", 18);
+    await registry.connect(riskManager).updateCoverageSold(0, amount, true);
+
+    await expect(
+      registry.connect(riskManager).updateCoverageSold(0, amount + 1n, false)
+    ).to.be.revertedWithPanic(0x11);
   });
 });
