@@ -331,14 +331,65 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     /* ───────────────── Rewards Claiming ───────────────── */
 
-    function claimPremiumRewards(uint256 _poolId) external nonReentrant {
-        (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(_poolId);
-        rewardDistributor.claim(msg.sender, _poolId, address(protocolToken), underwriterPoolPledge[msg.sender][_poolId]);
+
+    /**
+     * @notice Claims premium rewards for multiple pools.
+     * @dev Iterates through the provided pool IDs and claims the rewards for each.
+     * @param _poolIds An array of pool IDs to claim rewards from.
+     */
+    function claimPremiumRewards(uint256[] calldata _poolIds) external nonReentrant {
+        for (uint256 i = 0; i < _poolIds.length; i++) {
+            uint256 poolId = _poolIds[i];
+            // Only attempt a claim if the underwriter has a pledge in the pool.
+            if (underwriterPoolPledge[msg.sender][poolId] > 0) {
+                (IERC20 protocolToken, , , , , , ) = poolRegistry.getPoolData(poolId);
+                rewardDistributor.claim(
+                    msg.sender,
+                    poolId,
+                    address(protocolToken),
+                    underwriterPoolPledge[msg.sender][poolId]
+                );
+            }
+        }
     }
 
-    function claimDistressedAssets(uint256 _poolId) external nonReentrant {
-        (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(_poolId);
-        catPool.claimProtocolAssetRewardsFor(msg.sender, address(protocolToken));
+    /**
+     * @notice Claims distressed assets (protocol tokens) from the Catastrophe Pool for multiple underlying protocols.
+     * @dev This function is useful when an underwriter is allocated to pools covering different protocol tokens.
+     * It identifies the unique protocol tokens from the given pool IDs and claims rewards for each.
+     * @param _poolIds An array of pool IDs from which to determine the protocol tokens for claiming rewards.
+     */
+    function claimDistressedAssets(uint256[] calldata _poolIds) external nonReentrant {
+        // Temporary memory array to store unique protocol token addresses encountered.
+        address[] memory uniqueTokens = new address[](_poolIds.length);
+        uint256 uniqueTokenCount = 0;
+
+        // First loop: Iterate through pool IDs to find unique protocol tokens.
+        for (uint256 i = 0; i < _poolIds.length; i++) {
+            (IERC20 protocolToken, , , , , , ) = poolRegistry.getPoolData(_poolIds[i]);
+            address tokenAddress = address(protocolToken);
+
+            // Ensure the token address is valid and not already processed.
+            if (tokenAddress != address(0)) {
+                bool found = false;
+                for (uint256 j = 0; j < uniqueTokenCount; j++) {
+                    if (uniqueTokens[j] == tokenAddress) {
+                        found = true;
+                        break;
+                    }
+                }
+                // If the token is not found in our unique list, add it.
+                if (!found) {
+                    uniqueTokens[uniqueTokenCount] = tokenAddress;
+                    uniqueTokenCount++;
+                }
+            }
+        }
+
+        // Second loop: Iterate through the unique tokens and claim rewards.
+        for (uint256 i = 0; i < uniqueTokenCount; i++) {
+            catPool.claimProtocolAssetRewardsFor(msg.sender, uniqueTokens[i]);
+        }
     }
 
     function onCapitalDeposited(address _underwriter, uint256 _amount) external {
