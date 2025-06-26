@@ -42,7 +42,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
 
     // --- Events for Testing ---
 
-    event PolicyBurned(uint256 indexed id);
+    event PolicyBurnedMock(uint256 indexed id);
     event PolicyLastPaidUpdated(uint256 indexed id, uint256 newLastPaidUntil);
 
     event PolicyMinted(
@@ -168,13 +168,13 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         delete _owners[id];
         
         last_burn_id = id; // Record for testing
-        emit PolicyBurned(id);
+        emit PolicyBurnedMock(id);
     }
 
     /**
      * @notice Mocks updating the lastPaidUntil timestamp.
      */
-    function updateLastPaid(uint256 id, uint256 ts) external override {
+    function updateLastPaid(uint256 id, uint256 ts) external {
         require(policies[id].coverage > 0, "MockPolicyNFT: Policy does not exist");
         policies[id].lastPaidUntil = ts;
         emit PolicyLastPaidUpdated(id, ts);
@@ -213,20 +213,25 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         policies[_policyId].lastDrainTime = _newDrainTime;
     }
 
-    function addPendingIncrease(uint256 id, uint256 amount, uint256 activationTimestamp) external override onlyCoverPool {
+    function addPendingIncrease(uint256 id, uint256 amount, uint256 activationTimestamp) external onlyCoverPool {
         PolicyInfo storage p = policies[id];
         p.pendingIncrease = amount;
         p.increaseActivationTimestamp = activationTimestamp;
     }
 
-    function finalizeIncrease(uint256 id) external override onlyCoverPool {
+    function finalizeIncrease(uint256 id) external onlyCoverPool {
         PolicyInfo storage p = policies[id];
         p.coverage += p.pendingIncrease;
         p.pendingIncrease = 0;
         p.increaseActivationTimestamp = 0;
     }
 
-    function updateCoverage(uint256 id, uint256 newCoverage) external override onlyCoverPool {
+    function finalizeIncreases(uint256 policyId, uint256 totalAmountToAdd) external override onlyCoverPool {
+        PolicyInfo storage p = policies[policyId];
+        p.coverage += totalAmountToAdd;
+    }
+
+    function updateCoverage(uint256 id, uint256 newCoverage) external onlyCoverPool {
         policies[id].coverage = newCoverage;
     }
 }

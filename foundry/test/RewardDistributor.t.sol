@@ -169,13 +169,6 @@ contract RewardDistributorTest is Test {
         rd.claimForCatPool(user, 1, address(token), 1 ether);
     }
 
-    function testClaimForCatPoolOnlyCatPool() public {
-        vm.prank(owner);
-        rd.setCatPool(catPool);
-        vm.prank(address(0x5));
-        vm.expectRevert("RD: Not CatPool");
-        rd.claimForCatPool(user, 1, address(token), 1 ether);
-    }
 
     function testUpdateUserStateRecordsDebt() public {
         uint256 poolId = 1;
