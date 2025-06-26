@@ -42,7 +42,6 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
 
     // --- Events for Testing ---
 
-    event PolicyBurned(uint256 indexed id);
     event PolicyLastPaidUpdated(uint256 indexed id, uint256 newLastPaidUntil);
 
     event PolicyMinted(
@@ -174,7 +173,7 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     /**
      * @notice Mocks updating the lastPaidUntil timestamp.
      */
-    function updateLastPaid(uint256 id, uint256 ts) external override {
+    function updateLastPaid(uint256 id, uint256 ts) external {
         require(policies[id].coverage > 0, "MockPolicyNFT: Policy does not exist");
         policies[id].lastPaidUntil = ts;
         emit PolicyLastPaidUpdated(id, ts);
@@ -188,14 +187,11 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
     function getPolicy(uint256 id) external view override returns (IPolicyNFT.Policy memory) {
         PolicyInfo memory p = policies[id];
         return IPolicyNFT.Policy({
-            coverage: p.coverage,
-            poolId: p.poolId,
-            start: p.start,
-            activation: p.activation,
+            coverage: uint128(p.coverage),
+            poolId: uint96(p.poolId),
+            activation: uint128(p.activation),
             premiumDeposit: p.premiumDeposit,
-            lastDrainTime: p.lastDrainTime,
-            pendingIncrease: p.pendingIncrease,
-            increaseActivationTimestamp: p.increaseActivationTimestamp
+            lastDrainTime: p.lastDrainTime
         });
     }
 
@@ -213,20 +209,29 @@ contract MockPolicyNFT is Ownable, IPolicyNFT {
         policies[_policyId].lastDrainTime = _newDrainTime;
     }
 
-    function addPendingIncrease(uint256 id, uint256 amount, uint256 activationTimestamp) external override onlyCoverPool {
+    function addPendingIncrease(uint256 id, uint256 amount, uint256 activationTimestamp) external onlyCoverPool {
         PolicyInfo storage p = policies[id];
         p.pendingIncrease = amount;
         p.increaseActivationTimestamp = activationTimestamp;
     }
 
-    function finalizeIncrease(uint256 id) external override onlyCoverPool {
+    function finalizeIncrease(uint256 id) external onlyCoverPool {
         PolicyInfo storage p = policies[id];
         p.coverage += p.pendingIncrease;
         p.pendingIncrease = 0;
         p.increaseActivationTimestamp = 0;
     }
 
-    function updateCoverage(uint256 id, uint256 newCoverage) external override onlyCoverPool {
+    // Minimal implementation to satisfy the IPolicyNFT interface
+    function finalizeIncreases(uint256 id, uint256 totalAmountToAdd) external override onlyCoverPool {
+        PolicyInfo storage p = policies[id];
+        p.coverage += totalAmountToAdd;
+        // reset pending fields for simplicity
+        p.pendingIncrease = 0;
+        p.increaseActivationTimestamp = 0;
+    }
+
+    function updateCoverage(uint256 id, uint256 newCoverage) external onlyCoverPool {
         policies[id].coverage = newCoverage;
     }
 }
