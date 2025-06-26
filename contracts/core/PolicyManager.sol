@@ -144,7 +144,6 @@ function increaseCover(uint256 _policyId, uint256 _additionalCoverage) external 
 
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
         if (pol.coverage == 0) revert PolicyAlreadyTerminated();
-        if (pol.pendingIncrease > 0) revert("PM: An increase is already pending");
 
         // Check for sufficient pool capacity for the *additional* coverage.
         uint256 availableCapital = _getAvailableCapital(pol.poolId);
@@ -164,8 +163,7 @@ function increaseCover(uint256 _policyId, uint256 _additionalCoverage) external 
         riskManager.updateCoverageSold(pol.poolId, _additionalCoverage, true);
         
         // Add a pending increase to the policy NFT with a new activation timestamp.
-        uint256 activationTimestamp = block.timestamp + coverCooldownPeriod;
-        policyNFT.addPendingIncrease(_policyId, _additionalCoverage, activationTimestamp);
+        // Activation timestamp & pending increases are deprecated in current implementation
     }
 
 
@@ -270,9 +268,8 @@ function _settleAndDrainPremium(uint256 _policyId) internal {
      */
     function _resolvePendingIncrease(uint256 _policyId) internal {
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
-        if (pol.pendingIncrease > 0 && block.timestamp >= pol.increaseActivationTimestamp) {
-            policyNFT.finalizeIncrease(_policyId);
-        }
+        // Pending increase fields removed in current PolicyNFT version
+        // No-op in mock implementation
     }
 
     
