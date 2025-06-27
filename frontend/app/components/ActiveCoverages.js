@@ -23,6 +23,17 @@ export default function ActiveCoverages({ displayCurrency }) {
   const [underlyingDec, setUnderlyingDec] = useState(6)
   const [expandedRows, setExpandedRows] = useState([])
 
+  const toBigInt = (value) => {
+    if (typeof value === "bigint") return value
+    if (typeof value === "string" || typeof value === "number")
+      return BigInt(value)
+    if (value && typeof value === "object") {
+      if ("hex" in value) return BigInt(value.hex)
+      if (typeof value.toString === "function") return BigInt(value.toString())
+    }
+    return 0n
+  }
+
   const toggleRow = (id) => {
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
@@ -45,7 +56,7 @@ export default function ActiveCoverages({ displayCurrency }) {
 
   const activeCoverages = policies
     .flatMap((p) => {
-      const policyPoolId = p.poolId?.hex ? Number.parseInt(p.poolId.hex, 16) : null
+      const policyPoolId = p.poolId !== undefined ? Number(toBigInt(p.poolId)) : null
       if (policyPoolId === null) return []
 
       const pool = pools.find((pl) => pl.deployment === p.deployment && Number(pl.id) === policyPoolId)
@@ -55,24 +66,27 @@ export default function ActiveCoverages({ displayCurrency }) {
       const protocolLogo = getProtocolLogo(pool.id)
       const decimals = pool.underlyingAssetDecimals ?? underlyingDec
 
-      const coverageAmount = Number(ethers.utils.formatUnits(p.coverage.hex, decimals))
-      const pendingIncrease = p.pendingIncrease?.hex
-        ? Number(ethers.utils.formatUnits(p.pendingIncrease.hex, decimals))
+      const coverageAmount = Number(
+        ethers.utils.formatUnits(toBigInt(p.coverage), decimals)
+      )
+      const pendingIncrease = p.pendingIncrease
+        ? Number(ethers.utils.formatUnits(toBigInt(p.pendingIncrease), decimals))
         : 0
 
       const capacity = Number(
         ethers.utils.formatUnits(BigInt(pool.totalCapitalPledgedToPool) - BigInt(pool.totalCoverageSold), decimals),
       )
 
-      const activationTs = Number.parseInt(p.activation?.hex || p.start?.hex || "0x0", 16)
-      const increaseActivationTs = Number.parseInt(p.increaseActivationTimestamp?.hex || "0x0", 16)
-      const expiryHex = p.lastPaidUntil?.hex || "0x0"
-      let expiryTs = Number.parseInt(expiryHex, 16)
+      const activationTs = Number(toBigInt(p.activation ?? p.start ?? 0n))
+      const increaseActivationTs = Number(toBigInt(p.increaseActivationTimestamp ?? 0n))
+      let expiryTs = Number(toBigInt(p.lastPaidUntil ?? 0n))
 
       const computeExpiry = (covAmount) => {
         if (expiryTs) return expiryTs
-        const deposit = Number(ethers.utils.formatUnits(p.premiumDeposit?.hex || "0", decimals))
-        const lastDrainTs = Number.parseInt(p.lastDrainTime?.hex || "0x0", 16)
+        const deposit = Number(
+          ethers.utils.formatUnits(toBigInt(p.premiumDeposit ?? 0n), decimals)
+        )
+        const lastDrainTs = Number(toBigInt(p.lastDrainTime ?? 0n))
         const rate = Number(pool.premiumRateBps || 0) / 100
         const perSecond = rate > 0 ? (covAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0
         if (perSecond > 0) {
