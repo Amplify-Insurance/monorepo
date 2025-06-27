@@ -91,9 +91,9 @@
 				"type": "tuple"
 			},
 			{
-				"internalType": "enum IPoolRegistry.ProtocolRiskIdentifier",
-				"name": "_protocolCovered",
-				"type": "uint8"
+				"internalType": "uint256",
+				"name": "_claimFeeBps",
+				"type": "uint256"
 			}
 		],
 		"name": "addProtocolRiskPool",
@@ -202,6 +202,11 @@
 				"internalType": "address",
 				"name": "feeRecipient",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "claimFeeBps",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -348,9 +353,9 @@
 				"type": "uint256"
 			},
 			{
-				"internalType": "enum IPoolRegistry.ProtocolRiskIdentifier",
-				"name": "protocolCovered",
-				"type": "uint8"
+				"internalType": "uint256",
+				"name": "claimFeeBps",
+				"type": "uint256"
 			},
 			{
 				"internalType": "bool",
