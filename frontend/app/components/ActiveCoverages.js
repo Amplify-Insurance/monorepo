@@ -297,7 +297,15 @@ export default function ActiveCoverages({ displayCurrency }) {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      coverage.status === "active"
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400"
+                        : coverage.status === "pending"
+                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400"
+                        : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400"
+                    }`}
+                  >
                     {coverage.status}
                   </span>
                 </td>
@@ -459,35 +467,41 @@ export default function ActiveCoverages({ displayCurrency }) {
                                   Quick Actions
                                 </h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  <button
-                                    className="group flex items-center justify-center gap-3 py-3 px-4 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-                                    onClick={() => handleOpenModal(coverage)}
-                                  >
-                                    <svg
-                                      className="w-5 h-5 group-hover:scale-110 transition-transform"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
+                                  {coverage.status !== "expired" && (
+                                    <button
+                                      className="group flex items-center justify-center gap-3 py-3 px-4 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                                      onClick={() => handleOpenModal(coverage)}
                                     >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                                      />
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                      />
-                                    </svg>
-                                    Manage Coverage
-                                  </button>
+                                      <svg
+                                        className="w-5 h-5 group-hover:scale-110 transition-transform"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                                        />
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                      </svg>
+                                      Manage Coverage
+                                    </button>
+                                  )}
 
                                   <button
                                     className="group flex items-center justify-center gap-3 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-                                    onClick={() => openCancelModal(coverage)}
+                                    onClick={() =>
+                                      coverage.status === "expired"
+                                        ? handleOpenModal(coverage)
+                                        : openCancelModal(coverage)
+                                    }
                                   >
                                     <svg
                                       className="w-5 h-5 group-hover:scale-110 transition-transform"
@@ -499,10 +513,14 @@ export default function ActiveCoverages({ displayCurrency }) {
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                         strokeWidth={2}
-                                        d="M6 18L18 6M6 6l12 12"
+                                        d={
+                                          coverage.status === "expired"
+                                            ? "M12 6v6m0 0v6m-6-6h12"
+                                            : "M6 18L18 6M6 6l12 12"
+                                        }
                                       />
                                     </svg>
-                                    Cancel Coverage
+                                    {coverage.status === "expired" ? "Renew Coverage" : "Cancel Coverage"}
                                   </button>
                                 </div>
                               </div>
@@ -677,8 +695,9 @@ export default function ActiveCoverages({ displayCurrency }) {
                                       Coverage Information
                                     </h5>
                                     <p className="text-blue-800 dark:text-blue-400 text-xs leading-relaxed">
-                                      This coverage protects your {coverage.poolName} assets against smart contract
-                                      risks and protocol failures.
+                                      {coverage.type === "stablecoin"
+                                        ? `This coverage protects your ${coverage.poolName} assets against depegging events.`
+                                        : `This coverage protects your ${coverage.poolName} assets against smart contract risks and protocol failures.`}
                                     </p>
                                   </div>
                                 </div>
