@@ -14,11 +14,11 @@ export default function Navbar() {
   const pathname = usePathname()
 
   const navigation = [
-    { name: "Markets", href: "/markets" },
-    { name: "Dashboard", href: "/dashboard" },
-    { name: "Staking", href: "/staking" },
-    { name: "Cat Pool", href: "/catpool" },
-    { name: "Analytics", href: "/analytics" },
+    // { name: "Markets", href: "/markets" },
+    // { name: "Dashboard", href: "/dashboard" },
+    // { name: "Staking", href: "/staking" },
+    // { name: "Cat Pool", href: "/catpool" },
+    // { name: "Analytics", href: "/analytics" },
     // { name: "Claims", href: "/claims" },
   ]
 
@@ -50,7 +50,7 @@ export default function Navbar() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                    Shield<span className="text-slate-600 dark:text-slate-400">Pro</span>
+                    Layer<span className="text-slate-600 dark:text-slate-400">Cover</span>
                   </h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">Insurance Protocol</p>
                 </div>
