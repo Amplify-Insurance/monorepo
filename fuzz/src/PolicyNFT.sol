@@ -111,9 +111,6 @@ contract PolicyNFT is ERC721URIStorage, Ownable {
         emit PolicyCoverageIncreased(id, policy.coverage);
     }
 
-    // REMOVED: addPendingIncrease(), finalizeIncrease(), and updateCoverage() are no longer needed.
-    // Their logic is now handled by the PolicyManager and the new finalizeIncreases() function.
-
     /**
      * @notice Retrieves the data for a specific policy.
      */

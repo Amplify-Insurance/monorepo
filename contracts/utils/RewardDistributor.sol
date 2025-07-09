@@ -16,6 +16,7 @@ contract RewardDistributor is IRewardDistributor, Ownable {
     using SafeERC20 for IERC20;
 
     address public riskManager;
+    address public policyManager;
     address public catPool;
 
     event CatPoolSet(address indexed newCatPool);
@@ -48,6 +49,12 @@ contract RewardDistributor is IRewardDistributor, Ownable {
         _;
     }
 
+
+    modifier onlyApproved() {
+        require(msg.sender == riskManager || msg.sender == policyManager, "RD: Not RiskManager or policyManager");
+        _;
+    }
+
     modifier onlyCatPool() {
         require(msg.sender == catPool, "RD: Not CatPool");
         _;
@@ -57,8 +64,11 @@ contract RewardDistributor is IRewardDistributor, Ownable {
 
     /* ───────────────────────── Constructor & Setup ──────────────────────── */
 
-    constructor(address _riskManagerAddress) Ownable(msg.sender) {
+    constructor(address _riskManagerAddress, address _policyManagerAddress) Ownable(msg.sender) {
         if (_riskManagerAddress == address(0)) revert ZeroAddress();
+        if (_policyManagerAddress == address(0)) revert ZeroAddress();
+       
+        policyManager = _policyManagerAddress;
         riskManager = _riskManagerAddress;
     }
 
@@ -73,6 +83,11 @@ contract RewardDistributor is IRewardDistributor, Ownable {
         riskManager = _newRiskManager;
     }
 
+    function setPolicyManager(address _newPolicyManager) external onlyOwner {
+        if (_newPolicyManager == address(0)) revert ZeroAddress();
+        policyManager = _newPolicyManager;
+    }
+
     /* ───────────────────────── Core Logic ──────────────────────── */
 
     /**
@@ -83,7 +98,7 @@ contract RewardDistributor is IRewardDistributor, Ownable {
      * @param rewardAmount The total amount of the reward to distribute.
      * @param totalPledgeInPool The total capital pledged to the pool at this moment.
      */
-    function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external override onlyRiskManager {
+    function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external override onlyApproved {
         if (rewardAmount == 0 || totalPledgeInPool == 0) {
             return;
         }

@@ -55,14 +55,15 @@ async function main() {
   const lossDistributor = await LossDistributor.deploy(riskManager.target);
   await lossDistributor.waitForDeployment();
 
-  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
-  const rewardDistributor = await RewardDistributor.deploy(riskManager.target);
-  await rewardDistributor.waitForDeployment();
-
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
   await policyNFT.setPolicyManagerAddress(policyManager.target);
+
+  
+  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+  const rewardDistributor = await RewardDistributor.deploy(riskManager.target, policyManager.target);
+  await rewardDistributor.waitForDeployment();
 
   
   const CatShare = await ethers.getContractFactory("CatShare");

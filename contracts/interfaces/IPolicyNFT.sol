@@ -5,12 +5,10 @@ pragma solidity ^0.8.20;
 
 interface IPolicyNFT {
     struct Policy {
-        uint96 poolId;
-        // REMOVED: No longer tracked in the NFT
-        // uint128 pendingIncrease;
-        // uint128 increaseActivationTimestamp;
-        uint128 coverage;
-        uint128 activation;
+        uint256 coverage;       // Currently active liability
+        uint256 poolId;
+        uint256 start;
+        uint256 activation;     // Activation for the initial coverage
         uint128 premiumDeposit;
         uint128 lastDrainTime;
     }

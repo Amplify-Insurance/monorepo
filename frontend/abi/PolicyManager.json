@@ -69,11 +69,6 @@
 	},
 	{
 		"inputs": [],
-		"name": "InvalidPoolId",
-		"type": "error"
-	},
-	{
-		"inputs": [],
 		"name": "NotPolicyOwner",
 		"type": "error"
 	},
@@ -133,6 +128,11 @@
 			}
 		],
 		"name": "SafeERC20FailedOperation",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TooManyPendingIncreases",
 		"type": "error"
 	},
 	{
@@ -281,24 +281,6 @@
 				"internalType": "uint256",
 				"name": "_policyId",
 				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_premiumAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "addPremium",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_policyId",
-				"type": "uint256"
 			}
 		],
 		"name": "cancelCover",
@@ -353,6 +335,42 @@
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_policyId",
+				"type": "uint256"
+			}
+		],
+		"name": "getPendingIncreases",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint128",
+						"name": "amount",
+						"type": "uint128"
+					},
+					{
+						"internalType": "uint128",
+						"name": "activationTimestamp",
+						"type": "uint128"
+					},
+					{
+						"internalType": "uint256",
+						"name": "nextNodeId",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct PolicyManager.PendingIncreaseNode[]",
+				"name": "",
+				"type": "tuple[]"
 			}
 		],
 		"stateMutability": "view",
@@ -427,24 +445,33 @@
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			},
+			}
+		],
+		"name": "pendingCoverageSum",
+		"outputs": [
 			{
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "pendingCoverIncreases",
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "pendingIncreaseListHead",
 		"outputs": [
 			{
-				"internalType": "uint128",
-				"name": "amount",
-				"type": "uint128"
-			},
-			{
-				"internalType": "uint128",
-				"name": "activationTimestamp",
-				"type": "uint128"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -567,6 +594,19 @@
 			}
 		],
 		"name": "setAddresses",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_catPool",
+				"type": "address"
+			}
+		],
+		"name": "setCatPool",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
