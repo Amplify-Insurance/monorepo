@@ -1,4 +1,4 @@
-// test/CatInsurancePool.test.js
+// test/BackstopPool.test.js
 
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
@@ -8,7 +8,7 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 // the current hardhat/ethers setup) we deploy simple Solidity based
 // mock contracts from the `contracts/test` directory.
 
-describe("CatInsurancePool", function () {
+describe("BackstopPool", function () {
     // --- Signers ---
     let owner, riskManager, policyManager, capitalPool, lp1, lp2, nonParty;
 
@@ -17,7 +17,7 @@ describe("CatInsurancePool", function () {
     let mockAdapter, mockRewardDistributor, mockUsdc, mockRewardToken, catShareToken;
 
     // --- Constants ---
-    const MIN_USDC_AMOUNT = 1000n; // matches CatInsurancePool.MIN_USDC_AMOUNT
+    const MIN_USDC_AMOUNT = 1000n; // matches BackstopPool.MIN_USDC_AMOUNT
     const CAT_POOL_REWARD_ID = ethers.MaxUint256;
     const NOTICE_PERIOD = 30 * 24 * 60 * 60;
 
@@ -39,11 +39,11 @@ describe("CatInsurancePool", function () {
         const MockRewardDistributor = await ethers.getContractFactory("MockRewardDistributor");
         mockRewardDistributor = await MockRewardDistributor.deploy();
         
-        // --- Deploy CatInsurancePool ---
+        // --- Deploy BackstopPool ---
         const CatShareFactory = await ethers.getContractFactory("CatShare");
         catShareToken = await CatShareFactory.deploy();
 
-        const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+        const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
         catPool = await CatPoolFactory.deploy(mockUsdc.target, catShareToken.target, mockAdapter.target, owner.address);
 
         await catShareToken.transferOwnership(catPool.target);
@@ -72,7 +72,7 @@ describe("CatInsurancePool", function () {
         it("Should emit Initialized and prevent re-initialization", async function () {
             const CatShareFactory = await ethers.getContractFactory("CatShare");
             const share = await CatShareFactory.deploy();
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, ethers.ZeroAddress, owner.address);
 
             await share.transferOwnership(pool.target);
@@ -84,7 +84,7 @@ describe("CatInsurancePool", function () {
         it("Should revert initialize when pool does not own CatShare", async function () {
             const CatShareFactory = await ethers.getContractFactory("CatShare");
             const share = await CatShareFactory.deploy();
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, ethers.ZeroAddress, owner.address);
 
             await expect(pool.initialize()).to.be.revertedWith("CIP: Pool must be owner of share token");
@@ -93,13 +93,13 @@ describe("CatInsurancePool", function () {
         it("Should revert constructor when USDC address is zero", async function () {
             const CatShareFactory = await ethers.getContractFactory("CatShare");
             const share = await CatShareFactory.deploy();
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             await expect(CatPoolFactory.deploy(ethers.ZeroAddress, share.target, ethers.ZeroAddress, owner.address))
                 .to.be.revertedWith("CIP: Invalid USDC token address");
         });
 
         it("Should revert constructor when CatShare address is zero", async function () {
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             await expect(CatPoolFactory.deploy(mockUsdc.target, ethers.ZeroAddress, ethers.ZeroAddress, owner.address))
                 .to.be.revertedWith("CIP: Invalid CatShare token address");
         });
@@ -447,7 +447,7 @@ describe("CatInsurancePool", function () {
         it("drawFund should revert when capital pool address is unset", async function () {
             const CatShareFactory = await ethers.getContractFactory("CatShare");
             const share = await CatShareFactory.deploy();
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, mockAdapter.target, owner.address);
             await share.transferOwnership(pool.target);
             await pool.initialize();
@@ -471,7 +471,7 @@ describe("CatInsurancePool", function () {
         it("getPendingProtocolAssetRewards should return zero when distributor unset", async function () {
             const CatShareFactory = await ethers.getContractFactory("CatShare");
             const newShare = await CatShareFactory.deploy();
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             const newCatPool = await CatPoolFactory.deploy(mockUsdc.target, newShare.target, ethers.ZeroAddress, owner.address);
             await newShare.transferOwnership(newCatPool.target);
             await newCatPool.initialize();
@@ -524,7 +524,7 @@ describe("CatInsurancePool", function () {
         it("claimProtocolAssetRewards should revert when distributor unset", async function () {
             const CatShareFactory = await ethers.getContractFactory("CatShare");
             const share = await CatShareFactory.deploy();
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             const pool = await CatPoolFactory.deploy(mockUsdc.target, share.target, ethers.ZeroAddress, owner.address);
             await share.transferOwnership(pool.target);
             await pool.initialize();
@@ -555,7 +555,7 @@ describe("CatInsurancePool", function () {
 
             const CatShareFactory = await ethers.getContractFactory("CatShare");
             const share2 = await CatShareFactory.deploy();
-            const CatPoolFactory = await ethers.getContractFactory("CatInsurancePool");
+            const CatPoolFactory = await ethers.getContractFactory("BackstopPool");
             const pool2 = await CatPoolFactory.deploy(mockUsdc.target, share2.target, ethers.ZeroAddress, owner.address);
             await share2.transferOwnership(pool2.target);
             await pool2.initialize();

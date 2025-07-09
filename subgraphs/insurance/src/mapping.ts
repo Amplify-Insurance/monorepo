@@ -31,13 +31,13 @@ import {
   CoverPoolAddressSet,
   DepositToAdapter,
   DrawFromFund,
-  OwnershipTransferred as CatInsurancePoolOwnershipTransferred,
+  OwnershipTransferred as BackstopPoolOwnershipTransferred,
   ProtocolAssetReceivedForDistribution,
   ProtocolAssetRewardsClaimed,
   UsdcPremiumReceived,
   PolicyManagerAddressSet,
   RewardDistributorSet
-} from "../generated/CatInsurancePool/CatInsurancePool";
+} from "../generated/BackstopPool/BackstopPool";
 import {
   AddressesSet as PMAddressesSet,
   CatPremiumShareSet,
@@ -190,8 +190,8 @@ export function handleRiskManagerOwnershipTransferred(
   saveOwner(event, event.params.newOwner);
 }
 
-export function handleCatInsurancePoolOwnershipTransferred(
-  event: CatInsurancePoolOwnershipTransferred
+export function handleBackstopPoolOwnershipTransferred(
+  event: BackstopPoolOwnershipTransferred
 ): void {
   saveGeneric(event, "OwnershipTransferred");
   saveOwner(event, event.params.newOwner);

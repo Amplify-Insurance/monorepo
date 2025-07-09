@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IYieldAdapterEmergency.sol";
-import "../interfaces/IRiskManagerWithCat.sol";
+import "../interfaces/IRiskManagerWithBackstop.sol";
 
 /**
  * @title CapitalPool
@@ -267,7 +267,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (totalPayoutAmount == 0) return;
         if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
         
-        ICatInsurancePool catPool = IRiskManagerWithCat(riskManager).catPool();
+        IBackstopPool catPool = IRiskManagerWithBackstop(riskManager).catPool();
 
         if (_payoutData.totalCapitalFromPoolLPs > 0) {
             for (uint i = 0; i < _payoutData.adapters.length; i++) {

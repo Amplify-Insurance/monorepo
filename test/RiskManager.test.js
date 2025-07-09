@@ -47,7 +47,7 @@ const MAX_ALLOCATIONS = 5;
         const PolicyNFTFactory = await ethers.getContractFactory("MockPolicyNFT");
         mockPolicyNFT = await PolicyNFTFactory.deploy(owner.address);
 
-        const CatPoolFactory = await ethers.getContractFactory("MockCatInsurancePool");
+        const CatPoolFactory = await ethers.getContractFactory("MockBackstopPool");
         mockCatPool = await CatPoolFactory.deploy(owner.address);
 
         const LossFactory = await ethers.getContractFactory("MockLossDistributor");

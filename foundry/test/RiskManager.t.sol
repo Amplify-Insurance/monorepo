@@ -7,7 +7,7 @@ import {RiskManager} from "contracts/core/RiskManager.sol";
 import {MockCapitalPool} from "contracts/test/MockCapitalPool.sol";
 import {MockPoolRegistry} from "contracts/test/MockPoolRegistry.sol";
 import {MockPolicyNFT} from "contracts/test/MockPolicyNFT.sol";
-import {MockCatInsurancePool} from "contracts/test/MockCatInsurancePool.sol";
+import {MockBackstopPool} from "contracts/test/MockBackstopPool.sol";
 import {MockLossDistributor} from "contracts/test/MockLossDistributor.sol";
 import {MockPolicyManager} from "contracts/test/MockPolicyManager.sol";
 import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
@@ -18,7 +18,7 @@ contract RiskManagerTest is Test {
     MockCapitalPool cp;
     MockPoolRegistry pr;
     MockPolicyNFT nft;
-    MockCatInsurancePool cat;
+    MockBackstopPool cat;
     MockLossDistributor ld;
     MockPolicyManager pm;
     MockRewardDistributor rd;
@@ -34,7 +34,7 @@ contract RiskManagerTest is Test {
         nft = new MockPolicyNFT(address(this));
         pm = new MockPolicyManager();
         pm.setPolicyNFT(address(nft));
-        cat = new MockCatInsurancePool(address(this));
+        cat = new MockBackstopPool(address(this));
         ld = new MockLossDistributor();
         rd = new MockRewardDistributor();
         rm = new RiskManager(address(this));

@@ -331,9 +331,9 @@ describe("CapitalPool", function () {
         await capitalPool.connect(user1).deposit(DEPOSIT_1, YIELD_PLATFORM_1);
         await capitalPool.connect(user2).deposit(DEPOSIT_2, YIELD_PLATFORM_2);
 
-        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const MockCatPool = await ethers.getContractFactory("MockBackstopPool");
         const catPool = await MockCatPool.deploy(owner.address);
-        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        const RM = await ethers.getContractFactory("MockRiskManagerWithBackstop");
         riskManagerContract = await RM.deploy(catPool.target);
         await catPool.setCoverPoolAddress(capitalPool.target);
         await capitalPool.connect(owner).setRiskManager(riskManagerContract.target);
@@ -410,7 +410,7 @@ describe("CapitalPool", function () {
         await expect(riskManagerContract.executePayout(capitalPool.target, payoutData))
           .to.not.be.reverted;
         const catAddr2 = await riskManagerContract.catPool();
-        const cat2 = await ethers.getContractAt("MockCatInsurancePool", catAddr2);
+        const cat2 = await ethers.getContractAt("MockBackstopPool", catAddr2);
         expect(await cat2.drawFundCallCount()).to.equal(0);
         expect(await mockUsdc.balanceOf(claimant.address)).to.equal(payoutAmount);
       });
@@ -434,9 +434,9 @@ describe("CapitalPool", function () {
         await mockUsdc.connect(owner).mint(revAdapter.target, payoutAmount);
         await mockUsdc.connect(owner).mint(capitalPool.target, payoutAmount);
 
-        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const MockCatPool = await ethers.getContractFactory("MockBackstopPool");
         const catPool = await MockCatPool.deploy(owner.address);
-        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        const RM = await ethers.getContractFactory("MockRiskManagerWithBackstop");
         const rm = await RM.deploy(catPool.target);
         await catPool.setCoverPoolAddress(capitalPool.target);
         await capitalPool.connect(owner).setRiskManager(rm.target);
@@ -464,9 +464,9 @@ describe("CapitalPool", function () {
 
         await mockUsdc.connect(owner).mint(capitalPool.target, payoutAmount);
 
-        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const MockCatPool = await ethers.getContractFactory("MockBackstopPool");
         const catPool = await MockCatPool.deploy(owner.address);
-        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        const RM = await ethers.getContractFactory("MockRiskManagerWithBackstop");
         const rm = await RM.deploy(catPool.target);
         await catPool.setCoverPoolAddress(capitalPool.target);
         await capitalPool.connect(owner).setRiskManager(rm.target);
@@ -650,9 +650,9 @@ describe("CapitalPool", function () {
 
         await mockUsdc.connect(owner).mint(mockAdapter1.target, payoutAmount * 2n);
         await mockAdapter1.connect(owner).setTotalValueHeld(payoutAmount * 2n);
-        const MockCatPool = await ethers.getContractFactory("MockCatInsurancePool");
+        const MockCatPool = await ethers.getContractFactory("MockBackstopPool");
         const catPool = await MockCatPool.deploy(owner.address);
-        const RM = await ethers.getContractFactory("MockRiskManagerWithCat");
+        const RM = await ethers.getContractFactory("MockRiskManagerWithBackstop");
         const rm = await RM.deploy(catPool.target);
         await catPool.setCoverPoolAddress(capitalPool.target);
         await capitalPool.connect(owner).setRiskManager(rm.target);

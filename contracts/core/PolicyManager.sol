@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/IPolicyNFT.sol";
 import "../interfaces/IPoolRegistry.sol";
 import "../interfaces/ICapitalPool.sol";
-import "../interfaces/ICatInsurancePool.sol";
+import "../interfaces/IBackstopPool.sol";
 import "../interfaces/IRewardDistributor.sol";
 import "../interfaces/IRiskManager_PM_Hook.sol";
 
@@ -31,7 +31,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     uint256 public coverCooldownPeriod = 0 days;
     IPoolRegistry public poolRegistry;
     ICapitalPool public capitalPool;
-    ICatInsurancePool public catPool;
+    IBackstopPool public catPool;
     IPolicyNFT public immutable policyNFT;
     IRewardDistributor public rewardDistributor;
     IRiskManager_PM_Hook public riskManager;
@@ -92,7 +92,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         ) revert AddressesNotSet();
         poolRegistry     = IPoolRegistry(_registry);
         capitalPool      = ICapitalPool(_capital);
-        catPool          = ICatInsurancePool(_cat);
+        catPool          = IBackstopPool(_cat);
         rewardDistributor= IRewardDistributor(_rewards);
         riskManager      = IRiskManager_PM_Hook(_rm);
         emit AddressesSet(_registry, _capital, _rewards, _rm);
@@ -100,7 +100,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
     function setCatPool(address _catPool) external onlyOwner {
         if (_catPool == address(0)) revert AddressesNotSet();
-        catPool = ICatInsurancePool(_catPool);
+        catPool = IBackstopPool(_catPool);
         emit CatPoolSet(_catPool);
     }
 

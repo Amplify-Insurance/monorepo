@@ -25,7 +25,7 @@ async function deployFixture() {
   const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
   const rewardDistributor = await RewardDistributor.deploy(owner.address);
 
-  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const CatPool = await ethers.getContractFactory("BackstopPool");
   const catPool = await CatPool.deploy(usdc.target, catShare.target, ethers.ZeroAddress, owner.address);
   await catShare.transferOwnership(catPool.target);
   await catPool.initialize();

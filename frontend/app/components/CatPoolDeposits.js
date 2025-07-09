@@ -164,8 +164,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
           <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
             <TrendingUp className="w-8 h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Cat Pool Deposits</h3>
-          <p className="text-gray-500 dark:text-gray-400">Start earning by depositing into the Cat Pool</p>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Backstop Pool Deposits</h3>
+          <p className="text-gray-500 dark:text-gray-400">Start earning by depositing into the Backstop Pool</p>
         </div>
       </div>
     )
@@ -200,7 +200,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     token: r.token,
     amount: Number(ethers.utils.formatUnits(r.amount, 18)).toFixed(4),
     value: Number(ethers.utils.formatUnits(r.amount, 18)),
-    type: "Cat Pool Rewards",
+    type: "Backstop Pool Rewards",
   }))
 
   const daysUntilAvailable = pendingWithdrawal
@@ -218,7 +218,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                 <TrendingUp className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cat Pool Deposits</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Backstop Pool Deposits</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Your liquidity positions</p>
               </div>
             </div>
@@ -519,8 +519,8 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
       <ClaimRewardsModal
         isOpen={showClaimModal}
         onClose={() => setShowClaimModal(false)}
-        title="Claim Cat Pool Rewards"
-        description="Claim your pending rewards from the Cat Pool liquidity provision."
+        title="Claim Backstop Pool Rewards"
+        description="Claim your pending rewards from the Backstop Pool liquidity provision."
         rewards={rewardsData}
         onClaim={handleClaimRewards}
         isSubmitting={isClaimingRewards}

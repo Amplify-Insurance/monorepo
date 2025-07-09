@@ -38,7 +38,7 @@ async function deployFixture() {
   const CatShare = await ethers.getContractFactory("CatShare");
   const catShare = await CatShare.deploy();
 
-  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const CatPool = await ethers.getContractFactory("BackstopPool");
   const catPool = await CatPool.deploy(usdc.target, catShare.target, adapter.target, owner.address);
   await catShare.transferOwnership(catPool.target);
   await catPool.initialize();

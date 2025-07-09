@@ -5,12 +5,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @title MockCatInsurancePool
- * @notice A mock implementation of the CatInsurancePool for testing external contracts like RiskManager.
+ * @title MockBackstopPool
+ * @notice A mock implementation of the BackstopPool for testing external contracts like RiskManager.
  * @dev This contract simulates the interface that the RiskManager/CoverPool calls. It records
  * interactions and allows tests to force reverts to check error handling.
  */
-contract MockCatInsurancePool is Ownable {
+contract MockBackstopPool is Ownable {
 
     // --- State for Mocking ---
 
@@ -51,7 +51,7 @@ contract MockCatInsurancePool is Ownable {
         emit RevertOnDrawSet(_shouldRevert);
     }
 
-    // --- Mocked Functions (Implementing the CatInsurancePool's external interface) ---
+    // --- Mocked Functions (Implementing the BackstopPool's external interface) ---
 
     /**
      * @notice Mocks the owner-only function to set the CoverPool address.

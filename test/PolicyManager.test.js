@@ -8,14 +8,14 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 async function deployMocks(owner, usdcAddress) {
     const MockPoolRegistry = await ethers.getContractFactory("MockPoolRegistry");
     const MockCapitalPool = await ethers.getContractFactory("MockCapitalPool");
-    const MockCatInsurancePool = await ethers.getContractFactory("MockCatInsurancePool");
+    const MockBackstopPool = await ethers.getContractFactory("MockBackstopPool");
     const MockPolicyNFT = await ethers.getContractFactory("MockPolicyNFT");
     const MockRewardDistributor = await ethers.getContractFactory("MockRewardDistributor");
     const MockRiskManager = await ethers.getContractFactory("MockRiskManagerHook");
 
     const poolRegistry = await MockPoolRegistry.deploy();
     const capitalPool = await MockCapitalPool.deploy(owner.address, usdcAddress);
-    const catPool = await MockCatInsurancePool.deploy(owner.address);
+    const catPool = await MockBackstopPool.deploy(owner.address);
     const policyNFT = await MockPolicyNFT.deploy(owner.address);
     const rewardDistributor = await MockRewardDistributor.deploy();
     const riskManager = await MockRiskManager.deploy();
@@ -617,7 +617,7 @@ describe("PolicyManager", function () {
             });
 
             it("Should prevent re-entrancy during addPremium", async function() {
-                const MaliciousCatFactory = await ethers.getContractFactory("MaliciousCatReentrant");
+                const MaliciousCatFactory = await ethers.getContractFactory("MaliciousBackstopReentrant");
                 const maliciousCat = await MaliciousCatFactory.deploy();
                 await maliciousCat.setTargets(policyManager.target, POLICY_ID);
 
