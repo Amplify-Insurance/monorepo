@@ -13,7 +13,7 @@ Amplify Insurance is building a modular, open-source insurance marketplace where
 
 ### Liquidity & premium flows
 
-Underwriters deposit USDC → `CapitalPool` optionally stakes it in Aave, Compound, Euler, Moonwell or Morpho via plug-in adapters → yield flows back to the pool. When a policy-holder buys cover, `PolicyManager` pulls capital from the relevant risk pool, mints a `PolicyNFT` and streams premiums (block-by-block) back to underwriters. A small slice of every premium goes to the `CatInsurancePool` – a catastrophe back-stop fund issued as `CatShare` ERC-20 tokens. The README diagrams (“Underwriter Capital Flow” & “Distressed Capital Flow”) illustrate these paths in detail.
+Underwriters deposit USDC → `CapitalPool` optionally stakes it in Aave, Compound, Euler, Moonwell or Morpho via plug-in adapters → yield flows back to the pool. When a policy-holder buys cover, `PolicyManager` pulls capital from the relevant risk pool, mints a `PolicyNFT` and streams premiums (block-by-block) back to underwriters. A small slice of every premium goes to the `BackstopPool` – a catastrophe back-stop fund issued as `CatShare` ERC-20 tokens. The README diagrams (“Underwriter Capital Flow” & “Distressed Capital Flow”) illustrate these paths in detail.
 
 ## Directory Layout
 
@@ -25,7 +25,7 @@ contracts/               Solidity sources
 │  ├─ PolicyManager.sol     User-facing policy lifecycle logic
 │  └─ RiskManager.sol       Coordinates allocation, claims and payouts
 ├─ external/             Optional backstop modules
-│  └─ CatInsurancePool.sol  Secondary pool funded by premiums
+│  └─ BackstopPool.sol  Secondary pool funded by premiums
 ├─ governance/           DAO style governance
 │  ├─ Committee.sol
 │  └─ Staking.sol
@@ -108,7 +108,7 @@ The default network configuration uses Hardhat's in‑memory chain.  Modify `har
 - **PolicyManager** – User entrypoint for purchasing cover. Mints and burns `PolicyNFT` tokens.
 - **RiskManager** – Coordinates pool allocations, claims processing and rewards through `LossDistributor` and `RewardDistributor`.
 - **PoolRegistry** – Stores pool parameters, rate models and active adapters for each risk pool.
-- **CatInsurancePool** – Collects a share of premiums and provides additional liquidity during large claims. Calling `setRewardDistributor` now configures the distributor's cat pool automatically so users can claim protocol asset rewards without extra setup.
+- **BackstopPool** – Collects a share of premiums and provides additional liquidity during large claims. Calling `setRewardDistributor` now configures the distributor's cat pool automatically so users can claim protocol asset rewards without extra setup.
 - **Governance (Committee & Staking)** – Simple on‑chain governance used for pausing pools and slashing misbehaving stakers.
 
 ## Running a Local Node
@@ -179,9 +179,9 @@ include:
 - `GET /api/adapters` – active yield adapter addresses
 - `GET /api/underwriters/[address]/allocated/[poolId]` – check an underwriter's pool allocation
 - `GET /api/underwriters/[address]/losses/[poolId]` – pending losses for a pool
-- `GET /api/catpool/liquidusdc` – CatInsurancePool liquid USDC value
-- `GET /api/catpool/apr` – CatInsurancePool adapter APR
-- `GET /api/catpool/user/[address]` – CatInsurancePool account details
+- `GET /api/catpool/liquidusdc` – BackstopPool liquid USDC value
+- `GET /api/catpool/apr` – BackstopPool adapter APR
+- `GET /api/catpool/user/[address]` – BackstopPool account details
 - `GET /api/catpool/rewards/[address]/[token]` – claimable distressed asset rewards
 - `GET /api/analytics` – protocol usage metrics
 - `GET /api/claims` – list of processed claims
@@ -213,7 +213,7 @@ Each deployment object supports the following keys:
 - `name` – label reported in API responses
 - `riskManager` – `RiskManager` contract address
 - `capitalPool` – `CapitalPool` contract address
-- `catInsurancePool` – `CatInsurancePool` contract address
+- `catInsurancePool` – `BackstopPool` contract address
 - `priceOracle` – `PriceOracle` contract address
 - `multicallReader` – `MulticallReader` contract address
 - `lossDistributor` – `LossDistributor` contract address
@@ -332,7 +332,7 @@ graph TD
     PolicyManager -->|notify| RiskManager
     Policyholder -->|pay premium| PolicyManager
     PolicyManager -->|rewards| RewardDistributor
-    PolicyManager -->|share| CatInsurancePool
+    PolicyManager -->|share| BackstopPool
 ```
 
 ## Distressed Capital Flow During Claims
@@ -341,10 +341,10 @@ graph TD
 graph TD
     Policyholder -->|file claim| RiskManager
     RiskManager -->|distribute loss| LossDistributor
-    RiskManager -->|draw backstop| CatInsurancePool
+    RiskManager -->|draw backstop| BackstopPool
     RiskManager -->|request payout| CapitalPool
     CapitalPool -->|withdraw funds| YieldAdapter
     CapitalPool -->|pay out| Policyholder
     Underwriter -.->|capital reduced| CapitalPool
-    CatInsurancePool -->|protocol assets| RewardDistributor
+    BackstopPool -->|protocol assets| RewardDistributor
 ```

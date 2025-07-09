@@ -6,7 +6,7 @@ const GovToken = "contracts/tokens/CatShare.sol:CatShare";
 const RiskManager = "contracts/core/RiskManager.sol:RiskManager";
 const PoolRegistry = "contracts/core/PoolRegistry.sol:PoolRegistry";
 const CapitalPool = "contracts/core/CapitalPool.sol:CapitalPool";
-const CatInsurancePool = "contracts/external/CatInsurancePool.sol:CatInsurancePool";
+const BackstopPool = "contracts/external/BackstopPool.sol:BackstopPool";
 const LossDistributor = "contracts/utils/LossDistributor.sol:LossDistributor";
 const RewardDistributor = "contracts/utils/RewardDistributor.sol:RewardDistributor";
 const PolicyNFT = "contracts/tokens/PolicyNFT.sol:PolicyNFT";
@@ -44,7 +44,7 @@ describe("Committee Integration", function () {
         const CapitalPoolFactory = await ethers.getContractFactory(CapitalPool);
         const capitalPool = await CapitalPoolFactory.deploy(owner.address, usdc.target);
 
-        const CatPoolFactory = await ethers.getContractFactory(CatInsurancePool);
+        const CatPoolFactory = await ethers.getContractFactory(BackstopPool);
         const catPool = await CatPoolFactory.deploy(usdc.target, govToken.target, ethers.ZeroAddress, owner.address);
 
         const LossFactory = await ethers.getContractFactory(LossDistributor);
@@ -321,7 +321,7 @@ describe("Committee Integration", function () {
             const CapitalPoolFactory = await ethers.getContractFactory(CapitalPool);
             const capitalPool = await CapitalPoolFactory.deploy(owner.address, usdc.target);
 
-            const CatPoolFactory = await ethers.getContractFactory(CatInsurancePool);
+            const CatPoolFactory = await ethers.getContractFactory(BackstopPool);
             const catPool = await CatPoolFactory.deploy(usdc.target, govToken.target, ethers.ZeroAddress, owner.address);
 
             const LossFactory = await ethers.getContractFactory(LossDistributor);

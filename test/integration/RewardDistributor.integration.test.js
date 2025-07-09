@@ -25,7 +25,7 @@ async function deployFixture() {
   const capitalPool = await CapitalPool.deploy(owner.address, usdc.target);
   await capitalPool.setBaseYieldAdapter(1, adapter.target);
 
-  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const CatPool = await ethers.getContractFactory("BackstopPool");
   const catPool = await CatPool.deploy(usdc.target, catShare.target, adapter.target, owner.address);
   await catShare.transferOwnership(catPool.target);
   await catPool.initialize();
@@ -322,7 +322,7 @@ describe("RewardDistributor Integration", function () {
 
     const CatShare = await ethers.getContractFactory("CatShare");
     const newShare = await CatShare.deploy();
-    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const CatPool = await ethers.getContractFactory("BackstopPool");
     const newCatPool = await CatPool.deploy(usdc.target, newShare.target, adapter.target, owner.address);
 
     await expect(rewardDistributor.connect(owner).setCatPool(newCatPool.target))

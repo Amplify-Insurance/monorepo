@@ -23,7 +23,7 @@ export default function useCatPoolStats() {
         }
         setStats({ liquidUsdc: liquid, apr })
       } catch (err) {
-        console.error('Failed to load cat pool stats', err)
+        console.error('Failed to load backstop pool stats', err)
       } finally {
         setLoading(false)
       }

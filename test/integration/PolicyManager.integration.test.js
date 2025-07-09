@@ -33,7 +33,7 @@ describe("PolicyManager Integration", function () {
     capitalPool = await CapitalPool.deploy(owner.address, usdc.target);
     await capitalPool.setRiskManager(riskManager.target);
 
-    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const CatPool = await ethers.getContractFactory("BackstopPool");
     catPool = await CatPool.deploy(usdc.target, catShare.target, ethers.ZeroAddress, owner.address);
     await catShare.transferOwnership(catPool.target);
     await catPool.initialize();

@@ -10,7 +10,7 @@ import "../interfaces/IPolicyNFT.sol";
 import "../interfaces/IPoolRegistry.sol";
 import "../interfaces/ICapitalPool.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "../interfaces/ICatInsurancePool.sol";
+import "../interfaces/IBackstopPool.sol";
 import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IPolicyManager.sol";
 import "../interfaces/IRewardDistributor.sol";
@@ -28,7 +28,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     ICapitalPool public capitalPool;
     IPoolRegistry public poolRegistry;
     IPolicyNFT public policyNFT;
-    ICatInsurancePool public catPool;
+    IBackstopPool public catPool;
     ILossDistributor public lossDistributor;
     IRewardDistributor public rewardDistributor;
     address public policyManager;
@@ -92,7 +92,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         poolRegistry = IPoolRegistry(_registry);
         policyManager = _policy;
         policyNFT = IPolicyManager(_policy).policyNFT();
-        catPool = ICatInsurancePool(_cat);
+        catPool = IBackstopPool(_cat);
         lossDistributor = ILossDistributor(_loss);
         rewardDistributor = IRewardDistributor(_rewards);
         emit AddressesSet(_capital, _registry, _policy, _cat, _loss, _rewards);

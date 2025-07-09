@@ -2,8 +2,8 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-/** Integration tests for CatInsurancePool using the real RewardDistributor */
-describe("CatInsurancePool Integration", function () {
+/** Integration tests for BackstopPool using the real RewardDistributor */
+describe("BackstopPool Integration", function () {
   let owner, riskManager, policyManager, capitalPool, lp1, lp2;
   let usdc, rewardToken;
   let catShare, adapter, rewardDistributor, catPool;
@@ -25,7 +25,7 @@ describe("CatInsurancePool Integration", function () {
     const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
     rewardDistributor = await RewardDistributor.deploy(riskManager.address);
 
-    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const CatPool = await ethers.getContractFactory("BackstopPool");
     catPool = await CatPool.deploy(usdc.target, catShare.target, adapter.target, owner.address);
 
     await catShare.transferOwnership(catPool.target);
@@ -307,7 +307,7 @@ describe("CatInsurancePool Integration", function () {
   it("claim rewards reverts when distributor unset", async function () {
     const CatShare = await ethers.getContractFactory("CatShare");
     const share = await CatShare.deploy();
-    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const CatPool = await ethers.getContractFactory("BackstopPool");
     const pool = await CatPool.deploy(usdc.target, share.target, adapter.target, owner.address);
     await share.transferOwnership(pool.target);
     await pool.initialize();

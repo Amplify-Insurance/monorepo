@@ -70,8 +70,8 @@ async function main() {
   const catShare = await CatShare.deploy();
   await catShare.waitForDeployment();
 
-  const CatInsurancePool = await ethers.getContractFactory("CatInsurancePool");
-  const catPool = await CatInsurancePool.deploy(USDC_ADDRESS, catShare.target, ethers.ZeroAddress, deployer.address);
+  const BackstopPool = await ethers.getContractFactory("BackstopPool");
+  const catPool = await BackstopPool.deploy(USDC_ADDRESS, catShare.target, ethers.ZeroAddress, deployer.address);
   await catPool.waitForDeployment();
 
   const transferTx = await catShare.transferOwnership(catPool.target);
@@ -129,7 +129,7 @@ async function main() {
     PolicyNFT:         policyNFT.target,
     PolicyManager:     policyManager.target,
     PoolRegistry:      poolRegistry.target,
-    CatInsurancePool:  catPool.target,
+    BackstopPool:  catPool.target,
     CapitalPool:       capitalPool.target,
     LossDistributor:   lossDistributor.target,
     RewardDistributor: rewardDistributor.target,

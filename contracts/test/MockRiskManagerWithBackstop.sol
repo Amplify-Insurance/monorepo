@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/IRiskManagerWithCat.sol";
-import "../interfaces/ICatInsurancePool.sol";
+import "../interfaces/IRiskManagerWithBackstop.sol";
+import "../interfaces/IBackstopPool.sol";
 import "../core/CapitalPool.sol";
 
-contract MockRiskManagerWithCat is IRiskManagerWithCat {
-    ICatInsurancePool public override catPool;
+contract MockRiskManagerWithBackstop is IRiskManagerWithBackstop {
+    IBackstopPool public override catPool;
 
     event CapitalDeposited(address indexed underwriter, uint256 amount);
     event WithdrawalRequested(address indexed underwriter, uint256 amount);
     event CapitalWithdrawn(address indexed underwriter, uint256 amount, bool full);
 
     constructor(address _catPool) {
-        catPool = ICatInsurancePool(_catPool);
+        catPool = IBackstopPool(_catPool);
     }
 
     function setCatPool(address _catPool) external {
-        catPool = ICatInsurancePool(_catPool);
+        catPool = IBackstopPool(_catPool);
     }
 
     function onCapitalDeposited(address _u, uint256 _amount) external {

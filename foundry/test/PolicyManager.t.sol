@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
 import {MockPoolRegistry} from "contracts/test/MockPoolRegistry.sol";
 import {MockCapitalPool} from "contracts/test/MockCapitalPool.sol";
-import {MockCatInsurancePool} from "contracts/test/MockCatInsurancePool.sol";
+import {MockBackstopPool} from "contracts/test/MockBackstopPool.sol";
 import {MockPolicyNFT} from "contracts/test/MockPolicyNFT.sol";
 import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 import {MockRiskManagerHook} from "contracts/test/MockRiskManagerHook.sol";
@@ -16,7 +16,7 @@ contract PolicyManagerTest is Test {
     PolicyManager pm;
     MockPoolRegistry registry;
     MockCapitalPool capital;
-    MockCatInsurancePool cat;
+    MockBackstopPool cat;
     MockPolicyNFT nft;
     MockRewardDistributor rewards;
     MockRiskManagerHook rm;
@@ -34,7 +34,7 @@ contract PolicyManagerTest is Test {
 
         registry = new MockPoolRegistry();
         capital = new MockCapitalPool(address(this), address(token));
-        cat = new MockCatInsurancePool(address(this));
+        cat = new MockBackstopPool(address(this));
         nft = new MockPolicyNFT(address(this));
         rewards = new MockRewardDistributor();
         rm = new MockRiskManagerHook();

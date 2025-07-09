@@ -28,7 +28,7 @@ export default function useCatPoolRewards(address) {
         )
         setRewards(results.filter(Boolean))
       } catch (err) {
-        console.error('Failed to load cat pool rewards', err)
+        console.error('Failed to load backstop pool rewards', err)
       } finally {
         setLoading(false)
       }

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/ICatInsurancePool.sol";
+import "../interfaces/IBackstopPool.sol";
 
 interface IPM {
     function addPremium(uint256 id, uint256 amount) external;
 }
 
-contract MaliciousCatReentrant is ICatInsurancePool {
+contract MaliciousBackstopReentrant is IBackstopPool {
     IPM public pm;
     uint256 public policyId;
 

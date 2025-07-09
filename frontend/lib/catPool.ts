@@ -1,13 +1,13 @@
 import { ethers } from 'ethers';
-import CatPool from '../abi/CatInsurancePool.json';
+import CatPool from '../abi/BackstopPool.json';
 import { getProvider, provider } from './provider';
 import deployments from '../app/config/deployments';
 
-const DEFAULT_ADDRESS = deployments[0]?.catInsurancePool as string;
+const DEFAULT_ADDRESS = deployments[0]?.backstopPool as string;
 
 if (!DEFAULT_ADDRESS) {
-  console.error('❌  CatInsurancePool address not configured');
-  throw new Error('CatInsurancePool address not set');
+  console.error('❌  BackstopPool address not configured');
+  throw new Error('BackstopPool address not set');
 }
 
 export function getCatPool(address: string = DEFAULT_ADDRESS, deployment?: string) {

@@ -295,7 +295,7 @@
 		"name": "catPool",
 		"outputs": [
 			{
-				"internalType": "contract ICatInsurancePool",
+				"internalType": "contract IBackstopPool",
 				"name": "",
 				"type": "address"
 			}

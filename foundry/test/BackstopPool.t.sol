@@ -2,14 +2,14 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {CatInsurancePool} from "contracts/external/CatInsurancePool.sol";
+import {BackstopPool} from "contracts/external/BackstopPool.sol";
 import {CatShare} from "contracts/tokens/CatShare.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
 import {MockYieldAdapter} from "contracts/test/MockYieldAdapter.sol";
 import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 
-contract CatInsurancePoolTest is Test {
-    CatInsurancePool pool;
+contract BackstopPoolTest is Test {
+    BackstopPool pool;
     CatShare share;
     MockERC20 usdc;
     MockYieldAdapter adapter;
@@ -31,7 +31,7 @@ contract CatInsurancePoolTest is Test {
 
         usdc.mint(user, STARTING_BALANCE);
 
-        pool = new CatInsurancePool(usdc, share, adapter, address(this));
+        pool = new BackstopPool(usdc, share, adapter, address(this));
         share.transferOwnership(address(pool));
         pool.initialize();
 

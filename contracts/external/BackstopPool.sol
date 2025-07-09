@@ -10,7 +10,7 @@ import "../tokens/CatShare.sol"; // Assumes CatShare.sol is in a sub-directory
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IRewardDistributor.sol";
 
-contract CatInsurancePool is Ownable, ReentrancyGuard {
+contract BackstopPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;
@@ -76,7 +76,7 @@ contract CatInsurancePool is Ownable, ReentrancyGuard {
     /**
      * @notice Initializes the pool by minting the initial locked shares.
      * @dev This function can only be called once by the owner.
-     * The CatInsurancePool contract must be the owner of the CatShare token before this is called.
+     * The BackstopPool contract must be the owner of the CatShare token before this is called.
      */
     function initialize() external onlyOwner {
         require(!_initialized, "CIP: Already initialized");

@@ -355,13 +355,13 @@ dataSources:
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
-    name: CatInsurancePoolEth
+    name: BackstopPoolEth
     network: mainnet
     context:
       deployment: eth
     source:
       address: "0x1111111111111111111111111111111111111111" # replace with deployed address
-      abi: CatInsurancePool
+      abi: BackstopPool
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -375,8 +375,8 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
       abis:
-        - name: CatInsurancePool
-          file: ./abis/CatInsurancePool.json
+        - name: BackstopPool
+          file: ./abis/BackstopPool.json
       eventHandlers:
         - event: AdapterChanged(indexed address)
           handler: handleAdapterChanged
@@ -401,7 +401,7 @@ dataSources:
         - event: RewardDistributorSet(indexed address)
           handler: handleRewardDistributorSet
         - event: OwnershipTransferred(indexed address,indexed address)
-          handler: handleCatInsurancePoolOwnershipTransferred
+          handler: handleBackstopPoolOwnershipTransferred
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
@@ -548,13 +548,13 @@ dataSources:
           handler: handlePoolRegistryOwnershipTransferred
       file: ./src/mapping.ts
   - kind: ethereum/contract
-    name: CatInsurancePool
+    name: BackstopPool
     network: mainnet
     context:
       deployment: usdc
     source:
       address: "0x0000000000000000000000000000000000000000" # replace with deployed address
-      abi: CatInsurancePool
+      abi: BackstopPool
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -568,8 +568,8 @@ dataSources:
         - ContractOwner
         - PoolUtilizationSnapshot
       abis:
-        - name: CatInsurancePool
-          file: ./abis/CatInsurancePool.json
+        - name: BackstopPool
+          file: ./abis/BackstopPool.json
       eventHandlers:
         - event: AdapterChanged(indexed address)
           handler: handleAdapterChanged
@@ -594,7 +594,7 @@ dataSources:
         - event: RewardDistributorSet(indexed address)
           handler: handleRewardDistributorSet
         - event: OwnershipTransferred(indexed address,indexed address)
-          handler: handleCatInsurancePoolOwnershipTransferred
+          handler: handleBackstopPoolOwnershipTransferred
       file: ./src/mapping.ts
 
   - kind: ethereum/contract

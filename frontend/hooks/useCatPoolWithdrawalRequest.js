@@ -20,7 +20,7 @@ export default function useCatPoolWithdrawalRequest(address) {
         setRequest(null)
       }
     } catch (err) {
-      console.error('Failed to load cat pool withdrawal request', err)
+      console.error('Failed to load backstop pool withdrawal request', err)
     }
   }, [address])
 

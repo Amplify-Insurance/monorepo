@@ -35,14 +35,14 @@ describe("Reset approve tokens", function () {
 
     const MockPoolRegistry = await ethers.getContractFactory("MockPoolRegistry");
     const MockCapitalPool = await ethers.getContractFactory("MockCapitalPool");
-    const MockCatInsurancePool = await ethers.getContractFactory("MockCatInsurancePool");
+    const MockBackstopPool = await ethers.getContractFactory("MockBackstopPool");
     const MockPolicyNFT = await ethers.getContractFactory("MockPolicyNFT");
     const MockRewardDistributor = await ethers.getContractFactory("MockRewardDistributor");
     const MockRiskManager = await ethers.getContractFactory("MockRiskManagerHook");
 
     const poolRegistry = await MockPoolRegistry.deploy();
     const capitalPool = await MockCapitalPool.deploy(owner.address, token.target);
-    const catPool = await MockCatInsurancePool.deploy(owner.address);
+    const catPool = await MockBackstopPool.deploy(owner.address);
     const policyNFT = await MockPolicyNFT.deploy(owner.address);
     const rewards = await MockRewardDistributor.deploy();
     const risk = await MockRiskManager.deploy();

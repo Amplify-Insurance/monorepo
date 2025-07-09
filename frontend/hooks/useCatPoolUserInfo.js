@@ -30,7 +30,7 @@ export default function useCatPoolUserInfo(address) {
         value: value.toString(),
       })
     } catch (err) {
-      console.error('Failed to load cat pool user info', err)
+      console.error('Failed to load backstop pool user info', err)
     } finally {
       setLoading(false)
     }

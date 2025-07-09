@@ -34,7 +34,7 @@ async function deployFixture() {
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
   const capitalPool = await CapitalPool.deploy(owner.address, token.target);
 
-  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const CatPool = await ethers.getContractFactory("BackstopPool");
   const catPool = await CatPool.deploy(token.target, token.target, ethers.ZeroAddress, owner.address);
 
   const LossDistributor = await ethers.getContractFactory("LossDistributor");
@@ -104,7 +104,7 @@ async function deployNoCommitteeFixture() {
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
   const capitalPool = await CapitalPool.deploy(owner.address, token.target);
 
-  const CatPool = await ethers.getContractFactory("CatInsurancePool");
+  const CatPool = await ethers.getContractFactory("BackstopPool");
   const catPool = await CatPool.deploy(token.target, token.target, ethers.ZeroAddress, owner.address);
 
   const LossDistributor = await ethers.getContractFactory("LossDistributor");
@@ -221,7 +221,7 @@ describe("StakingContract Integration", function () {
     const CapitalPool = await ethers.getContractFactory("CapitalPool");
     const capitalPool = await CapitalPool.deploy(owner.address, token.target);
 
-    const CatPool = await ethers.getContractFactory("CatInsurancePool");
+    const CatPool = await ethers.getContractFactory("BackstopPool");
     const catPool = await CatPool.deploy(token.target, token.target, ethers.ZeroAddress, owner.address);
 
     const LossDistributor = await ethers.getContractFactory("LossDistributor");

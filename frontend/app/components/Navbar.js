@@ -17,7 +17,7 @@ export default function Navbar() {
     // { name: "Markets", href: "/markets" },
     // { name: "Dashboard", href: "/dashboard" },
     // { name: "Staking", href: "/staking" },
-    // { name: "Cat Pool", href: "/catpool" },
+    // { name: "Backstop Pool", href: "/catpool" },
     // { name: "Analytics", href: "/analytics" },
     // { name: "Claims", href: "/claims" },
   ]

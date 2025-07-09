@@ -59,7 +59,7 @@ export default function CatPoolPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Cat Insurance Pool</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Backstop Pool</h1>
           <p className="text-gray-600 dark:text-gray-400">
             Provide liquidity to the catastrophe insurance pool and earn rewards
           </p>
@@ -221,7 +221,7 @@ export default function CatPoolPage() {
 
           {/* My Deposits Section */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">My Cat Pool Deposits</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">My Backstop Pool Deposits</h2>
             <CatPoolDeposits displayCurrency="USD" refreshTrigger={refreshTrigger} />
           </div>
         </div>
