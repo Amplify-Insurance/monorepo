@@ -25,7 +25,8 @@
     "slither:test": "slither . --compile-force-framework hardhat --exclude naming-convention --filter-paths 'test|node_modules/@openzeppelin/contracts'",
     "test:forge": "forge test",
     "test:forge:fuzz": "forge test -C fuzz",
-    "test:mythril": "./scripts/mythril.sh"
+    "test:mythril": "./scripts/mythril.sh",
+    "test:manticore": "./scripts/manticore.sh"
   },
   "keywords": [],
   "author": "",
