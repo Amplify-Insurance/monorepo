@@ -4,12 +4,13 @@ pragma solidity ^0.8.2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IPoolAddressesProvider.sol";
 import "../interfaces/IPool.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract AaveV3Adapter is IYieldAdapter, Ownable {
+contract AaveV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable underlyingToken;
@@ -44,7 +45,7 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
      * @notice CORRECTED: Added the onlyCapitalPool modifier to prevent unauthorized deposits
      * and protect against NAV manipulation attacks.
      */
-    function deposit(uint256 _amountToDeposit) external override onlyCapitalPool {
+    function deposit(uint256 _amountToDeposit) external override onlyCapitalPool nonReentrant {
         require(_amountToDeposit > 0, "AaveV3Adapter: amount zero");
         // The CapitalPool now holds the funds and calls this function.
         // It must have approved this adapter contract to spend its funds.
@@ -57,6 +58,7 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
         external
         override
         onlyCapitalPool
+        nonReentrant
         returns (uint256 actuallyWithdrawn)
     {
         require(_to != address(0), "AaveV3Adapter: zero address");
@@ -89,7 +91,7 @@ contract AaveV3Adapter is IYieldAdapter, Ownable {
         return liquid + aTokenBal;
     }
 
-    function emergencyTransfer(address _to, uint256 _amount) external onlyCapitalPool returns (uint256) {
+    function emergencyTransfer(address _to, uint256 _amount) external onlyCapitalPool nonReentrant returns (uint256) {
         uint256 bal = aToken.balanceOf(address(this));
         uint256 amt = Math.min(_amount, bal);
         if (amt > 0) {
