@@ -19,6 +19,11 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
     address public depositor;
     uint256 public totalValueHeld;
 
+    event DepositorSet(address indexed newDepositor);
+    event Deposited(address indexed caller, uint256 amount);
+    event Withdrawn(address indexed caller, address indexed to, uint256 amountRequested, uint256 amountTransferred);
+    event TotalValueHeldSet(uint256 newValue);
+
     constructor(address _asset, address _depositor, address _owner) Ownable(_owner) {
         require(_asset != address(0), "Adapter: asset zero");
         underlyingToken = IERC20(_asset);
@@ -33,6 +38,7 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
     function setDepositor(address _depositor) external onlyOwner {
         require(_depositor != address(0), "Adapter: zero depositor");
         depositor = _depositor;
+        emit DepositorSet(_depositor);
     }
 
     function asset() external view override returns (IERC20) {
@@ -43,6 +49,7 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
         require(amount > 0, "Adapter: amount zero");
         underlyingToken.safeTransferFrom(msg.sender, address(this), amount);
         totalValueHeld += amount;
+        emit Deposited(msg.sender, amount);
     }
 
     function withdraw(uint256 amount, address to) external override onlyDepositor nonReentrant returns (uint256) {
@@ -51,6 +58,7 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
         if (available > 0) {
             totalValueHeld = totalValueHeld > available ? totalValueHeld - available : 0;
             underlyingToken.safeTransfer(to, available);
+            emit Withdrawn(msg.sender, to, amount, available);
         }
         return available;
     }
@@ -61,6 +69,7 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
 
     function setTotalValueHeld(uint256 value) external onlyOwner {
         totalValueHeld = value;
+        emit TotalValueHeldSet(value);
     }
 
     function fundAdapter(uint256 amount) external onlyOwner {

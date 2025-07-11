@@ -34,6 +34,7 @@ contract StakingContract is Ownable, ReentrancyGuard {
     event Staked(address indexed user, uint256 amount);
     event Unstaked(address indexed user, uint256 amount);
     event CommitteeAddressSet(address indexed committeeAddress);
+    event Slashed(address indexed user, uint256 amount);
 
     error NotCommittee();
     error ZeroAddress();
@@ -124,5 +125,6 @@ contract StakingContract is Ownable, ReentrancyGuard {
         totalStaked -= _amount;
         // The slashed tokens are transferred to the committee for distribution.
         governanceToken.safeTransfer(committeeAddress, _amount);
+        emit Slashed(_user, _amount);
     }
 }

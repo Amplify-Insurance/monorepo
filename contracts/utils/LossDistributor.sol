@@ -13,6 +13,8 @@ import "../interfaces/ILossDistributor.sol";
 contract LossDistributor is ILossDistributor, Ownable {
     address public riskManager;
 
+    event RiskManagerAddressSet(address indexed newRiskManager);
+
     // --- Accounting Structs ---
     struct LossTracker {
         // Total accumulated losses for a pool, divided by the total pledge at the time of distribution.
@@ -53,6 +55,7 @@ contract LossDistributor is ILossDistributor, Ownable {
     function setRiskManager(address _newRiskManager) external onlyOwner {
         if (_newRiskManager == address(0)) revert ZeroAddress();
         riskManager = _newRiskManager;
+        emit RiskManagerAddressSet(_newRiskManager);
     }
 
     /* ───────────────────────── Core Logic ──────────────────────── */
