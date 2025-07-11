@@ -6,10 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IYieldAdapter.sol";
+import "../interfaces/IYieldAdapterEmergency.sol";
 import "../interfaces/IComet.sol";
 import "../interfaces/ICometWithRates.sol";
 
-contract CompoundV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
+contract CompoundV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable underlyingToken;

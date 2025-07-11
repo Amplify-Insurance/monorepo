@@ -18,14 +18,14 @@ contract Committee is Ownable, ReentrancyGuard {
     IERC20 public immutable governanceToken;
 
     uint256 public proposalCounter;
-    uint256 public votingPeriod;
-    uint256 public challengePeriod; // e.g., 7 days
-    uint256 public quorumBps;
-    uint256 public minBondAmount = 1000 ether;
-    uint256 public maxBondAmount = 2500 ether;
-    uint256 public minProposerFeeBps = 1000; // 10%
-    uint256 public maxProposerFeeBps = 2500; // 25%
-    uint256 public slashPercentageBps;
+    uint256 public immutable votingPeriod;
+    uint256 public immutable challengePeriod; // e.g., 7 days
+    uint256 public immutable quorumBps;
+    uint256 public constant minBondAmount = 1000 ether;
+    uint256 public constant maxBondAmount = 2500 ether;
+    uint256 public constant minProposerFeeBps = 1000; // 10%
+    uint256 public constant maxProposerFeeBps = 2500; // 25%
+    uint256 public immutable slashPercentageBps;
 
     enum ProposalType { Unpause, Pause }
     enum VoteOption { None, Against, For }
