@@ -97,6 +97,12 @@ Run Mythril security analysis with:
 npm run test:mythril
 ```
 
+Run Manticore symbolic execution with:
+
+```bash
+npm run test:manticore
+```
+
 Deploy the **PriceOracle** and register Chainlink feeds on Base with:
 
 ```bash
