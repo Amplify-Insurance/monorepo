@@ -408,13 +408,12 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
                     uint256 _cf2
                 ) = poolRegistry.getPoolData(poolId);
                 (_pledged2, _sold2, _pend2, _paused2, _fr2, _cf2);
-                uint256 claimed = rewardDistributor.claim(
+                rewardDistributor.claim(
                     msg.sender,
                     poolId,
                     address(protocolToken),
                     underwriterPoolPledge[msg.sender][poolId]
                 );
-                claimed;
             }
         }
     }

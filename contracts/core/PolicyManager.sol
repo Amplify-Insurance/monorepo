@@ -365,16 +365,19 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     /* ───────────────────── View Functions ───────────────────── */
 
     function getPendingIncreases(uint256 _policyId) external view returns (PendingIncreaseNode[] memory) {
-        // capped view to prevent RPC DoS
-        PendingIncreaseNode[] memory list = new PendingIncreaseNode[](PROCESS_LIMIT);
+        uint256 count = 0;
         uint256 nodeId = pendingIncreaseListHead[_policyId];
-        uint256 i = 0;
-        while (nodeId != 0 && i < PROCESS_LIMIT) {
+        while (nodeId != 0 && count < PROCESS_LIMIT) {
+            count++;
+            nodeId = _nodes[nodeId].nextNodeId;
+        }
+
+        PendingIncreaseNode[] memory list = new PendingIncreaseNode[](count);
+        nodeId = pendingIncreaseListHead[_policyId];
+        for (uint256 i = 0; i < count; i++) {
             list[i] = _nodes[nodeId];
             nodeId = _nodes[nodeId].nextNodeId;
-            i++;
         }
-        assembly { mstore(list, i) }
         return list;
     }
 

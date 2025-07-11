@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -12,7 +12,7 @@ import "../interfaces/IPool.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 
-contract AaveV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
+contract AaveV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, ReentrancyGuard {
 
     using SafeERC20 for IERC20;
 

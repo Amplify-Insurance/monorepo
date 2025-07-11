@@ -122,9 +122,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external onlyOwner {
         if (_platform == YieldPlatform.NONE) revert("CP: Cannot set for NONE platform");
         if (_adapterAddress == address(0)) revert ZeroAddress();
-        uint256 codeSize;
-        assembly { codeSize := extcodesize(_adapterAddress) }
-        require(codeSize > 0, "CP: Adapter address is not a contract");
+        require(_adapterAddress.code.length > 0, "CP: Adapter address is not a contract");
         require(address(IYieldAdapter(_adapterAddress).asset()) == address(underlyingAsset), "CP: Adapter asset mismatch");
         baseYieldAdapters[_platform] = IYieldAdapter(_adapterAddress);
         if (!isAdapterActive[_adapterAddress]) {
