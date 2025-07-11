@@ -31,6 +31,7 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
     }
 
     constructor(address _initialPolicyManager, address initialOwner) ERC721("Policy", "PCOVER") Ownable(initialOwner) {
+        require(_initialPolicyManager != address(0), "PolicyNFT: PolicyManager address cannot be zero");
         policyManagerContract = _initialPolicyManager;
     }
 

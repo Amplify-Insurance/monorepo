@@ -97,6 +97,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     event SystemValueSynced(uint256 newTotalSystemValue, uint256 oldTotalSystemValue);
     event AdapterCallFailed(address indexed adapterAddress, string functionCalled, string reason);
     event UnderwriterNoticePeriodSet(uint256 newPeriod);
+    event PayoutExecuted(address indexed claimant, uint256 claimantAmount, address indexed feeRecipient, uint256 feeAmount, uint256 newTotalSystemValue);
 
 
     /* ───────────────────── Constructor ─────────────────────────── */
@@ -308,6 +309,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (_payoutData.feeAmount > 0 && _payoutData.feeRecipient != address(0)) {
             underlyingAsset.safeTransfer(_payoutData.feeRecipient, _payoutData.feeAmount);
         }
+        emit PayoutExecuted(_payoutData.claimant, _payoutData.claimantAmount, _payoutData.feeRecipient, _payoutData.feeAmount, totalSystemValue);
     }
 
 

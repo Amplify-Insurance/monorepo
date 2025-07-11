@@ -26,6 +26,7 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
 
     constructor(address _asset, address _depositor, address _owner) Ownable(_owner) {
         require(_asset != address(0), "Adapter: asset zero");
+        require(_depositor != address(0), "Adapter: zero depositor");
         underlyingToken = IERC20(_asset);
         depositor = _depositor;
     }
