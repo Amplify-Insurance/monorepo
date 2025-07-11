@@ -83,7 +83,7 @@ contract Committee is Ownable, ReentrancyGuard {
         slashPercentageBps = _slashPercentageBps;
     }
         
-    function createProposal(uint256 _poolId, ProposalType _pType, uint256 _bondAmount) external returns (uint256) {
+    function createProposal(uint256 _poolId, ProposalType _pType, uint256 _bondAmount) external nonReentrant returns (uint256) {
         require(stakingContract.stakedBalance(msg.sender) > 0, "Must be a staker");
         require(!activeProposalForPool[_poolId], "Proposal already exists");
 
@@ -113,7 +113,7 @@ contract Committee is Ownable, ReentrancyGuard {
         return proposalId;
     }
 
-    function vote(uint256 _proposalId, VoteOption _vote) external {
+    function vote(uint256 _proposalId, VoteOption _vote) external nonReentrant {
         Proposal storage p = proposals[_proposalId];
         require(p.status == ProposalStatus.Active, "Proposal not active");
         require(block.timestamp < p.votingDeadline, "Voting ended");
@@ -145,7 +145,7 @@ contract Committee is Ownable, ReentrancyGuard {
         emit Voted(_proposalId, msg.sender, _vote, currentWeight);
     }
 
-    function updateVoteWeight(address _voter, uint256 _proposalId, uint256 _newWeight) external {
+    function updateVoteWeight(address _voter, uint256 _proposalId, uint256 _newWeight) external nonReentrant {
         require(msg.sender == address(stakingContract), "Not staking contract");
         Proposal storage p = proposals[_proposalId];
         if (p.status != ProposalStatus.Active || block.timestamp >= p.votingDeadline) {
@@ -182,7 +182,7 @@ contract Committee is Ownable, ReentrancyGuard {
     /**
      * @notice REFACTORED: This function now acts as a dispatcher to prevent "stack too deep" errors.
      */
-    function executeProposal(uint256 _proposalId) external {
+    function executeProposal(uint256 _proposalId) external nonReentrant {
         Proposal storage p = proposals[_proposalId];
         require(p.status == ProposalStatus.Active, "Proposal not active for execution");
         require(block.timestamp >= p.votingDeadline, "Voting not over");
@@ -231,7 +231,7 @@ contract Committee is Ownable, ReentrancyGuard {
         }
     }
     
-    function resolvePauseBond(uint256 _proposalId) external {
+    function resolvePauseBond(uint256 _proposalId) external nonReentrant {
         Proposal storage p = proposals[_proposalId];
         require(p.pType == ProposalType.Pause, "Not a pause proposal");
         require(p.status == ProposalStatus.Challenged, "Not in challenge phase");
