@@ -85,8 +85,8 @@ contract AaveV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
         emit CapitalPoolAddressSet(_capitalPoolAddress);
     }
 
-    function getReserveData(address asset) external view returns (IPool.ReserveData memory) {
-        return aavePool.getReserveData(asset);
+    function getReserveData(address reserveAsset) external view returns (IPool.ReserveData memory) {
+        return aavePool.getReserveData(reserveAsset);
     }
 
     function getCurrentValueHeld() external view override returns (uint256) {
