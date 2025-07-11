@@ -265,46 +265,50 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
 
-    /* ───────────────────── Trusted Functions (RiskManager Only) ────────────────── */
+        /* ───────────────────── Trusted Functions (RiskManager Only) ────────────────── */
     function executePayout(PayoutData calldata _payoutData) external nonReentrant onlyRiskManager {
         uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
         if (totalPayoutAmount == 0) return;
         if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
-        
-        IBackstopPool catPool = IRiskManagerWithBackstop(riskManager).catPool();
 
+        uint256 amountPaidDirectlyByAdapters = 0;
         if (_payoutData.totalCapitalFromPoolLPs > 0) {
+            IBackstopPool catPool = IRiskManagerWithBackstop(riskManager).catPool();
             for (uint i = 0; i < _payoutData.adapters.length; i++) {
-                IYieldAdapter adapter = IYieldAdapter(_payoutData.adapters[i]);
                 uint256 adapterCapitalShare = _payoutData.capitalPerAdapter[i];
-                if (adapterCapitalShare > 0) {
-                    uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
-                    if (amountToWithdraw > 0) {
-                        try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256) {
-                            // ignore returned amount; rely on final balance check
-                        } catch {
-                            emit AdapterCallFailed(_payoutData.adapters[i], "withdraw", "withdraw failed");
-                            uint256 sent = 0;
-                            try IYieldAdapterEmergency(_payoutData.adapters[i]).emergencyTransfer(_payoutData.claimant, amountToWithdraw) returns (uint256 v) {
-                                sent = v;
-                            } catch {}
-                            if (sent == 0) {
-                                catPool.drawFund(amountToWithdraw);
-                            }
-                        }
-                    }
-                }
+                if (adapterCapitalShare == 0) continue;
+
+                uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
+                if (amountToWithdraw == 0) continue;
+
+                amountPaidDirectlyByAdapters += _handleWithdrawalAttempt(
+                    IYieldAdapter(_payoutData.adapters[i]),
+                    amountToWithdraw,
+                    _payoutData.claimant,
+                    catPool
+                );
             }
         }
-        require(underlyingAsset.balanceOf(address(this)) >= totalPayoutAmount, "CP: Payout failed, insufficient funds gathered");
+
+        // Determine the amount that should have been gathered in this contract.
+        uint256 requiredContractBalance = totalPayoutAmount - amountPaidDirectlyByAdapters;
+        require(underlyingAsset.balanceOf(address(this)) >= requiredContractBalance, "CP: Payout failed, insufficient funds gathered");
+
         totalSystemValue -= totalPayoutAmount;
-        if (_payoutData.claimantAmount > 0) {
-            underlyingAsset.safeTransfer(_payoutData.claimant, _payoutData.claimantAmount);
+
+        // Calculate remaining amount to pay the claimant from this contract.
+        uint256 claimantAmountToPay = _payoutData.claimantAmount > amountPaidDirectlyByAdapters
+            ? _payoutData.claimantAmount - amountPaidDirectlyByAdapters
+            : 0;
+
+        if (claimantAmountToPay > 0) {
+            underlyingAsset.safeTransfer(_payoutData.claimant, claimantAmountToPay);
         }
         if (_payoutData.feeAmount > 0 && _payoutData.feeRecipient != address(0)) {
             underlyingAsset.safeTransfer(_payoutData.feeRecipient, _payoutData.feeAmount);
         }
     }
+
 
     function applyLosses(address _underwriter, uint256 _principalLossAmount) external nonReentrant onlyRiskManager {
         if (_principalLossAmount == 0) revert InvalidAmount();
@@ -381,6 +385,44 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             account.masterShares,
             account.totalPendingWithdrawalShares
         );
+    }
+
+
+        /**
+    * @dev Internal function to handle the withdrawal from a yield adapter for a payout.
+    * It attempts a standard withdrawal first. If that fails, it tries an emergency
+    * transfer to the claimant. If both fail, it draws funds from the Catastrophe Pool.
+    * @return amountPaidDirectly The amount of assets transferred directly to the claimant.
+    */
+    function _handleWithdrawalAttempt(
+        IYieldAdapter adapter,
+        uint256 amountToWithdraw,
+        address claimant,
+        IBackstopPool catPool
+    ) internal returns (uint256 amountPaidDirectly) {
+        try adapter.withdraw(amountToWithdraw, address(this)) {
+            // Success: funds are in CapitalPool. Nothing was paid directly.
+            return 0;
+        } catch {
+            emit AdapterCallFailed(address(adapter), "withdraw", "withdraw failed");
+            
+            uint256 sent = 0;
+            // Fallback 1: Try emergency transfer directly to claimant.
+            try IYieldAdapterEmergency(address(adapter)).emergencyTransfer(claimant, amountToWithdraw) returns (uint256 v) {
+                sent = v;
+            } catch {
+                // Emergency transfer is not supported or failed.
+            }
+
+            if (sent > 0) {
+                // Funds went directly to the claimant. Return this amount.
+                return sent;
+            } else {
+                // Fallback 2: Draw from the backstop pool into this contract.
+                catPool.drawFund(amountToWithdraw);
+                return 0;
+            }
+        }
     }
     function getWithdrawalRequestCount(address _underwriter) external view returns (uint256) {
         return withdrawalRequests[_underwriter].length;
