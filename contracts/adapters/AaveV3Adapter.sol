@@ -31,7 +31,8 @@ contract AaveV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
         underlyingToken = _asset;
         aavePool = _pool;
         aToken = _aToken;
-        _asset.approve(address(_pool), type(uint256).max);
+        // use SafeERC20 to handle non-standard tokens
+        _asset.forceApprove(address(_pool), type(uint256).max);
     }
 
     // Modifier to restrict calls to the CapitalPool only
