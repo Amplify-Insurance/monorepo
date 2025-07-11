@@ -32,6 +32,8 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     PoolData[] public protocolRiskPools;
     address public riskManager;
 
+    event RiskManagerAddressSet(address indexed newRiskManager);
+
     modifier onlyRiskManager() {
         require(msg.sender == riskManager, "PR: Not RiskManager");
         _;
@@ -44,6 +46,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     function setRiskManager(address _newRiskManager) external onlyOwner {
         require(_newRiskManager != address(0), "PR: Zero address");
         riskManager = _newRiskManager;
+        emit RiskManagerAddressSet(_newRiskManager);
     }
     
     /* ───────────────────── State Modifying Functions (RM only) ───────────────────── */

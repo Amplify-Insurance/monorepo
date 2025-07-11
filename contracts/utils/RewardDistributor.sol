@@ -21,6 +21,8 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
     address public catPool;
 
     event CatPoolSet(address indexed newCatPool);
+    event RiskManagerAddressSet(address indexed newRiskManager);
+    event PolicyManagerAddressSet(address indexed newPolicyManager);
 
     // --- Accounting Structs ---
     struct RewardTracker {
@@ -71,6 +73,8 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
        
         policyManager = _policyManagerAddress;
         riskManager = _riskManagerAddress;
+        emit RiskManagerAddressSet(_riskManagerAddress);
+        emit PolicyManagerAddressSet(_policyManagerAddress);
     }
 
     function setCatPool(address _catPool) external onlyOwner {
@@ -82,11 +86,13 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
     function setRiskManager(address _newRiskManager) external onlyOwner {
         if (_newRiskManager == address(0)) revert ZeroAddress();
         riskManager = _newRiskManager;
+        emit RiskManagerAddressSet(_newRiskManager);
     }
 
     function setPolicyManager(address _newPolicyManager) external onlyOwner {
         if (_newPolicyManager == address(0)) revert ZeroAddress();
         policyManager = _newPolicyManager;
+        emit PolicyManagerAddressSet(_newPolicyManager);
     }
 
     /* ───────────────────────── Core Logic ──────────────────────── */
