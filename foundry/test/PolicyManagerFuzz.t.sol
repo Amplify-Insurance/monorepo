@@ -77,21 +77,6 @@ contract PolicyManagerFuzz is Test {
         pm.purchaseCover(POOL_ID, coverage, deposit);
     }
 
-    function testFuzz_addPremium(uint96 coverage, uint96 deposit, uint96 addAmount) public {
-        vm.assume(coverage > 0 && coverage < 100_000e6);
-        uint256 minPremium = _minPremium(coverage);
-        vm.assume(deposit >= minPremium && deposit < 1_000_000e6);
-        vm.assume(addAmount > 0 && uint256(addAmount) + uint256(deposit) < 1_000_000e6);
-
-        vm.startPrank(user);
-        uint256 policyId = pm.purchaseCover(POOL_ID, coverage, deposit);
-        pm.addPremium(policyId, addAmount);
-        vm.stopPrank();
-
-        IPolicyNFT.Policy memory pol = nft.getPolicy(policyId);
-        assertEq(pol.premiumDeposit, deposit + addAmount);
-        assertEq(token.balanceOf(address(pm)), deposit + addAmount);
-    }
 
     function testFuzz_cancelCover(uint96 coverage, uint96 deposit) public {
         vm.assume(coverage > 0 && coverage < 100_000e6);

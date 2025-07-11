@@ -11,19 +11,24 @@ contract RewardDistributorTest is Test {
 
     address owner = address(this);
     address riskManager = address(0x1);
-    address catPool = address(0x2);
-    address user = address(0x3);
+    address policyManager = address(0x2);
+    address catPool = address(0x3);
+    address user = address(0x4);
 
     uint256 constant PRECISION = 1e18;
 
     function setUp() public {
-        rd = new RewardDistributor(riskManager);
+        rd = new RewardDistributor(riskManager, policyManager);
         token = new MockERC20("Reward", "RWD", 18);
         token.mint(address(rd), 1000 ether);
     }
 
     function testDeploymentSetsRiskManager() public {
         assertEq(rd.riskManager(), riskManager);
+    }
+
+    function testDeploymentSetsPolicyManager() public {
+        assertEq(rd.policyManager(), policyManager);
     }
 
     function testSetCatPool() public {
@@ -86,7 +91,9 @@ contract RewardDistributorTest is Test {
 
     function testConstructorZeroRiskManagerReverts() public {
         vm.expectRevert(RewardDistributor.ZeroAddress.selector);
-        new RewardDistributor(address(0));
+        new RewardDistributor(address(0), policyManager);
+        vm.expectRevert(RewardDistributor.ZeroAddress.selector);
+        new RewardDistributor(riskManager, address(0));
     }
 
     function testSetCatPoolOnlyOwner() public {
