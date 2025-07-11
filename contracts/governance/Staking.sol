@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface ICommittee {
     function isProposalFinalized(uint256 proposalId) external view returns (bool);
@@ -16,7 +17,7 @@ interface ICommittee {
  * @notice A simple contract for users to stake and unstake governance tokens.
  * The staked balance is used by the Committee contract to determine voting power.
  */
-contract StakingContract is Ownable {
+contract StakingContract is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable governanceToken;
@@ -64,7 +65,7 @@ contract StakingContract is Ownable {
     /**
      * @notice Stake governance tokens to participate in voting.
      */
-    function stake(uint256 _amount) external {
+    function stake(uint256 _amount) external nonReentrant {
         if (_amount == 0) revert InvalidAmount();
         stakedBalance[msg.sender] += _amount;
         totalStaked += _amount;
@@ -80,7 +81,7 @@ contract StakingContract is Ownable {
     /**
      * @notice Unstake governance tokens.
      */
-    function unstake(uint256 _amount) external {
+    function unstake(uint256 _amount) external nonReentrant {
         if (_amount == 0) revert InvalidAmount();
         if (stakedBalance[msg.sender] < _amount) revert InsufficientStakedBalance();
         uint256 proposalId = lastVotedProposal[msg.sender];
@@ -109,7 +110,7 @@ contract StakingContract is Ownable {
      * @param _user The user whose stake is to be slashed.
      * @param _amount The amount to slash.
      */
-    function slash(address _user, uint256 _amount) external onlyCommittee {
+    function slash(address _user, uint256 _amount) external onlyCommittee nonReentrant {
         if (_amount == 0) revert InvalidAmount();
         uint256 userStake = stakedBalance[_user];
         if (userStake < _amount) revert InsufficientStakedBalance();

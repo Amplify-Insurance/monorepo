@@ -4,11 +4,12 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IYieldAdapter.sol"; // Assuming IYieldAdapter is in interfaces/
 import "../interfaces/ISdai.sol";       // Assuming ISdai is in interfaces/
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract SdaiAdapter is IYieldAdapter, Ownable {
+contract SdaiAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable underlyingToken; // Renamed from usdc for clarity with IYieldAdapter.asset()
@@ -42,7 +43,7 @@ contract SdaiAdapter is IYieldAdapter, Ownable {
      * @dev msg.sender (e.g., CoverPool) transfers `_amountToDeposit` of `asset()` to this adapter.
      * This adapter then deposits those funds into the sDAI contract.
      */
-    function deposit(uint256 _amountToDeposit) external override {
+    function deposit(uint256 _amountToDeposit) external override nonReentrant {
         // This function expects msg.sender (CoverPool) to be the owner of the funds
         // and for CoverPool to transfer funds to this SdaiAdapter contract.
         // CoverPool's depositAndAllocate:
@@ -78,7 +79,7 @@ contract SdaiAdapter is IYieldAdapter, Ownable {
     function withdraw(
         uint256 _targetAmountOfUnderlyingToWithdraw,
         address _to
-    ) external override onlyOwner returns (uint256 actuallyWithdrawn) {
+    ) external override onlyOwner nonReentrant returns (uint256 actuallyWithdrawn) {
         require(_to != address(0), "SdaiAdapter: Cannot withdraw to zero address");
         if (_targetAmountOfUnderlyingToWithdraw == 0) {
             return 0;

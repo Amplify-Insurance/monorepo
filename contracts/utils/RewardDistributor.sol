@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IRewardDistributor.sol";
 
 /**
@@ -12,7 +13,7 @@ import "../interfaces/IRewardDistributor.sol";
  * @notice Manages the scalable distribution of rewards to underwriters using the "pull-over-push" pattern.
  * This avoids gas-intensive loops by tracking rewards on a per-share basis.
  */
-contract RewardDistributor is IRewardDistributor, Ownable {
+contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address public riskManager;
@@ -115,7 +116,7 @@ contract RewardDistributor is IRewardDistributor, Ownable {
      * @param userPledge The user's current capital pledge.
      * @return The amount of rewards claimed.
      */
-    function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyRiskManager returns (uint256) {
+    function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyRiskManager nonReentrant returns (uint256) {
         uint256 rewards = pendingRewards(user, poolId, rewardToken, userPledge);
         
         if (rewards > 0) {
@@ -128,7 +129,7 @@ contract RewardDistributor is IRewardDistributor, Ownable {
         return rewards;
     }
 
-    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyCatPool returns (uint256) {
+    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyCatPool nonReentrant returns (uint256) {
         uint256 rewards = pendingRewards(user, poolId, rewardToken, userPledge);
         if (rewards > 0) {
             UserRewardState storage userState = userRewardStates[user][poolId][rewardToken];
