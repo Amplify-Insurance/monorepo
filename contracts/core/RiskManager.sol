@@ -142,19 +142,27 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         
         uint256 poolCount = poolRegistry.getPoolCount();
 
-        for(uint i = 0; i < _poolIds.length; i++){
+        for (uint i = 0; i < _poolIds.length; i++) {
             uint256 poolId = _poolIds[i];
             require(poolId < poolCount, "Invalid poolId");
             require(!isAllocatedToPool[msg.sender][poolId], "Already allocated to this pool");
-            
-            poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, totalPledge, true);
-            underwriterPoolPledge[msg.sender][poolId] = totalPledge;
 
+            // Effects: update internal accounting before external interaction
+            underwriterPoolPledge[msg.sender][poolId] = totalPledge;
             isAllocatedToPool[msg.sender][poolId] = true;
             underwriterAllocations[msg.sender].push(poolId);
             poolSpecificUnderwriters[poolId].push(msg.sender);
-            underwriterIndexInPoolArray[poolId][msg.sender] = poolSpecificUnderwriters[poolId].length - 1;
-            
+            underwriterIndexInPoolArray[poolId][msg.sender] =
+                poolSpecificUnderwriters[poolId].length - 1;
+
+            // Interaction: notify the PoolRegistry after internal state changes
+            poolRegistry.updateCapitalAllocation(
+                poolId,
+                userAdapterAddress,
+                totalPledge,
+                true
+            );
+
             emit CapitalAllocated(msg.sender, poolId, totalPledge);
         }
     }
@@ -210,15 +218,24 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
         require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
 
-        poolRegistry.updateCapitalAllocation(_poolId, userAdapterAddress, amount, false);
-        poolRegistry.updateCapitalPendingWithdrawal(_poolId, amount, false);
         uint256 remaining = underwriterPoolPledge[underwriter][_poolId] - amount;
+
+        // Effects: update internal state before external calls
         underwriterPoolPledge[underwriter][_poolId] = remaining;
         if (remaining == 0) {
             _removeUnderwriterFromPool(underwriter, _poolId);
         }
         delete deallocationRequestTimestamp[underwriter][_poolId];
         delete deallocationRequestAmount[underwriter][_poolId];
+
+        // Interaction: update the PoolRegistry after state changes
+        poolRegistry.updateCapitalAllocation(
+            _poolId,
+            userAdapterAddress,
+            amount,
+            false
+        );
+        poolRegistry.updateCapitalPendingWithdrawal(_poolId, amount, false);
 
         emit CapitalDeallocated(underwriter, _poolId, amount);
     }
