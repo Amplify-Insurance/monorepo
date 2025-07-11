@@ -58,6 +58,9 @@ contract BackstopPoolTest is Test {
 
         uint256 shares = share.balanceOf(user);
         vm.prank(user);
+        pool.requestWithdrawal(shares);
+        vm.warp(block.timestamp + pool.NOTICE_PERIOD());
+        vm.prank(user);
         pool.withdrawLiquidity(shares);
 
         // expected withdrawal = shares * totalValue / (totalShares - locked)
