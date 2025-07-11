@@ -18,3 +18,6 @@ test = 'foundry/test/PoolRegistryFuzz.t.sol'
 [profile.lossfuzz]
 test = 'foundry/test/LossDistributorFuzz.t.sol'
 
+[profile.staking]
+test = 'foundry/staking-tests'
+
