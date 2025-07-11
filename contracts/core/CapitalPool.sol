@@ -226,23 +226,26 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (sharesToBurn > account.masterShares) revert InconsistentState();
 
         uint256 amountToReceiveBasedOnNAV = sharesToValue(sharesToBurn);
+        uint256 oldMasterShares = account.masterShares;
+
+        // Effects: update user and global state before external interaction
+        uint256 principalComponentRemoved = (account.totalDepositedAssetPrincipal * sharesToBurn) / oldMasterShares;
+        account.totalDepositedAssetPrincipal -= principalComponentRemoved;
+        account.masterShares -= sharesToBurn;
+        account.totalPendingWithdrawalShares -= sharesToBurn;
+        totalMasterSharesSystem -= sharesToBurn;
+
+        // Remove the executed request from the array using swap-and-pop
+        requests[_requestIndex] = requests[requests.length - 1];
+        requests.pop();
+
+        // Interaction: pull funds from the adapter after state updates
         uint256 assetsActuallyWithdrawn = 0;
         if (amountToReceiveBasedOnNAV > 0) {
             assetsActuallyWithdrawn = account.yieldAdapter.withdraw(amountToReceiveBasedOnNAV, address(this));
         }
 
-        // Update account state *before* external calls and transfers
-        uint256 principalComponentRemoved = (account.totalDepositedAssetPrincipal * sharesToBurn) / account.masterShares;
-        account.totalDepositedAssetPrincipal -= principalComponentRemoved;
-        account.masterShares -= sharesToBurn;
-        account.totalPendingWithdrawalShares -= sharesToBurn; // Decrement total pending shares
-        
-        totalMasterSharesSystem -= sharesToBurn;
         totalSystemValue = totalSystemValue > assetsActuallyWithdrawn ? totalSystemValue - assetsActuallyWithdrawn : 0;
-
-        // Remove the executed request from the array using swap-and-pop
-        requests[_requestIndex] = requests[requests.length - 1];
-        requests.pop();
 
         bool isFullWithdrawal = (account.masterShares == 0);
         
