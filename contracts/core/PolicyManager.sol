@@ -172,8 +172,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         uint256 minPrem = (newTotal * rateBps * 7 days) / (SECS_YEAR * BPS);
         if (pol.premiumDeposit < minPrem) revert DepositTooLow();
 
-        riskManager.updateCoverageSold(pol.poolId, _additionalCoverage, true);
-
         uint256 activateAt = block.timestamp + coverCooldownPeriod;
         uint256 nodeId     = _nextNodeId++;
         _nodes[nodeId]     = PendingIncreaseNode({
@@ -183,6 +181,8 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         });
         pendingIncreaseListHead[_policyId] = nodeId;
         pendingCoverageSum[_policyId]     += _additionalCoverage;
+
+        riskManager.updateCoverageSold(pol.poolId, _additionalCoverage, true);
 
         emit CoverIncreaseRequested(_policyId, _additionalCoverage, activateAt);
     }
