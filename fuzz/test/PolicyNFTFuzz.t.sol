@@ -32,6 +32,14 @@ contract PolicyNFTFuzz is Test {
         nft.setPolicyManagerAddress(address(0));
     }
 
+    function testMintReturnValue() public {
+        nft.setPolicyManagerAddress(manager);
+        vm.prank(manager);
+        uint256 id = nft.mint(user, 1, 42, 0, 0, 0);
+        assertEq(id, 1);
+        assertEq(nft.nextId(), 2);
+    }
+
     function testFuzz_MintStoresPolicy(
         address to,
         uint256 pid,
