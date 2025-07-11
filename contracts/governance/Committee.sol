@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -10,6 +11,7 @@ import "../interfaces/IStakingContract.sol";
 
 contract Committee is Ownable, ReentrancyGuard {
     using Address for address payable;
+    using SafeERC20 for IERC20;
 
     /* ───────────────────────── State Variables ──────────────────────── */
 
@@ -103,7 +105,7 @@ contract Committee is Ownable, ReentrancyGuard {
             require(_bondAmount >= minBondAmount && _bondAmount <= maxBondAmount, "Invalid bond");
             p.bondAmount = _bondAmount;
             p.proposerFeeShareBps = _calculateFeeShare(_bondAmount);
-            governanceToken.transferFrom(msg.sender, address(this), _bondAmount);
+            governanceToken.safeTransferFrom(msg.sender, address(this), _bondAmount);
         } else {
             require(_bondAmount == 0, "No bond for unpause");
             p.proposerFeeShareBps = 0;
@@ -226,7 +228,7 @@ contract Committee is Ownable, ReentrancyGuard {
             uint256 slashAmount = (p.bondAmount * slashPercentageBps) / 10000;
             uint256 refund = p.bondAmount - slashAmount;
             if (refund > 0) {
-                governanceToken.transfer(p.proposer, refund);
+                governanceToken.safeTransfer(p.proposer, refund);
             }
         }
     }
@@ -241,7 +243,7 @@ contract Committee is Ownable, ReentrancyGuard {
         activeProposalForPool[p.poolId] = false;
 
         if (p.totalRewardFees > 0) {
-            governanceToken.transfer(p.proposer, p.bondAmount);
+            governanceToken.safeTransfer(p.proposer, p.bondAmount);
             emit BondResolved(_proposalId, false);
         } else {
             // entire bond is slashed and kept in the contract

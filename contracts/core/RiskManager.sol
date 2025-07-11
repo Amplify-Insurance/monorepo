@@ -276,6 +276,7 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
 
         (IERC20 protocolToken,, , , , , uint256 poolClaimFeeBps) = poolRegistry.getPoolData(poolId);
         address claimant = policyNFT.ownerOf(_policyId);
+        require(msg.sender == claimant, "Only policy owner");
         if (coverage > 0) {
             uint8 protocolDecimals = IERC20Metadata(address(protocolToken)).decimals();
             uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
@@ -295,7 +296,7 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         uint256 claimFee = (coverage * poolClaimFeeBps) / BPS;
         
         ICapitalPool.PayoutData memory payoutData;
-        payoutData.claimant = policyNFT.ownerOf(_policyId);
+        payoutData.claimant = claimant;
         payoutData.claimantAmount = coverage - claimFee;
         payoutData.feeRecipient = committee;
         payoutData.feeAmount = claimFee;
