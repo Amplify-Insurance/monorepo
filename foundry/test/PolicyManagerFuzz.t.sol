@@ -11,6 +11,7 @@ import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 import {MockRiskManagerHook} from "contracts/test/MockRiskManagerHook.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
+import {IPolicyNFT} from "contracts/interfaces/IPolicyNFT.sol";
 
 contract PolicyManagerFuzz is Test {
     PolicyManager pm;
@@ -108,4 +109,3 @@ contract PolicyManagerFuzz is Test {
         assertEq(nft.last_burn_id(), policyId);
     }
 }
-
