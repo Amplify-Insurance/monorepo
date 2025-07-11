@@ -12,7 +12,7 @@ import "../interfaces/IPool.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 
-contract AaveV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
+contract AaveV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, ReentrancyGuard {
 
     using SafeERC20 for IERC20;
 
@@ -95,7 +95,13 @@ contract AaveV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
         return liquid + aTokenBal;
     }
 
-    function emergencyTransfer(address _to, uint256 _amount) external onlyCapitalPool nonReentrant returns (uint256) {
+    function emergencyTransfer(address _to, uint256 _amount)
+        external
+        override
+        onlyCapitalPool
+        nonReentrant
+        returns (uint256)
+    {
         uint256 bal = aToken.balanceOf(address(this));
         uint256 amt = Math.min(_amount, bal);
         if (amt > 0) {
