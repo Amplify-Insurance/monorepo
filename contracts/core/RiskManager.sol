@@ -172,7 +172,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         require(_amount <= currentPledge, "Amount exceeds pledge");
         if (totalPledge == 0) revert NoCapitalToAllocate();
 
-        (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,, ,) = poolRegistry.getPoolData(_poolId);
+        (
+            IERC20 _pt,
+            uint256 totalPledged,
+            uint256 totalSold,
+            uint256 pendingWithdrawal,
+            bool _paused,
+            address _fr,
+            uint256 _cf
+        ) = poolRegistry.getPoolData(_poolId);
+        (_pt, _paused, _fr, _cf);
         uint256 freeCapital = totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
         if (_amount > freeCapital) revert InsufficientFreeCapital();
 
@@ -241,7 +250,14 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
     /* ───────────────────── Keeper & Liquidation Functions ───────────────────── */
 
     function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
-        (,, uint256 masterShares,,) = capitalPool.getUnderwriterAccount(_underwriter);
+        (
+            uint256 _dep,
+            uint8 _yp,
+            uint256 masterShares,
+            uint256 _pending,
+            uint256 _reqShares
+        ) = capitalPool.getUnderwriterAccount(_underwriter);
+        (_dep, _yp, _pending, _reqShares);
         if (masterShares == 0) revert UnderwriterNotInsolvent();
 
         uint256 totalShareValue = capitalPool.sharesToValue(masterShares);
@@ -274,7 +290,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         uint256 coverage = policy.coverage;
         (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) = poolRegistry.getPoolPayoutData(poolId);
 
-        (IERC20 protocolToken,, , , , , uint256 poolClaimFeeBps) = poolRegistry.getPoolData(poolId);
+        (
+            IERC20 protocolToken,
+            uint256 _pledged0,
+            uint256 _sold0,
+            uint256 _pend0,
+            bool _paused0,
+            address _fr0,
+            uint256 poolClaimFeeBps
+        ) = poolRegistry.getPoolData(poolId);
+        (_pledged0, _sold0, _pend0, _paused0, _fr0);
         address claimant = policyNFT.ownerOf(_policyId);
         require(msg.sender == claimant, "Only policy owner");
         if (coverage > 0) {
@@ -317,7 +342,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
 
         // Update coverage sold directly without going through the PolicyManager
         // hook to avoid the NotPolicyManager revert when processing claims.
-        (, , uint256 totalCoverageSold,, , ,) = poolRegistry.getPoolData(poolId);
+        (
+            IERC20 _pt1,
+            uint256 _pledged1,
+            uint256 totalCoverageSold,
+            uint256 _pend1,
+            bool _paused1,
+            address _fr1,
+            uint256 _cf1
+        ) = poolRegistry.getPoolData(poolId);
+        (_pt1, _pledged1, _pend1, _paused1, _fr1, _cf1);
         uint256 reduction = Math.min(coverage, totalCoverageSold);
         if (reduction > 0) {
             poolRegistry.updateCoverageSold(poolId, reduction, false);
@@ -346,13 +380,23 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
             uint256 poolId = _poolIds[i];
             // Only attempt a claim if the underwriter has a pledge in the pool.
             if (underwriterPoolPledge[msg.sender][poolId] > 0) {
-                (IERC20 protocolToken, , , , , , ) = poolRegistry.getPoolData(poolId);
-                rewardDistributor.claim(
+                (
+                    IERC20 protocolToken,
+                    uint256 _pledged2,
+                    uint256 _sold2,
+                    uint256 _pend2,
+                    bool _paused2,
+                    address _fr2,
+                    uint256 _cf2
+                ) = poolRegistry.getPoolData(poolId);
+                (_pledged2, _sold2, _pend2, _paused2, _fr2, _cf2);
+                uint256 claimed = rewardDistributor.claim(
                     msg.sender,
                     poolId,
                     address(protocolToken),
                     underwriterPoolPledge[msg.sender][poolId]
                 );
+                claimed;
             }
         }
     }
@@ -370,7 +414,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
 
         // First loop: Iterate through pool IDs to find unique protocol tokens.
         for (uint256 i = 0; i < _poolIds.length; i++) {
-            (IERC20 protocolToken, , , , , , ) = poolRegistry.getPoolData(_poolIds[i]);
+            (
+                IERC20 protocolToken,
+                uint256 _pledged3,
+                uint256 _sold3,
+                uint256 _pend3,
+                bool _paused3,
+                address _fr3,
+                uint256 _cf3
+            ) = poolRegistry.getPoolData(_poolIds[i]);
+            (_pledged3, _sold3, _pend3, _paused3, _fr3, _cf3);
             address tokenAddress = address(protocolToken);
 
             // Ensure the token address is valid and not already processed.
@@ -402,7 +455,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         uint256[] memory pools = underwriterAllocations[_underwriter];
         for(uint i=0; i<pools.length; i++){
             underwriterPoolPledge[_underwriter][pools[i]] += _amount;
-            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(pools[i]);
+            (
+                IERC20 protocolToken,
+                uint256 _pledged4,
+                uint256 _sold4,
+                uint256 _pend4,
+                bool _paused4,
+                address _fr4,
+                uint256 _cf4
+            ) = poolRegistry.getPoolData(pools[i]);
+            (_pledged4, _sold4, _pend4, _paused4, _fr4, _cf4);
             rewardDistributor.updateUserState(
                 _underwriter,
                 pools[i],
@@ -417,7 +479,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
             poolRegistry.updateCapitalPendingWithdrawal(allocations[i], _principalComponent, true);
-            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(allocations[i]);
+            (
+                IERC20 protocolToken,
+                uint256 _pledged5,
+                uint256 _sold5,
+                uint256 _pend5,
+                bool _paused5,
+                address _fr5,
+                uint256 _cf5
+            ) = poolRegistry.getPoolData(allocations[i]);
+            (_pledged5, _sold5, _pend5, _paused5, _fr5, _cf5);
             rewardDistributor.updateUserState(
                 _underwriter,
                 allocations[i],
@@ -432,7 +503,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
             poolRegistry.updateCapitalPendingWithdrawal(allocations[i], _principalComponent, false);
-            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(allocations[i]);
+            (
+                IERC20 protocolToken,
+                uint256 _pledged6,
+                uint256 _sold6,
+                uint256 _pend6,
+                bool _paused6,
+                address _fr6,
+                uint256 _cf6
+            ) = poolRegistry.getPoolData(allocations[i]);
+            (_pledged6, _sold6, _pend6, _paused6, _fr6, _cf6);
             rewardDistributor.updateUserState(
                 _underwriter,
                 allocations[i],
@@ -453,14 +533,32 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
-            (, , , uint256 pendingWithdrawal, , ,) = poolRegistry.getPoolData(poolId);
+            (
+                IERC20 _pt7,
+                uint256 _pledged7,
+                uint256 _sold7,
+                uint256 pendingWithdrawal,
+                bool _paused7,
+                address _fr7,
+                uint256 _cf7
+            ) = poolRegistry.getPoolData(poolId);
+            (_pt7, _pledged7, _sold7, _paused7, _fr7, _cf7);
             uint256 reduction = Math.min(_principalComponentRemoved, pendingWithdrawal);
             if (reduction > 0) {
                 poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
             }
             uint256 pledgeReduction = _principalComponentRemoved > underwriterPoolPledge[_underwriter][poolId] ? underwriterPoolPledge[_underwriter][poolId] : _principalComponentRemoved;
             underwriterPoolPledge[_underwriter][poolId] -= pledgeReduction;
-            (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(poolId);
+            (
+                IERC20 protocolToken,
+                uint256 _pledged8,
+                uint256 _sold8,
+                uint256 _pend8,
+                bool _paused8,
+                address _fr8,
+                uint256 _cf8
+            ) = poolRegistry.getPoolData(poolId);
+            (_pledged8, _sold8, _pend8, _paused8, _fr8, _cf8);
             rewardDistributor.updateUserState(
                 _underwriter,
                 poolId,

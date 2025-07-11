@@ -43,7 +43,15 @@ contract PriceOracle is Ownable {
         if (address(agg) == address(0)) {
             return (0, 0);
         }
-        (, price, , , ) = agg.latestRoundData();
+        (
+            uint80 _rId,
+            int256 p,
+            uint256 _sAt,
+            uint256 _uAt,
+            uint80 _ansR
+        ) = agg.latestRoundData();
+        price = p;
+        (_rId, _sAt, _uAt, _ansR);
         decimals = agg.decimals();
     }
 

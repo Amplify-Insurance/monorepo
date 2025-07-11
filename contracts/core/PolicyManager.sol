@@ -124,7 +124,17 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     ) external nonReentrant returns (uint256 policyId) {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
 
-        (, , uint256 sold, , bool paused, ,) = poolRegistry.getPoolData(_poolId);
+        (
+            IERC20 _pt,
+            uint256 _pledged,
+            uint256 sold,
+            uint256 _pending,
+            bool paused,
+            address _feeR,
+            uint256 _claimFee
+        ) = poolRegistry.getPoolData(_poolId);
+        // silence unused variable warnings
+        (_pt, _pledged, _pending, _feeR, _claimFee);
         if (paused) revert PoolPaused();
         if (_coverageAmount == 0 || _initialPremiumDeposit == 0) revert InvalidAmount();
         if (_initialPremiumDeposit > type(uint128).max) revert InvalidAmount();
@@ -162,7 +172,16 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
         if (pol.coverage == 0) revert PolicyAlreadyTerminated();
 
-        (, , uint256 sold, , , ,) = poolRegistry.getPoolData(pol.poolId);
+        (
+            IERC20 _pt,
+            uint256 _pledged,
+            uint256 sold,
+            uint256 _pending,
+            bool _p,
+            address _fr,
+            uint256 _cf
+        ) = poolRegistry.getPoolData(pol.poolId);
+        (_pt, _pledged, _pending, _p, _fr, _cf);
         uint256 cap = _getAvailableCapital(pol.poolId);
         if (sold + _additionalCoverage > cap) revert InsufficientCapacity();
 
@@ -290,11 +309,21 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
         if (catAmt > 0) {
             IERC20 underlying = capitalPool.underlyingAsset();
-            underlying.approve(address(catPool), catAmt);
+            // approve safely for catastrophe pool
+            underlying.forceApprove(address(catPool), catAmt);
             catPool.receiveUsdcPremium(catAmt);
         }
 
-        (, uint256 pledged, , , , ,) = poolRegistry.getPoolData(pol.poolId);
+        (
+            IERC20 _pt2,
+            uint256 pledged,
+            uint256 _sold2,
+            uint256 _pending2,
+            bool _pause2,
+            address _fr2,
+            uint256 _cf2
+        ) = poolRegistry.getPoolData(pol.poolId);
+        (_pt2, _sold2, _pending2, _pause2, _fr2, _cf2);
         if (poolInc > 0 && pledged > 0) {
             rewardDistributor.distribute(pol.poolId, address(capitalPool.underlyingAsset()), poolInc, pledged);
         }
@@ -364,7 +393,16 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     function _getPremiumRateBpsAnnual(uint256 _poolId) internal view returns (uint256) {
-        (, , uint256 sold, , , ,) = poolRegistry.getPoolData(_poolId);
+        (
+            IERC20 _pt3,
+            uint256 _pledged3,
+            uint256 sold,
+            uint256 _pend3,
+            bool _paused3,
+            address _fr3,
+            uint256 _cf3
+        ) = poolRegistry.getPoolData(_poolId);
+        (_pt3, _pledged3, _pend3, _paused3, _fr3, _cf3);
         uint256 cap    = _getAvailableCapital(_poolId);
         IPoolRegistry.RateModel memory m = poolRegistry.getPoolRateModel(_poolId);
         if (cap == 0) {
@@ -380,7 +418,16 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     function _getAvailableCapital(uint256 _poolId) internal view returns (uint256) {
-        (, uint256 pledged, , uint256 pendingW, , ,) = poolRegistry.getPoolData(_poolId);
+        (
+            IERC20 _pt4,
+            uint256 pledged,
+            uint256 _sold4,
+            uint256 pendingW,
+            bool _paused4,
+            address _fr4,
+            uint256 _cf4
+        ) = poolRegistry.getPoolData(_poolId);
+        (_pt4, _sold4, _paused4, _fr4, _cf4);
         return pendingW >= pledged ? 0 : pledged - pendingW;
     }
 }

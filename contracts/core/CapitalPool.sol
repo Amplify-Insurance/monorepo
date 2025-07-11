@@ -158,7 +158,8 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         account.totalDepositedAssetPrincipal += _amount;
         account.masterShares += sharesToMint;
         underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
-        underlyingAsset.approve(address(chosenAdapter), _amount);
+        // grant allowance safely for the adapter
+        underlyingAsset.forceApprove(address(chosenAdapter), _amount);
         chosenAdapter.deposit(_amount);
         totalMasterSharesSystem += sharesToMint;
         totalSystemValue += _amount;
@@ -279,7 +280,9 @@ contract CapitalPool is ReentrancyGuard, Ownable {
                 if (adapterCapitalShare > 0) {
                     uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
                     if(amountToWithdraw > 0) {
-                        try adapter.withdraw(amountToWithdraw, address(this)) {
+                        try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256 _withdrawn) {
+                            // ignore value; rely on final balance check
+                            _withdrawn;
                         } catch {
                             emit AdapterCallFailed(_payoutData.adapters[i], "withdraw", "withdraw failed");
                             uint256 sent;

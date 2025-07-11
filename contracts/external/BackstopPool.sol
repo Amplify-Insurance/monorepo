@@ -67,8 +67,8 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         
         if (address(_initialAdapter) != address(0)) {
             adapter = _initialAdapter;
-            usdc.approve(address(_initialAdapter), 0);
-            usdc.approve(address(_initialAdapter), type(uint256).max);
+            usdc.forceApprove(address(_initialAdapter), 0);
+            usdc.forceApprove(address(_initialAdapter), type(uint256).max);
         }
     }
 
@@ -135,13 +135,13 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
                 idleUSDC += withdrawnAmount;
             }
             // Revoke allowance from the old adapter
-            usdc.approve(address(oldAdapter), 0);
+            usdc.forceApprove(address(oldAdapter), 0);
         }
 
         if (address(adapter) != address(0)) {
             // Grant allowance to the new adapter safely
-            usdc.approve(address(adapter), 0);
-            usdc.approve(address(adapter), type(uint256).max);
+            usdc.forceApprove(address(adapter), 0);
+            usdc.forceApprove(address(adapter), type(uint256).max);
         }
         emit AdapterChanged(_newAdapterAddress);
     }

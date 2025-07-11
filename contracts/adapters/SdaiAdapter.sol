@@ -28,7 +28,8 @@ contract SdaiAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
         // If sDai.deposit takes tokens directly, this contract needs to receive them first.
         // The current deposit function has this contract receive then deposit.
         // This approval is for when *this contract* calls sDai.deposit using assets it holds.
-        _underlyingToken.approve(address(_sDai), type(uint256).max);
+        // approve safely so non-standard tokens are handled
+        _underlyingToken.forceApprove(address(_sDai), type(uint256).max);
     }
 
     /**

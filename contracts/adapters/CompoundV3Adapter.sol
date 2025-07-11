@@ -32,7 +32,8 @@ contract CompoundV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, Re
         require(asset != address(0), "CompoundV3Adapter: invalid asset");
         underlyingToken = IERC20(asset);
         comet = _comet;
-        underlyingToken.approve(address(_comet), type(uint256).max);
+        // grant allowance safely using SafeERC20
+        underlyingToken.forceApprove(address(_comet), type(uint256).max);
     }
 
     function setCapitalPoolAddress(address _capitalPoolAddress) external onlyOwner {
