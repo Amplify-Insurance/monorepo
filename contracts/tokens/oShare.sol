@@ -15,6 +15,7 @@ contract oShare is ERC20 {
     constructor(IERC20 _asset, address _pool, string memory name_, string memory symbol_)
         ERC20(name_, symbol_)
     {
+        require(_pool != address(0), "oShare: zero pool");
         asset = _asset;
         pool  = _pool;
     }

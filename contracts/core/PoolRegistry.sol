@@ -40,6 +40,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     }
 
     constructor(address _initialOwner, address _riskManager) Ownable(_initialOwner) {
+        require(_riskManager != address(0), "PR: Zero address");
         riskManager = _riskManager;
     }
 
