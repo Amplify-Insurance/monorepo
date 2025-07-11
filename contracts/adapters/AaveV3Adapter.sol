@@ -5,11 +5,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IYieldAdapter.sol";
+import "../interfaces/IYieldAdapterEmergency.sol";
 import "../interfaces/IPoolAddressesProvider.sol";
 import "../interfaces/IPool.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract AaveV3Adapter is IYieldAdapter, Ownable {
+contract AaveV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable underlyingToken;

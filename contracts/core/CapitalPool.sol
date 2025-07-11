@@ -54,7 +54,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     uint256 public totalMasterSharesSystem;
     uint256 public totalSystemValue;
-    IERC20 public underlyingAsset;
+    IERC20 public immutable underlyingAsset;
 
     /* ───────────────────────── Modifiers & Errors ──────────────────────── */
     modifier onlyRiskManager() {
@@ -333,7 +333,8 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     /* ─────────────────── NAV Synchronization (Keeper Function) ─────────────────── */
     function syncYieldAndAdjustSystemValue() external nonReentrant {
         uint256 newCalculatedTotalSystemValue = 0;
-        for (uint i = 0; i < activeYieldAdapterAddresses.length; i++) {
+        uint256 adaptersLength = activeYieldAdapterAddresses.length;
+        for (uint i = 0; i < adaptersLength; i++) {
             address adapterAddress = activeYieldAdapterAddresses[i];
             try IYieldAdapter(adapterAddress).getCurrentValueHeld() returns (uint256 valueInAdapter) {
                 newCalculatedTotalSystemValue += valueInAdapter;

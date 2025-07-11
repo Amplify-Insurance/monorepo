@@ -6,8 +6,8 @@ interface ICatPool {
     function withdrawLiquidity(uint256 shareAmount) external;
 }
 contract MaliciousAdapter {
-    ICatPool catPool;
-    IERC20 public asset;
+    ICatPool public immutable catPool;
+    IERC20 public immutable asset;
     uint256 sharesToBurn;
     constructor(address _catPool, address _asset) {
         catPool = ICatPool(_catPool);
