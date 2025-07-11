@@ -279,13 +279,12 @@ contract CapitalPool is ReentrancyGuard, Ownable {
                 uint256 adapterCapitalShare = _payoutData.capitalPerAdapter[i];
                 if (adapterCapitalShare > 0) {
                     uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
-                    if(amountToWithdraw > 0) {
-                        try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256 _withdrawn) {
-                            // ignore value; rely on final balance check
-                            _withdrawn;
+                    if (amountToWithdraw > 0) {
+                        try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256) {
+                            // ignore returned amount; rely on final balance check
                         } catch {
                             emit AdapterCallFailed(_payoutData.adapters[i], "withdraw", "withdraw failed");
-                            uint256 sent;
+                            uint256 sent = 0;
                             try IYieldAdapterEmergency(_payoutData.adapters[i]).emergencyTransfer(_payoutData.claimant, amountToWithdraw) returns (uint256 v) {
                                 sent = v;
                             } catch {}
@@ -395,7 +394,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
     function valueToShares(uint256 _value) external view returns (uint256) {
-        if (totalSystemValue == 0 || _value < 1) {
+        if (totalSystemValue == 0) {
             return _value;
         }
         return (_value * totalMasterSharesSystem) / totalSystemValue;
