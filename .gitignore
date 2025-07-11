@@ -26,3 +26,6 @@ lib/
 !lib/forge-std/
 foundry/out
 
+
+# Manticore output
+/mcore_*

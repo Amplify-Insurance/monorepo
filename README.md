@@ -348,3 +348,4 @@ graph TD
     Underwriter -.->|capital reduced| CapitalPool
     BackstopPool -->|protocol assets| RewardDistributor
 ```
+\n## Manticore Symbolic Execution\n\nInstall Manticore (requires Python 3.10 or later) and run the example script to explore symbolic paths in the test contracts.\n\n```bash\npython3 -m pip install manticore\nnpm run test:manticore\n```\n
