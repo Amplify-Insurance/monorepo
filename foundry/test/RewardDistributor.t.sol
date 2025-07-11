@@ -17,7 +17,7 @@ contract RewardDistributorTest is Test {
     uint256 constant PRECISION = 1e18;
 
     function setUp() public {
-        rd = new RewardDistributor(riskManager);
+        rd = new RewardDistributor(riskManager, address(0xdead));
         token = new MockERC20("Reward", "RWD", 18);
         token.mint(address(rd), 1000 ether);
     }
@@ -86,7 +86,7 @@ contract RewardDistributorTest is Test {
 
     function testConstructorZeroRiskManagerReverts() public {
         vm.expectRevert(RewardDistributor.ZeroAddress.selector);
-        new RewardDistributor(address(0));
+        new RewardDistributor(address(0), address(0xdead));
     }
 
     function testSetCatPoolOnlyOwner() public {

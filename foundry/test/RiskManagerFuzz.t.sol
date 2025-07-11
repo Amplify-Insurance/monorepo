@@ -11,6 +11,7 @@ import {MockLossDistributor} from "contracts/test/MockLossDistributor.sol";
 import {MockPolicyManager} from "contracts/test/MockPolicyManager.sol";
 import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
+import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 
 contract RiskManagerFuzz is Test {
     RiskManager rm;
@@ -135,5 +136,61 @@ contract RiskManagerFuzz is Test {
         rm.setPoolFeeRecipient(0, recipient);
         (, , , , , address stored,) = pr.getPoolData(0);
         assertEq(stored, recipient);
+    }
+
+    function testFuzz_setCommittee(address newCommittee) public {
+        vm.assume(newCommittee != address(0));
+        rm.setCommittee(newCommittee);
+        assertEq(rm.committee(), newCommittee);
+    }
+
+    function testFuzz_setMaxAllocationsPerUnderwriter(uint8 newMax) public {
+        vm.assume(newMax > 0);
+        rm.setMaxAllocationsPerUnderwriter(newMax);
+        assertEq(rm.maxAllocationsPerUnderwriter(), newMax);
+    }
+
+    function testFuzz_setDeallocationNoticePeriod(uint96 period) public {
+        rm.setDeallocationNoticePeriod(period);
+        assertEq(rm.deallocationNoticePeriod(), period);
+    }
+
+    function testFuzz_addProtocolRiskPool(address tokenAddress, uint16 claimFee) public {
+        MockERC20 protocolToken = new MockERC20("P", "P", 18);
+        IPoolRegistry.RateModel memory model = IPoolRegistry.RateModel({
+            base: 0,
+            slope1: 0,
+            slope2: 0,
+            kink: 0
+        });
+        uint256 id = rm.addProtocolRiskPool(address(protocolToken), model, claimFee);
+        assertEq(id, 0);
+    }
+
+    function testFuzz_liquidateInsolventUnderwriter(uint96 pledge, uint96 loss) public {
+        vm.assume(pledge > 0);
+        vm.assume(loss > 0 && loss <= pledge);
+        _prepareAllocation(pledge, 0);
+        uint256[] memory pools = new uint256[](1);
+        pools[0] = 0;
+        vm.prank(underwriter);
+        rm.allocateCapital(pools);
+        cp.setUnderwriterAccount(underwriter, pledge);
+        cp.setSharesToValue(pledge, pledge);
+        uint256 pending = uint256(pledge) + uint256(loss);
+        ld.setPendingLoss(underwriter, 0, pending);
+        rm.liquidateInsolventUnderwriter(underwriter);
+        assertEq(cp.applyLossesCallCount(), 1);
+    }
+
+    function testFuzz_onHooks(uint96 amount) public {
+        vm.assume(amount > 0);
+        _prepareAllocation(amount, 0);
+        cp.triggerOnWithdrawalRequested(address(rm), underwriter, amount);
+        cp.triggerOnWithdrawalCancelled(address(rm), underwriter, amount);
+        cp.triggerOnCapitalWithdrawn(address(rm), underwriter, amount, false);
+        // simply ensure no reverts and state updated
+        (, , , uint256 pending,, ,) = pr.getPoolData(0);
+        assertEq(pending, 0);
     }
 }

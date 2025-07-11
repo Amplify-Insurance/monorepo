@@ -12,13 +12,13 @@ contract PolicyNFTTest is Test {
     address other = address(0x3);
 
     function setUp() public {
-        nft = new PolicyNFT(owner);
+        nft = new PolicyNFT(address(0), owner);
     }
 
     function testInitialState() public {
         assertEq(nft.owner(), owner);
         assertEq(nft.nextId(), 1);
-        assertEq(nft.riskManagerContract(), address(0));
+        assertEq(nft.policyManagerContract(), address(0));
         assertEq(nft.name(), "Premium Drain Cover");
         assertEq(nft.symbol(), "PCOVER");
     }
@@ -26,23 +26,23 @@ contract PolicyNFTTest is Test {
     function testSetRiskManagerOnlyOwner() public {
         vm.prank(other);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", other));
-        nft.setRiskManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(riskManager);
 
-        nft.setRiskManagerAddress(riskManager);
-        assertEq(nft.riskManagerContract(), riskManager);
+        nft.setPolicyManagerAddress(riskManager);
+        assertEq(nft.policyManagerContract(), riskManager);
     }
 
     function testSetRiskManagerCannotBeZero() public {
         vm.expectRevert(bytes("PolicyNFT: Address cannot be zero"));
-        nft.setRiskManagerAddress(address(0));
+        nft.setPolicyManagerAddress(address(0));
     }
 
     function testSetRiskManagerChangeAccess() public {
-        nft.setRiskManagerAddress(riskManager);
-        nft.setRiskManagerAddress(other);
+        nft.setPolicyManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(other);
 
         vm.prank(riskManager);
-        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized RiskManager"));
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
         nft.mint(user, 1, 1, 0, 0, 0);
 
         vm.prank(other);
@@ -52,12 +52,12 @@ contract PolicyNFTTest is Test {
 
     function testMintOnlyRiskManager() public {
         vm.prank(riskManager);
-        vm.expectRevert(bytes("PolicyNFT: RiskManager address not set"));
+        vm.expectRevert(bytes("PolicyNFT: PolicyManager address not set"));
         nft.mint(user, 1, 1, 0, 0, 0);
 
-        nft.setRiskManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(riskManager);
 
-        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized RiskManager"));
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
         nft.mint(user, 1, 1, 0, 0, 0);
 
         vm.prank(riskManager);
@@ -74,7 +74,7 @@ contract PolicyNFTTest is Test {
     }
 
     function testMintSequentialIds() public {
-        nft.setRiskManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(riskManager);
         vm.prank(riskManager);
         nft.mint(user, 1, 1, 0, 0, 0);
         vm.prank(riskManager);
@@ -85,11 +85,11 @@ contract PolicyNFTTest is Test {
     }
 
     function testBurn() public {
-        nft.setRiskManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(riskManager);
         vm.prank(riskManager);
         nft.mint(user, 1, 1, 0, 0, 0);
 
-        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized RiskManager"));
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
         nft.burn(1);
 
         vm.prank(riskManager);
@@ -103,18 +103,18 @@ contract PolicyNFTTest is Test {
     }
 
     function testBurnNonexistentReverts() public {
-        nft.setRiskManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(riskManager);
         vm.prank(riskManager);
         vm.expectRevert(abi.encodeWithSignature("ERC721NonexistentToken(uint256)", 1));
         nft.burn(1);
     }
 
     function testUpdatePremiumAccount() public {
-        nft.setRiskManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(riskManager);
         vm.prank(riskManager);
         nft.mint(user, 1, 1, 0, 500, 0);
 
-        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized RiskManager"));
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
         nft.updatePremiumAccount(1, 300, 5);
 
         vm.prank(riskManager);
@@ -126,10 +126,10 @@ contract PolicyNFTTest is Test {
 
     function testUpdatePremiumAccountChecks() public {
         vm.prank(riskManager);
-        vm.expectRevert(bytes("PolicyNFT: RiskManager address not set"));
+        vm.expectRevert(bytes("PolicyNFT: PolicyManager address not set"));
         nft.updatePremiumAccount(1, 0, 0);
 
-        nft.setRiskManagerAddress(riskManager);
+        nft.setPolicyManagerAddress(riskManager);
         vm.prank(riskManager);
         vm.expectRevert(bytes("PolicyNFT: Policy does not exist or has been burned"));
         nft.updatePremiumAccount(1, 0, 0);
@@ -144,10 +144,8 @@ contract PolicyNFTTest is Test {
     }
 
     function testUpdateLastPaidAlwaysReverts() public {
-        nft.setRiskManagerAddress(riskManager);
-        vm.prank(riskManager);
-        vm.expectRevert(bytes("PolicyNFT: updateLastPaid is deprecated; use updatePremiumAccount"));
-        nft.updateLastPaid(1, 0);
+        // The updateLastPaid function has been removed; nothing to test.
+        assertTrue(true);
     }
 
     function testGetPolicyUnknownId() public {
