@@ -136,6 +136,17 @@ contract PoolRegistryFuzz is Test {
         assertEq(adapters.length, 0);
     }
 
+    function testFuzz_deallocateUnknownAdapter(address adapter) public {
+        vm.assume(adapter != address(0));
+        IPoolRegistry.RateModel memory rm = IPoolRegistry.RateModel(1, 2, 3, 4);
+        uint256 id = _createPool(rm, 0);
+        vm.prank(riskManager);
+        registry.updateCapitalAllocation(id, adapter, 0, false);
+        (, uint256 total,,,,,) = registry.getPoolData(id);
+        assertEq(total, 0);
+        assertEq(registry.getPoolActiveAdapters(id).length, 0);
+    }
+
     function testFuzz_getPoolPayoutData(address adapter1, address adapter2, uint96 amount1, uint96 amount2) public {
         vm.assume(adapter1 != address(0));
         vm.assume(adapter2 != address(0) && adapter2 != adapter1);

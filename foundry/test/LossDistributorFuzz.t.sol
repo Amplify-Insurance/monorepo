@@ -111,6 +111,11 @@ contract LossDistributorFuzz is Test {
         assertEq(ld.poolLossTrackers(poolId), before);
     }
 
+    function testFuzz_constructorZeroReverts() public {
+        vm.expectRevert(LossDistributor.ZeroAddress.selector);
+        new LossDistributor(address(0));
+    }
+
     function testFuzz_realizeLossesNoPending(uint256 poolId, uint96 pledge) public {
         vm.prank(RISK_MANAGER);
         uint256 realized = ld.realizeLosses(USER1, poolId, pledge);
