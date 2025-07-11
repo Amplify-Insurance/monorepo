@@ -3,9 +3,10 @@ import { Inter } from "next/font/google"
 import "../app/globals.css"
 import { Providers } from "./providers" // Import the JS component
 
-import Navbar from "./components/Navbar" // Ensure paths are correct
-import Sidebar from "./components/Sidebar" // Ensure paths are correct
+import Navbar from "./components/Navbar"
+import Sidebar from "./components/Sidebar"
 import { Toaster } from "../components/ui/toaster"
+import { TransactionsProvider } from "../hooks/useTransactions"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,16 +25,16 @@ export default function RootLayout({ children }) {
       </head>
       <body className={inter.className}>
         <Providers>
-          {" "}
-          {/* Use the JS Providers component */}
-          <Toaster />
-          <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-            <Navbar />
-            <div className="flex flex-1">
-              <Sidebar />
-              <main className="flex-1 p-4 md:p-6 lg:p-8 pt-20 md:ml-64">{children}</main>
+          <TransactionsProvider>
+            <Toaster />
+            <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+              <Navbar />
+              <div className="flex flex-1">
+                <Sidebar />
+                <main className="flex-1 p-4 md:p-6 lg:p-8 pt-20 md:ml-64">{children}</main>
+              </div>
             </div>
-          </div>
+          </TransactionsProvider>
         </Providers>
       </body>
     </html>

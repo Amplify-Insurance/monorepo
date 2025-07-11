@@ -22,5 +22,7 @@ ignition/deployments/chain-31337
 
 # Foundry
 lib/
+!lib/
+!lib/forge-std/
 foundry/out
 
