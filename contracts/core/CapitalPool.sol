@@ -200,12 +200,15 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
         uint256 sharesToCancel = requests[_requestIndex].shares;
 
-        // Notify RiskManager about the cancellation
-        uint256 valueCancelled = sharesToValue(sharesToCancel);
-        (bool success,) = riskManager.call(abi.encodeWithSignature("onWithdrawalCancelled(address,uint256)", msg.sender, valueCancelled));
-        require(success, "CP: RiskManager rejected withdrawal cancellation");
-
+        // Effects: update accounting before making any external calls
         underwriterAccounts[msg.sender].totalPendingWithdrawalShares -= sharesToCancel;
+
+        // Interaction: notify RiskManager about the cancellation
+        uint256 valueCancelled = sharesToValue(sharesToCancel);
+        (bool success,) = riskManager.call(
+            abi.encodeWithSignature("onWithdrawalCancelled(address,uint256)", msg.sender, valueCancelled)
+        );
+        require(success, "CP: RiskManager rejected withdrawal cancellation");
 
         // Swap and pop to remove the request from the array efficiently
         requests[_requestIndex] = requests[requests.length - 1];
