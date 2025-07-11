@@ -16,7 +16,6 @@
     "test:RiskManager": "npx hardhat test test/RiskManager.test.js",
     "test:Staking": "npx hardhat test test/Staking.test.js",
     "test:PriceOracle": "npx hardhat test test/PriceOracle.test.js",
-    "slither": "hardhat slither",
     "deploy:usdc": "hardhat run scripts/deploy-usdc.js --network base",
     "deploy:weth": "hardhat run scripts/deploy-weth.js --network base",
     "deploy:governance": "hardhat run scripts/deploy-governance.js --network base",
