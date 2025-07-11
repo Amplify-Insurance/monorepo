@@ -204,17 +204,15 @@ contract Committee is Ownable, ReentrancyGuard {
      * @notice NEW: Internal function to handle the logic for a successful proposal.
      */
     function _handleSuccessfulProposal(Proposal storage p) internal {
-        p.status = ProposalStatus.Succeeded;
-
         if (p.pType == ProposalType.Pause) {
-            riskManager.reportIncident(p.poolId, true);
-            riskManager.setPoolFeeRecipient(p.poolId, address(this));
             p.status = ProposalStatus.Challenged;
             p.challengeDeadline = block.timestamp + challengePeriod;
+            riskManager.reportIncident(p.poolId, true);
+            riskManager.setPoolFeeRecipient(p.poolId, address(this));
         } else { // Unpause
-            riskManager.reportIncident(p.poolId, false);
             p.status = ProposalStatus.Executed;
             activeProposalForPool[p.poolId] = false;
+            riskManager.reportIncident(p.poolId, false);
         }
     }
 

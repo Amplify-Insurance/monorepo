@@ -89,8 +89,8 @@ contract SdaiAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
         uint256 currentUnderlyingBalanceInSdai = sDai.balanceOf(address(this)); 
         uint256 amountToAttempt = Math.min(_targetAmountOfUnderlyingToWithdraw, currentUnderlyingBalanceInSdai);
 
-        if (amountToAttempt == 0) {
-            return 0; 
+        if (amountToAttempt < 1) {
+            return 0;
         }
 
         // sDai.withdraw(assets, receiver, owner)

@@ -277,7 +277,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
         uint256 cost      = (pol.coverage * rateBps * elapsed) / (SECS_YEAR * BPS);
         uint256 toDrain   = Math.min(cost, pol.premiumDeposit);
-        if (toDrain == 0) {
+        if (toDrain < 1) {
             policyNFT.updatePremiumAccount(_policyId, pol.premiumDeposit, uint128(block.timestamp));
             return;
         }
@@ -372,9 +372,11 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         }
         uint256 utilBps = (sold * BPS) / cap;
         if (utilBps < m.kink) {
-            return m.base + (m.slope1 * utilBps) / BPS;
+            return m.base + (sold * m.slope1) / cap;
         }
-        return m.base + (m.slope1 * m.kink) / BPS + (m.slope2 * (utilBps - m.kink)) / BPS;
+        uint256 postKink = (sold * BPS) - (m.kink * cap);
+        uint256 slope2Portion = (m.slope2 * postKink) / (cap * BPS);
+        return m.base + (m.slope1 * m.kink) / BPS + slope2Portion;
     }
 
     function _getAvailableCapital(uint256 _poolId) internal view returns (uint256) {

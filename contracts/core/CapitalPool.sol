@@ -392,7 +392,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
     function valueToShares(uint256 _value) external view returns (uint256) {
-        if (totalSystemValue == 0 || _value == 0) {
+        if (totalSystemValue == 0 || _value < 1) {
             return _value;
         }
         return (_value * totalMasterSharesSystem) / totalSystemValue;
