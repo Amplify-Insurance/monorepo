@@ -319,15 +319,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         }
         
         uint256 claimFee = (coverage * poolClaimFeeBps) / BPS;
-        
-        ICapitalPool.PayoutData memory payoutData;
-        payoutData.claimant = claimant;
-        payoutData.claimantAmount = coverage - claimFee;
-        payoutData.feeRecipient = committee;
-        payoutData.feeAmount = claimFee;
-        payoutData.adapters = adapters;
-        payoutData.capitalPerAdapter = capitalPerAdapter;
-        payoutData.totalCapitalFromPoolLPs = totalCapitalPledged;
+
+        ICapitalPool.PayoutData memory payoutData = ICapitalPool.PayoutData({
+            claimant: claimant,
+            claimantAmount: coverage - claimFee,
+            feeRecipient: committee,
+            feeAmount: claimFee,
+            adapters: adapters,
+            capitalPerAdapter: capitalPerAdapter,
+            totalCapitalFromPoolLPs: totalCapitalPledged
+        });
         
         capitalPool.executePayout(payoutData);
 
