@@ -24,7 +24,8 @@
     "configure:params": "hardhat run scripts/configure-parameters.js --network base",
     "slither:test": "slither . --compile-force-framework hardhat --exclude naming-convention --filter-paths 'test|node_modules/@openzeppelin/contracts'",
     "test:forge": "forge test",
-    "test:forge:fuzz": "forge test -C fuzz"
+    "test:forge:fuzz": "forge test -C fuzz",
+    "test:mythril": "./scripts/mythril.sh"
   },
   "keywords": [],
   "author": "",
