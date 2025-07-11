@@ -9,7 +9,8 @@ import { getERC20WithSigner, getTokenDecimals, getTokenSymbol } from "../../lib/
 import { getTokenLogo } from "../config/tokenNameMap"
 import Modal from "./Modal"
 import { STAKING_TOKEN_ADDRESS } from "../config/deployments"
-import { getTxExplorerUrl } from "../utils/explorer"
+import { notifyTx } from "../utils/explorer"
+import { useTransactions } from "../../hooks/useTransactions"
 
 export default function UnstakeModal({ isOpen, onClose }) {
   const [amount, setAmount] = useState("")
@@ -19,6 +20,7 @@ export default function UnstakeModal({ isOpen, onClose }) {
   const [symbol, setSymbol] = useState("")
   const [decimals, setDecimals] = useState(18)
   const tokenAddress = STAKING_TOKEN_ADDRESS
+  const { addTransaction } = useTransactions()
 
   const loadBalance = async () => {
     if (!tokenAddress) return
@@ -59,7 +61,7 @@ export default function UnstakeModal({ isOpen, onClose }) {
       const staking = await getStakingWithSigner()
       const tx = await staking.unstake(ethers.utils.parseUnits(amount, decimals))
       setTxHash(tx.hash)
-      await tx.wait()
+      await notifyTx(tx, "Unstake Tokens", addTransaction)
       setAmount("")
       onClose()
     } catch (err) {
