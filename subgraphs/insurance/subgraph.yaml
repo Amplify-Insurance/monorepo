@@ -10,7 +10,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000" # replace with new deployed address
+      address: "0x0AC80254b545e573ec2583a818e20F7437AebFE0" # replace with new deployed address
       abi: RiskManager
       startBlock: 0
     mapping:
@@ -51,7 +51,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111" # replace with new deployed address
+      address: "0xEF1463994C25A9203D91AE5757Ec9dfc1e763De4" # replace with new deployed address
       abi: RiskManager
       startBlock: 0
     mapping:
@@ -92,7 +92,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111"
+      address: "0x467eB64f81F76D5aDD0C5F0D84a6A144428e6a82"
       abi: Staking
       startBlock: 0
     mapping:
@@ -119,7 +119,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111"
+      address: "0xb6dFA6D8c8f59eE989BE47d89c67e4b6562E05C2"
       abi: Committee
       startBlock: 0
     mapping:
@@ -198,7 +198,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111"
+      address: "0x811De960067a50DA4f7dd860a919E3Ea4C9c3853"
       abi: YieldAdapter
       startBlock: 0
     mapping:
@@ -221,7 +221,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111"
+      address: "0xAf0E02F17aB4851A60f3f9851b8A663f7a07F398"
       abi: YieldAdapter
       startBlock: 0
     mapping:
@@ -244,7 +244,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111"
+      address: "0xdbAb1Ca8C13d8feB7567721D06C0BD394c20D0b4"
       abi: YieldAdapter
       startBlock: 0
     mapping:
@@ -269,7 +269,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111"
+      address: "0x2642880ED3EE014b8FFb5943C3efC26bE9AB3449"
       abi: YieldAdapter
       startBlock: 0
     mapping:
@@ -294,7 +294,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      address: "0x583372F2060AAB5c7f061fE99bd0A078dC25095c" # replace with deployed address
       abi: PolicyNFT
       startBlock: 0
     mapping:
@@ -328,7 +328,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      address: "0x684a16E175e20C7506D6577153620e556502DDC2" # replace with deployed address
       abi: PoolManager
       startBlock: 0
     mapping:
@@ -360,7 +360,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      address: "0x2095Dc68d41f0f28d8b40B7eF07F479522a773e5" # replace with deployed address
       abi: BackstopPool
       startBlock: 0
     mapping:
@@ -410,7 +410,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      address: "0xb564f7EF2FCBC886A7c79d55f1226d7550654302" # replace with deployed address
       abi: PoolRegistry
       startBlock: 0
     mapping:
@@ -438,7 +438,7 @@ dataSources:
     context:
       deployment: eth
     source:
-      address: "0x1111111111111111111111111111111111111111" # replace with deployed address
+      address: "0xe48486853896434EcA2F2e30dd3BF4B437d11DC3" # replace with deployed address
       abi: CapitalPool
       startBlock: 0
     mapping:
@@ -482,7 +482,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      address: "0x7b3E7a44C5b498F53F0EACe8F34c83521bc1d838" # replace with deployed address
       abi: CapitalPool
       startBlock: 0
     mapping:
@@ -526,7 +526,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      address: "0xCFb0b00AEA3dc5c260642bd1D04D8BDC5f422fC0" # replace with deployed address
       abi: PoolRegistry
       startBlock: 0
     mapping:
@@ -553,7 +553,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      address: "0x088e04d044eD987e9c99AE6a82bA385bC3C06f24" # replace with deployed address
       abi: BackstopPool
       startBlock: 0
     mapping:
@@ -603,7 +603,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      address: "0x990C52D044bdDa263D54BBf30124c35D8B27cD88" # replace with deployed address
       abi: PoolManager
       startBlock: 0
     mapping:
@@ -635,7 +635,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000" # replace with deployed address
+      address: "0x52E49178ad281dfF1B27eCBabb648a9daD610166" # replace with deployed address
       abi: PolicyNFT
       startBlock: 0
     mapping:
@@ -669,7 +669,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0xa7812253C879F85942984D7a56B07B37c1Bc84d1"
       abi: YieldAdapter
       startBlock: 0
     mapping:
@@ -694,7 +694,7 @@ dataSources:
     context:
       deployment: usdc
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0xcc0A45eb4f418aE86CF7321077Fd7B57c132EaD4"
       abi: YieldAdapter
       startBlock: 0
     mapping:
