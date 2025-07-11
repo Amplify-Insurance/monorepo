@@ -91,6 +91,12 @@ Run Slither static analysis with:
 npm run slither
 ```
 
+Run Mythril security analysis with:
+
+```bash
+npm run test:mythril
+```
+
 Deploy the **PriceOracle** and register Chainlink feeds on Base with:
 
 ```bash
