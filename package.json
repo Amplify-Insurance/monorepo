@@ -23,7 +23,9 @@
     "deploy:oracle": "hardhat run scripts/deploy-oracle.js --network base",
     "deploy": "npm run deploy:usdc && npm run deploy:weth && npm run deploy:governance && npm run deploy:oracle",
     "configure:params": "hardhat run scripts/configure-parameters.js --network base",
-    "slither:test": "slither . --compile-force-framework hardhat"
+    "slither:test": "slither . --compile-force-framework hardhat",
+    "test:forge": "forge test",
+    "test:forge:fuzz": "forge test -C fuzz"
   },
   "keywords": [],
   "author": "",
