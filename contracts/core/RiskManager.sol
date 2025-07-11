@@ -281,7 +281,7 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
             uint8 protocolDecimals = IERC20Metadata(address(protocolToken)).decimals();
             uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
             uint256 protocolCoverage = _scaleAmount(coverage, underlyingDecimals, protocolDecimals);
-            protocolToken.safeTransferFrom(claimant, address(rewardDistributor), protocolCoverage);
+            protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
             rewardDistributor.distribute(poolId, address(protocolToken), protocolCoverage, totalCapitalPledged);
         }
 
