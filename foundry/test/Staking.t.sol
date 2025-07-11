@@ -232,4 +232,34 @@ contract StakingTest is Test {
         assertEq(staking.lastVotedProposal(staker), 0);
         assertEq(staking.lastVoteTime(staker), 0);
     }
+
+    function testUnstakeAfterLockPeriodUpdatesVoteWeight() public {
+        MockProposalFinalization committeeMock = new MockProposalFinalization();
+        vm.prank(owner);
+        staking.setCommitteeAddress(address(committeeMock));
+
+        vm.prank(staker);
+        staking.stake(100 ether);
+
+        committeeMock.callRecordVote(address(staking), staker, 1);
+
+        vm.warp(block.timestamp + staking.UNSTAKE_LOCK_PERIOD() + 1);
+
+        uint256 newBalance = 90 ether;
+        vm.expectCall(
+            address(committeeMock),
+            abi.encodeWithSelector(
+                committeeMock.updateVoteWeight.selector,
+                staker,
+                1,
+                newBalance
+            )
+        );
+
+        vm.prank(staker);
+        staking.unstake(10 ether);
+
+        assertEq(staking.stakedBalance(staker), newBalance);
+        assertEq(staking.lastVotedProposal(staker), 1);
+    }
 }
