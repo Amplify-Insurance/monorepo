@@ -78,7 +78,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
      * @dev This function can only be called once by the owner.
      * The BackstopPool contract must be the owner of the CatShare token before this is called.
      */
-    function initialize() external onlyOwner {
+    function initialize() external onlyOwner nonReentrant {
         require(!_initialized, "CIP: Already initialized");
         require(catShareToken.owner() == address(this), "CIP: Pool must be owner of share token");
 
@@ -146,7 +146,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         emit AdapterChanged(_newAdapterAddress);
     }
 
-    function flushToAdapter(uint256 amount) external onlyOwner { 
+    function flushToAdapter(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "CIP: Amount must be > 0");
         require(amount <= idleUSDC, "CIP: Amount exceeds idle USDC");
         require(address(adapter) != address(0), "CIP: Yield adapter not set");
