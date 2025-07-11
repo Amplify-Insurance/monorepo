@@ -124,17 +124,20 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         emit RewardDistributorSet(_rewardDistributor);
     }
 
-    function setAdapter(address _newAdapterAddress) external onlyOwner {
-        if (address(adapter) != address(0)) {
-            uint256 balanceInOldAdapter = adapter.getCurrentValueHeld();
+    function setAdapter(address _newAdapterAddress) external onlyOwner nonReentrant {
+        IYieldAdapter oldAdapter = adapter;
+        adapter = IYieldAdapter(_newAdapterAddress);
+
+        if (address(oldAdapter) != address(0)) {
+            uint256 balanceInOldAdapter = oldAdapter.getCurrentValueHeld();
             if (balanceInOldAdapter > 0) {
-                uint256 withdrawnAmount = adapter.withdraw(balanceInOldAdapter, address(this));
+                uint256 withdrawnAmount = oldAdapter.withdraw(balanceInOldAdapter, address(this));
                 idleUSDC += withdrawnAmount;
             }
             // Revoke allowance from the old adapter
-            usdc.approve(address(adapter), 0);
+            usdc.approve(address(oldAdapter), 0);
         }
-        adapter = IYieldAdapter(_newAdapterAddress);
+
         if (address(adapter) != address(0)) {
             // Grant allowance to the new adapter safely
             usdc.approve(address(adapter), 0);
@@ -228,9 +231,9 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         uint256 usdcToWithdraw = (catShareAmountBurn * currentTotalValueInPool) / effectiveSupply;
         require(usdcToWithdraw >= MIN_USDC_AMOUNT, "CIP: Withdrawal amount below minimum");
 
-        catShareToken.burn(msg.sender, catShareAmountBurn);
         delete withdrawalRequestShares[msg.sender];
         delete withdrawalRequestTimestamp[msg.sender];
+        catShareToken.burn(msg.sender, catShareAmountBurn);
 
         if (usdcToWithdraw <= idleUSDC) {
             idleUSDC -= usdcToWithdraw;

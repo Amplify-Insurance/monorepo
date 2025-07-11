@@ -134,13 +134,13 @@ contract Committee is Ownable, ReentrancyGuard {
         p.votes[msg.sender] = _vote;
         p.voterWeight[msg.sender] = currentWeight;
 
-        stakingContract.recordVote(msg.sender, _proposalId);
-
         if (_vote == VoteOption.For) {
             p.forVotes += currentWeight;
         } else {
             p.againstVotes += currentWeight;
         }
+
+        stakingContract.recordVote(msg.sender, _proposalId);
 
         emit Voted(_proposalId, msg.sender, _vote, currentWeight);
     }

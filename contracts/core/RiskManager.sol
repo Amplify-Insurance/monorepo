@@ -176,9 +176,9 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         uint256 freeCapital = totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
         if (_amount > freeCapital) revert InsufficientFreeCapital();
 
-        poolRegistry.updateCapitalPendingWithdrawal(_poolId, _amount, true);
         deallocationRequestTimestamp[underwriter][_poolId] = block.timestamp;
         deallocationRequestAmount[underwriter][_poolId] = _amount;
+        poolRegistry.updateCapitalPendingWithdrawal(_poolId, _amount, true);
         emit DeallocationRequested(underwriter, _poolId, _amount, block.timestamp);
     }
 
@@ -395,7 +395,7 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         }
     }
 
-    function onCapitalDeposited(address _underwriter, uint256 _amount) external {
+    function onCapitalDeposited(address _underwriter, uint256 _amount) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         underwriterTotalPledge[_underwriter] += _amount;
         uint256[] memory pools = underwriterAllocations[_underwriter];
@@ -411,7 +411,7 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         }
     }
 
-    function onWithdrawalRequested(address _underwriter, uint256 _principalComponent) external {
+    function onWithdrawalRequested(address _underwriter, uint256 _principalComponent) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
@@ -426,7 +426,7 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         }
     }
 
-    function onWithdrawalCancelled(address _underwriter, uint256 _principalComponent) external {
+    function onWithdrawalCancelled(address _underwriter, uint256 _principalComponent) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         uint256[] memory allocations = underwriterAllocations[_underwriter];
         for (uint i = 0; i < allocations.length; i++) {
@@ -441,7 +441,7 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         }
     }
 
-    function onCapitalWithdrawn(address _underwriter, uint256 _principalComponentRemoved, bool _isFullWithdrawal) external {
+    function onCapitalWithdrawn(address _underwriter, uint256 _principalComponentRemoved, bool _isFullWithdrawal) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
         _realizeLossesForAllPools(_underwriter);
         
