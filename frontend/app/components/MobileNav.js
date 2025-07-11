@@ -29,6 +29,7 @@ export default function MobileNav() {
   const navigation = [
     { name: "Markets", href: "/markets", icon: BarChart2 },
     { name: "Dashboard", href: "/dashboard", icon: Shield },
+    { name: "Transactions", href: "/transactions", icon: FileText },
         { name: "Backstop Pool", href: "/catpool", icon: Coins },
     { name: "Make a Claim", href: "/claims", icon: AlertTriangle },
     { name: "Analytics", href: "/analytics", icon: Activity },
