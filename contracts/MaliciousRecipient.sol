@@ -4,8 +4,8 @@ interface ICommittee {
     function claimReward(uint256 _proposalId) external;
 }
 contract MaliciousRecipient {
-    ICommittee committee;
-    uint256 proposalId;
+    ICommittee public immutable committee;
+    uint256 public immutable proposalId;
     constructor(address _committee, uint256 _proposalId) payable {
         committee = ICommittee(_committee);
         proposalId = _proposalId;
