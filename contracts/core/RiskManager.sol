@@ -414,7 +414,6 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
                     address(protocolToken),
                     underwriterPoolPledge[msg.sender][poolId]
                 );
-                claimed;
             }
         }
     }
