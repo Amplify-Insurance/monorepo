@@ -27,9 +27,9 @@ contract CompoundV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
     }
 
     constructor(IComet _comet, address _initialOwner) Ownable(_initialOwner) {
-        address asset = _comet.baseToken();
-        require(asset != address(0), "CompoundV3Adapter: invalid asset");
-        underlyingToken = IERC20(asset);
+        address assetToken = _comet.baseToken();
+        require(assetToken != address(0), "CompoundV3Adapter: invalid asset");
+        underlyingToken = IERC20(assetToken);
         comet = _comet;
         underlyingToken.approve(address(_comet), type(uint256).max);
     }

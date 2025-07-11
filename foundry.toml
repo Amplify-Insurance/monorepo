@@ -29,4 +29,7 @@ test = 'foundry/staking-tests'
 [profile.riskfuzz]
 test = 'foundry/test/RiskManagerFuzz.t.sol'
 
+[profile.cpfuzz]
+test = 'foundry/test/CapitalPoolFuzz.t.sol'
+
 

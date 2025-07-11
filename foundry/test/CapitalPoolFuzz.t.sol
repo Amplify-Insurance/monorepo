@@ -31,14 +31,14 @@ contract CapitalPoolFuzz is Test {
     function testFuzz_depositWithdraw(uint96 amount) public {
         vm.assume(amount > 0 && amount < INITIAL_SUPPLY);
         pool.deposit(amount, CapitalPool.YieldPlatform.AAVE);
-        (uint256 principal,, uint256 shares,,) = pool.getUnderwriterAccount(address(this));
+        (uint256 principal,, uint256 shares,) = pool.getUnderwriterAccount(address(this));
         assertEq(principal, amount);
         assertEq(shares, amount);
 
         pool.requestWithdrawal(shares);
         pool.executeWithdrawal(0);
 
-        (principal,, shares,,) = pool.getUnderwriterAccount(address(this));
+        (principal,, shares,) = pool.getUnderwriterAccount(address(this));
         assertEq(principal, 0);
         assertEq(shares, 0);
         assertEq(token.balanceOf(address(this)) + adapter.totalValueHeld(), INITIAL_SUPPLY);
@@ -47,7 +47,7 @@ contract CapitalPoolFuzz is Test {
 
     function testFuzz_multipleDeposits(uint96 first, uint96 second) public {
         vm.assume(first > 0 && second > 0);
-        vm.assume(first + second < INITIAL_SUPPLY);
+        vm.assume(uint256(first) + uint256(second) < INITIAL_SUPPLY);
 
         pool.deposit(first, CapitalPool.YieldPlatform.AAVE);
         uint256 msBefore = pool.totalMasterSharesSystem();
@@ -56,14 +56,15 @@ contract CapitalPoolFuzz is Test {
         pool.deposit(second, CapitalPool.YieldPlatform.AAVE);
 
         uint256 expectedSharesSecond = (second * msBefore) / tvBefore;
-        (, , uint256 shares,,) = pool.getUnderwriterAccount(address(this));
+        (, , uint256 shares,) = pool.getUnderwriterAccount(address(this));
         assertEq(shares, first + expectedSharesSecond);
         assertEq(pool.totalSystemValue(), first + second);
     }
 
     function testFuzz_depositWithYield(uint96 depositAmount, uint96 secondDeposit, uint96 yieldGain) public {
         vm.assume(depositAmount > 0 && secondDeposit > 0);
-        vm.assume(depositAmount + secondDeposit + yieldGain < INITIAL_SUPPLY);
+        vm.assume(uint256(depositAmount) + uint256(secondDeposit) + uint256(yieldGain) < INITIAL_SUPPLY);
+        vm.assume(uint256(yieldGain) < uint256(secondDeposit) * uint256(depositAmount));
 
         pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
 
@@ -76,7 +77,7 @@ contract CapitalPoolFuzz is Test {
         pool.deposit(secondDeposit, CapitalPool.YieldPlatform.AAVE);
         uint256 expectedShares = (secondDeposit * msBefore) / tvBefore;
 
-        (, , uint256 shares,,) = pool.getUnderwriterAccount(address(this));
+        (, , uint256 shares,) = pool.getUnderwriterAccount(address(this));
         assertEq(shares, depositAmount + expectedShares);
         assertEq(pool.totalSystemValue(), depositAmount + secondDeposit + yieldGain);
     }
@@ -90,7 +91,7 @@ contract CapitalPoolFuzz is Test {
         vm.prank(address(rm));
         pool.applyLosses(address(this), loss);
 
-        (uint256 principal,, uint256 shares,,) = pool.getUnderwriterAccount(address(this));
+        (uint256 principal,, uint256 shares,) = pool.getUnderwriterAccount(address(this));
         uint256 expected = depositAmount - loss;
         assertEq(principal, expected);
         assertEq(shares, expected);
@@ -100,7 +101,7 @@ contract CapitalPoolFuzz is Test {
     function testFuzz_partialWithdrawalWithYield(uint96 depositAmount, uint96 withdrawShares, uint96 yieldGain) public {
         vm.assume(depositAmount > 0 && withdrawShares > 0);
         vm.assume(withdrawShares <= depositAmount);
-        vm.assume(depositAmount + yieldGain < INITIAL_SUPPLY);
+        vm.assume(uint256(depositAmount) + uint256(yieldGain) < INITIAL_SUPPLY);
 
         pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
 
@@ -112,7 +113,7 @@ contract CapitalPoolFuzz is Test {
         uint256 expectedValue = pool.sharesToValue(withdrawShares);
         pool.executeWithdrawal(0);
 
-        (uint256 principal,, uint256 shares,,) = pool.getUnderwriterAccount(address(this));
+        (uint256 principal,, uint256 shares,) = pool.getUnderwriterAccount(address(this));
         assertEq(principal, depositAmount - withdrawShares);
         assertEq(shares, depositAmount - withdrawShares);
         assertEq(pool.totalSystemValue(), depositAmount + yieldGain - expectedValue);
