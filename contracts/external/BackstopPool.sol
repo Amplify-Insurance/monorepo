@@ -9,8 +9,10 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../tokens/CatShare.sol"; // Assumes CatShare.sol is in a sub-directory
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IRewardDistributor.sol";
+import "../interfaces/IBackstopPool.sol";
+import "../MaliciousAdapter.sol"; // ICatPool interface
 
-contract BackstopPool is Ownable, ReentrancyGuard {
+contract BackstopPool is Ownable, ReentrancyGuard, ICatPool, IBackstopPool {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;

@@ -5,7 +5,7 @@ interface ICatPool {
     function depositLiquidity(uint256 usdcAmount) external;
 }
 contract MaliciousToken {
-    ICatPool catPool;
+    ICatPool public immutable catPool;
     uint256 amount;
     uint256 yieldChoice;
     constructor(address _catPool) {

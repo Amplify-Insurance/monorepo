@@ -14,6 +14,8 @@ import "../interfaces/IBackstopPool.sol";
 import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IPolicyManager.sol";
 import "../interfaces/IRewardDistributor.sol";
+import "../MaliciousPoolRegistry.sol"; // IRiskManager interface
+import "../interfaces/IRiskManager_PM_Hook.sol";
 
 /**
  * @title RiskManager
@@ -21,7 +23,7 @@ import "../interfaces/IRewardDistributor.sol";
  * @notice A lean orchestrator for a decentralized insurance protocol. It manages capital allocation,
  * claim processing, and liquidations by coordinating with specialized satellite contracts.
  */
-contract RiskManager is Ownable, ReentrancyGuard {
+contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_Hook {
     using SafeERC20 for IERC20;
 
     /* ───────────────────────── State Variables ───────────────────────── */
@@ -324,7 +326,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     
     /* ───────────────── Hooks & State Updaters ───────────────── */
 
-    function updateCoverageSold(uint256 _poolId, uint256 _amount, bool _isSale) public {
+    function updateCoverageSold(uint256 _poolId, uint256 _amount, bool _isSale) external {
         if(msg.sender != policyManager) revert NotPolicyManager();
         poolRegistry.updateCoverageSold(_poolId, _amount, _isSale);
     }
