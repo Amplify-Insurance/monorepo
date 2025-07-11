@@ -256,7 +256,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
 
     function receiveUsdcPremium(uint256 amount) external onlyPolicyManager {
         require(amount > 0, "CIP: Premium amount must be positive");
-        usdc.safeTransferFrom(policyManagerAddress, address(this), amount);
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
         idleUSDC += amount;
         emit UsdcPremiumReceived(amount);
     }
@@ -298,7 +298,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         require(protocolAsset != address(0), "CIP: Protocol asset cannot be zero address");
         require(amount > 0, "CIP: Amount of protocol asset must be positive");
 
-        IERC20(protocolAsset).safeTransferFrom(riskManagerAddress, address(this), amount);
+        IERC20(protocolAsset).safeTransferFrom(msg.sender, address(this), amount);
 
         uint256 totalCatSharesSupply = catShareToken.totalSupply();
         rewardDistributor.distribute(CAT_POOL_REWARD_ID, protocolAsset, amount, totalCatSharesSupply);
