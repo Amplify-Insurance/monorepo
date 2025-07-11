@@ -18,10 +18,13 @@ test = 'foundry/test/PoolRegistryFuzz.t.sol'
 [profile.lossfuzz]
 test = 'foundry/test/LossDistributorFuzz.t.sol'
 
+[profile.pm]
+test = 'foundry/test/PolicyManagerFuzz.t.sol'
 [profile.rewardfuzz]
 test = 'foundry/test/RewardDistributorFuzz.t.sol'
 [profile.staking]
 test = 'foundry/staking-tests'
 [profile.riskfuzz]
 test = 'foundry/test/RiskManagerFuzz.t.sol'
+
 
