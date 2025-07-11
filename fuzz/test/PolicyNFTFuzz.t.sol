@@ -27,6 +27,11 @@ contract PolicyNFTFuzz is Test {
         nft.setPolicyManagerAddress(newManager);
     }
 
+    function testFuzz_SetPolicyManagerAddressZeroReverts() public {
+        vm.expectRevert(bytes("PolicyNFT: Address cannot be zero"));
+        nft.setPolicyManagerAddress(address(0));
+    }
+
     function testFuzz_MintStoresPolicy(
         address to,
         uint256 pid,
@@ -49,6 +54,19 @@ contract PolicyNFTFuzz is Test {
         assertEq(nft.ownerOf(1), to);
     }
 
+    function testFuzz_MintManagerNotSetReverts(address to) public {
+        vm.assume(to != address(0) && to.code.length == 0);
+        vm.expectRevert(bytes("PolicyNFT: PolicyManager address not set"));
+        nft.mint(to, 0, 0, 0, 0, 0);
+    }
+
+    function testFuzz_MintOnlyPolicyManager(address to) public {
+        vm.assume(to != address(0) && to.code.length == 0);
+        nft.setPolicyManagerAddress(manager);
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
+        nft.mint(to, 0, 0, 0, 0, 0);
+    }
+
     function testFuzz_BurnDeletesPolicy(uint256 pid, uint256 coverage) public {
         nft.setPolicyManagerAddress(manager);
         vm.prank(manager);
@@ -64,6 +82,19 @@ contract PolicyNFTFuzz is Test {
         assertEq(p.start, 0);
     }
 
+    function testFuzz_BurnManagerNotSetReverts() public {
+        vm.expectRevert(bytes("PolicyNFT: PolicyManager address not set"));
+        nft.burn(1);
+    }
+
+    function testFuzz_BurnOnlyPolicyManager(uint256 pid, uint256 coverage) public {
+        nft.setPolicyManagerAddress(manager);
+        vm.prank(manager);
+        nft.mint(user, pid, coverage, 0, 0, 0);
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
+        nft.burn(1);
+    }
+
     function testFuzz_UpdatePremiumAccount(uint128 deposit, uint128 drain) public {
         nft.setPolicyManagerAddress(manager);
         vm.prank(manager);
@@ -76,6 +107,26 @@ contract PolicyNFTFuzz is Test {
         assertEq(p.lastDrainTime, drain);
     }
 
+    function testFuzz_UpdatePremiumAccountManagerNotSet() public {
+        vm.expectRevert(bytes("PolicyNFT: PolicyManager address not set"));
+        nft.updatePremiumAccount(1, 0, 0);
+    }
+
+    function testFuzz_UpdatePremiumAccountOnlyManager(uint128 deposit, uint128 drain) public {
+        nft.setPolicyManagerAddress(manager);
+        vm.prank(manager);
+        nft.mint(user, 1, 1, 0, 0, 0);
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
+        nft.updatePremiumAccount(1, deposit, drain);
+    }
+
+    function testFuzz_UpdatePremiumAccountNonexistent(uint128 deposit, uint128 drain) public {
+        nft.setPolicyManagerAddress(manager);
+        vm.prank(manager);
+        vm.expectRevert(bytes("PolicyNFT: Policy does not exist or has been burned"));
+        nft.updatePremiumAccount(1, deposit, drain);
+    }
+
     function testFuzz_FinalizeIncreases(uint256 addAmount) public {
         nft.setPolicyManagerAddress(manager);
         vm.prank(manager);
@@ -85,6 +136,30 @@ contract PolicyNFTFuzz is Test {
         nft.finalizeIncreases(1, addAmount);
         PolicyNFT.Policy memory p = nft.getPolicy(1);
         assertEq(p.coverage, 100 + addAmount);
+    }
+
+    function testFuzz_FinalizeIncreasesZeroReverts() public {
+        nft.setPolicyManagerAddress(manager);
+        vm.prank(manager);
+        nft.mint(user, 1, 100, 0, 0, 0);
+        vm.prank(manager);
+        vm.expectRevert(bytes("PolicyNFT: Amount to add must be greater than zero"));
+        nft.finalizeIncreases(1, 0);
+    }
+
+    function testFuzz_FinalizeIncreasesOnlyPolicyManager(uint256 amount) public {
+        nft.setPolicyManagerAddress(manager);
+        vm.prank(manager);
+        nft.mint(user, 1, 100, 0, 0, 0);
+        vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
+        nft.finalizeIncreases(1, amount);
+    }
+
+    function testFuzz_FinalizeIncreasesNonexistent(uint256 amount) public {
+        nft.setPolicyManagerAddress(manager);
+        vm.prank(manager);
+        vm.expectRevert(bytes("PolicyNFT: Policy does not exist or has been burned"));
+        nft.finalizeIncreases(1, amount);
     }
 
     function testFuzz_GetPolicyNonexistent(uint256 id) public view {

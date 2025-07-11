@@ -62,7 +62,9 @@ contract LossDistributorFuzz is Test {
 
         _distribute(poolId, loss2, total2);
         uint256 perShare2 = uint256(loss2) * ld.PRECISION_FACTOR() / total2;
-        uint256 expected2 = uint256(userPledge) * perShare2 / ld.PRECISION_FACTOR();
+        uint256 expected2 =
+            (uint256(userPledge) * (perShare1 + perShare2) / ld.PRECISION_FACTOR()) -
+            (uint256(userPledge) * perShare1 / ld.PRECISION_FACTOR());
         assertEq(_realize(USER1, poolId, userPledge), expected2);
 
         assertEq(ld.getPendingLosses(USER1, poolId, userPledge), 0);
@@ -82,6 +84,43 @@ contract LossDistributorFuzz is Test {
         _realize(USER1, poolId, pledge1);
         uint256 pending2After = ld.getPendingLosses(USER2, poolId, pledge2);
         assertEq(pending2After, pending2Before);
+    }
+
+    function testFuzz_setRiskManager(address newRM) public {
+        vm.assume(newRM != address(0));
+        ld.setRiskManager(newRM);
+        assertEq(ld.riskManager(), newRM);
+    }
+
+    function testFuzz_setRiskManagerOnlyOwner(address newRM, address caller) public {
+        vm.assume(newRM != address(0) && caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", caller));
+        ld.setRiskManager(newRM);
+    }
+
+    function testFuzz_setRiskManagerZeroReverts() public {
+        vm.expectRevert(LossDistributor.ZeroAddress.selector);
+        ld.setRiskManager(address(0));
+    }
+
+    function testFuzz_distributeLossZeroNoChange(uint256 poolId, uint96 loss, uint96 total) public {
+        vm.assume(loss == 0 || total == 0);
+        uint256 before = ld.poolLossTrackers(poolId);
+        _distribute(poolId, loss, total);
+        assertEq(ld.poolLossTrackers(poolId), before);
+    }
+
+    function testFuzz_constructorZeroReverts() public {
+        vm.expectRevert(LossDistributor.ZeroAddress.selector);
+        new LossDistributor(address(0));
+    }
+
+    function testFuzz_realizeLossesNoPending(uint256 poolId, uint96 pledge) public {
+        vm.prank(RISK_MANAGER);
+        uint256 realized = ld.realizeLosses(USER1, poolId, pledge);
+        assertEq(realized, 0);
+        assertEq(ld.userLossStates(USER1, poolId), 0);
     }
 }
 
