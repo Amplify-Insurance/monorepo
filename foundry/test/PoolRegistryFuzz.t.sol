@@ -170,4 +170,17 @@ contract PoolRegistryFuzz is Test {
         }
         assertEq(total, uint256(amount1) + uint256(amount2));
     }
+
+    function testRevert_onlyRiskManager(address caller) public {
+        vm.assume(caller != riskManager);
+        IPoolRegistry.RateModel memory rm = IPoolRegistry.RateModel(1, 1, 1, 1);
+        vm.prank(caller);
+        vm.expectRevert("PR: Not RiskManager");
+        registry.addProtocolRiskPool(address(token), rm, 0);
+    }
+
+    function testRevert_setRiskManagerZero() public {
+        vm.expectRevert("PR: Zero address");
+        registry.setRiskManager(address(0));
+    }
 }
