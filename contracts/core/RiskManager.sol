@@ -14,6 +14,7 @@ import "../interfaces/IBackstopPool.sol";
 import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IPolicyManager.sol";
 import "../interfaces/IRewardDistributor.sol";
+import "../interfaces/IRiskManager.sol";
 // import "../MaliciousPoolRegistry.sol"; // IRiskManager interface
 import "../interfaces/IRiskManager_PM_Hook.sol";
 
