@@ -20,4 +20,6 @@ test = 'foundry/test/LossDistributorFuzz.t.sol'
 
 [profile.staking]
 test = 'foundry/staking-tests'
+[profile.riskfuzz]
+test = 'foundry/test/RiskManagerFuzz.t.sol'
 
