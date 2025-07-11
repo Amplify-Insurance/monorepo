@@ -138,4 +138,47 @@ contract RewardDistributorFuzz is Test {
         rd.setCatPool(newCat);
         assertEq(rd.catPool(), newCat);
     }
+
+    function testFuzz_setCatPoolZeroReverts() public {
+        vm.prank(owner);
+        vm.expectRevert(RewardDistributor.ZeroAddress.selector);
+        rd.setCatPool(address(0));
+    }
+
+    function testFuzz_distributeOnlyApproved(address caller) public {
+        vm.assume(caller != riskManager && caller != policyManager);
+        vm.prank(caller);
+        vm.expectRevert("RD: Not RiskManager or policyManager");
+        rd.distribute(1, address(token), 1, 1);
+    }
+
+    function testFuzz_claimOnlyRiskManager(address caller) public {
+        vm.assume(caller != riskManager);
+        vm.prank(caller);
+        vm.expectRevert("RD: Not RiskManager");
+        rd.claim(user, 1, address(token), 1);
+    }
+
+    function testFuzz_claimForCatPoolOnlyCatPool(address caller) public {
+        vm.assume(caller != catPool);
+        vm.prank(owner);
+        rd.setCatPool(catPool);
+        vm.prank(caller);
+        vm.expectRevert("RD: Not CatPool");
+        rd.claimForCatPool(user, 1, address(token), 1);
+    }
+
+    function testFuzz_updateUserStateOnlyRiskManager(address caller) public {
+        vm.assume(caller != riskManager);
+        vm.prank(caller);
+        vm.expectRevert("RD: Not RiskManager");
+        rd.updateUserState(user, 1, address(token), 1);
+    }
+
+    function testFuzz_constructorZeroReverts() public {
+        vm.expectRevert(RewardDistributor.ZeroAddress.selector);
+        new RewardDistributor(address(0), policyManager);
+        vm.expectRevert(RewardDistributor.ZeroAddress.selector);
+        new RewardDistributor(riskManager, address(0));
+    }
 }
