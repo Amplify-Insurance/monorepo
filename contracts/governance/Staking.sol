@@ -92,7 +92,12 @@ contract StakingContract is Ownable, ReentrancyGuard {
                     revert VoteLockActive();
                 }
                 uint256 newBalance = stakedBalance[msg.sender] - _amount;
+                stakedBalance[msg.sender] = newBalance;
+                totalStaked -= _amount;
                 ICommittee(committeeAddress).updateVoteWeight(msg.sender, proposalId, newBalance);
+                governanceToken.safeTransfer(msg.sender, _amount);
+                emit Unstaked(msg.sender, _amount);
+                return;
             } else {
                 lastVotedProposal[msg.sender] = 0;
                 lastVoteTime[msg.sender] = 0;

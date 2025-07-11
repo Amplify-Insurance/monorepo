@@ -176,11 +176,11 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         uint256 newTotalPending = account.totalPendingWithdrawalShares + _sharesToBurn;
         if (newTotalPending > account.masterShares) revert InsufficientShares();
 
+        account.totalPendingWithdrawalShares = newTotalPending;
+
         uint256 valueToWithdraw = sharesToValue(_sharesToBurn);
         (bool success,) = riskManager.call(abi.encodeWithSignature("onWithdrawalRequested(address,uint256)", msg.sender, valueToWithdraw));
         require(success, "CP: RiskManager rejected withdrawal request");
-
-        account.totalPendingWithdrawalShares = newTotalPending;
         
         uint256 unlockTime = block.timestamp + underwriterNoticePeriod;
         withdrawalRequests[msg.sender].push(WithdrawalRequest({
