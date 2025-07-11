@@ -32,7 +32,12 @@ contract LossDistributorFuzz is Test {
         assertEq(ld.poolLossTrackers(poolId), expected);
     }
 
-    function testFuzz_realizeLossesUpdatesState(uint256 poolId, uint96 lossAmount, uint96 totalPledge, uint96 userPledge) public {
+    function testFuzz_realizeLossesUpdatesState(
+        uint256 poolId,
+        uint96 lossAmount,
+        uint96 totalPledge,
+        uint96 userPledge
+    ) public {
         vm.assume(lossAmount > 0 && totalPledge > 0 && userPledge > 0);
 
         _distribute(poolId, lossAmount, totalPledge);
@@ -62,9 +67,8 @@ contract LossDistributorFuzz is Test {
 
         _distribute(poolId, loss2, total2);
         uint256 perShare2 = uint256(loss2) * ld.PRECISION_FACTOR() / total2;
-        uint256 expected2 =
-            (uint256(userPledge) * (perShare1 + perShare2) / ld.PRECISION_FACTOR()) -
-            (uint256(userPledge) * perShare1 / ld.PRECISION_FACTOR());
+        uint256 expected2 = (uint256(userPledge) * (perShare1 + perShare2) / ld.PRECISION_FACTOR())
+            - (uint256(userPledge) * perShare1 / ld.PRECISION_FACTOR());
         assertEq(_realize(USER1, poolId, userPledge), expected2);
 
         assertEq(ld.getPendingLosses(USER1, poolId, userPledge), 0);
@@ -99,6 +103,20 @@ contract LossDistributorFuzz is Test {
         ld.setRiskManager(newRM);
     }
 
+    function testFuzz_distributeLossOnlyRiskManager(address caller, uint256 poolId, uint96 loss, uint96 total) public {
+        vm.assume(caller != RISK_MANAGER);
+        vm.prank(caller);
+        vm.expectRevert(bytes("LD: Not RiskManager"));
+        ld.distributeLoss(poolId, loss, total);
+    }
+
+    function testFuzz_realizeLossesOnlyRiskManager(address caller, uint256 poolId, uint96 pledge) public {
+        vm.assume(caller != RISK_MANAGER);
+        vm.prank(caller);
+        vm.expectRevert(bytes("LD: Not RiskManager"));
+        ld.realizeLosses(USER1, poolId, pledge);
+    }
+
     function testFuzz_setRiskManagerZeroReverts() public {
         vm.expectRevert(LossDistributor.ZeroAddress.selector);
         ld.setRiskManager(address(0));
@@ -123,4 +141,3 @@ contract LossDistributorFuzz is Test {
         assertEq(ld.userLossStates(USER1, poolId), 0);
     }
 }
-
