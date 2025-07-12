@@ -133,21 +133,16 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
     /* ──────────────── Underwriter Capital Allocation ──────────────── */
     
     function allocateCapital(uint256[] calldata _poolIds) external nonReentrant {
-        uint256 totalPledge = underwriterTotalPledge[msg.sender];
-        if (totalPledge == 0) revert NoCapitalToAllocate();
-        require(_poolIds.length > 0 && _poolIds.length <= maxAllocationsPerUnderwriter, "Invalid number of allocations");
+        // ─── PREPARE / CHECKS ─────────────────────────────────────────────────
+        (uint256 totalPledge, address adapter) = _prepareAllocateCapital(_poolIds);
 
-        address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(msg.sender);
-        require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
-        
-        uint256 poolCount = poolRegistry.getPoolCount();
-
-        for (uint i = 0; i < _poolIds.length; i++) {
+        // ─── EFFECTS & INTERACTIONS ────────────────────────────────────────────
+        // We do effects (storage updates) immediately before each external call
+        // to PoolRegistry.updateCapitalAllocation, then emit.
+        for (uint256 i = 0; i < _poolIds.length; i++) {
             uint256 poolId = _poolIds[i];
-            require(poolId < poolCount, "Invalid poolId");
-            require(!isAllocatedToPool[msg.sender][poolId], "Already allocated to this pool");
 
-            // Effects: update internal accounting before external interaction
+            // Effects
             underwriterPoolPledge[msg.sender][poolId] = totalPledge;
             isAllocatedToPool[msg.sender][poolId] = true;
             underwriterAllocations[msg.sender].push(poolId);
@@ -155,10 +150,10 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
             underwriterIndexInPoolArray[poolId][msg.sender] =
                 poolSpecificUnderwriters[poolId].length - 1;
 
-            // Interaction: notify the PoolRegistry after internal state changes
+            // Interaction (one external call per pool)
             poolRegistry.updateCapitalAllocation(
                 poolId,
-                userAdapterAddress,
+                adapter,
                 totalPledge,
                 true
             );
@@ -266,37 +261,13 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
 
     /* ───────────────────── Keeper & Liquidation Functions ───────────────────── */
 
-    function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
-        (
-            uint256 _dep,
-            uint8 _yp,
-            uint256 masterShares,
-            uint256 _pending,
-            uint256 _reqShares
-        ) = capitalPool.getUnderwriterAccount(_underwriter);
-        (_dep, _yp, _pending, _reqShares);
-        if (masterShares == 0) revert UnderwriterNotInsolvent();
+function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
+    // ─── CHECKS & PREPARE ─────────────────────────────────────────────────
+    (uint256 pendingLosses, uint256 shareValue) = _prepareLiquidation(_underwriter);
 
-        uint256 totalShareValue = capitalPool.sharesToValue(masterShares);
-        
-        uint256[] memory allocations = underwriterAllocations[_underwriter];
-        uint256 totalPendingLosses = 0;
-        
-        for (uint i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-            totalPendingLosses += lossDistributor.getPendingLosses(
-                _underwriter,
-                poolId,
-                underwriterPoolPledge[_underwriter][poolId]
-            );
-        }
-
-        if (totalPendingLosses < totalShareValue) revert UnderwriterNotInsolvent();
-
-        _realizeLossesForAllPools(_underwriter);
-
-        emit UnderwriterLiquidated(msg.sender, _underwriter);
-    }
+    emit UnderwriterLiquidated(msg.sender, _underwriter);
+    _realizeLossesForAllPools(_underwriter);
+}
 
     /* ───────────────────── Claim Processing ───────────────────── */
 
@@ -408,60 +379,24 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
                     uint256 _cf2
                 ) = poolRegistry.getPoolData(poolId);
                 (_pledged2, _sold2, _pend2, _paused2, _fr2, _cf2);
-                rewardDistributor.claim(
+                uint256 claimed = rewardDistributor.claim(
                     msg.sender,
                     poolId,
                     address(protocolToken),
                     underwriterPoolPledge[msg.sender][poolId]
                 );
+                claimed;
             }
         }
     }
 
     /**
-     * @notice Claims distressed assets (protocol tokens) from the Catastrophe Pool for multiple underlying protocols.
-     * @dev This function is useful when an underwriter is allocated to pools covering different protocol tokens.
-     * It identifies the unique protocol tokens from the given pool IDs and claims rewards for each.
-     * @param _poolIds An array of pool IDs from which to determine the protocol tokens for claiming rewards.
+     * @notice EXTERNAL “execute” function: pulls in the pre–aggregated tokens
+     *         and makes one isolated external call per token.
      */
     function claimDistressedAssets(uint256[] calldata _poolIds) external nonReentrant {
-        // Temporary memory array to store unique protocol token addresses encountered.
-        address[] memory uniqueTokens = new address[](_poolIds.length);
-        uint256 uniqueTokenCount = 0;
-
-        // First loop: Iterate through pool IDs to find unique protocol tokens.
-        for (uint256 i = 0; i < _poolIds.length; i++) {
-            (
-                IERC20 protocolToken,
-                uint256 _pledged3,
-                uint256 _sold3,
-                uint256 _pend3,
-                bool _paused3,
-                address _fr3,
-                uint256 _cf3
-            ) = poolRegistry.getPoolData(_poolIds[i]);
-            (_pledged3, _sold3, _pend3, _paused3, _fr3, _cf3);
-            address tokenAddress = address(protocolToken);
-
-            // Ensure the token address is valid and not already processed.
-            if (tokenAddress != address(0)) {
-                bool found = false;
-                for (uint256 j = 0; j < uniqueTokenCount; j++) {
-                    if (uniqueTokens[j] == tokenAddress) {
-                        found = true;
-                        break;
-                    }
-                }
-                // If the token is not found in our unique list, add it.
-                if (!found) {
-                    uniqueTokens[uniqueTokenCount] = tokenAddress;
-                    uniqueTokenCount++;
-                }
-            }
-        }
-
-        // Second loop: Iterate through the unique tokens and claim rewards.
-        for (uint256 i = 0; i < uniqueTokenCount; i++) {
+        address[] memory uniqueTokens = _prepareDistressedAssets(_poolIds);
+        for (uint i; i < uniqueTokens.length; i++) {
             catPool.claimProtocolAssetRewardsFor(msg.sender, uniqueTokens[i]);
         }
     }
@@ -636,5 +571,91 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_
         underwriters.pop();
         delete underwriterIndexInPoolArray[_poolId][_underwriter];
         delete underwriterPoolPledge[_underwriter][_poolId];
+    }
+
+
+
+        /** 
+     * @dev INTERNAL “prepare” function: collects all unique protocol-tokens
+     *      — **NO** external calls in here.
+     */
+    function _prepareDistressedAssets(uint256[] calldata _poolIds)
+        internal
+        view
+        returns (address[] memory tokens)
+    {
+        tokens = new address[](_poolIds.length);
+        uint256 count;
+
+        for (uint i; i < _poolIds.length; i++) {
+            (IERC20 protocolToken,, , , , ,) = poolRegistry.getPoolData(_poolIds[i]);
+            address t = address(protocolToken);
+            if (t == address(0)) continue;
+
+            bool seen;
+            for (uint j; j < count; j++) {
+                if (tokens[j] == t) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (!seen) tokens[count++] = t;
+        }
+
+        // shrink array
+        assembly { mstore(tokens, count) }
+        return tokens;
+    }
+
+
+    function _prepareLiquidation(address _underwriter)
+    internal
+    view
+    returns (uint256 totalPendingLosses, uint256 totalShareValue)
+{
+    // 1a) Read the underwriter’s account (view only)
+    (, , uint256 masterShares, , ) = capitalPool.getUnderwriterAccount(_underwriter);
+    if (masterShares == 0) {
+        revert UnderwriterNotInsolvent();
+    }
+    totalShareValue = capitalPool.sharesToValue(masterShares);
+
+    // 1b) Loop purely over storage to sum up pending losses
+    uint256[] memory allocs = underwriterAllocations[_underwriter];
+    for (uint i = 0; i < allocs.length; i++) {
+        uint256 pid = allocs[i];
+        totalPendingLosses += lossDistributor.getPendingLosses(
+            _underwriter,
+            pid,
+            underwriterPoolPledge[_underwriter][pid]
+        );
+    }
+
+    // 1c) Verify insolvency condition
+    if (totalPendingLosses < totalShareValue) {
+        revert UnderwriterNotInsolvent();
+    }
+}
+
+    function _prepareAllocateCapital(uint256[] calldata _poolIds)
+        internal
+        view
+        returns (uint256 totalPledge, address adapter)
+    {
+        totalPledge = underwriterTotalPledge[msg.sender];
+        if (totalPledge == 0) revert NoCapitalToAllocate();
+
+        uint256 len = _poolIds.length;
+        if (len == 0 || len > maxAllocationsPerUnderwriter) revert ExceedsMaxAllocations();
+
+        adapter = capitalPool.getUnderwriterAdapterAddress(msg.sender);
+        require(adapter != address(0), "User has no yield adapter set in CapitalPool");
+
+        uint256 poolCount = poolRegistry.getPoolCount();
+        for (uint256 i = 0; i < len; i++) {
+            uint256 pid = _poolIds[i];
+            if (pid >= poolCount) revert InvalidPoolId();
+            if (isAllocatedToPool[msg.sender][pid]) revert AlreadyAllocated();
+        }
     }
 }
