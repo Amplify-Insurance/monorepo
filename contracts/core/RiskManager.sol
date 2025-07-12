@@ -16,7 +16,7 @@ import "../interfaces/IPolicyManager.sol";
 import "../interfaces/IRewardDistributor.sol";
 import "../interfaces/IRiskManager.sol";
 // import "../MaliciousPoolRegistry.sol"; // IRiskManager interface
-import "../interfaces/IRiskManager_PM_Hook.sol";
+import "../interfaces/IRiskManagerPMHook.sol";
 
 /**
  * @title RiskManager
@@ -24,7 +24,7 @@ import "../interfaces/IRiskManager_PM_Hook.sol";
  * @notice A lean orchestrator for a decentralized insurance protocol. It manages capital allocation,
  * claim processing, and liquidations by coordinating with specialized satellite contracts.
  */
-contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManager_PM_Hook {
+contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHook {
     using SafeERC20 for IERC20;
 
     /* ───────────────────────── State Variables ───────────────────────── */

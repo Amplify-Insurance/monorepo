@@ -36,43 +36,43 @@ contract CompoundV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, Re
         underlyingToken.forceApprove(address(_comet), type(uint256).max);
     }
 
-    function setCapitalPoolAddress(address _capitalPoolAddress) external onlyOwner {
-        require(_capitalPoolAddress != address(0), "CompoundV3Adapter: Zero address");
-        capitalPoolAddress = _capitalPoolAddress;
-        emit CapitalPoolAddressSet(_capitalPoolAddress);
+    function setCapitalPoolAddress(address capitalPoolAddr) external onlyOwner {
+        require(capitalPoolAddr != address(0), "CompoundV3Adapter: Zero address");
+        capitalPoolAddress = capitalPoolAddr;
+        emit CapitalPoolAddressSet(capitalPoolAddr);
     }
 
     function asset() external view override returns (IERC20) {
         return underlyingToken;
     }
 
-    function deposit(uint256 _amountToDeposit) external override onlyCapitalPool nonReentrant {
-        require(_amountToDeposit > 0, "CompoundV3Adapter: amount zero");
-        underlyingToken.safeTransferFrom(msg.sender, address(this), _amountToDeposit);
-        comet.supply(address(underlyingToken), _amountToDeposit);
+    function deposit(uint256 amountToDeposit) external override onlyCapitalPool nonReentrant {
+        require(amountToDeposit > 0, "CompoundV3Adapter: amount zero");
+        underlyingToken.safeTransferFrom(msg.sender, address(this), amountToDeposit);
+        comet.supply(address(underlyingToken), amountToDeposit);
     }
 
-    function withdraw(uint256 _targetAmountOfUnderlyingToWithdraw, address _to)
+    function withdraw(uint256 targetAmountOfUnderlyingToWithdraw, address to)
         external
         override
         onlyCapitalPool
         nonReentrant
         returns (uint256 actuallyWithdrawn)
     {
-        require(_to != address(0), "CompoundV3Adapter: zero address");
-        if (_targetAmountOfUnderlyingToWithdraw == 0) {
+        require(to != address(0), "CompoundV3Adapter: zero address");
+        if (targetAmountOfUnderlyingToWithdraw == 0) {
             return 0;
         }
 
         uint256 beforeBal = underlyingToken.balanceOf(address(this));
-        comet.withdraw(address(underlyingToken), _targetAmountOfUnderlyingToWithdraw);
+        comet.withdraw(address(underlyingToken), targetAmountOfUnderlyingToWithdraw);
         uint256 afterBal = underlyingToken.balanceOf(address(this));
         
         actuallyWithdrawn = afterBal - beforeBal;
 
         if (actuallyWithdrawn > 0) {
-            underlyingToken.safeTransfer(_to, actuallyWithdrawn);
-            emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
+            underlyingToken.safeTransfer(to, actuallyWithdrawn);
+            emit FundsWithdrawn(to, targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
         }
     }
 
@@ -101,11 +101,11 @@ contract CompoundV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, Re
         return liquid + suppliedValue;
     }
 
-    function emergencyTransfer(address _to, uint256 _amount) external onlyCapitalPool returns (uint256) {
+    function emergencyTransfer(address to, uint256 amount) external onlyCapitalPool returns (uint256) {
         uint256 bal = IERC20(address(comet)).balanceOf(address(this));
-        uint256 amt = _amount < bal ? _amount : bal;
+        uint256 amt = amount < bal ? amount : bal;
         if (amt > 0) {
-            IERC20(address(comet)).safeTransfer(_to, amt);
+            IERC20(address(comet)).safeTransfer(to, amt);
         }
         return amt;
     }

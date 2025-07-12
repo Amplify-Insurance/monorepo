@@ -41,7 +41,7 @@ contracts/               Solidity sources
 ├─ tokens/               ERC20/721 tokens used by the protocol
 │  ├─ CatShare.sol
 │  ├─ PolicyNFT.sol
-│  └─ oShare.sol
+│  └─ OShare.sol
 ├─ oracles/              Price feeds
 │  └─ PriceOracle.sol
 ├─ utils/                Misc utilities
