@@ -49,40 +49,40 @@ contract AaveV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, Reentr
      * @notice CORRECTED: Added the onlyCapitalPool modifier to prevent unauthorized deposits
      * and protect against NAV manipulation attacks.
      */
-    function deposit(uint256 _amountToDeposit) external override onlyCapitalPool nonReentrant {
-        require(_amountToDeposit > 0, "AaveV3Adapter: amount zero");
+    function deposit(uint256 amountToDeposit) external override onlyCapitalPool nonReentrant {
+        require(amountToDeposit > 0, "AaveV3Adapter: amount zero");
         // The CapitalPool now holds the funds and calls this function.
         // It must have approved this adapter contract to spend its funds.
         // The safeTransferFrom will pull the funds from the CapitalPool.
-        underlyingToken.safeTransferFrom(msg.sender, address(this), _amountToDeposit);
-        aavePool.supply(address(underlyingToken), _amountToDeposit, address(this), 0);
+        underlyingToken.safeTransferFrom(msg.sender, address(this), amountToDeposit);
+        aavePool.supply(address(underlyingToken), amountToDeposit, address(this), 0);
     }
 
-    function withdraw(uint256 _targetAmountOfUnderlyingToWithdraw, address _to)
+    function withdraw(uint256 targetAmountOfUnderlyingToWithdraw, address to)
         external
         override
         onlyCapitalPool
         nonReentrant
         returns (uint256 actuallyWithdrawn)
     {
-        require(_to != address(0), "AaveV3Adapter: zero address");
-        if (_targetAmountOfUnderlyingToWithdraw == 0) {
+        require(to != address(0), "AaveV3Adapter: zero address");
+        if (targetAmountOfUnderlyingToWithdraw == 0) {
             return 0;
         }
 
-        actuallyWithdrawn = aavePool.withdraw(address(underlyingToken), _targetAmountOfUnderlyingToWithdraw, address(this));
+        actuallyWithdrawn = aavePool.withdraw(address(underlyingToken), targetAmountOfUnderlyingToWithdraw, address(this));
 
         if (actuallyWithdrawn > 0) {
-            underlyingToken.safeTransfer(_to, actuallyWithdrawn);
-            emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
+            underlyingToken.safeTransfer(to, actuallyWithdrawn);
+            emit FundsWithdrawn(to, targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
         }
     }
 
     // Owner can set the CapitalPool address
-    function setCapitalPoolAddress(address _capitalPoolAddress) external onlyOwner {
-        require(_capitalPoolAddress != address(0), "AaveV3Adapter: Zero address");
-        capitalPoolAddress = _capitalPoolAddress;
-        emit CapitalPoolAddressSet(_capitalPoolAddress);
+    function setCapitalPoolAddress(address capitalPoolAddr) external onlyOwner {
+        require(capitalPoolAddr != address(0), "AaveV3Adapter: Zero address");
+        capitalPoolAddress = capitalPoolAddr;
+        emit CapitalPoolAddressSet(capitalPoolAddr);
     }
 
     function getReserveData(address reserveAsset) external view returns (IPool.ReserveData memory) {
@@ -95,7 +95,7 @@ contract AaveV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, Reentr
         return liquid + aTokenBal;
     }
 
-    function emergencyTransfer(address _to, uint256 _amount)
+    function emergencyTransfer(address to, uint256 amount)
         external
         override
         onlyCapitalPool
@@ -103,9 +103,9 @@ contract AaveV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, Reentr
         returns (uint256)
     {
         uint256 bal = aToken.balanceOf(address(this));
-        uint256 amt = Math.min(_amount, bal);
+        uint256 amt = Math.min(amount, bal);
         if (amt > 0) {
-            aToken.safeTransfer(_to, amt);
+            aToken.safeTransfer(to, amt);
         }
         return amt;
     }

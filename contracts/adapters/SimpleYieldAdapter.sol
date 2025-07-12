@@ -24,11 +24,11 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
     event Withdrawn(address indexed caller, address indexed to, uint256 amountRequested, uint256 amountTransferred);
     event TotalValueHeldSet(uint256 newValue);
 
-    constructor(address _asset, address _depositor, address _owner) Ownable(_owner) {
+    constructor(address _asset, address depositorAddress, address _owner) Ownable(_owner) {
         require(_asset != address(0), "Adapter: asset zero");
-        require(_depositor != address(0), "Adapter: zero depositor");
+        require(depositorAddress != address(0), "Adapter: zero depositor");
         underlyingToken = IERC20(_asset);
-        depositor = _depositor;
+        depositor = depositorAddress;
     }
 
     modifier onlyDepositor() {
@@ -36,10 +36,10 @@ contract SimpleYieldAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
         _;
     }
 
-    function setDepositor(address _depositor) external onlyOwner {
-        require(_depositor != address(0), "Adapter: zero depositor");
-        depositor = _depositor;
-        emit DepositorSet(_depositor);
+    function setDepositor(address depositorAddress) external onlyOwner {
+        require(depositorAddress != address(0), "Adapter: zero depositor");
+        depositor = depositorAddress;
+        emit DepositorSet(depositorAddress);
     }
 
     function asset() external view override returns (IERC20) {

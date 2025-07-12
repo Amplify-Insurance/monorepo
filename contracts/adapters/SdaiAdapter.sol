@@ -44,7 +44,7 @@ contract SdaiAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
      * @dev msg.sender (e.g., CoverPool) transfers `_amountToDeposit` of `asset()` to this adapter.
      * This adapter then deposits those funds into the sDAI contract.
      */
-    function deposit(uint256 _amountToDeposit) external override nonReentrant {
+    function deposit(uint256 amountToDeposit) external override nonReentrant {
         // This function expects msg.sender (CoverPool) to be the owner of the funds
         // and for CoverPool to transfer funds to this SdaiAdapter contract.
         // CoverPool's depositAndAllocate:
@@ -58,17 +58,17 @@ contract SdaiAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
         // The current CoverPool approves this adapter, then calls deposit(_amount).
         // This adapter should then transferFrom CoverPool.
 
-        require(_amountToDeposit > 0, "SdaiAdapter: Deposit amount must be positive");
+        require(amountToDeposit > 0, "SdaiAdapter: Deposit amount must be positive");
         
         // 1. Pull underlyingToken from the depositor (CoverPool, which is msg.sender) into this adapter contract
-        underlyingToken.safeTransferFrom(msg.sender, address(this), _amountToDeposit);
+        underlyingToken.safeTransferFrom(msg.sender, address(this), amountToDeposit);
         
         // 2. Deposit the received underlyingToken into the sDAI contract.
         //    sDai.deposit expects assets and receiver (this adapter).
         //    It should handle the conversion to sDAI internally.
         //    The sDai.deposit() interface may vary. Assuming it returns amount of sDAI or underlying value.
         //    ISdai interface used in CoverPool's constructor suggests sDai.deposit returns uint256.
-        uint256 sDaiReceivedOrValue = sDai.deposit(_amountToDeposit, address(this)); // This adapter receives the sDAI
+        uint256 sDaiReceivedOrValue = sDai.deposit(amountToDeposit, address(this)); // This adapter receives the sDAI
         require(sDaiReceivedOrValue > 0, "SdaiAdapter: sDAI deposit failed or returned zero");
     }
 
@@ -78,17 +78,17 @@ contract SdaiAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
      * This SdaiAdapter withdraws underlyingToken from sDAI and sends it to `_to`.
      */
     function withdraw(
-        uint256 _targetAmountOfUnderlyingToWithdraw,
-        address _to
+        uint256 targetAmountOfUnderlyingToWithdraw,
+        address to
     ) external override onlyOwner nonReentrant returns (uint256 actuallyWithdrawn) {
-        require(_to != address(0), "SdaiAdapter: Cannot withdraw to zero address");
-        if (_targetAmountOfUnderlyingToWithdraw == 0) {
+        require(to != address(0), "SdaiAdapter: Cannot withdraw to zero address");
+        if (targetAmountOfUnderlyingToWithdraw == 0) {
             return 0;
         }
 
         // currentUnderlyingBalance is the value of sDAI this adapter holds, in terms of the underlying token.
-        uint256 currentUnderlyingBalanceInSdai = sDai.balanceOf(address(this)); 
-        uint256 amountToAttempt = Math.min(_targetAmountOfUnderlyingToWithdraw, currentUnderlyingBalanceInSdai);
+        uint256 currentUnderlyingBalanceInSdai = sDai.balanceOf(address(this));
+        uint256 amountToAttempt = Math.min(targetAmountOfUnderlyingToWithdraw, currentUnderlyingBalanceInSdai);
 
         if (amountToAttempt < 1) {
             return 0;
@@ -103,8 +103,8 @@ contract SdaiAdapter is IYieldAdapter, Ownable, ReentrancyGuard {
 
         if (actuallyWithdrawn > 0) {
             // Transfer the withdrawn underlyingToken from this adapter to the requested `_to` address.
-            underlyingToken.safeTransfer(_to, actuallyWithdrawn);
-            emit FundsWithdrawn(_to, _targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
+            underlyingToken.safeTransfer(to, actuallyWithdrawn);
+            emit FundsWithdrawn(to, targetAmountOfUnderlyingToWithdraw, actuallyWithdrawn);
         }
         return actuallyWithdrawn;
     }

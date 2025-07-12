@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/IRiskManager_PM_Hook.sol";
+import "../interfaces/IRiskManagerPMHook.sol";
 
-contract MockRiskManagerHook is IRiskManager_PM_Hook {
+contract MockRiskManagerHook is IRiskManagerPMHook {
     event CoverageUpdated(uint256 poolId, uint256 amount, bool isSale);
 
     function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external override {

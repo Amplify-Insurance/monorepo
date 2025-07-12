@@ -109,95 +109,95 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
     /* ───────────────────── Admin Functions ────────────────── */
-    function setRiskManager(address _riskManager) external onlyOwner {
-        if (_riskManager == address(0)) revert ZeroAddress();
-        riskManager = _riskManager;
-        emit RiskManagerSet(_riskManager);
+    function setRiskManager(address riskManagerAddress) external onlyOwner {
+        if (riskManagerAddress == address(0)) revert ZeroAddress();
+        riskManager = riskManagerAddress;
+        emit RiskManagerSet(riskManagerAddress);
     }
 
-    function setUnderwriterNoticePeriod(uint256 _newPeriod) external onlyOwner {
-        underwriterNoticePeriod = _newPeriod;
-        emit UnderwriterNoticePeriodSet(_newPeriod);
+    function setUnderwriterNoticePeriod(uint256 newPeriod) external onlyOwner {
+        underwriterNoticePeriod = newPeriod;
+        emit UnderwriterNoticePeriodSet(newPeriod);
     }
 
-    function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external onlyOwner {
-        if (_platform == YieldPlatform.NONE) revert("CP: Cannot set for NONE platform");
-        if (_adapterAddress == address(0)) revert ZeroAddress();
-        require(_adapterAddress.code.length > 0, "CP: Adapter address is not a contract");
-        require(address(IYieldAdapter(_adapterAddress).asset()) == address(underlyingAsset), "CP: Adapter asset mismatch");
-        baseYieldAdapters[_platform] = IYieldAdapter(_adapterAddress);
-        if (!isAdapterActive[_adapterAddress]) {
-            isAdapterActive[_adapterAddress] = true;
-            activeYieldAdapterAddresses.push(_adapterAddress);
+    function setBaseYieldAdapter(YieldPlatform platform, address adapterAddress) external onlyOwner {
+        if (platform == YieldPlatform.NONE) revert("CP: Cannot set for NONE platform");
+        if (adapterAddress == address(0)) revert ZeroAddress();
+        require(adapterAddress.code.length > 0, "CP: Adapter address is not a contract");
+        require(address(IYieldAdapter(adapterAddress).asset()) == address(underlyingAsset), "CP: Adapter asset mismatch");
+        baseYieldAdapters[platform] = IYieldAdapter(adapterAddress);
+        if (!isAdapterActive[adapterAddress]) {
+            isAdapterActive[adapterAddress] = true;
+            activeYieldAdapterAddresses.push(adapterAddress);
         }
-        emit BaseYieldAdapterSet(_platform, _adapterAddress);
+        emit BaseYieldAdapterSet(platform, adapterAddress);
     }
 
     /* ───────────────── Underwriter Deposit & Withdrawal ────────────────── */
-    function deposit(uint256 _amount, YieldPlatform _yieldChoice) external nonReentrant {
-        if (_amount == 0) revert InvalidAmount();
-        if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
+    function deposit(uint256 amount, YieldPlatform yieldChoice) external nonReentrant {
+        if (amount == 0) revert InvalidAmount();
+        if (yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
-        IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
+        IYieldAdapter chosenAdapter = baseYieldAdapters[yieldChoice];
         if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
-        if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
+        if (account.masterShares > 0 && account.yieldChoice != yieldChoice) {
             revert("CP: Cannot change yield platform; withdraw first.");
         }
         uint256 sharesToMint;
         if (totalSystemValue == 0) {
-            sharesToMint = _amount;
+            sharesToMint = amount;
         } else {
-            sharesToMint = (_amount * totalMasterSharesSystem) / totalSystemValue;
+            sharesToMint = (amount * totalMasterSharesSystem) / totalSystemValue;
         }
         if (sharesToMint == 0) revert NoSharesToMint();
         if (account.masterShares == 0) {
-            account.yieldChoice = _yieldChoice;
+            account.yieldChoice = yieldChoice;
             account.yieldAdapter = chosenAdapter;
         }
-        account.totalDepositedAssetPrincipal += _amount;
+        account.totalDepositedAssetPrincipal += amount;
         account.masterShares += sharesToMint;
-        underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
+        underlyingAsset.safeTransferFrom(msg.sender, address(this), amount);
         // grant allowance safely for the adapter
-        underlyingAsset.forceApprove(address(chosenAdapter), _amount);
-        chosenAdapter.deposit(_amount);
+        underlyingAsset.forceApprove(address(chosenAdapter), amount);
+        chosenAdapter.deposit(amount);
         totalMasterSharesSystem += sharesToMint;
-        totalSystemValue += _amount;
-        (bool success,) = riskManager.call(abi.encodeWithSignature("onCapitalDeposited(address,uint256)", msg.sender, _amount));
+        totalSystemValue += amount;
+        (bool success,) = riskManager.call(abi.encodeWithSignature("onCapitalDeposited(address,uint256)", msg.sender, amount));
         require(success, "CP: Failed to notify RiskManager of deposit");
-        emit Deposit(msg.sender, _amount, sharesToMint, _yieldChoice);
+        emit Deposit(msg.sender, amount, sharesToMint, yieldChoice);
     }
 
     // REFACTORED: to handle multiple requests
-    function requestWithdrawal(uint256 _sharesToBurn) external nonReentrant {
-        if (_sharesToBurn == 0) revert InvalidAmount();
+    function requestWithdrawal(uint256 sharesToBurn) external nonReentrant {
+        if (sharesToBurn == 0) revert InvalidAmount();
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
         
         // Check that the new request + already pending requests don't exceed total shares.
-        uint256 newTotalPending = account.totalPendingWithdrawalShares + _sharesToBurn;
+        uint256 newTotalPending = account.totalPendingWithdrawalShares + sharesToBurn;
         if (newTotalPending > account.masterShares) revert InsufficientShares();
 
         account.totalPendingWithdrawalShares = newTotalPending;
 
-        uint256 valueToWithdraw = sharesToValue(_sharesToBurn);
+        uint256 valueToWithdraw = sharesToValue(sharesToBurn);
         (bool success,) = riskManager.call(abi.encodeWithSignature("onWithdrawalRequested(address,uint256)", msg.sender, valueToWithdraw));
         require(success, "CP: RiskManager rejected withdrawal request");
         
         uint256 unlockTime = block.timestamp + underwriterNoticePeriod;
         withdrawalRequests[msg.sender].push(WithdrawalRequest({
-            shares: _sharesToBurn,
+            shares: sharesToBurn,
             unlockTimestamp: unlockTime
         }));
         
         uint256 requestIndex = withdrawalRequests[msg.sender].length - 1;
-        emit WithdrawalRequested(msg.sender, _sharesToBurn, block.timestamp, requestIndex);
+        emit WithdrawalRequested(msg.sender, sharesToBurn, block.timestamp, requestIndex);
     }
 
     // NEW: Added a function to cancel a specific pending withdrawal request.
-    function cancelWithdrawalRequest(uint256 _requestIndex) external nonReentrant {
+    function cancelWithdrawalRequest(uint256 requestIndex) external nonReentrant {
         WithdrawalRequest[] storage requests = withdrawalRequests[msg.sender];
-        if (_requestIndex >= requests.length) revert InvalidRequestIndex();
+        if (requestIndex >= requests.length) revert InvalidRequestIndex();
 
-        uint256 sharesToCancel = requests[_requestIndex].shares;
+        uint256 sharesToCancel = requests[requestIndex].shares;
 
         // Effects: update accounting before making any external calls
         underwriterAccounts[msg.sender].totalPendingWithdrawalShares -= sharesToCancel;
@@ -210,19 +210,19 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         require(success, "CP: RiskManager rejected withdrawal cancellation");
 
         // Swap and pop to remove the request from the array efficiently
-        requests[_requestIndex] = requests[requests.length - 1];
+        requests[requestIndex] = requests[requests.length - 1];
         requests.pop();
 
-        emit WithdrawalRequestCancelled(msg.sender, sharesToCancel, _requestIndex);
+        emit WithdrawalRequestCancelled(msg.sender, sharesToCancel, requestIndex);
     }
 
     // REFACTORED: to execute a specific request by index
-    function executeWithdrawal(uint256 _requestIndex) external nonReentrant {
+    function executeWithdrawal(uint256 requestIndex) external nonReentrant {
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
         WithdrawalRequest[] storage requests = withdrawalRequests[msg.sender];
-        if (_requestIndex >= requests.length) revert InvalidRequestIndex();
+        if (requestIndex >= requests.length) revert InvalidRequestIndex();
 
-        WithdrawalRequest memory requestToExecute = requests[_requestIndex];
+        WithdrawalRequest memory requestToExecute = requests[requestIndex];
         uint256 sharesToBurn = requestToExecute.shares;
 
         if (block.timestamp < requestToExecute.unlockTimestamp) revert NoticePeriodActive();
@@ -239,7 +239,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         totalMasterSharesSystem -= sharesToBurn;
 
         // Remove the executed request from the array using swap-and-pop
-        requests[_requestIndex] = requests[requests.length - 1];
+        requests[requestIndex] = requests[requests.length - 1];
         requests.pop();
 
         // Interaction: pull funds from the adapter after state updates
@@ -263,30 +263,30 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             underlyingAsset.safeTransfer(msg.sender, assetsActuallyWithdrawn);
         }
         
-        emit WithdrawalExecuted(msg.sender, assetsActuallyWithdrawn, sharesToBurn, _requestIndex);
+        emit WithdrawalExecuted(msg.sender, assetsActuallyWithdrawn, sharesToBurn, requestIndex);
     }
 
 
         /* ───────────────────── Trusted Functions (RiskManager Only) ────────────────── */
-    function executePayout(PayoutData calldata _payoutData) external nonReentrant onlyRiskManager {
-        uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
+    function executePayout(PayoutData calldata payoutData) external nonReentrant onlyRiskManager {
+        uint256 totalPayoutAmount = payoutData.claimantAmount + payoutData.feeAmount;
         if (totalPayoutAmount == 0) return;
-        if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
+        if (totalPayoutAmount > payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
 
         uint256 amountPaidDirectlyByAdapters = 0;
-        if (_payoutData.totalCapitalFromPoolLPs > 0) {
+        if (payoutData.totalCapitalFromPoolLPs > 0) {
             IBackstopPool catPool = IRiskManagerWithBackstop(riskManager).catPool();
-            for (uint i = 0; i < _payoutData.adapters.length; i++) {
-                uint256 adapterCapitalShare = _payoutData.capitalPerAdapter[i];
+            for (uint i = 0; i < payoutData.adapters.length; i++) {
+                uint256 adapterCapitalShare = payoutData.capitalPerAdapter[i];
                 if (adapterCapitalShare == 0) continue;
 
-                uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
+                uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / payoutData.totalCapitalFromPoolLPs;
                 if (amountToWithdraw == 0) continue;
 
                 amountPaidDirectlyByAdapters += _handleWithdrawalAttempt(
-                    IYieldAdapter(_payoutData.adapters[i]),
+                    IYieldAdapter(payoutData.adapters[i]),
                     amountToWithdraw,
-                    _payoutData.claimant,
+                    payoutData.claimant,
                     catPool
                 );
             }
@@ -299,25 +299,25 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         totalSystemValue -= totalPayoutAmount;
 
         // Calculate remaining amount to pay the claimant from this contract.
-        uint256 claimantAmountToPay = _payoutData.claimantAmount > amountPaidDirectlyByAdapters
-            ? _payoutData.claimantAmount - amountPaidDirectlyByAdapters
+        uint256 claimantAmountToPay = payoutData.claimantAmount > amountPaidDirectlyByAdapters
+            ? payoutData.claimantAmount - amountPaidDirectlyByAdapters
             : 0;
 
         if (claimantAmountToPay > 0) {
-            underlyingAsset.safeTransfer(_payoutData.claimant, claimantAmountToPay);
+            underlyingAsset.safeTransfer(payoutData.claimant, claimantAmountToPay);
         }
-        if (_payoutData.feeAmount > 0 && _payoutData.feeRecipient != address(0)) {
-            underlyingAsset.safeTransfer(_payoutData.feeRecipient, _payoutData.feeAmount);
+        if (payoutData.feeAmount > 0 && payoutData.feeRecipient != address(0)) {
+            underlyingAsset.safeTransfer(payoutData.feeRecipient, payoutData.feeAmount);
         }
-        emit PayoutExecuted(_payoutData.claimant, _payoutData.claimantAmount, _payoutData.feeRecipient, _payoutData.feeAmount, totalSystemValue);
+        emit PayoutExecuted(payoutData.claimant, payoutData.claimantAmount, payoutData.feeRecipient, payoutData.feeAmount, totalSystemValue);
     }
 
 
-    function applyLosses(address _underwriter, uint256 _principalLossAmount) external nonReentrant onlyRiskManager {
-        if (_principalLossAmount == 0) revert InvalidAmount();
-        UnderwriterAccount storage account = underwriterAccounts[_underwriter];
+    function applyLosses(address underwriter, uint256 principalLossAmount) external nonReentrant onlyRiskManager {
+        if (principalLossAmount == 0) revert InvalidAmount();
+        UnderwriterAccount storage account = underwriterAccounts[underwriter];
         if (account.totalDepositedAssetPrincipal == 0) revert NoActiveDeposit();
-        uint256 actualLoss = Math.min(_principalLossAmount, account.totalDepositedAssetPrincipal);
+        uint256 actualLoss = Math.min(principalLossAmount, account.totalDepositedAssetPrincipal);
         if (account.totalDepositedAssetPrincipal > 0) {
             uint256 sharesToBurn = (account.masterShares * actualLoss) / account.totalDepositedAssetPrincipal;
             if (sharesToBurn > account.masterShares) {
@@ -336,10 +336,10 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             if(account.masterShares > 0) {
                totalMasterSharesSystem -= account.masterShares;
             }
-            delete underwriterAccounts[_underwriter];
-            delete withdrawalRequests[_underwriter]; // Also clear any pending requests.
+            delete underwriterAccounts[underwriter];
+            delete withdrawalRequests[underwriter]; // Also clear any pending requests.
         }
-        emit LossesApplied(_underwriter, actualLoss, wipedOut);
+        emit LossesApplied(underwriter, actualLoss, wipedOut);
     }
 
     /* ─────────────────── NAV Synchronization (Keeper Function) ─────────────────── */
@@ -366,12 +366,12 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
     /* ───────────────────────── View Functions ──────────────────────── */
-    function getUnderwriterAdapterAddress(address _underwriter) external view returns(address) {
-        return address(underwriterAccounts[_underwriter].yieldAdapter);
+    function getUnderwriterAdapterAddress(address underwriter) external view returns(address) {
+        return address(underwriterAccounts[underwriter].yieldAdapter);
     }
     
     // REFACTORED: View function updated for new UnderwriterAccount struct
-    function getUnderwriterAccount(address _underwriter)
+    function getUnderwriterAccount(address underwriter)
         external
         view
         returns (
@@ -381,7 +381,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             uint256 totalPendingWithdrawalShares
         )
     {
-        UnderwriterAccount storage account = underwriterAccounts[_underwriter];
+        UnderwriterAccount storage account = underwriterAccounts[underwriter];
         return (
             account.totalDepositedAssetPrincipal,
             account.yieldChoice,
@@ -427,21 +427,21 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             }
         }
     }
-    function getWithdrawalRequestCount(address _underwriter) external view returns (uint256) {
-        return withdrawalRequests[_underwriter].length;
+    function getWithdrawalRequestCount(address underwriter) external view returns (uint256) {
+        return withdrawalRequests[underwriter].length;
     }
 
-    function sharesToValue(uint256 _shares) public view returns (uint256) {
-        if (totalMasterSharesSystem == 0 || _shares == 0) {
+    function sharesToValue(uint256 shares) public view returns (uint256) {
+        if (totalMasterSharesSystem == 0 || shares == 0) {
             return 0;
         }
-        return (_shares * totalSystemValue) / totalMasterSharesSystem;
+        return (shares * totalSystemValue) / totalMasterSharesSystem;
     }
 
-    function valueToShares(uint256 _value) external view returns (uint256) {
+    function valueToShares(uint256 value) external view returns (uint256) {
         if (totalSystemValue == 0) {
-            return _value;
+            return value;
         }
-        return (_value * totalMasterSharesSystem) / totalSystemValue;
+        return (value * totalMasterSharesSystem) / totalSystemValue;
     }
 }
