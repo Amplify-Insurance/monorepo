@@ -30,3 +30,6 @@ test = 'foundry/staking-tests'
 test = 'foundry/test/RiskManagerFuzz.t.sol'
 
 
+
+[profile.integration]
+test = "foundry/integration"
