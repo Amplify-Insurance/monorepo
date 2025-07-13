@@ -10,6 +10,17 @@ interface IPoolRegistry {
         uint256 slope2;
         uint256 kink;
     }
+
+    struct PoolInfo {
+        IERC20 protocolTokenToCover;
+        uint256 totalCapitalPledgedToPool;
+        uint256 totalCoverageSold;
+        uint256 capitalPendingWithdrawal;
+        bool isPaused;
+        address feeRecipient;
+        uint256 claimFeeBps;
+    }
+
     enum ProtocolRiskIdentifier { NONE, PROTOCOL_A, PROTOCOL_B, LIDO_STETH, ROCKET_RETH }
 
     function getPoolData(uint256 _poolId) external view returns (
@@ -33,4 +44,5 @@ interface IPoolRegistry {
     function getPoolCount() external view returns (uint256);
     function setPauseState(uint256 _poolId, bool _isPaused) external;
     function setFeeRecipient(uint256 _poolId, address _recipient) external;
+    function getMultiplePoolData(uint256[] calldata _poolIds) external view returns (PoolInfo[] memory);
 }

@@ -29,6 +29,18 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         mapping(address => bool) isAdapterInPool;
     }
 
+
+    // We define a new struct to hold the returned data for each pool.
+    struct PoolInfo {
+        IERC20 protocolTokenToCover;
+        uint256 totalCapitalPledgedToPool;
+        uint256 totalCoverageSold;
+        uint256 capitalPendingWithdrawal;
+        bool isPaused;
+        address feeRecipient;
+        uint256 claimFeeBps;
+    }
+
     PoolData[] public protocolRiskPools;
     address public riskManager;
 
@@ -44,73 +56,73 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         riskManager = _riskManager;
     }
 
-    function setRiskManager(address newRiskManager) external onlyOwner {
-        require(newRiskManager != address(0), "PR: Zero address");
-        riskManager = newRiskManager;
-        emit RiskManagerAddressSet(newRiskManager);
+    function setRiskManager(address _newRiskManager) external onlyOwner {
+        require(_newRiskManager != address(0), "PR: Zero address");
+        riskManager = _newRiskManager;
+        emit RiskManagerAddressSet(_newRiskManager);
     }
     
     /* ───────────────────── State Modifying Functions (RM only) ───────────────────── */
 
     function addProtocolRiskPool(
-        address protocolTokenToCover,
-        RateModel calldata rateModel,
-        uint256 claimFeeBps
+        address _protocolTokenToCover,
+        RateModel calldata _rateModel,
+        uint256 _claimFeeBps
     ) external onlyRiskManager returns (uint256) {
         uint256 poolId = protocolRiskPools.length;
         protocolRiskPools.push();
         PoolData storage pool = protocolRiskPools[poolId];
-        pool.protocolTokenToCover = IERC20(protocolTokenToCover);
-        pool.rateModel = rateModel;
-        pool.claimFeeBps = claimFeeBps;
+        pool.protocolTokenToCover = IERC20(_protocolTokenToCover);
+        pool.rateModel = _rateModel;
+        pool.claimFeeBps = _claimFeeBps;
         return poolId;
     }
 
-    function updateCapitalAllocation(uint256 poolId, address adapterAddress, uint256 pledgeAmount, bool isAllocation) external onlyRiskManager {
-        PoolData storage pool = protocolRiskPools[poolId];
-        if (isAllocation) {
-            pool.totalCapitalPledgedToPool += pledgeAmount;
-            pool.capitalPerAdapter[adapterAddress] += pledgeAmount;
-            if (!pool.isAdapterInPool[adapterAddress]) {
-                pool.isAdapterInPool[adapterAddress] = true;
-                pool.activeAdapters.push(adapterAddress);
-                pool.adapterIndex[adapterAddress] = pool.activeAdapters.length - 1;
+    function updateCapitalAllocation(uint256 _poolId, address _adapterAddress, uint256 _pledgeAmount, bool _isAllocation) external onlyRiskManager {
+        PoolData storage pool = protocolRiskPools[_poolId];
+        if (_isAllocation) {
+            pool.totalCapitalPledgedToPool += _pledgeAmount;
+            pool.capitalPerAdapter[_adapterAddress] += _pledgeAmount;
+            if (!pool.isAdapterInPool[_adapterAddress]) {
+                pool.isAdapterInPool[_adapterAddress] = true;
+                pool.activeAdapters.push(_adapterAddress);
+                pool.adapterIndex[_adapterAddress] = pool.activeAdapters.length - 1;
             }
         } else {
-            pool.totalCapitalPledgedToPool -= pledgeAmount;
-            pool.capitalPerAdapter[adapterAddress] -= pledgeAmount;
-            if (pool.capitalPerAdapter[adapterAddress] == 0) {
-                _removeAdapterFromPool(pool, adapterAddress);
+            pool.totalCapitalPledgedToPool -= _pledgeAmount;
+            pool.capitalPerAdapter[_adapterAddress] -= _pledgeAmount;
+            if (pool.capitalPerAdapter[_adapterAddress] == 0) {
+                _removeAdapterFromPool(pool, _adapterAddress);
             }
         }
     }
 
-    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external onlyRiskManager {
-        PoolData storage pool = protocolRiskPools[poolId];
-        if (isRequest) {
-            pool.capitalPendingWithdrawal += amount;
+    function updateCapitalPendingWithdrawal(uint256 _poolId, uint256 _amount, bool _isRequest) external onlyRiskManager {
+        PoolData storage pool = protocolRiskPools[_poolId];
+        if (_isRequest) {
+            pool.capitalPendingWithdrawal += _amount;
         } else {
-            pool.capitalPendingWithdrawal -= amount;
+            pool.capitalPendingWithdrawal -= _amount;
         }
     }
 
-    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external onlyRiskManager {
-        PoolData storage pool = protocolRiskPools[poolId];
-        if (isSale) {
-            pool.totalCoverageSold += amount;
+    function updateCoverageSold(uint256 _poolId, uint256 _amount, bool _isSale) external onlyRiskManager {
+        PoolData storage pool = protocolRiskPools[_poolId];
+        if (_isSale) {
+            pool.totalCoverageSold += _amount;
         } else {
-            pool.totalCoverageSold -= amount;
+            pool.totalCoverageSold -= _amount;
         }
     }
 
-    function setPauseState(uint256 poolId, bool isPaused) external onlyRiskManager {
-        PoolData storage pool = protocolRiskPools[poolId];
-        pool.isPaused = isPaused;
-        pool.pauseTimestamp = isPaused ? block.timestamp : 0;
+    function setPauseState(uint256 _poolId, bool _isPaused) external onlyRiskManager {
+        PoolData storage pool = protocolRiskPools[_poolId];
+        pool.isPaused = _isPaused;
+        pool.pauseTimestamp = _isPaused ? block.timestamp : 0;
     }
     
-    function setFeeRecipient(uint256 poolId, address recipient) external onlyRiskManager {
-        protocolRiskPools[poolId].feeRecipient = recipient;
+    function setFeeRecipient(uint256 _poolId, address _recipient) external onlyRiskManager {
+        protocolRiskPools[_poolId].feeRecipient = _recipient;
     }
 
     /* ───────────────────── View Functions ───────────────────── */
@@ -119,7 +131,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         return protocolRiskPools.length;
     }
 
-    function getPoolData(uint256 poolId) external view override returns (
+    function getPoolData(uint256 _poolId) external view override returns (
         IERC20 protocolTokenToCover,
         uint256 totalCapitalPledgedToPool,
         uint256 totalCoverageSold,
@@ -128,7 +140,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         address feeRecipient,
         uint256 claimFeeBps
     ) {
-        PoolData storage pool = protocolRiskPools[poolId];
+        PoolData storage pool = protocolRiskPools[_poolId];
         return (
             pool.protocolTokenToCover,
             pool.totalCapitalPledgedToPool,
@@ -139,30 +151,76 @@ contract PoolRegistry is IPoolRegistry, Ownable {
             pool.claimFeeBps
         );
     }
-    
-    function getPoolRateModel(uint256 poolId) external view override returns (RateModel memory) {
-        return protocolRiskPools[poolId].rateModel;
+
+
+    /**
+    * @notice Gets the data for multiple pools in a single call.
+    * @param _poolIds An array of IDs for the pools to query.
+    * @return A memory array of PoolInfo structs containing the data for each requested pool.
+    */
+    function getMultiplePoolData(uint256[] calldata _poolIds) external view returns (PoolInfo[] memory) {
+        uint256 numPools = _poolIds.length;
+        PoolInfo[] memory multiplePoolData = new PoolInfo[](numPools);
+
+        for (uint256 i = 0; i < numPools; i++) {
+            uint256 poolId = _poolIds[i];
+            PoolData storage pool = protocolRiskPools[poolId];
+
+            multiplePoolData[i] = PoolInfo({
+                protocolTokenToCover: pool.protocolTokenToCover,
+                totalCapitalPledgedToPool: pool.totalCapitalPledgedToPool,
+                totalCoverageSold: pool.totalCoverageSold,
+                capitalPendingWithdrawal: pool.capitalPendingWithdrawal,
+                isPaused: pool.isPaused,
+                feeRecipient: pool.feeRecipient,
+                claimFeeBps: pool.claimFeeBps
+            });
+        }
+
+        return multiplePoolData;
     }
     
-    function getPoolActiveAdapters(uint256 poolId) external view override returns (address[] memory) {
-        return protocolRiskPools[poolId].activeAdapters;
+    function getPoolRateModel(uint256 _poolId) external view override returns (RateModel memory) {
+        return protocolRiskPools[_poolId].rateModel;
+    }
+    
+    function getPoolActiveAdapters(uint256 _poolId) external view override returns (address[] memory) {
+        return protocolRiskPools[_poolId].activeAdapters;
     }
 
-    function getCapitalPerAdapter(uint256 poolId, address adapter) external view override returns (uint256) {
-        return protocolRiskPools[poolId].capitalPerAdapter[adapter];
+    function getCapitalPerAdapter(uint256 _poolId, address _adapter) external view override returns (uint256) {
+        return protocolRiskPools[_poolId].capitalPerAdapter[_adapter];
     }
     
     /**
      * @notice CORRECTED: This function is now implemented to serve the on-chain needs of the RiskManager.
      */
-    function getPoolPayoutData(uint256 poolId) external view override returns (address[] memory, uint256[] memory, uint256) {
-        PoolData storage pool = protocolRiskPools[poolId];
+    function getPoolPayoutData(uint256 _poolId) external view override returns (address[] memory, uint256[] memory, uint256) {
+        PoolData storage pool = protocolRiskPools[_poolId];
         address[] memory adapters = pool.activeAdapters;
         uint256[] memory capitalPerAdapter = new uint256[](adapters.length);
         for(uint i = 0; i < adapters.length; i++){
             capitalPerAdapter[i] = pool.capitalPerAdapter[adapters[i]];
         }
         return (adapters, capitalPerAdapter, pool.totalCapitalPledgedToPool);
+    }
+
+
+    function getPoolTokens(uint256[] calldata _poolIds)
+        external
+        view
+        returns (address[] memory tokens)
+    {
+        uint256 len = _poolIds.length;
+        tokens = new address[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            uint256 pid = _poolIds[i];
+            require(pid < protocolRiskPools.length, "PR: Invalid poolId");
+            tokens[i] = address(protocolRiskPools[pid].protocolTokenToCover);
+        }
+
+        return tokens;
     }
     
     /* ───────────────── Internal & Helper Functions ──────────────── */

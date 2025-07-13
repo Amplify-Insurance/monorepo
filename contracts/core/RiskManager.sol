@@ -364,28 +364,28 @@ function liquidateInsolventUnderwriter(address underwriter) external nonReentran
      * @dev Iterates through the provided pool IDs and claims the rewards for each.
      * @param poolIds An array of pool IDs to claim rewards from.
      */
+
     function claimPremiumRewards(uint256[] calldata poolIds) external nonReentrant {
+        // 1. Fetch all pool data in a single, efficient call
+        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(poolIds);
+
         for (uint256 i = 0; i < poolIds.length; i++) {
             uint256 poolId = poolIds[i];
-            // Only attempt a claim if the underwriter has a pledge in the pool.
+
+            // 2. Only attempt a claim if the underwriter has a pledge in the pool.
             if (underwriterPoolPledge[msg.sender][poolId] > 0) {
-                (
-                    IERC20 protocolToken,
-                    uint256 _pledged2,
-                    uint256 _sold2,
-                    uint256 _pend2,
-                    bool _paused2,
-                    address _fr2,
-                    uint256 _cf2
-                ) = poolRegistry.getPoolData(poolId);
-                (_pledged2, _sold2, _pend2, _paused2, _fr2, _cf2);
+                // 3. Get the specific pool's data from our pre-fetched array
+                IPoolRegistry.PoolInfo memory poolData = allPoolData[i];
+                
+                // 4. Make the external call. The nonReentrant modifier protects this.
                 uint256 claimed = rewardDistributor.claim(
                     msg.sender,
                     poolId,
-                    address(protocolToken),
+                    address(poolData.protocolTokenToCover),
                     underwriterPoolPledge[msg.sender][poolId]
                 );
-                claimed;
+                // You can use the 'claimed' variable if needed
+                claimed; 
             }
         }
     }
@@ -401,75 +401,75 @@ function liquidateInsolventUnderwriter(address underwriter) external nonReentran
         }
     }
 
-    function onCapitalDeposited(address underwriter, uint256 amount) external nonReentrant {
-        if(msg.sender != address(capitalPool)) revert NotCapitalPool();
-        underwriterTotalPledge[underwriter] += amount;
-        uint256[] memory pools = underwriterAllocations[underwriter];
-        for(uint i=0; i<pools.length; i++){
-            underwriterPoolPledge[underwriter][pools[i]] += amount;
-            (
-                IERC20 protocolToken,
-                uint256 _pledged4,
-                uint256 _sold4,
-                uint256 _pend4,
-                bool _paused4,
-                address _fr4,
-                uint256 _cf4
-            ) = poolRegistry.getPoolData(pools[i]);
-            (_pledged4, _sold4, _pend4, _paused4, _fr4, _cf4);
-            rewardDistributor.updateUserState(
-                underwriter,
-                pools[i],
-                address(protocolToken),
-                underwriterPoolPledge[underwriter][pools[i]]
-            );
-        }
+function onCapitalDeposited(address underwriter, uint256 amount) external nonReentrant {
+    if(msg.sender != address(capitalPool)) revert NotCapitalPool();
+
+    underwriterTotalPledge[underwriter] += amount;
+    uint256[] memory pools = underwriterAllocations[underwriter];
+
+    // 1. Fetch all required pool data in a single external call before the loop.
+    IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(pools);
+
+    for(uint i=0; i<pools.length; i++){
+        underwriterPoolPledge[underwriter][pools[i]] += amount;
+
+        // 2. Get the protocol token from the data we already fetched.
+        address protocolToken = address(allPoolData[i].protocolTokenToCover);
+
+        // 3. Call the reward distributor with the pre-fetched data.
+        rewardDistributor.updateUserState(
+            underwriter,
+            pools[i],
+            protocolToken,
+            underwriterPoolPledge[underwriter][pools[i]]
+        );
     }
+}
 
     function onWithdrawalRequested(address underwriter, uint256 principalComponent) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
+        
         uint256[] memory allocations = underwriterAllocations[underwriter];
+
+        // 1 Fetch all pool data at once to save gas.
+        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
+
         for (uint i = 0; i < allocations.length; i++) {
-            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], principalComponent, true);
-            (
-                IERC20 protocolToken,
-                uint256 _pledged5,
-                uint256 _sold5,
-                uint256 _pend5,
-                bool _paused5,
-                address _fr5,
-                uint256 _cf5
-            ) = poolRegistry.getPoolData(allocations[i]);
-            (_pledged5, _sold5, _pend5, _paused5, _fr5, _cf5);
+            uint256 poolId = allocations[i];
+
+            poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, true);
+
+            address protocolToken = address(allPoolData[i].protocolTokenToCover);
+            
             rewardDistributor.updateUserState(
                 underwriter,
-                allocations[i],
-                address(protocolToken),
-                underwriterPoolPledge[underwriter][allocations[i]]
+                poolId,
+                protocolToken,
+                underwriterPoolPledge[underwriter][poolId]
             );
         }
     }
 
     function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
+        
         uint256[] memory allocations = underwriterAllocations[underwriter];
+
+        // 1. Fetch all necessary pool data in a single, efficient call.
+        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
+
         for (uint i = 0; i < allocations.length; i++) {
-            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], principalComponent, false);
-            (
-                IERC20 protocolToken,
-                uint256 _pledged6,
-                uint256 _sold6,
-                uint256 _pend6,
-                bool _paused6,
-                address _fr6,
-                uint256 _cf6
-            ) = poolRegistry.getPoolData(allocations[i]);
-            (_pledged6, _sold6, _pend6, _paused6, _fr6, _cf6);
+            uint256 poolId = allocations[i];
+
+            poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, false);
+
+            address protocolToken = address(allPoolData[i].protocolTokenToCover);
+
             rewardDistributor.updateUserState(
                 underwriter,
-                allocations[i],
-                address(protocolToken),
-                underwriterPoolPledge[underwriter][allocations[i]]
+                poolId,
+                protocolToken,
+                underwriterPoolPledge[underwriter][poolId]
             );
         }
     }
@@ -483,40 +483,33 @@ function liquidateInsolventUnderwriter(address underwriter) external nonReentran
         underwriterTotalPledge[underwriter] -= amountToSubtract;
         
         uint256[] memory allocations = underwriterAllocations[underwriter];
+
+        // 1. Fetch all pool data at once, replacing two separate calls inside the loop.
+        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
+
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
-            (
-                IERC20 _pt7,
-                uint256 _pledged7,
-                uint256 _sold7,
-                uint256 pendingWithdrawal,
-                bool _paused7,
-                address _fr7,
-                uint256 _cf7
-            ) = poolRegistry.getPoolData(poolId);
-            (_pt7, _pledged7, _sold7, _paused7, _fr7, _cf7);
+            
+            // 2. Get data from our pre-fetched array instead of making external calls.
+            IPoolRegistry.PoolInfo memory poolData = allPoolData[i];
+            uint256 pendingWithdrawal = poolData.capitalPendingWithdrawal;
+            address protocolToken = address(poolData.protocolTokenToCover);
+
             uint256 reduction = Math.min(principalComponentRemoved, pendingWithdrawal);
             if (reduction > 0) {
                 poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
             }
+
             uint256 pledgeReduction = principalComponentRemoved > underwriterPoolPledge[underwriter][poolId] ? underwriterPoolPledge[underwriter][poolId] : principalComponentRemoved;
             underwriterPoolPledge[underwriter][poolId] -= pledgeReduction;
-            (
-                IERC20 protocolToken,
-                uint256 _pledged8,
-                uint256 _sold8,
-                uint256 _pend8,
-                bool _paused8,
-                address _fr8,
-                uint256 _cf8
-            ) = poolRegistry.getPoolData(poolId);
-            (_pledged8, _sold8, _pend8, _paused8, _fr8, _cf8);
+
             rewardDistributor.updateUserState(
                 underwriter,
                 poolId,
-                address(protocolToken),
+                protocolToken,
                 underwriterPoolPledge[underwriter][poolId]
             );
+
             if (isFullWithdrawal || underwriterPoolPledge[underwriter][poolId] == 0) {
                 _removeUnderwriterFromPool(underwriter, poolId);
             }
@@ -580,32 +573,45 @@ function liquidateInsolventUnderwriter(address underwriter) external nonReentran
      *      — **NO** external calls in here.
      */
     function _prepareDistressedAssets(uint256[] calldata _poolIds)
-        internal
-        view
-        returns (address[] memory tokens)
-    {
-        tokens = new address[](_poolIds.length);
-        uint256 count;
+    internal
+    view
+    returns (address[] memory tokens)
+{
+    // 1. Fetch all pool data at once instead of in a loop.
+    IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(_poolIds);
+    
+    address[] memory uniqueTokens = new address[](_poolIds.length);
+    uint256 count;
 
-        for (uint i; i < _poolIds.length; i++) {
-            (IERC20 protocolToken,, , , , ,) = poolRegistry.getPoolData(_poolIds[i]);
-            address t = address(protocolToken);
-            if (t == address(0)) continue;
-
-            bool seen;
-            for (uint j; j < count; j++) {
-                if (tokens[j] == t) {
-                    seen = true;
-                    break;
-                }
-            }
-            if (!seen) tokens[count++] = t;
+    for (uint i = 0; i < allPoolData.length; i++) {
+        // 2. Get the token directly from the pre-fetched data.
+        address t = address(allPoolData[i].protocolTokenToCover);
+        if (t == address(0)) {
+            continue;
         }
 
-        // shrink array
-        assembly { mstore(tokens, count) }
-        return tokens;
+        bool seen = false;
+        for (uint j = 0; j < count; j++) {
+            if (uniqueTokens[j] == t) {
+                seen = true;
+                break;
+            }
+        }
+
+        if (!seen) {
+            uniqueTokens[count] = t;
+            count++;
+        }
     }
+
+    // Create a new array with the exact size and copy the unique tokens.
+    tokens = new address[](count);
+    for (uint i = 0; i < count; i++) {
+        tokens[i] = uniqueTokens[i];
+    }
+
+    return tokens;
+}
 
 
     function _prepareLiquidation(address _underwriter)
