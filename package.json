@@ -48,7 +48,7 @@
     "@types/mocha": ">=9.1.0",
     "hardhat": "^2.24.1",
     "hardhat-slither": "^1.0.4",
-    "solc": "^0.8.20",
+    "solc": "^0.8.22",
     "solidity-coverage": "^0.8.1",
     "ts-node": ">=8.0.0",
     "typechain": "^8.3.0"

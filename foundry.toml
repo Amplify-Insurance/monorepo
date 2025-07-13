@@ -10,7 +10,7 @@ remappings = [
   '@openzeppelin/=node_modules/@openzeppelin/',
   '@chainlink/contracts/=node_modules/@chainlink/contracts/',
 ]
-solc_version = '0.8.20'
+solc_version = '0.8.22'
 
 [profile.pool]
 test = 'foundry/test/PoolRegistryFuzz.t.sol'

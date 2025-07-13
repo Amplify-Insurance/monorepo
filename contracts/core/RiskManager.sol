@@ -18,6 +18,10 @@ import "../interfaces/IRiskManager.sol";
 // import "../MaliciousPoolRegistry.sol"; // IRiskManager interface
 import "../interfaces/IRiskManagerPMHook.sol";
 
+// Events are defined at the file level so they can be imported directly in tests.
+event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 amount, uint256 timestamp);
+event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
+
 /**
  * @title RiskManager
  * @author Gemini
@@ -70,10 +74,8 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
 
     event AddressesSet(address capital, address registry, address policy, address cat, address loss, address rewards);
     event CommitteeSet(address committee);
-    event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
     event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
     event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
-    event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 amount, uint256 timestamp);
     event DeallocationNoticePeriodSet(uint256 newPeriod);
     event MaxAllocationsPerUnderwriterSet(uint256 newMax);
 
