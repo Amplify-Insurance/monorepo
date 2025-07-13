@@ -118,35 +118,53 @@ contract BackstopPoolFuzz is Test {
         amount = uint96(bound(uint256(amount), 1, STARTING_BALANCE));
         MockERC20 token = new MockERC20("RWD", "RWD", 18);
         token.mint(riskManager, amount);
+        
         vm.startPrank(riskManager);
         token.approve(address(pool), amount);
         pool.receiveProtocolAssetsForDistribution(address(token), amount);
         vm.stopPrank();
-        uint256 stored = distributor.totalRewards(pool.CAT_POOL_REWARD_ID(), address(token));
-        assertEq(stored, amount);
+
+        uint256 totalShares = share.totalSupply();
+        uint256 expectedRewardsPerShare = amount * distributor.PRECISION_FACTOR() / totalShares;
+        
+        // Assert that the mock's internal rewards-per-share tracker was updated correctly.
+        assertEq(distributor.accumulatedRewardsPerShare(pool.CAT_POOL_REWARD_ID(), address(token)), expectedRewardsPerShare);
     }
 
-    function testFuzz_claimProtocolRewards(uint96 depositAmount, uint96 reward) public {
-        uint256 min = pool.MIN_USDC_AMOUNT();
-        depositAmount = uint96(bound(uint256(depositAmount), min, STARTING_BALANCE));
-        reward = uint96(bound(uint256(reward), 1, STARTING_BALANCE));
 
-        _deposit(depositAmount);
+// In BackstopPoolFuzz.t.sol// In BackstopPoolFuzz.t.sol
+function testFuzz_claimProtocolRewards(uint96 depositAmount, uint96 reward) public {
+    vm.assume(depositAmount > 0);
+    uint256 min = pool.MIN_USDC_AMOUNT();
+    depositAmount = uint96(bound(uint256(depositAmount), min, STARTING_BALANCE));
+    reward = uint96(bound(uint256(reward), 1, STARTING_BALANCE));
 
-        MockERC20 token = new MockERC20("RWD", "RWD", 18);
-        token.mint(riskManager, reward);
-        vm.startPrank(riskManager);
-        token.approve(address(pool), reward);
-        pool.receiveProtocolAssetsForDistribution(address(token), reward);
-        vm.stopPrank();
+    _deposit(depositAmount);
 
-        uint256 pending = pool.getPendingProtocolAssetRewards(user, address(token));
-        vm.assume(pending > 0);
-        vm.prank(user);
-        pool.claimProtocolAssetRewards(address(token));
-        uint256 remaining = pool.getPendingProtocolAssetRewards(user, address(token));
-        assertLt(remaining, pending);
-    }
+    MockERC20 rwdToken = new MockERC20("RWD", "RWD", 18);
+    // Fund the distributor so it can pay the final claim
+    rwdToken.mint(address(distributor), reward);
+    
+    // FIX: The Risk Manager must have the tokens and give the pool an allowance
+    // before the pool can pull the funds in `receiveProtocolAssetsForDistribution`.
+    rwdToken.mint(riskManager, reward);
+    vm.startPrank(riskManager);
+    rwdToken.approve(address(pool), reward);
+    pool.receiveProtocolAssetsForDistribution(address(rwdToken), reward);
+    vm.stopPrank();
+
+    uint256 pending = pool.getPendingProtocolAssetRewards(user, address(rwdToken));
+    vm.assume(pending > 0);
+    
+    uint256 balBefore = rwdToken.balanceOf(user);
+    vm.prank(user);
+    pool.claimProtocolAssetRewards(address(rwdToken));
+    uint256 balAfter = rwdToken.balanceOf(user);
+    
+    assertEq(balAfter - balBefore, pending, "User did not receive the correct pending amount");
+    uint256 remaining = pool.getPendingProtocolAssetRewards(user, address(rwdToken));
+    assertApproxEqAbs(remaining, 0, 1, "Remaining rewards should be zero after claim");
+}
 
     function testFuzz_adminSetters(address newRM, address newCP, address newPM) public {
         vm.assume(newRM != address(0) && newCP != address(0) && newPM != address(0));
@@ -191,33 +209,63 @@ function testRevert_initialize_ifNotShareTokenOwner() public {
     newPool.initialize();
 }
 
-function test_claimProtocolAssetRewardsFor_byRiskManager() public {
-    // --- Setup ---
-    uint96 depositAmount = 50_000e6;
-    uint96 rewardAmount = 1_000e18;
-    MockERC20 rewardToken = new MockERC20("Reward", "RWD", 18);
+// Add this new test to BackstopPoolFuzz.t.sol
+function test_MockRewardDistributor_Directly() public {
+    // --- Setup: Interact ONLY with the mock ---
+    uint256 rewardAmount = 1000;
+    uint256 poolId = 99;
+    uint256 userPledge = 100;
+    MockERC20 rewardToken = new MockERC20("RWD", "RWD", 18);
 
-    // 1. User deposits to have shares
-    _deposit(depositAmount);
+    // 1. Fund the MockRewardDistributor so it has tokens to send.
+    rewardToken.mint(address(distributor), rewardAmount);
+    assertEq(rewardToken.balanceOf(address(distributor)), rewardAmount);
+    assertEq(rewardToken.balanceOf(user), 0);
 
-    // 2. Risk Manager sends rewards to the pool
-    rewardToken.mint(riskManager, rewardAmount);
-    vm.startPrank(riskManager);
-    rewardToken.approve(address(pool), rewardAmount);
-    pool.receiveProtocolAssetsForDistribution(address(rewardToken), rewardAmount);
-    vm.stopPrank();
+    // 2. Set up the mock's internal state to simulate a pending reward.
+    distributor.distribute(poolId, address(rewardToken), rewardAmount, userPledge);
+
+    // Sanity check: user should have a pending reward.
+    uint256 pending = distributor.pendingRewards(user, poolId, address(rewardToken), userPledge);
+    assertEq(pending, rewardAmount);
 
     // --- Action ---
-    // 3. Risk Manager triggers the claim on behalf of the user
-    uint256 userBalanceBefore = rewardToken.balanceOf(user);
-    vm.prank(riskManager);
-    pool.claimProtocolAssetRewardsFor(user, address(rewardToken));
-    uint256 userBalanceAfter = rewardToken.balanceOf(user);
+    // 3. Call the function that is causing the error.
+    distributor.claimForCatPool(user, poolId, address(rewardToken), userPledge);
 
     // --- Assertions ---
-    // 4. Verify the user received the rewards
-    assertEq(userBalanceAfter, userBalanceBefore + rewardAmount, "User did not receive rewards");
+    // 4. If the mock is correct, the user's balance should have increased.
+    assertEq(rewardToken.balanceOf(user), rewardAmount, "User should have received the rewards");
+    assertEq(rewardToken.balanceOf(address(distributor)), 0, "Distributor should have sent the tokens");
 }
+
+// In BackstopPoolFuzz.t.sol
+
+    function test_claimProtocolAssetRewardsFor_byRiskManager() public {
+        uint96 depositAmount = 50_000e6;
+        uint96 rewardAmount = 1_000e18;
+        MockERC20 rewardToken = new MockERC20("Reward", "RWD", 18);
+        _deposit(depositAmount);
+
+        // --- Test the `receive` logic ---
+        rewardToken.mint(riskManager, rewardAmount);
+        vm.startPrank(riskManager);
+        rewardToken.approve(address(pool), rewardAmount);
+        pool.receiveProtocolAssetsForDistribution(address(rewardToken), rewardAmount);
+        vm.stopPrank();
+        assertEq(rewardToken.balanceOf(address(pool)), rewardAmount, "Pool should have received the tokens");
+
+        // --- Test the `claim` logic ---
+        // Ensure the mock distributor is funded so it can pay the claim
+        rewardToken.mint(address(distributor), rewardAmount);
+
+        uint256 userBalanceBefore = rewardToken.balanceOf(user);
+        vm.prank(riskManager);
+        pool.claimProtocolAssetRewardsFor(user, address(rewardToken));
+        uint256 userBalanceAfter = rewardToken.balanceOf(user);
+
+        assertEq(userBalanceAfter, userBalanceBefore + rewardAmount, "User did not receive rewards");
+    }
 
 function testRevert_setters_ifZeroAddress() public {
     // This test checks that admin functions correctly revert when given the zero address.

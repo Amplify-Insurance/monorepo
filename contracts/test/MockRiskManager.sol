@@ -26,4 +26,9 @@ contract MockRiskManager {
     function onCapitalWithdrawn(address _underwriter, uint256 _principal, bool _isFullWithdrawal) external {
         emit CapitalWithdrawn(_underwriter, _principal, _isFullWithdrawal);
     }
+
+    function onWithdrawalCancelled(address underwriter, uint256 valueCancelled) external {
+    // This function can be empty for the test to pass. Its existence is what matters.
+    // You can optionally add state variables to track calls if needed for assertions.
+}
 }

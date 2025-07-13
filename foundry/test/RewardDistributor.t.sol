@@ -4,6 +4,9 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
+// FIX: Import Ownable to access its custom errors
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
 
 contract RewardDistributorTest is Test {
     RewardDistributor rd;
@@ -22,6 +25,7 @@ contract RewardDistributorTest is Test {
         token = new MockERC20("Reward", "RWD", 18);
         token.mint(address(rd), 1000 ether);
     }
+    
 
     function testDeploymentSetsRiskManager() public {
         assertEq(rd.riskManager(), riskManager);
@@ -92,8 +96,10 @@ contract RewardDistributorTest is Test {
     }
 
     function testSetCatPoolOnlyOwner() public {
-        vm.prank(address(0x5));
-        vm.expectRevert("OwnableUnauthorizedAccount");
+        address nonOwner = address(0x5);
+        vm.prank(nonOwner);
+        // FIX: Check for the custom error with its arguments
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", nonOwner));
         rd.setCatPool(catPool);
     }
 
@@ -104,8 +110,10 @@ contract RewardDistributorTest is Test {
     }
 
     function testSetRiskManagerOnlyOwner() public {
-        vm.prank(address(0x5));
-        vm.expectRevert("OwnableUnauthorizedAccount");
+        address nonOwner = address(0x5);
+        vm.prank(nonOwner);
+        // FIX: Check for the custom error with its arguments
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", nonOwner));
         rd.setRiskManager(address(0x6));
     }
 
@@ -149,7 +157,8 @@ contract RewardDistributorTest is Test {
     }
 
     function testDistributeOnlyRiskManager() public {
-        vm.expectRevert("RD: Not RiskManager");
+        // FIX: The `distribute` function uses the `onlyApproved` modifier. Match its revert string.
+        vm.expectRevert("RD: Not RiskManager or policyManager");
         rd.distribute(1, address(token), 1 ether, 1 ether);
     }
 
@@ -257,9 +266,14 @@ contract RewardDistributorTest is Test {
         address newRM = address(0x7);
         vm.prank(owner);
         rd.setRiskManager(newRM);
+
+        // This call is from the old riskManager, so it should fail.
         vm.prank(riskManager);
-        vm.expectRevert("RD: Not RiskManager");
+        // FIX: The `distribute` function uses the `onlyApproved` modifier. Match its revert string.
+        vm.expectRevert("RD: Not RiskManager or policyManager");
         rd.distribute(1, address(token), 1, 1);
+        
+        // This call from the new riskManager should succeed.
         vm.prank(newRM);
         rd.distribute(1, address(token), 1, 1);
     }

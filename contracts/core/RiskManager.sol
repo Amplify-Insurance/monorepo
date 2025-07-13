@@ -195,41 +195,49 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
         emit DeallocationRequested(underwriter, poolId, amount, block.timestamp);
     }
 
-    function deallocateFromPool(uint256 poolId) external nonReentrant {
-        address underwriter = msg.sender;
-        uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
-        uint256 amount = deallocationRequestAmount[underwriter][poolId];
-        if (requestTime == 0) revert NoDeallocationRequest();
-        if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
+function deallocateFromPool(uint256 poolId) external nonReentrant {
+    address underwriter = msg.sender;
+    uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
+    uint256 requestedAmount = deallocationRequestAmount[underwriter][poolId]; // The original request amount
 
-        _realizeLossesForAllPools(underwriter);
+    // 1. Initial Validation
+    if (requestTime == 0) revert NoDeallocationRequest();
+    if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
 
-        uint256 totalPledge = underwriterTotalPledge[underwriter];
-        if (totalPledge == 0) revert NoCapitalToAllocate();
+    // 2. Realize any new losses that occurred since the request was made.
+    _realizeLossesForAllPools(underwriter);
 
-        uint256 poolCount = poolRegistry.getPoolCount();
-        require(poolId < poolCount, "Invalid poolId");
-        require(isAllocatedToPool[underwriter][poolId], "Not allocated to this pool");
+    // 3. The Safety Check (THE FIX)
+    uint256 pledgeAfterLosses = underwriterPoolPledge[underwriter][poolId];
+    
+    // Determine the actual amount to deallocate. It's the lesser of what was
+    // requested and what the underwriter has left after losses.
+    uint256 finalAmountToDeallocate = Math.min(requestedAmount, pledgeAfterLosses);
 
-        address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
-        require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
+    uint256 remainingPledge = pledgeAfterLosses - finalAmountToDeallocate;
 
-        uint256 remaining = underwriterPoolPledge[underwriter][poolId] - amount;
+    // 4. State Updates
+    address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
+    require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
 
-        // Effects: update internal state before external calls
-        underwriterPoolPledge[underwriter][poolId] = remaining;
-        if (remaining == 0) {
-            _removeUnderwriterFromPool(underwriter, poolId);
-        }
-        delete deallocationRequestTimestamp[underwriter][poolId];
-        delete deallocationRequestAmount[underwriter][poolId];
-
-        // Interaction: update the PoolRegistry after state changes
-        poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, amount, false);
-        poolRegistry.updateCapitalPendingWithdrawal(poolId, amount, false);
-
-        emit CapitalDeallocated(underwriter, poolId, amount);
+    underwriterPoolPledge[underwriter][poolId] = remainingPledge;
+    
+    // If the user's pledge in this pool is now zero, remove them.
+    if (remainingPledge == 0) {
+        _removeUnderwriterFromPool(underwriter, poolId);
     }
+
+    // Clear the completed withdrawal request.
+    delete deallocationRequestTimestamp[underwriter][poolId];
+    delete deallocationRequestAmount[underwriter][poolId];
+
+    // 5. Final Interactions
+    // Update the PoolRegistry using the safe, final deallocation amount.
+    poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, finalAmountToDeallocate, false);
+    poolRegistry.updateCapitalPendingWithdrawal(poolId, finalAmountToDeallocate, false);
+
+    emit CapitalDeallocated(underwriter, poolId, finalAmountToDeallocate);
+}
 
     // CORRECTED: Added missing governance hook functions
     /* ───────────────────── Governance Hooks ───────────────────── */

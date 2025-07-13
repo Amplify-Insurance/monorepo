@@ -1,13 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IRewardDistributor.sol";
 
 contract MockRewardDistributor is IRewardDistributor {
+    using SafeERC20 for IERC20;
+
     address public catPool;
 
+    // --- NEW: State variables to accurately mimic the real contract ---
+    uint256 public constant PRECISION_FACTOR = 1e18;
+    mapping(uint256 => mapping(address => uint256)) public accumulatedRewardsPerShare;
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public rewardDebt;
+    
     mapping(uint256 => mapping(address => uint256)) public totalRewards;
     mapping(uint256 => mapping(address => uint256)) public totalShares;
+    
+    // --- Test helper variables ---
     address public lastClaimUser;
     uint256 public lastClaimPoolId;
     address public lastClaimToken;
@@ -35,57 +46,68 @@ contract MockRewardDistributor is IRewardDistributor {
         external
         override
     {
-        last_distribute_poolId = poolId;
-        last_distribute_protocolToken = rewardToken;
-        last_distribute_amount = rewardAmount;
-        last_distribute_totalPledge = totalPledgeInPool;
-        totalRewards[poolId][rewardToken] += rewardAmount;
-        totalShares[poolId][rewardToken] = totalPledgeInPool;
-        distributeCallCount++;
-    }
-
-    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge)
-        external
-        override
-        returns (uint256)
-    {
-        uint256 reward = pendingRewards(user, poolId, rewardToken, userPledge);
-        if (reward > 0) {
-            totalRewards[poolId][rewardToken] -= reward;
+        if (totalPledgeInPool > 0) {
+            accumulatedRewardsPerShare[poolId][rewardToken] += (rewardAmount * PRECISION_FACTOR) / totalPledgeInPool;
         }
-        return reward;
     }
 
+// In MockRewardDistributor.sol
+
+function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge)
+    external
+    override
+    returns (uint256)
+{
+    // 1. Calculate the user's pending rewards based on the current state.
+    uint256 reward = pendingRewards(user, poolId, rewardToken, userPledge);
+
+    if (reward > 0) {
+        // 2. Update the user's "reward debt" to prevent re-claiming.
+        // This snapshots their state so they cannot claim the same rewards again.
+        rewardDebt[user][poolId][rewardToken] =
+            (userPledge * accumulatedRewardsPerShare[poolId][rewardToken]) / PRECISION_FACTOR;
+        
+        // 3. Transfer the claimed reward tokens FROM THIS CONTRACT'S BALANCE TO the user.
+        IERC20(rewardToken).safeTransfer(user, reward);
+    }
+
+    // 4. Return the amount of rewards successfully claimed.
+    return reward;
+}
     function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge)
         external
         override
         returns (uint256)
     {
+        // Update test trackers
         lastClaimUser = user;
         lastClaimPoolId = poolId;
         lastClaimToken = rewardToken;
         lastClaimPledge = userPledge;
         claimCallCount++;
-        return 0;
+
+        // Perform the actual claim logic
+        uint256 reward = pendingRewards(user, poolId, rewardToken, userPledge);
+        if (reward > 0) {
+            rewardDebt[user][poolId][rewardToken] = (userPledge * accumulatedRewardsPerShare[poolId][rewardToken]) / PRECISION_FACTOR;
+            IERC20(rewardToken).safeTransfer(user, reward);
+        }
+        return reward;
     }
 
     function updateUserState(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override {
-        last_updateUserState_user = user;
-        last_updateUserState_poolId = poolId;
-        last_updateUserState_token = rewardToken;
-        last_updateUserState_pledge = userPledge;
-        updateUserStateCallCount++;
+        uint256 accumulated = accumulatedRewardsPerShare[poolId][rewardToken];
+        rewardDebt[user][poolId][rewardToken] = (userPledge * accumulated) / PRECISION_FACTOR;
     }
 
-    function pendingRewards(address, uint256 poolId, address rewardToken, uint256 userPledge)
+
+    function pendingRewards(address user, uint256 poolId, address rewardToken, uint256 userPledge)
         public
         view
         override
         returns (uint256)
     {
-        uint256 total = totalRewards[poolId][rewardToken];
-        uint256 shares = totalShares[poolId][rewardToken];
-        if (shares == 0) return 0;
-        return total * userPledge / shares;
+        uint256 accumulated = (userPledge * accumulatedRewardsPerShare[poolId][rewardToken]) / PRECISION_FACTOR;
+        return accumulated - rewardDebt[user][poolId][rewardToken];
     }
 }
