@@ -16,6 +16,7 @@ contract MockPolicyNFT {
 
     uint256 public nextPolicyId = 1;
     uint256 public last_burn_id;
+    uint256 public burnCallCount;
     address public coverPool;
     address public owner;
 
@@ -52,8 +53,29 @@ contract MockPolicyNFT {
     function burn(uint256 id) external {
         require(msg.sender == coverPool, "not cover pool");
         last_burn_id = id;
+        burnCallCount++;
         delete ownerOf[id];
         delete policies[id];
+    }
+
+    function lastBurnedTokenId() external view returns (uint256) {
+        return last_burn_id;
+    }
+
+    // Simplified helper used in tests
+    function setPolicy(uint256 id, uint256 poolId, uint256 coverage, uint256 start) external {
+        policies[id] = Policy({
+            coverage: coverage,
+            poolId: poolId,
+            start: start,
+            activation: 0,
+            premiumDeposit: 0,
+            lastDrainTime: 0
+        });
+    }
+
+    function setOwnerOf(uint256 id, address user) external {
+        ownerOf[id] = user;
     }
 
     function updatePremiumAccount(uint256 id, uint128 newDeposit, uint128 newDrainTime) external {

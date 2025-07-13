@@ -849,40 +849,6 @@ function test_onCapitalWithdrawn_hook_partialWithdrawal() public {
     assertEq(allocations[0], poolId, "Incorrect poolId in allocation array");
 }
 
-function test_onCapitalWithdrawn_hook_partialWithdrawal() public {
-    // --- Setup ---
-    uint256 initialPledge = 50_000 * 1e6;
-    uint256 partialWithdrawalAmount = 10_000 * 1e6;
-    uint256 poolId = 0;
-
-    // 1. Allocate underwriter
-    cp.triggerOnCapitalDeposited(address(rm), underwriter, initialPledge);
-    cp.setUnderwriterAdapterAddress(underwriter, address(1));
-    pr.setPoolCount(1);
-    pr.setPoolData(poolId, token, initialPledge, 0, 0, false, address(0), 0);
-    uint256[] memory pools = new uint256[](1);
-    pools[0] = poolId;
-    vm.prank(underwriter);
-    rm.allocateCapital(pools);
-
-    // --- Action ---
-    // 2. Simulate a PARTIAL withdrawal from the CapitalPool
-    cp.triggerOnCapitalWithdrawn(address(rm), underwriter, partialWithdrawalAmount, false);
-
-    // --- Assertions ---
-    // 1. Check that pledges are correctly reduced
-    uint256 expectedFinalPledge = initialPledge - partialWithdrawalAmount;
-    assertEq(rm.underwriterTotalPledge(underwriter), expectedFinalPledge, "Total pledge not reduced correctly");
-    assertEq(rm.underwriterPoolPledge(underwriter, poolId), expectedFinalPledge, "Pool pledge not reduced correctly");
-
-    // 2. Check that the underwriter is STILL allocated to the pool
-    assertTrue(rm.isAllocatedToPool(underwriter, poolId), "Underwriter should still be allocated");
-
-    // 3. Check that the underwriter's allocation array still contains the pool
-    uint256[] memory allocations = rm.getUnderwriterAllocations(underwriter);
-    assertEq(allocations.length, 1, "Allocation array should still have one entry");
-    assertEq(allocations[0], poolId, "Incorrect poolId in allocation array");
-}
 
 function test_claimPremiumRewards_forSubsetOfPools() public {
     // --- Setup ---

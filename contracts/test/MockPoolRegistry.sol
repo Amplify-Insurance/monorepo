@@ -24,6 +24,19 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
     uint256[] public payoutAmounts;
     uint256 public payoutTotal;
 
+    // --- Variables for test assertions ---
+    uint256 public updateCapitalAllocationCallCount;
+    uint256 public updateCapitalPendingWithdrawalCallCount;
+
+    uint256 public last_updateCapitalAllocation_poolId;
+    address public last_updateCapitalAllocation_adapter;
+    uint256 public last_updateCapitalAllocation_amount;
+    bool public last_updateCapitalAllocation_isAllocation;
+
+    uint256 public last_updateCapitalPendingWithdrawal_poolId;
+    uint256 public last_updateCapitalPendingWithdrawal_amount;
+    bool public last_updateCapitalPendingWithdrawal_isRequest;
+
     constructor() Ownable(msg.sender) {}
 
     function setPoolData(
@@ -55,24 +68,35 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         poolCount = count;
     }
 
-    function setPayoutData(address[] calldata adapters, uint256[] calldata amounts, uint256 total) external {
+    function setPayoutData(address[] calldata adapters, uint256[] calldata amounts, uint256 total) public {
         payoutAdapters = adapters;
         payoutAmounts = amounts;
         payoutTotal = total;
-        for(uint256 i = 0; i < adapters.length; i++) {
+        for (uint256 i = 0; i < adapters.length; i++) {
             capitalPerAdapter[0][adapters[i]] = amounts[i];
         }
     }
 
-    function getPoolData(uint256 poolId) external view override returns (
-        IERC20 protocolTokenToCover,
-        uint256 totalCapitalPledgedToPool,
-        uint256 totalCoverageSold,
-        uint256 capitalPendingWithdrawal,
-        bool isPaused,
-        address feeRecipient,
-        uint256 claimFeeBps
-    ) {
+    function setPoolPayoutData(uint256, address[] calldata adapters, uint256[] calldata amounts, uint256 total)
+        external
+    {
+        setPayoutData(adapters, amounts, total);
+    }
+
+    function getPoolData(uint256 poolId)
+        external
+        view
+        override
+        returns (
+            IERC20 protocolTokenToCover,
+            uint256 totalCapitalPledgedToPool,
+            uint256 totalCoverageSold,
+            uint256 capitalPendingWithdrawal,
+            bool isPaused,
+            address feeRecipient,
+            uint256 claimFeeBps
+        )
+    {
         PoolData storage d = pools[poolId];
         protocolTokenToCover = d.protocolTokenToCover;
         totalCapitalPledgedToPool = d.totalCapitalPledgedToPool;
@@ -104,7 +128,10 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         return 0;
     }
 
-    function updateCapitalAllocation(uint256 poolId, address adapter, uint256 amount, bool isAllocation) external override {
+    function updateCapitalAllocation(uint256 poolId, address adapter, uint256 amount, bool isAllocation)
+        external
+        override
+    {
         PoolData storage pool = pools[poolId];
         if (isAllocation) {
             pool.totalCapitalPledgedToPool += amount;
@@ -113,6 +140,12 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
             pool.totalCapitalPledgedToPool -= amount;
             capitalPerAdapter[poolId][adapter] -= amount;
         }
+
+        updateCapitalAllocationCallCount++;
+        last_updateCapitalAllocation_poolId = poolId;
+        last_updateCapitalAllocation_adapter = adapter;
+        last_updateCapitalAllocation_amount = amount;
+        last_updateCapitalAllocation_isAllocation = isAllocation;
     }
 
     function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external override {
@@ -121,6 +154,11 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         } else {
             pools[poolId].capitalPendingWithdrawal -= amount;
         }
+
+        updateCapitalPendingWithdrawalCallCount++;
+        last_updateCapitalPendingWithdrawal_poolId = poolId;
+        last_updateCapitalPendingWithdrawal_amount = amount;
+        last_updateCapitalPendingWithdrawal_isRequest = isRequest;
     }
 
     function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external override {
@@ -143,7 +181,12 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         pools[poolId].feeRecipient = recipient;
     }
 
-    function getMultiplePoolData(uint256[] calldata poolIds) external view override returns (IPoolRegistry.PoolInfo[] memory infos) {
+    function getMultiplePoolData(uint256[] calldata poolIds)
+        external
+        view
+        override
+        returns (IPoolRegistry.PoolInfo[] memory infos)
+    {
         uint256 len = poolIds.length;
         infos = new IPoolRegistry.PoolInfo[](len);
         for (uint256 i = 0; i < len; i++) {
@@ -159,5 +202,30 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
             });
         }
     }
-}
 
+    // Helper view functions for tests
+    function get_last_updateCapitalAllocation()
+        external
+        view
+        returns (uint256 poolId, address adapter, uint256 amount, bool isAllocation)
+    {
+        return (
+            last_updateCapitalAllocation_poolId,
+            last_updateCapitalAllocation_adapter,
+            last_updateCapitalAllocation_amount,
+            last_updateCapitalAllocation_isAllocation
+        );
+    }
+
+    function get_last_updateCapitalPendingWithdrawal()
+        external
+        view
+        returns (uint256 poolId, uint256 amount, bool isRequest)
+    {
+        return (
+            last_updateCapitalPendingWithdrawal_poolId,
+            last_updateCapitalPendingWithdrawal_amount,
+            last_updateCapitalPendingWithdrawal_isRequest
+        );
+    }
+}
