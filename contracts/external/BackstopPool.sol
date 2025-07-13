@@ -100,33 +100,33 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
 
     /* ───────────────────── Admin Functions ───────────────────── */
 
-    function setRiskManagerAddress(address _newRiskManagerAddress) external onlyOwner {
-        require(_newRiskManagerAddress != address(0), "CIP: Address cannot be zero");
-        riskManagerAddress = _newRiskManagerAddress;
-        emit RiskManagerAddressSet(_newRiskManagerAddress);
+    function setRiskManagerAddress(address newRiskManagerAddress) external onlyOwner {
+        require(newRiskManagerAddress != address(0), "CIP: Address cannot be zero");
+        riskManagerAddress = newRiskManagerAddress;
+        emit RiskManagerAddressSet(newRiskManagerAddress);
     }
     
-    function setCapitalPoolAddress(address _newCapitalPoolAddress) external onlyOwner {
-        require(_newCapitalPoolAddress != address(0), "CIP: Address cannot be zero");
-        capitalPoolAddress = _newCapitalPoolAddress;
-        emit CapitalPoolAddressSet(_newCapitalPoolAddress);
+    function setCapitalPoolAddress(address newCapitalPoolAddress) external onlyOwner {
+        require(newCapitalPoolAddress != address(0), "CIP: Address cannot be zero");
+        capitalPoolAddress = newCapitalPoolAddress;
+        emit CapitalPoolAddressSet(newCapitalPoolAddress);
     }
 
-    function setPolicyManagerAddress(address _newPolicyManagerAddress) external onlyOwner {
-        require(_newPolicyManagerAddress != address(0), "CIP: Address cannot be zero");
-        policyManagerAddress = _newPolicyManagerAddress;
-        emit PolicyManagerAddressSet(_newPolicyManagerAddress);
+    function setPolicyManagerAddress(address newPolicyManagerAddress) external onlyOwner {
+        require(newPolicyManagerAddress != address(0), "CIP: Address cannot be zero");
+        policyManagerAddress = newPolicyManagerAddress;
+        emit PolicyManagerAddressSet(newPolicyManagerAddress);
     }
     
-    function setRewardDistributor(address _rewardDistributor) external onlyOwner {
-        require(_rewardDistributor != address(0), "CIP: Address cannot be zero");
-        rewardDistributor = IRewardDistributor(_rewardDistributor);
-        emit RewardDistributorSet(_rewardDistributor);
+    function setRewardDistributor(address rewardDistributorAddress) external onlyOwner {
+        require(rewardDistributorAddress != address(0), "CIP: Address cannot be zero");
+        rewardDistributor = IRewardDistributor(rewardDistributorAddress);
+        emit RewardDistributorSet(rewardDistributorAddress);
     }
 
-    function setAdapter(address _newAdapterAddress) external onlyOwner nonReentrant {
+    function setAdapter(address newAdapterAddress) external onlyOwner nonReentrant {
         IYieldAdapter oldAdapter = adapter;
-        adapter = IYieldAdapter(_newAdapterAddress);
+        adapter = IYieldAdapter(newAdapterAddress);
 
         if (address(oldAdapter) != address(0)) {
             uint256 balanceInOldAdapter = oldAdapter.getCurrentValueHeld();
@@ -143,7 +143,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
             usdc.forceApprove(address(adapter), 0);
             usdc.forceApprove(address(adapter), type(uint256).max);
         }
-        emit AdapterChanged(_newAdapterAddress);
+        emit AdapterChanged(newAdapterAddress);
     }
 
     function flushToAdapter(uint256 amount) external onlyOwner nonReentrant {

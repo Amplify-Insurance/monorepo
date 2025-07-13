@@ -52,10 +52,10 @@ contract LossDistributor is ILossDistributor, Ownable {
         riskManager = _riskManagerAddress;
     }
 
-    function setRiskManager(address _newRiskManager) external onlyOwner {
-        if (_newRiskManager == address(0)) revert ZeroAddress();
-        riskManager = _newRiskManager;
-        emit RiskManagerAddressSet(_newRiskManager);
+    function setRiskManager(address newRiskManager) external onlyOwner {
+        if (newRiskManager == address(0)) revert ZeroAddress();
+        riskManager = newRiskManager;
+        emit RiskManagerAddressSet(newRiskManager);
     }
 
     /* ───────────────────────── Core Logic ──────────────────────── */

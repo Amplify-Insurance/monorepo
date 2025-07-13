@@ -81,41 +81,41 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
 
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
-    function setAddresses(address _capital, address _registry, address _policy, address _cat, address _loss, address _rewards) external onlyOwner {
+    function setAddresses(address capital, address registry, address policy, address cat, address loss, address rewards) external onlyOwner {
         require(
-            _capital != address(0) &&
-            _registry != address(0) &&
-            _policy != address(0) &&
-            _cat != address(0) &&
-            _loss != address(0) &&
-            _rewards != address(0),
+            capital != address(0) &&
+            registry != address(0) &&
+            policy != address(0) &&
+            cat != address(0) &&
+            loss != address(0) &&
+            rewards != address(0),
             "Zero address not allowed"
         );
-        capitalPool = ICapitalPool(_capital);
-        poolRegistry = IPoolRegistry(_registry);
-        policyManager = _policy;
-        policyNFT = IPolicyManager(_policy).policyNFT();
-        catPool = IBackstopPool(_cat);
-        lossDistributor = ILossDistributor(_loss);
-        rewardDistributor = IRewardDistributor(_rewards);
-        emit AddressesSet(_capital, _registry, _policy, _cat, _loss, _rewards);
+        capitalPool = ICapitalPool(capital);
+        poolRegistry = IPoolRegistry(registry);
+        policyManager = policy;
+        policyNFT = IPolicyManager(policy).policyNFT();
+        catPool = IBackstopPool(cat);
+        lossDistributor = ILossDistributor(loss);
+        rewardDistributor = IRewardDistributor(rewards);
+        emit AddressesSet(capital, registry, policy, cat, loss, rewards);
     }
 
-    function setCommittee(address _committee) external onlyOwner {
-        require(_committee != address(0), "Zero address not allowed");
-        committee = _committee;
-        emit CommitteeSet(_committee);
+    function setCommittee(address newCommittee) external onlyOwner {
+        require(newCommittee != address(0), "Zero address not allowed");
+        committee = newCommittee;
+        emit CommitteeSet(newCommittee);
     }
 
-    function setMaxAllocationsPerUnderwriter(uint256 _newMax) external onlyOwner {
-        require(_newMax > 0, "Invalid max");
-        maxAllocationsPerUnderwriter = _newMax;
-        emit MaxAllocationsPerUnderwriterSet(_newMax);
+    function setMaxAllocationsPerUnderwriter(uint256 newMax) external onlyOwner {
+        require(newMax > 0, "Invalid max");
+        maxAllocationsPerUnderwriter = newMax;
+        emit MaxAllocationsPerUnderwriterSet(newMax);
     }
 
-    function setDeallocationNoticePeriod(uint256 _newPeriod) external onlyOwner {
-        deallocationNoticePeriod = _newPeriod;
-        emit DeallocationNoticePeriodSet(_newPeriod);
+    function setDeallocationNoticePeriod(uint256 newPeriod) external onlyOwner {
+        deallocationNoticePeriod = newPeriod;
+        emit DeallocationNoticePeriodSet(newPeriod);
     }
 
     /**
@@ -123,24 +123,24 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
      * @dev Enables governance to create new pools through the RiskManager.
      */
     function addProtocolRiskPool(
-        address _protocolTokenToCover,
-        IPoolRegistry.RateModel calldata _rateModel,
-        uint256 _claimFeeBps
+        address protocolTokenToCover,
+        IPoolRegistry.RateModel calldata rateModel,
+        uint256 claimFeeBps
     ) external onlyOwner returns (uint256) {
-        return poolRegistry.addProtocolRiskPool(_protocolTokenToCover, _rateModel, _claimFeeBps);
+        return poolRegistry.addProtocolRiskPool(protocolTokenToCover, rateModel, claimFeeBps);
     }
     
     /* ──────────────── Underwriter Capital Allocation ──────────────── */
     
-    function allocateCapital(uint256[] calldata _poolIds) external nonReentrant {
+    function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
         // ─── PREPARE / CHECKS ─────────────────────────────────────────────────
-        (uint256 totalPledge, address adapter) = _prepareAllocateCapital(_poolIds);
+        (uint256 totalPledge, address adapter) = _prepareAllocateCapital(poolIds);
 
         // ─── EFFECTS & INTERACTIONS ────────────────────────────────────────────
         // We do effects (storage updates) immediately before each external call
         // to PoolRegistry.updateCapitalAllocation, then emit.
-        for (uint256 i = 0; i < _poolIds.length; i++) {
-            uint256 poolId = _poolIds[i];
+        for (uint256 i = 0; i < poolIds.length; i++) {
+            uint256 poolId = poolIds[i];
 
             // Effects
             underwriterPoolPledge[msg.sender][poolId] = totalPledge;
@@ -162,17 +162,17 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
         }
     }
     
-    function requestDeallocateFromPool(uint256 _poolId, uint256 _amount) external nonReentrant {
+    function requestDeallocateFromPool(uint256 poolId, uint256 amount) external nonReentrant {
         address underwriter = msg.sender;
         uint256 poolCount = poolRegistry.getPoolCount();
-        require(_poolId < poolCount, "Invalid poolId");
-        require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
-        if (deallocationRequestTimestamp[underwriter][_poolId] != 0) revert DeallocationRequestPending();
+        require(poolId < poolCount, "Invalid poolId");
+        require(isAllocatedToPool[underwriter][poolId], "Not allocated to this pool");
+        if (deallocationRequestTimestamp[underwriter][poolId] != 0) revert DeallocationRequestPending();
 
-        require(_amount > 0, "Invalid amount");
+        require(amount > 0, "Invalid amount");
         uint256 totalPledge = underwriterTotalPledge[underwriter];
-        uint256 currentPledge = underwriterPoolPledge[underwriter][_poolId];
-        require(_amount <= currentPledge, "Amount exceeds pledge");
+        uint256 currentPledge = underwriterPoolPledge[underwriter][poolId];
+        require(amount <= currentPledge, "Amount exceeds pledge");
         if (totalPledge == 0) revert NoCapitalToAllocate();
 
         (
@@ -183,21 +183,21 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
             bool _paused,
             address _fr,
             uint256 _cf
-        ) = poolRegistry.getPoolData(_poolId);
+        ) = poolRegistry.getPoolData(poolId);
         (_pt, _paused, _fr, _cf);
         uint256 freeCapital = totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
-        if (_amount > freeCapital) revert InsufficientFreeCapital();
+        if (amount > freeCapital) revert InsufficientFreeCapital();
 
-        deallocationRequestTimestamp[underwriter][_poolId] = block.timestamp;
-        deallocationRequestAmount[underwriter][_poolId] = _amount;
-        poolRegistry.updateCapitalPendingWithdrawal(_poolId, _amount, true);
-        emit DeallocationRequested(underwriter, _poolId, _amount, block.timestamp);
+        deallocationRequestTimestamp[underwriter][poolId] = block.timestamp;
+        deallocationRequestAmount[underwriter][poolId] = amount;
+        poolRegistry.updateCapitalPendingWithdrawal(poolId, amount, true);
+        emit DeallocationRequested(underwriter, poolId, amount, block.timestamp);
     }
 
-    function deallocateFromPool(uint256 _poolId) external nonReentrant {
+    function deallocateFromPool(uint256 poolId) external nonReentrant {
         address underwriter = msg.sender;
-        uint256 requestTime = deallocationRequestTimestamp[underwriter][_poolId];
-        uint256 amount = deallocationRequestAmount[underwriter][_poolId];
+        uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
+        uint256 amount = deallocationRequestAmount[underwriter][poolId];
         if (requestTime == 0) revert NoDeallocationRequest();
         if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
 
@@ -207,32 +207,32 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
         if (totalPledge == 0) revert NoCapitalToAllocate();
 
         uint256 poolCount = poolRegistry.getPoolCount();
-        require(_poolId < poolCount, "Invalid poolId");
-        require(isAllocatedToPool[underwriter][_poolId], "Not allocated to this pool");
+        require(poolId < poolCount, "Invalid poolId");
+        require(isAllocatedToPool[underwriter][poolId], "Not allocated to this pool");
 
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
         require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
 
-        uint256 remaining = underwriterPoolPledge[underwriter][_poolId] - amount;
+        uint256 remaining = underwriterPoolPledge[underwriter][poolId] - amount;
 
         // Effects: update internal state before external calls
-        underwriterPoolPledge[underwriter][_poolId] = remaining;
+        underwriterPoolPledge[underwriter][poolId] = remaining;
         if (remaining == 0) {
-            _removeUnderwriterFromPool(underwriter, _poolId);
+            _removeUnderwriterFromPool(underwriter, poolId);
         }
-        delete deallocationRequestTimestamp[underwriter][_poolId];
-        delete deallocationRequestAmount[underwriter][_poolId];
+        delete deallocationRequestTimestamp[underwriter][poolId];
+        delete deallocationRequestAmount[underwriter][poolId];
 
         // Interaction: update the PoolRegistry after state changes
         poolRegistry.updateCapitalAllocation(
-            _poolId,
+            poolId,
             userAdapterAddress,
             amount,
             false
         );
-        poolRegistry.updateCapitalPendingWithdrawal(_poolId, amount, false);
+        poolRegistry.updateCapitalPendingWithdrawal(poolId, amount, false);
 
-        emit CapitalDeallocated(underwriter, _poolId, amount);
+        emit CapitalDeallocated(underwriter, poolId, amount);
     }
     
     // CORRECTED: Added missing governance hook functions
@@ -240,39 +240,39 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
 
     /**
      * @notice Called by the Committee to pause/unpause a pool following a successful vote.
-     * @param _poolId The ID of the pool to update.
-     * @param _pauseState The new pause state (true = paused, false = unpaused).
+     * @param poolId The ID of the pool to update.
+     * @param pauseState The new pause state (true = paused, false = unpaused).
      */
-    function reportIncident(uint256 _poolId, bool _pauseState) external {
+    function reportIncident(uint256 poolId, bool pauseState) external {
         if (msg.sender != committee) revert NotCommittee();
-        poolRegistry.setPauseState(_poolId, _pauseState);
+        poolRegistry.setPauseState(poolId, pauseState);
     }
 
     /**
      * @notice Called by the Committee to set the fee recipient for a pool.
      * @dev Typically used to redirect fees to the Committee contract during an incident.
-     * @param _poolId The ID of the pool to update.
-     * @param _recipient The address of the new fee recipient.
+     * @param poolId The ID of the pool to update.
+     * @param recipient The address of the new fee recipient.
      */
-    function setPoolFeeRecipient(uint256 _poolId, address _recipient) external {
+    function setPoolFeeRecipient(uint256 poolId, address recipient) external {
         if (msg.sender != committee) revert NotCommittee();
-        poolRegistry.setFeeRecipient(_poolId, _recipient);
+        poolRegistry.setFeeRecipient(poolId, recipient);
     }
 
     /* ───────────────────── Keeper & Liquidation Functions ───────────────────── */
 
-function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
+function liquidateInsolventUnderwriter(address underwriter) external nonReentrant {
     // ─── CHECKS & PREPARE ─────────────────────────────────────────────────
-    (uint256 pendingLosses, uint256 shareValue) = _prepareLiquidation(_underwriter);
+    (uint256 pendingLosses, uint256 shareValue) = _prepareLiquidation(underwriter);
 
-    emit UnderwriterLiquidated(msg.sender, _underwriter);
-    _realizeLossesForAllPools(_underwriter);
+    emit UnderwriterLiquidated(msg.sender, underwriter);
+    _realizeLossesForAllPools(underwriter);
 }
 
     /* ───────────────────── Claim Processing ───────────────────── */
 
-    function processClaim(uint256 _policyId) external nonReentrant {
-        IPolicyNFT.Policy memory policy = policyNFT.getPolicy(_policyId);
+    function processClaim(uint256 policyId) external nonReentrant {
+        IPolicyNFT.Policy memory policy = policyNFT.getPolicy(policyId);
         require(block.timestamp >= policy.activation, "Policy not active");
         uint256 poolId = policy.poolId;
         uint256 coverage = policy.coverage;
@@ -288,7 +288,7 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
             uint256 poolClaimFeeBps
         ) = poolRegistry.getPoolData(poolId);
         (_pledged0, _sold0, _pend0, _paused0, _fr0);
-        address claimant = policyNFT.ownerOf(_policyId);
+        address claimant = policyNFT.ownerOf(policyId);
         require(msg.sender == claimant, "Only policy owner");
         if (coverage > 0) {
             uint8 protocolDecimals = IERC20Metadata(address(protocolToken)).decimals();
@@ -346,14 +346,14 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
             poolRegistry.updateCoverageSold(poolId, reduction, false);
         }
 
-        policyNFT.burn(_policyId);
+        policyNFT.burn(policyId);
     }
     
     /* ───────────────── Hooks & State Updaters ───────────────── */
 
-    function updateCoverageSold(uint256 _poolId, uint256 _amount, bool _isSale) external {
+    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external {
         if(msg.sender != policyManager) revert NotPolicyManager();
-        poolRegistry.updateCoverageSold(_poolId, _amount, _isSale);
+        poolRegistry.updateCoverageSold(poolId, amount, isSale);
     }
 
     /* ───────────────── Rewards Claiming ───────────────── */
@@ -362,11 +362,11 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
     /**
      * @notice Claims premium rewards for multiple pools.
      * @dev Iterates through the provided pool IDs and claims the rewards for each.
-     * @param _poolIds An array of pool IDs to claim rewards from.
+     * @param poolIds An array of pool IDs to claim rewards from.
      */
-    function claimPremiumRewards(uint256[] calldata _poolIds) external nonReentrant {
-        for (uint256 i = 0; i < _poolIds.length; i++) {
-            uint256 poolId = _poolIds[i];
+    function claimPremiumRewards(uint256[] calldata poolIds) external nonReentrant {
+        for (uint256 i = 0; i < poolIds.length; i++) {
+            uint256 poolId = poolIds[i];
             // Only attempt a claim if the underwriter has a pledge in the pool.
             if (underwriterPoolPledge[msg.sender][poolId] > 0) {
                 (
@@ -394,19 +394,19 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
      * @notice EXTERNAL “execute” function: pulls in the pre–aggregated tokens
      *         and makes one isolated external call per token.
      */
-    function claimDistressedAssets(uint256[] calldata _poolIds) external nonReentrant {
-        address[] memory uniqueTokens = _prepareDistressedAssets(_poolIds);
+    function claimDistressedAssets(uint256[] calldata poolIds) external nonReentrant {
+        address[] memory uniqueTokens = _prepareDistressedAssets(poolIds);
         for (uint i; i < uniqueTokens.length; i++) {
             catPool.claimProtocolAssetRewardsFor(msg.sender, uniqueTokens[i]);
         }
     }
 
-    function onCapitalDeposited(address _underwriter, uint256 _amount) external nonReentrant {
+    function onCapitalDeposited(address underwriter, uint256 amount) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
-        underwriterTotalPledge[_underwriter] += _amount;
-        uint256[] memory pools = underwriterAllocations[_underwriter];
+        underwriterTotalPledge[underwriter] += amount;
+        uint256[] memory pools = underwriterAllocations[underwriter];
         for(uint i=0; i<pools.length; i++){
-            underwriterPoolPledge[_underwriter][pools[i]] += _amount;
+            underwriterPoolPledge[underwriter][pools[i]] += amount;
             (
                 IERC20 protocolToken,
                 uint256 _pledged4,
@@ -418,19 +418,19 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
             ) = poolRegistry.getPoolData(pools[i]);
             (_pledged4, _sold4, _pend4, _paused4, _fr4, _cf4);
             rewardDistributor.updateUserState(
-                _underwriter,
+                underwriter,
                 pools[i],
                 address(protocolToken),
-                underwriterPoolPledge[_underwriter][pools[i]]
+                underwriterPoolPledge[underwriter][pools[i]]
             );
         }
     }
 
-    function onWithdrawalRequested(address _underwriter, uint256 _principalComponent) external nonReentrant {
+    function onWithdrawalRequested(address underwriter, uint256 principalComponent) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
-        uint256[] memory allocations = underwriterAllocations[_underwriter];
+        uint256[] memory allocations = underwriterAllocations[underwriter];
         for (uint i = 0; i < allocations.length; i++) {
-            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], _principalComponent, true);
+            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], principalComponent, true);
             (
                 IERC20 protocolToken,
                 uint256 _pledged5,
@@ -442,19 +442,19 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
             ) = poolRegistry.getPoolData(allocations[i]);
             (_pledged5, _sold5, _pend5, _paused5, _fr5, _cf5);
             rewardDistributor.updateUserState(
-                _underwriter,
+                underwriter,
                 allocations[i],
                 address(protocolToken),
-                underwriterPoolPledge[_underwriter][allocations[i]]
+                underwriterPoolPledge[underwriter][allocations[i]]
             );
         }
     }
 
-    function onWithdrawalCancelled(address _underwriter, uint256 _principalComponent) external nonReentrant {
+    function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
-        uint256[] memory allocations = underwriterAllocations[_underwriter];
+        uint256[] memory allocations = underwriterAllocations[underwriter];
         for (uint i = 0; i < allocations.length; i++) {
-            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], _principalComponent, false);
+            poolRegistry.updateCapitalPendingWithdrawal(allocations[i], principalComponent, false);
             (
                 IERC20 protocolToken,
                 uint256 _pledged6,
@@ -466,23 +466,23 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
             ) = poolRegistry.getPoolData(allocations[i]);
             (_pledged6, _sold6, _pend6, _paused6, _fr6, _cf6);
             rewardDistributor.updateUserState(
-                _underwriter,
+                underwriter,
                 allocations[i],
                 address(protocolToken),
-                underwriterPoolPledge[_underwriter][allocations[i]]
+                underwriterPoolPledge[underwriter][allocations[i]]
             );
         }
     }
 
-    function onCapitalWithdrawn(address _underwriter, uint256 _principalComponentRemoved, bool _isFullWithdrawal) external nonReentrant {
+    function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) external nonReentrant {
         if(msg.sender != address(capitalPool)) revert NotCapitalPool();
-        _realizeLossesForAllPools(_underwriter);
+        _realizeLossesForAllPools(underwriter);
         
-        uint256 pledgeAfterLosses = underwriterTotalPledge[_underwriter];
-        uint256 amountToSubtract = Math.min(pledgeAfterLosses, _principalComponentRemoved);
-        underwriterTotalPledge[_underwriter] -= amountToSubtract;
+        uint256 pledgeAfterLosses = underwriterTotalPledge[underwriter];
+        uint256 amountToSubtract = Math.min(pledgeAfterLosses, principalComponentRemoved);
+        underwriterTotalPledge[underwriter] -= amountToSubtract;
         
-        uint256[] memory allocations = underwriterAllocations[_underwriter];
+        uint256[] memory allocations = underwriterAllocations[underwriter];
         for (uint i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
             (
@@ -495,12 +495,12 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
                 uint256 _cf7
             ) = poolRegistry.getPoolData(poolId);
             (_pt7, _pledged7, _sold7, _paused7, _fr7, _cf7);
-            uint256 reduction = Math.min(_principalComponentRemoved, pendingWithdrawal);
+            uint256 reduction = Math.min(principalComponentRemoved, pendingWithdrawal);
             if (reduction > 0) {
                 poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
             }
-            uint256 pledgeReduction = _principalComponentRemoved > underwriterPoolPledge[_underwriter][poolId] ? underwriterPoolPledge[_underwriter][poolId] : _principalComponentRemoved;
-            underwriterPoolPledge[_underwriter][poolId] -= pledgeReduction;
+            uint256 pledgeReduction = principalComponentRemoved > underwriterPoolPledge[underwriter][poolId] ? underwriterPoolPledge[underwriter][poolId] : principalComponentRemoved;
+            underwriterPoolPledge[underwriter][poolId] -= pledgeReduction;
             (
                 IERC20 protocolToken,
                 uint256 _pledged8,
@@ -512,17 +512,17 @@ function liquidateInsolventUnderwriter(address _underwriter) external nonReentra
             ) = poolRegistry.getPoolData(poolId);
             (_pledged8, _sold8, _pend8, _paused8, _fr8, _cf8);
             rewardDistributor.updateUserState(
-                _underwriter,
+                underwriter,
                 poolId,
                 address(protocolToken),
-                underwriterPoolPledge[_underwriter][poolId]
+                underwriterPoolPledge[underwriter][poolId]
             );
-            if (_isFullWithdrawal || underwriterPoolPledge[_underwriter][poolId] == 0) {
-                _removeUnderwriterFromPool(_underwriter, poolId);
+            if (isFullWithdrawal || underwriterPoolPledge[underwriter][poolId] == 0) {
+                _removeUnderwriterFromPool(underwriter, poolId);
             }
         }
-        if (_isFullWithdrawal) {
-            delete underwriterAllocations[_underwriter];
+        if (isFullWithdrawal) {
+            delete underwriterAllocations[underwriter];
         }
     }
     
