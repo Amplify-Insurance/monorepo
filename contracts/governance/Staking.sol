@@ -56,35 +56,35 @@ contract StakingContract is Ownable, ReentrancyGuard {
      * @notice Sets the address of the Committee contract. Can only be called once.
      * This is the only address that needs special privileges (e.g., for slashing).
      */
-    function setCommitteeAddress(address _committeeAddress) external onlyOwner {
+    function setCommitteeAddress(address committeeAddr) external onlyOwner {
         require(committeeAddress == address(0), "Committee address already set");
-        if (_committeeAddress == address(0)) revert ZeroAddress();
-        committeeAddress = _committeeAddress;
-        emit CommitteeAddressSet(_committeeAddress);
+        if (committeeAddr == address(0)) revert ZeroAddress();
+        committeeAddress = committeeAddr;
+        emit CommitteeAddressSet(committeeAddr);
     }
 
     /**
      * @notice Stake governance tokens to participate in voting.
      */
-    function stake(uint256 _amount) external nonReentrant {
-        if (_amount == 0) revert InvalidAmount();
-        stakedBalance[msg.sender] += _amount;
-        totalStaked += _amount;
-        governanceToken.safeTransferFrom(msg.sender, address(this), _amount);
-        emit Staked(msg.sender, _amount);
+    function stake(uint256 amount) external nonReentrant {
+        if (amount == 0) revert InvalidAmount();
+        stakedBalance[msg.sender] += amount;
+        totalStaked += amount;
+        governanceToken.safeTransferFrom(msg.sender, address(this), amount);
+        emit Staked(msg.sender, amount);
     }
 
-    function recordVote(address _voter, uint256 _proposalId) external onlyCommittee {
-        lastVotedProposal[_voter] = _proposalId;
-        lastVoteTime[_voter] = block.timestamp;
+    function recordVote(address voter, uint256 proposalId) external onlyCommittee {
+        lastVotedProposal[voter] = proposalId;
+        lastVoteTime[voter] = block.timestamp;
     }
 
     /**
      * @notice Unstake governance tokens.
      */
-    function unstake(uint256 _amount) external nonReentrant {
-        if (_amount == 0) revert InvalidAmount();
-        if (stakedBalance[msg.sender] < _amount) revert InsufficientStakedBalance();
+    function unstake(uint256 amount) external nonReentrant {
+        if (amount == 0) revert InvalidAmount();
+        if (stakedBalance[msg.sender] < amount) revert InsufficientStakedBalance();
         uint256 proposalId = lastVotedProposal[msg.sender];
         if (proposalId != 0) {
             bool finalized = ICommittee(committeeAddress).isProposalFinalized(proposalId);
@@ -92,12 +92,12 @@ contract StakingContract is Ownable, ReentrancyGuard {
                 if (block.timestamp < lastVoteTime[msg.sender] + UNSTAKE_LOCK_PERIOD) {
                     revert VoteLockActive();
                 }
-                uint256 newBalance = stakedBalance[msg.sender] - _amount;
+                uint256 newBalance = stakedBalance[msg.sender] - amount;
                 stakedBalance[msg.sender] = newBalance;
-                totalStaked -= _amount;
+                totalStaked -= amount;
                 ICommittee(committeeAddress).updateVoteWeight(msg.sender, proposalId, newBalance);
-                governanceToken.safeTransfer(msg.sender, _amount);
-                emit Unstaked(msg.sender, _amount);
+                governanceToken.safeTransfer(msg.sender, amount);
+                emit Unstaked(msg.sender, amount);
                 return;
             } else {
                 lastVotedProposal[msg.sender] = 0;
@@ -105,26 +105,26 @@ contract StakingContract is Ownable, ReentrancyGuard {
             }
         }
 
-        stakedBalance[msg.sender] -= _amount;
-        totalStaked -= _amount;
-        governanceToken.safeTransfer(msg.sender, _amount);
-        emit Unstaked(msg.sender, _amount);
+        stakedBalance[msg.sender] -= amount;
+        totalStaked -= amount;
+        governanceToken.safeTransfer(msg.sender, amount);
+        emit Unstaked(msg.sender, amount);
     }
 
     /**
      * @notice Function for the Committee to slash a user's staked tokens.
-     * @param _user The user whose stake is to be slashed.
-     * @param _amount The amount to slash.
+     * @param user The user whose stake is to be slashed.
+     * @param amount The amount to slash.
      */
-    function slash(address _user, uint256 _amount) external onlyCommittee nonReentrant {
-        if (_amount == 0) revert InvalidAmount();
-        uint256 userStake = stakedBalance[_user];
-        if (userStake < _amount) revert InsufficientStakedBalance();
+    function slash(address user, uint256 amount) external onlyCommittee nonReentrant {
+        if (amount == 0) revert InvalidAmount();
+        uint256 userStake = stakedBalance[user];
+        if (userStake < amount) revert InsufficientStakedBalance();
 
-        stakedBalance[_user] = userStake - _amount;
-        totalStaked -= _amount;
+        stakedBalance[user] = userStake - amount;
+        totalStaked -= amount;
         // The slashed tokens are transferred to the committee for distribution.
-        governanceToken.safeTransfer(committeeAddress, _amount);
-        emit Slashed(_user, _amount);
+        governanceToken.safeTransfer(committeeAddress, amount);
+        emit Slashed(user, amount);
     }
 }

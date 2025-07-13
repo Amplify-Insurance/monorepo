@@ -77,22 +77,22 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
         emit PolicyManagerAddressSet(_policyManagerAddress);
     }
 
-    function setCatPool(address _catPool) external onlyOwner {
-        if (_catPool == address(0)) revert ZeroAddress();
-        catPool = _catPool;
-        emit CatPoolSet(_catPool);
+    function setCatPool(address catPoolAddress) external onlyOwner {
+        if (catPoolAddress == address(0)) revert ZeroAddress();
+        catPool = catPoolAddress;
+        emit CatPoolSet(catPoolAddress);
     }
 
-    function setRiskManager(address _newRiskManager) external onlyOwner {
-        if (_newRiskManager == address(0)) revert ZeroAddress();
-        riskManager = _newRiskManager;
-        emit RiskManagerAddressSet(_newRiskManager);
+    function setRiskManager(address newRiskManager) external onlyOwner {
+        if (newRiskManager == address(0)) revert ZeroAddress();
+        riskManager = newRiskManager;
+        emit RiskManagerAddressSet(newRiskManager);
     }
 
-    function setPolicyManager(address _newPolicyManager) external onlyOwner {
-        if (_newPolicyManager == address(0)) revert ZeroAddress();
-        policyManager = _newPolicyManager;
-        emit PolicyManagerAddressSet(_newPolicyManager);
+    function setPolicyManager(address newPolicyManager) external onlyOwner {
+        if (newPolicyManager == address(0)) revert ZeroAddress();
+        policyManager = newPolicyManager;
+        emit PolicyManagerAddressSet(newPolicyManager);
     }
 
     /* ───────────────────────── Core Logic ──────────────────────── */
