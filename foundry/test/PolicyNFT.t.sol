@@ -12,7 +12,11 @@ contract PolicyNFTTest is Test {
     address other = address(0x3);
 
     function setUp() public {
-        nft = new PolicyNFT(address(0), owner);
+        // Pass a valid, non-zero address for the initial policy manager.
+        // It can be the owner or another address for the initial setup.
+        nft = new PolicyNFT(policyManager, owner);
+        // You can now remove nft.setPolicyManagerAddress(policyManager) from other tests
+        // as it's already set here.
     }
 
     function testInitialState() public {
@@ -149,4 +153,52 @@ contract PolicyNFTTest is Test {
         assertEq(p.poolId, 0);
         assertEq(p.start, 0);
     }
+
+
+    // 2. Add a new test function for `finalizeIncreases`
+function testFinalizeIncreases() public {
+    // --- Setup ---
+    vm.prank(policyManager);
+    uint256 policyId = nft.mint(user, 1, 1000, 0, 0, 0); // Initial coverage is 1000
+
+    uint256 amountToAdd = 500;
+
+    // --- Happy Path ---
+    vm.prank(policyManager);
+    nft.finalizeIncreases(policyId, amountToAdd);
+    PolicyNFT.Policy memory p = nft.getPolicy(policyId);
+    assertEq(p.coverage, 1000 + amountToAdd, "Coverage was not increased correctly");
+
+    // --- Revert: Not Policy Manager ---
+    vm.prank(other);
+    vm.expectRevert(bytes("PolicyNFT: Caller is not the authorized PolicyManager"));
+    nft.finalizeIncreases(policyId, amountToAdd);
+
+    // --- Revert: Amount is zero ---
+    vm.prank(policyManager);
+    vm.expectRevert(bytes("PolicyNFT: Amount to add must be greater than zero"));
+    nft.finalizeIncreases(policyId, 0);
+
+    // --- Revert: Policy does not exist ---
+    vm.prank(policyManager);
+    vm.expectRevert(bytes("PolicyNFT: Policy does not exist or has been burned"));
+    nft.finalizeIncreases(99, amountToAdd); // Non-existent ID
+}
+
+// 3. (Optional) Add a test for the constructor revert
+function testRevert_constructor_zeroAddress() public {
+    vm.expectRevert("PolicyNFT: PolicyManager address cannot be zero");
+    new PolicyNFT(address(0), owner);
+}
+
+// 4. (Optional) Add a basic ERC721 transfer test for full compliance check
+function testTransfer() public {
+    vm.prank(policyManager);
+    uint256 policyId = nft.mint(user, 1, 1000, 0, 0, 0);
+
+    // Test transfer
+    vm.prank(user);
+    nft.transferFrom(user, other, policyId);
+    assertEq(nft.ownerOf(policyId), other);
+}
 }

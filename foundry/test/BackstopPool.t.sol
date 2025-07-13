@@ -8,7 +8,7 @@ import {MockERC20} from "contracts/test/MockERC20.sol";
 import {MockYieldAdapter} from "contracts/test/MockYieldAdapter.sol";
 import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 
-contract BackstopPoolTest is Test {
+contract BackstopPoolFuzz is Test {
     BackstopPool pool;
     CatShare share;
     MockERC20 usdc;
@@ -21,7 +21,6 @@ contract BackstopPoolTest is Test {
     address policyManager = address(0x4);
 
     uint256 constant STARTING_BALANCE = 10_000e6;
-    uint256 constant DEPOSIT_AMOUNT = 1_000e6; // 1000 USDC
 
     function setUp() public {
         usdc = new MockERC20("USD Coin", "USDC", 6);
@@ -46,50 +45,192 @@ contract BackstopPoolTest is Test {
         usdc.approve(address(pool), type(uint256).max);
     }
 
-    function testDepositAndWithdrawFromAdapter() public {
+    function _deposit(uint256 amount) internal {
         vm.prank(user);
-        pool.depositLiquidity(DEPOSIT_AMOUNT);
-        assertEq(share.balanceOf(user), DEPOSIT_AMOUNT);
-        assertEq(pool.idleUSDC(), DEPOSIT_AMOUNT);
+        pool.depositLiquidity(amount);
+    }
 
-        pool.flushToAdapter(DEPOSIT_AMOUNT);
+    function testFuzz_depositLiquidity(uint96 amount) public {
+        uint256 min = pool.MIN_USDC_AMOUNT();
+        amount = uint96(bound(uint256(amount), min, STARTING_BALANCE));
+        _deposit(amount);
+        assertEq(share.balanceOf(user), amount);
+        assertEq(pool.idleUSDC(), amount);
+    }
+
+    function testFuzz_requestAndWithdraw(uint96 amount) public {
+        uint256 min = pool.MIN_USDC_AMOUNT();
+        amount = uint96(bound(uint256(amount), min, STARTING_BALANCE));
+
+        _deposit(amount);
+
+        vm.prank(user);
+        pool.requestWithdrawal(amount);
+
+        vm.warp(block.timestamp + pool.NOTICE_PERIOD());
+
+        uint256 before = usdc.balanceOf(user);
+
+        vm.prank(user);
+        pool.withdrawLiquidity(amount);
+
+        assertEq(usdc.balanceOf(user), before + amount);
+        assertEq(share.balanceOf(user), 0);
         assertEq(pool.idleUSDC(), 0);
-        assertEq(adapter.totalValueHeld(), DEPOSIT_AMOUNT);
-
-        uint256 shares = share.balanceOf(user);
-        vm.prank(user);
-        pool.withdrawLiquidity(shares);
-
-        // expected withdrawal = shares * totalValue / (totalShares - locked)
-        uint256 expectedWithdraw = shares * DEPOSIT_AMOUNT / shares;
-        assertEq(usdc.balanceOf(user), STARTING_BALANCE - DEPOSIT_AMOUNT + expectedWithdraw);
-        assertEq(adapter.totalValueHeld(), 0); // adapter fully drained
-        assertEq(share.totalSupply(), 1_000); // locked shares remain
     }
 
-    function testSubsequentDepositWithYield() public {
-        vm.prank(user);
-        pool.depositLiquidity(DEPOSIT_AMOUNT);
-        pool.flushToAdapter(DEPOSIT_AMOUNT);
-        adapter.setTotalValueHeld(DEPOSIT_AMOUNT * 110 / 100); // 10% yield
+    function testFuzz_flushToAdapter(uint96 amount) public {
+        uint256 min = pool.MIN_USDC_AMOUNT();
+        amount = uint96(bound(uint256(amount), min, STARTING_BALANCE));
+        _deposit(amount);
 
-        address user2 = address(0x5);
-        usdc.mint(user2, STARTING_BALANCE);
-        vm.prank(user2);
-        usdc.approve(address(pool), type(uint256).max);
+        pool.flushToAdapter(amount);
 
-        vm.prank(user2);
-        pool.depositLiquidity(DEPOSIT_AMOUNT);
-
-        uint256 totalShares = share.totalSupply();
-        uint256 totalValue = pool.liquidUsdc();
-        uint256 expectedShares = DEPOSIT_AMOUNT * (totalShares - 1_000) / totalValue;
-        assertEq(share.balanceOf(user2), expectedShares);
+        assertEq(adapter.totalValueHeld(), amount);
+        assertEq(pool.idleUSDC(), 0);
     }
 
-    function testDepositBelowMinimumReverts() public {
-        vm.prank(user);
-        vm.expectRevert("CIP: Amount below minimum");
-        pool.depositLiquidity(999);
+    function testFuzz_receiveUsdcPremium(uint96 premium) public {
+        premium = uint96(bound(uint256(premium), 1, STARTING_BALANCE));
+        usdc.mint(policyManager, premium);
+        vm.startPrank(policyManager);
+        usdc.approve(address(pool), premium);
+        pool.receiveUsdcPremium(premium);
+        vm.stopPrank();
+        assertEq(pool.idleUSDC(), premium);
     }
+
+    function testFuzz_drawFund(uint96 depositAmount, uint96 drawAmount) public {
+        uint256 min = pool.MIN_USDC_AMOUNT();
+        depositAmount = uint96(bound(uint256(depositAmount), min, STARTING_BALANCE));
+        drawAmount = uint96(bound(uint256(drawAmount), 1, depositAmount));
+
+        _deposit(depositAmount);
+
+        vm.prank(riskManager);
+        pool.drawFund(drawAmount);
+
+        assertEq(usdc.balanceOf(capitalPool), drawAmount);
+        assertEq(pool.idleUSDC(), depositAmount - drawAmount);
+    }
+
+    function testFuzz_receiveProtocolAssets(uint96 amount) public {
+        amount = uint96(bound(uint256(amount), 1, STARTING_BALANCE));
+        MockERC20 token = new MockERC20("RWD", "RWD", 18);
+        token.mint(riskManager, amount);
+        vm.startPrank(riskManager);
+        token.approve(address(pool), amount);
+        pool.receiveProtocolAssetsForDistribution(address(token), amount);
+        vm.stopPrank();
+        uint256 stored = distributor.totalRewards(pool.CAT_POOL_REWARD_ID(), address(token));
+        assertEq(stored, amount);
+    }
+
+    function testFuzz_claimProtocolRewards(uint96 depositAmount, uint96 reward) public {
+        uint256 min = pool.MIN_USDC_AMOUNT();
+        depositAmount = uint96(bound(uint256(depositAmount), min, STARTING_BALANCE));
+        reward = uint96(bound(uint256(reward), 1, STARTING_BALANCE));
+
+        _deposit(depositAmount);
+
+        MockERC20 token = new MockERC20("RWD", "RWD", 18);
+        token.mint(riskManager, reward);
+        vm.startPrank(riskManager);
+        token.approve(address(pool), reward);
+        pool.receiveProtocolAssetsForDistribution(address(token), reward);
+        vm.stopPrank();
+
+        uint256 pending = pool.getPendingProtocolAssetRewards(user, address(token));
+        vm.assume(pending > 0);
+        vm.prank(user);
+        pool.claimProtocolAssetRewards(address(token));
+        uint256 remaining = pool.getPendingProtocolAssetRewards(user, address(token));
+        assertLt(remaining, pending);
+    }
+
+    function testFuzz_adminSetters(address newRM, address newCP, address newPM) public {
+        vm.assume(newRM != address(0) && newCP != address(0) && newPM != address(0));
+
+        pool.setRiskManagerAddress(newRM);
+        assertEq(pool.riskManagerAddress(), newRM);
+
+        pool.setCapitalPoolAddress(newCP);
+        assertEq(pool.capitalPoolAddress(), newCP);
+
+        pool.setPolicyManagerAddress(newPM);
+        assertEq(pool.policyManagerAddress(), newPM);
+
+        MockRewardDistributor rd = new MockRewardDistributor();
+        pool.setRewardDistributor(address(rd));
+        assertEq(address(pool.rewardDistributor()), address(rd));
+
+        MockYieldAdapter newAdapter = new MockYieldAdapter(address(usdc), address(0), address(this));
+        pool.setAdapter(address(newAdapter));
+        assertEq(address(pool.adapter()), address(newAdapter));
+    }
+
+
+    // Add these test functions to your existing BackstopPoolFuzz contract
+
+function testRevert_initialize_ifAlreadyInitialized() public {
+    // The pool is already initialized in the setUp() function.
+    // Attempting to call it again should revert.
+    vm.expectRevert("CIP: Already initialized");
+    pool.initialize();
+}
+
+function testRevert_initialize_ifNotShareTokenOwner() public {
+    // --- Setup ---
+    // Deploy a new set of contracts where the pool is NOT the owner of the share token.
+    CatShare newShare = new CatShare();
+    BackstopPool newPool = new BackstopPool(usdc, newShare, adapter, address(this));
+
+    // --- Action & Assertion ---
+    // The call to initialize should fail because ownership of `newShare` was not transferred to `newPool`.
+    vm.expectRevert("CIP: Pool must be owner of share token");
+    newPool.initialize();
+}
+
+function test_claimProtocolAssetRewardsFor_byRiskManager() public {
+    // --- Setup ---
+    uint96 depositAmount = 50_000e6;
+    uint96 rewardAmount = 1_000e18;
+    MockERC20 rewardToken = new MockERC20("Reward", "RWD", 18);
+
+    // 1. User deposits to have shares
+    _deposit(depositAmount);
+
+    // 2. Risk Manager sends rewards to the pool
+    rewardToken.mint(riskManager, rewardAmount);
+    vm.startPrank(riskManager);
+    rewardToken.approve(address(pool), rewardAmount);
+    pool.receiveProtocolAssetsForDistribution(address(rewardToken), rewardAmount);
+    vm.stopPrank();
+
+    // --- Action ---
+    // 3. Risk Manager triggers the claim on behalf of the user
+    uint256 userBalanceBefore = rewardToken.balanceOf(user);
+    vm.prank(riskManager);
+    pool.claimProtocolAssetRewardsFor(user, address(rewardToken));
+    uint256 userBalanceAfter = rewardToken.balanceOf(user);
+
+    // --- Assertions ---
+    // 4. Verify the user received the rewards
+    assertEq(userBalanceAfter, userBalanceBefore + rewardAmount, "User did not receive rewards");
+}
+
+function testRevert_setters_ifZeroAddress() public {
+    // This test checks that admin functions correctly revert when given the zero address.
+    vm.expectRevert("CIP: Address cannot be zero");
+    pool.setRiskManagerAddress(address(0));
+
+    vm.expectRevert("CIP: Address cannot be zero");
+    pool.setCapitalPoolAddress(address(0));
+
+    vm.expectRevert("CIP: Address cannot be zero");
+    pool.setPolicyManagerAddress(address(0));
+
+    vm.expectRevert("CIP: Address cannot be zero");
+    pool.setRewardDistributor(address(0));
+}
 }

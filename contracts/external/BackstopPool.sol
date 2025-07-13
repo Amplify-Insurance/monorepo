@@ -344,4 +344,5 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         uint256 userShares = catShareToken.balanceOf(user);
         return rewardDistributor.pendingRewards(user, CAT_POOL_REWARD_ID, protocolAsset, userShares);
     }
+    
 }
