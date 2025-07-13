@@ -13,7 +13,6 @@ import "../interfaces/ICapitalPool.sol";
  * tests can assert correct interactions from the contract-under-test.
  */
 contract MockCapitalPool is Ownable {
-
     // --- State for Mocking ---
 
     IERC20 public immutable underlyingAssetToken;
@@ -43,8 +42,13 @@ contract MockCapitalPool is Ownable {
     mapping(address => Account) private accounts;
     mapping(uint256 => uint256) private shareValues;
     ICapitalPool.PayoutData public lastPayout;
-    uint256 public executePayoutCallCount;
+    ICapitalPool.PayoutData private _last_executePayout_payoutData;
 
+    function last_executePayout_payoutData() external view returns (ICapitalPool.PayoutData memory) {
+        return _last_executePayout_payoutData;
+    }
+
+    uint256 public executePayoutCallCount;
 
     // --- Constructor ---
 
@@ -52,7 +56,6 @@ contract MockCapitalPool is Ownable {
         require(_underlyingAsset != address(0), "MockCP: Invalid underlying asset");
         underlyingAssetToken = IERC20(_underlyingAsset);
     }
-
 
     // --- Mock Control Functions (Owner-only) ---
 
@@ -64,6 +67,8 @@ contract MockCapitalPool is Ownable {
         emit RevertOnApplyLossesSet(_shouldRevert);
     }
 
+    // Dummy setter to mimic interface in tests
+    function setUnderlyingAsset(address) external {}
 
     // --- Mocked Functions (Implementing the CapitalPool's external interface for RiskManager) ---
 
@@ -118,6 +123,13 @@ contract MockCapitalPool is Ownable {
         accounts[user] = Account(0, 0, masterShares, 0, 0);
     }
 
+    // Overloaded helper to mimic older interface used in tests
+    function setUnderwriterAccount(address user, uint256 dummy1, uint256 masterShares, uint256 dummy3, uint256 dummy4)
+        external
+    {
+        accounts[user] = Account(dummy1, 0, masterShares, dummy3, dummy4);
+    }
+
     function setSharesToValue(uint256 shares, uint256 value) external {
         shareValues[shares] = value;
     }
@@ -137,6 +149,7 @@ contract MockCapitalPool is Ownable {
 
     function executePayout(ICapitalPool.PayoutData calldata payoutData) external {
         lastPayout = payoutData;
+        _last_executePayout_payoutData = payoutData;
         executePayoutCallCount++;
     }
 

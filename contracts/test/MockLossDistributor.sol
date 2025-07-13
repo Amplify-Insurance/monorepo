@@ -11,13 +11,31 @@ import "../interfaces/ILossDistributor.sol";
 contract MockLossDistributor is ILossDistributor {
     mapping(address => mapping(uint256 => uint256)) public pending;
 
+    uint256 public distributeLossCallCount;
+    uint256 public last_distributeLoss_poolId;
+    uint256 public last_distributeLoss_lossAmount;
+    uint256 public last_distributeLoss_totalPledge;
+
     event LossDistributed(uint256 poolId, uint256 lossAmount, uint256 totalPledge);
 
     function setPendingLoss(address user, uint256 poolId, uint256 amount) external {
         pending[user][poolId] = amount;
     }
 
+    function setRealizeLosses(address user, uint256 poolId, uint256, uint256 amount) external {
+        pending[user][poolId] = amount;
+    }
+
+    // Added for backward compatibility with older tests expecting a 4-argument function
+    function setPendingLosses(address user, uint256 poolId, uint256, uint256 amount) external {
+        pending[user][poolId] = amount;
+    }
+
     function distributeLoss(uint256 poolId, uint256 lossAmount, uint256 totalPledgeInPool) external override {
+        last_distributeLoss_poolId = poolId;
+        last_distributeLoss_lossAmount = lossAmount;
+        last_distributeLoss_totalPledge = totalPledgeInPool;
+        distributeLossCallCount++;
         emit LossDistributed(poolId, lossAmount, totalPledgeInPool);
     }
 
