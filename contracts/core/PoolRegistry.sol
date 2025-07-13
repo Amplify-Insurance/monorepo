@@ -30,16 +30,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     }
 
 
-    // We define a new struct to hold the returned data for each pool.
-    struct PoolInfo {
-        IERC20 protocolTokenToCover;
-        uint256 totalCapitalPledgedToPool;
-        uint256 totalCoverageSold;
-        uint256 capitalPendingWithdrawal;
-        bool isPaused;
-        address feeRecipient;
-        uint256 claimFeeBps;
-    }
+
 
     PoolData[] public protocolRiskPools;
     address public riskManager;
@@ -158,15 +149,15 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     * @param _poolIds An array of IDs for the pools to query.
     * @return A memory array of PoolInfo structs containing the data for each requested pool.
     */
-    function getMultiplePoolData(uint256[] calldata _poolIds) external view returns (PoolInfo[] memory) {
+    function getMultiplePoolData(uint256[] calldata _poolIds) external view returns (IPoolRegistry.PoolInfo[] memory) {
         uint256 numPools = _poolIds.length;
-        PoolInfo[] memory multiplePoolData = new PoolInfo[](numPools);
+        IPoolRegistry.PoolInfo[] memory multiplePoolData = new IPoolRegistry.PoolInfo[](numPools);
 
         for (uint256 i = 0; i < numPools; i++) {
             uint256 poolId = _poolIds[i];
             PoolData storage pool = protocolRiskPools[poolId];
 
-            multiplePoolData[i] = PoolInfo({
+            multiplePoolData[i] = IPoolRegistry.PoolInfo({
                 protocolTokenToCover: pool.protocolTokenToCover,
                 totalCapitalPledgedToPool: pool.totalCapitalPledgedToPool,
                 totalCoverageSold: pool.totalCoverageSold,

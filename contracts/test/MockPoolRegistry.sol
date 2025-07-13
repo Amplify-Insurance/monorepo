@@ -142,5 +142,22 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
     function setFeeRecipient(uint256 poolId, address recipient) external override {
         pools[poolId].feeRecipient = recipient;
     }
+
+    function getMultiplePoolData(uint256[] calldata poolIds) external view override returns (IPoolRegistry.PoolInfo[] memory infos) {
+        uint256 len = poolIds.length;
+        infos = new IPoolRegistry.PoolInfo[](len);
+        for (uint256 i = 0; i < len; i++) {
+            PoolData storage d = pools[poolIds[i]];
+            infos[i] = IPoolRegistry.PoolInfo({
+                protocolTokenToCover: d.protocolTokenToCover,
+                totalCapitalPledgedToPool: d.totalCapitalPledgedToPool,
+                totalCoverageSold: d.totalCoverageSold,
+                capitalPendingWithdrawal: d.capitalPendingWithdrawal,
+                isPaused: d.isPaused,
+                feeRecipient: d.feeRecipient,
+                claimFeeBps: d.claimFeeBps
+            });
+        }
+    }
 }
 
