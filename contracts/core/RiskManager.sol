@@ -18,6 +18,7 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
 import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
 
+
 /**
  * @title RiskManager
  * @author Gemini
@@ -70,6 +71,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
 
+
     /* ───────────────────────── Errors ───────────────────────── */
     error NotPolicyManager();
     error UnderwriterNotInsolvent();
@@ -89,10 +91,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
         address _rewards,
         address _underwriterManager
     ) external onlyOwner {
-        if (
-            _capital == address(0) || _registry == address(0) || _policyManager == address(0) || _cat == address(0)
-                || _loss == address(0) || _rewards == address(0) || _underwriterManager == address(0)
-        ) {
+        if (_capital == address(0) || _registry == address(0) || _policyManager == address(0) || _cat == address(0)
+            || _loss == address(0) || _rewards == address(0) || _underwriterManager == address(0)) {
             revert ZeroAddressNotAllowed();
         }
 
@@ -141,21 +141,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
     ClaimData memory data = _prepareClaimData(policyId);
     if (msg.sender != data.claimant) revert OnlyPolicyOwner();
 
-<<<<<<< HEAD
     // --- 2. PREMIUM DISTRIBUTION ---
     _distributePremium(data);
-=======
-        // --- 2. PREMIUM DISTRIBUTION (if applicable) ---
-        if (coverage > 0) {
-            uint8 protocolDecimals = IERC20Metadata(address(data.protocolToken)).decimals();
-            uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
-            uint256 protocolCoverage = _scaleAmount(coverage, underlyingDecimals, protocolDecimals);
-            data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
-            rewardDistributor.distribute(
-                poolId, address(data.protocolToken), protocolCoverage, data.totalCapitalPledged
-            );
-        }
->>>>>>> c99a8210815d585e217060ce2b5165e07bcfc74f
 
     // --- 3. LOSS DISTRIBUTION ---
     uint256 lossBorneByPool = _distributeLosses(data);
@@ -231,6 +218,7 @@ function _updatePoolState(ClaimData memory _data, uint256 _lossBorneByPool) inte
         poolRegistry.updateCoverageSold(poolId, amount, isSale);
     }
 
+
     /* ───────────────── Internal Helper Functions ───────────────── */
 
     function _prepareClaimData(uint256 _policyId) internal view returns (ClaimData memory data) {
@@ -285,3 +273,4 @@ function _updatePoolState(ClaimData memory _data, uint256 _lossBorneByPool) inte
         return amount;
     }
 }
+

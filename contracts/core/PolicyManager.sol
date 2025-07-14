@@ -8,65 +8,12 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-// --- Interfaces ---
-interface IPolicyNFT {
-    struct Policy {
-        uint256 poolId;
-        uint256 coverage;
-        uint256 premiumDeposit;
-        uint128 lastDrainTime;
-        uint256 activation;
-        uint256 expiration;
-    }
-    function getPolicy(uint256 policyId) external view returns (Policy memory);
-    function ownerOf(uint256 policyId) external view returns (address);
-    function burn(uint256 policyId) external;
-    function mint(address to, uint256 poolId, uint256 coverage, uint256 activation, uint128 premium, uint128 lastDrain) external returns (uint256);
-    function updatePremiumAccount(uint256 policyId, uint128 newPremium, uint128 lastDrain) external;
-    function finalizeIncreases(uint256 policyId, uint256 amount) external;
-}
-
-interface IPoolRegistry {
-     struct PoolInfo {
-        IERC20 protocolTokenToCover;
-        uint256 totalCapitalPledged;
-        uint256 totalCoverageSold;
-        uint256 capitalPendingWithdrawal;
-        bool isPaused;
-        address feeRecipient;
-        uint256 claimFeeBps;
-    }
-    struct RateModel {
-        uint128 base;
-        uint128 slope1;
-        uint128 slope2;
-        uint128 kink;
-    }
-    function getPoolCount() external view returns (uint256);
-    function getPoolData(uint256 poolId) external view returns (IERC20, uint256, uint256, uint256, bool, address, uint256);
-    function getPoolRateModel(uint256 poolId) external view returns (RateModel memory);
-    function getMultiplePoolData(uint256[] calldata poolIds) external view returns (PoolInfo[] memory);
-    function updateCapitalAllocation(uint256 poolId, address adapter, uint256 amount, bool isAllocation) external;
-    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isIncrease) external;
-}
-
-interface ICapitalPool {
-    function underlyingAsset() external view returns (IERC20);
-    function receiveUsdcPremium(uint256 amount) external;
-}
-
-interface IBackstopPool {
-    function receiveUsdcPremium(uint256 amount) external;
-}
-
-interface IRewardDistributor {
-    function distribute(uint256 poolId, address token, uint256 amount, uint256 totalPledge) external;
-}
-
-interface IRiskManagerPMHook {
-    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
-}
-
+import "../interfaces/IPolicyNFT.sol";
+import "../interfaces/IPoolRegistry.sol";
+import "../interfaces/ICapitalPool.sol";
+import "../interfaces/IBackstopPool.sol";
+import "../interfaces/IRewardDistributor.sol";
+import "../interfaces/IRiskManagerPMHook.sol";
 
 /**
  * @title PolicyManager

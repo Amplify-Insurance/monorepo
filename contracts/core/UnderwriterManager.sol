@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.20;
 
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -8,7 +9,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // --- Interfaces ---
-<<<<<<< HEAD
 interface IPolicyNFT {
     struct Policy {
         uint256 poolId;
@@ -67,14 +67,6 @@ interface IRewardDistributor {
     function claim(address user, uint256 poolId, address token, uint256 pledge) external returns (uint256);
     function updateUserState(address user, uint256 poolId, address token, uint256 newPledge) external;
 }
-=======
-import {IPolicyNFT} from "../interfaces/IPolicyNFT.sol";
-import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
-import {ICapitalPool} from "../interfaces/ICapitalPool.sol";
-import {IBackstopPool} from "../interfaces/IBackstopPool.sol";
-import {ILossDistributor} from "../interfaces/ILossDistributor.sol";
-import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
->>>>>>> c99a8210815d585e217060ce2b5165e07bcfc74f
 
 /**
  * @title UnderwriterManager
@@ -142,10 +134,8 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         address _rewardDistributor,
         address _riskManager
     ) external onlyOwner {
-        if (
-            _capitalPool == address(0) || _poolRegistry == address(0) || _catPool == address(0)
-                || _lossDistributor == address(0) || _rewardDistributor == address(0) || _riskManager == address(0)
-        ) {
+        if (_capitalPool == address(0) || _poolRegistry == address(0) || _catPool == address(0) ||
+            _lossDistributor == address(0) || _rewardDistributor == address(0) || _riskManager == address(0)) {
             revert ZeroAddressNotAllowed();
         }
         capitalPool = ICapitalPool(_capitalPool);
@@ -324,7 +314,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         emit CapitalDeallocated(underwriter, poolId, finalAmountToDeallocate);
     }
 
-<<<<<<< HEAD
     /**
      * @notice NEW: Internal helper to validate a deallocation request.
      * @return requestedAmount The amount from the original request.
@@ -335,9 +324,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
         return deallocationRequestAmount[underwriter][poolId];
     }
-=======
-    /* ───────────────── Hooks & State Updaters ───────────────── */
->>>>>>> c99a8210815d585e217060ce2b5165e07bcfc74f
 
     /**
      * @notice NEW: Internal helper for the onCapitalDeposited hook logic.
@@ -429,8 +415,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
 
         uint256 currentPoolPledge = underwriterPoolPledge[underwriter][poolId];
-        uint256 newPoolPledge =
-            (principalComponentRemoved >= currentPoolPledge) ? 0 : currentPoolPledge - principalComponentRemoved;
+        uint256 newPoolPledge = (principalComponentRemoved >= currentPoolPledge)
+            ? 0
+            : currentPoolPledge - principalComponentRemoved;
 
         underwriterPoolPledge[underwriter][poolId] = newPoolPledge;
 
@@ -494,7 +481,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         uint256 currentPledge = underwriterPoolPledge[_underwriter][_poolId];
         require(_amount <= currentPledge, "Amount exceeds pledge");
 
-        (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,,,) = poolRegistry.getPoolData(_poolId);
+        (,uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,,,) = poolRegistry.getPoolData(_poolId);
 
         uint256 freeCapital =
             totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
