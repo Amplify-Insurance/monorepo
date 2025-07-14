@@ -28,7 +28,7 @@ event UnderwriterLiquidated(address indexed liquidator, address indexed underwri
  * @notice A lean orchestrator for a decentralized insurance protocol. It manages capital allocation,
  * claim processing, and liquidations by coordinating with specialized satellite contracts.
  */
-contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHook {
+contract RiskManagerOld is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHook {
     using SafeERC20 for IERC20;
 
     /* ───────────────────────── State Variables ───────────────────────── */
@@ -426,7 +426,6 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
             );
         }
     }
-U
     function onWithdrawalRequested(address underwriter, uint256 principalComponent) external nonReentrant {
         if (msg.sender != address(capitalPool)) revert NotCapitalPool();
 
