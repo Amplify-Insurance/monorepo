@@ -4,49 +4,12 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 // --- Interfaces ---
-
-interface IPoolRegistry {
-    struct RateModel {
-        uint128 U_1;
-        uint128 U_2;
-        uint128 R_0;
-        uint128 R_1;
-        uint128 R_2;
-    }
-    function addProtocolRiskPool(
-        address protocolTokenToCover,
-        RateModel calldata rateModel,
-        uint256 claimFeeBps
-    ) external returns (uint256);
-    function setPauseState(uint256 poolId, bool pauseState) external;
-    function setFeeRecipient(uint256 poolId, address recipient) external;
-}
-
-interface IPoolRegistryAdmin {
-    function setRiskManager(address newRiskManager) external;
-}
-
-interface ICapitalPoolAdmin {
-    enum YieldPlatform { NONE, AAVE, COMPOUND, OTHER_YIELD }
-    function setRiskManager(address _riskManager) external;
-    function setUnderwriterNoticePeriod(uint256 _newPeriod) external;
-    function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external;
-}
-
-interface IUnderwriterManagerAdmin {
-    function setMaxAllocationsPerUnderwriter(uint256 _newMax) external;
-    function setDeallocationNoticePeriod(uint256 _newPeriod) external;
-}
-
-interface IPolicyManagerAdmin {
-    function setCatPool(address catPoolAddress) external;
-    function setCatPremiumShareBps(uint256 newBps) external;
-    function setCoverCooldownPeriod(uint256 newPeriod) external;
-}
-
-interface IRiskManagerAdmin {
-    function setCommittee(address _newCommittee) external;
-}
+import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
+import {IPoolRegistryAdmin} from "../interfaces/IPoolRegistryAdmin.sol";
+import {ICapitalPoolAdmin} from "../interfaces/ICapitalPoolAdmin.sol";
+import {IUnderwriterManagerAdmin} from "../interfaces/IUnderwriterManagerAdmin.sol";
+import {IPolicyManagerAdmin} from "../interfaces/IPolicyManagerAdmin.sol";
+import {IRiskManagerAdmin} from "../interfaces/IRiskManagerAdmin.sol";
 
 /**
  * @title RiskAdmin
@@ -56,7 +19,6 @@ interface IRiskManagerAdmin {
  * Its purpose is to manage system-level parameters and critical safety features.
  */
 contract RiskAdmin is Ownable {
-
     /* ───────────────────────── State Variables ───────────────────────── */
     IPoolRegistry public poolRegistry;
     address public committee;
@@ -91,18 +53,14 @@ contract RiskAdmin is Ownable {
      * @notice Initializes the core contract addresses. Can only be called once by the owner.
      * @dev This approach ensures that all critical addresses are set in a single, atomic transaction.
      */
-    function initialize(
-        address _registry,
-        address _capitalPool,
-        address _policyManager,
-        address _underwriterManager
-    ) external onlyOwner {
+    function initialize(address _registry, address _capitalPool, address _policyManager, address _underwriterManager)
+        external
+        onlyOwner
+    {
         if (address(poolRegistry) != address(0)) revert AlreadyInitialized();
         if (
-            _registry == address(0) ||
-            _capitalPool == address(0) ||
-            _policyManager == address(0) ||
-            _underwriterManager == address(0)
+            _registry == address(0) || _capitalPool == address(0) || _policyManager == address(0)
+                || _underwriterManager == address(0)
         ) revert ZeroAddressNotAllowed();
 
         poolRegistry = IPoolRegistry(_registry);
@@ -153,7 +111,11 @@ contract RiskAdmin is Ownable {
         ICapitalPoolAdmin(capitalPool).setUnderwriterNoticePeriod(newPeriod);
     }
 
-    function setCapitalPoolBaseYieldAdapter(ICapitalPoolAdmin.YieldPlatform platform, address adapter) external onlyOwner initialized {
+    function setCapitalPoolBaseYieldAdapter(ICapitalPoolAdmin.YieldPlatform platform, address adapter)
+        external
+        onlyOwner
+        initialized
+    {
         ICapitalPoolAdmin(capitalPool).setBaseYieldAdapter(platform, adapter);
     }
 

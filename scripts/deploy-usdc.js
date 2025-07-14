@@ -42,6 +42,10 @@ async function main() {
   const riskManager = await RiskManager.deploy(deployer.address);
   await riskManager.waitForDeployment();
 
+  const UnderwriterManager = await ethers.getContractFactory("UnderwriterManager");
+  const underwriterManager = await UnderwriterManager.deploy(deployer.address);
+  await underwriterManager.waitForDeployment();
+
   const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
   // Pass zero address for PolicyManager placeholder; set actual address later
   const policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, deployer.address);
@@ -92,7 +96,34 @@ async function main() {
 
 
   await policyManager.setAddresses(poolRegistry.target, capitalPool.target, catPool.target, rewardDistributor.target, riskManager.target);
-  await riskManager.setAddresses(capitalPool.target, poolRegistry.target, policyManager.target, catPool.target, lossDistributor.target, rewardDistributor.target);
+  await riskManager.setAddresses(
+    capitalPool.target,
+    poolRegistry.target,
+    policyManager.target,
+    catPool.target,
+    lossDistributor.target,
+    rewardDistributor.target,
+    underwriterManager.target
+  );
+  await underwriterManager.setAddresses(
+    capitalPool.target,
+    poolRegistry.target,
+    catPool.target,
+    lossDistributor.target,
+    rewardDistributor.target,
+    riskManager.target
+  );
+
+  /*───────────────────────── ProtocolConfigurator ───────────────────────*/
+  const ProtocolConfigurator = await ethers.getContractFactory("RiskAdmin");
+  const protocolConfigurator = await ProtocolConfigurator.deploy(deployer.address);
+  await protocolConfigurator.waitForDeployment();
+  await protocolConfigurator.initialize(
+    poolRegistry.target,
+    capitalPool.target,
+    policyManager.target,
+    underwriterManager.target
+  );
 
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
@@ -134,6 +165,8 @@ async function main() {
     LossDistributor:   lossDistributor.target,
     RewardDistributor: rewardDistributor.target,
     RiskManager:       riskManager.target,
+    ProtocolConfigurator: protocolConfigurator.target,
+    UnderwriterManager: underwriterManager.target,
     "Aave Adapter":    aaveAdapter.target,
     "Compound Adapter": compoundAdapter.target,
   };
