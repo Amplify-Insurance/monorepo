@@ -12,7 +12,7 @@ import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 import usePools from "../../hooks/usePools"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { ethers } from "ethers"
-import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getUnderwriterManagerWithSigner } from "../../lib/underwriterManager"
 import { getCapitalPoolWithSigner, getUnderlyingAssetDecimals } from "../../lib/capitalPool"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { getDeployment } from "../config/deployments"
@@ -246,7 +246,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
     setIsClaiming(true)
     try {
       const dep = getDeployment(position.deployment)
-      const rm = await getRiskManagerWithSigner(dep.riskManager)
+      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
       if (typeof rm.claimPremiumRewards === "function") {
         await (await rm.claimPremiumRewards([position.poolId])).wait()
       }
@@ -270,7 +270,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
       }, {})
       for (const [depName, ids] of Object.entries(grouped)) {
         const dep = getDeployment(depName)
-        const rm = await getRiskManagerWithSigner(dep.riskManager)
+        const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
         if (typeof rm.claimPremiumRewards === "function") {
           await (await rm.claimPremiumRewards(ids)).wait()
         }
@@ -289,7 +289,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
     setIsClaimingDistressed(true)
     try {
       const dep = getDeployment(position.deployment)
-      const rm = await getRiskManagerWithSigner(dep.riskManager)
+      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
       if (typeof rm.claimDistressedAssets === "function") {
         await (await rm.claimDistressedAssets([position.poolId])).wait()
       }
@@ -312,7 +312,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
       }, {})
       for (const [depName, ids] of Object.entries(grouped)) {
         const dep = getDeployment(depName)
-        const rm = await getRiskManagerWithSigner(dep.riskManager)
+        const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
         if (typeof rm.claimDistressedAssets === "function") {
           await (await rm.claimDistressedAssets(ids)).wait()
         }
