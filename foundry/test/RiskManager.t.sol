@@ -147,6 +147,7 @@ function testDeallocateRealizesLoss() public {
         cp.triggerOnCapitalDeposited(address(rm), underwriter, pledge);
         pr.setPoolCount(1);
         pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
+        pr.setPoolCount(1);
         
         // FIX: The allocateCapital function requires an adapter to be set.
         cp.setUnderwriterAdapterAddress(underwriter, address(1));
@@ -544,14 +545,14 @@ function test_onWithdrawalRequested_hook() public {
     cp.triggerOnCapitalDeposited(address(rm), underwriter, pledge);
     cp.setUnderwriterAdapterAddress(underwriter, address(1));
     pr.setPoolCount(2);
-    pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
-    pr.setPoolData(1, token, 0, 0, 0, false, address(0), 0);
+    uint256 principalComponent = 5_000 * 1e6;
+    pr.setPoolData(0, token, 0, principalComponent, principalComponent, false, address(0), 0);
+    pr.setPoolData(1, token, 0, principalComponent, principalComponent, false, address(0), 0);
     vm.prank(underwriter);
     rm.allocateCapital(pools);
 
     // --- Action ---
     // 2. Simulate the CapitalPool calling the hook
-    uint256 principalComponent = 5_000 * 1e6;
     cp.triggerOnWithdrawalRequested(address(rm), underwriter, principalComponent);
 
     // --- Assertions ---
@@ -579,14 +580,14 @@ function test_onWithdrawalCancelled_hook() public {
     cp.triggerOnCapitalDeposited(address(rm), underwriter, pledge);
     cp.setUnderwriterAdapterAddress(underwriter, address(1));
     pr.setPoolCount(2);
-    pr.setPoolData(0, token, 0, 0, 0, false, address(0), 0);
-    pr.setPoolData(1, token, 0, 0, 0, false, address(0), 0);
+    uint256 principalComponent = 5_000 * 1e6;
+    pr.setPoolData(0, token, 0, principalComponent, principalComponent, false, address(0), 0);
+    pr.setPoolData(1, token, 0, principalComponent, principalComponent, false, address(0), 0);
     vm.prank(underwriter);
     rm.allocateCapital(pools);
 
     // --- Action ---
     // 2. Simulate the CapitalPool calling the hook
-    uint256 principalComponent = 5_000 * 1e6;
     cp.triggerOnWithdrawalCancelled(address(rm), underwriter, principalComponent);
 
     // --- Assertions ---
