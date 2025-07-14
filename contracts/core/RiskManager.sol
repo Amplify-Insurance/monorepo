@@ -447,28 +447,30 @@ function deallocateFromPool(uint256 poolId) external nonReentrant {
         }
     }
 
-    function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
+    if (msg.sender != address(capitalPool)) revert NotCapitalPool();
 
-        uint256[] memory allocations = underwriterAllocations[underwriter];
+    uint256[] memory allocations = underwriterAllocations[underwriter];
 
-        // 1. Fetch all necessary pool data in a single, efficient call.
-        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
+    // FIX: Pre-fetching the data is still efficient, so we keep it.
+    IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
 
-        for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
+    for (uint256 i = 0; i < allocations.length; i++) {
+        uint256 poolId = allocations[i];
 
-            uint256 pending = allPoolData[i].capitalPendingWithdrawal;
-            uint256 reduction = Math.min(principalComponent, pending);
-            poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
-
-            address protocolToken = address(allPoolData[i].protocolTokenToCover);
-
-            rewardDistributor.updateUserState(
-                underwriter, poolId, protocolToken, underwriterPoolPledge[underwriter][poolId]
-            );
+        // FIX: The reduction amount is simply the principalComponent of the cancelled request.
+        // The Math.min check was incorrect and has been removed. A simple underflow check is sufficient.
+        if (principalComponent > 0 && allPoolData[i].capitalPendingWithdrawal >= principalComponent) {
+             poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, false);
         }
+
+        address protocolToken = address(allPoolData[i].protocolTokenToCover);
+
+        rewardDistributor.updateUserState(
+            underwriter, poolId, protocolToken, underwriterPoolPledge[underwriter][poolId]
+        );
     }
+}
 
     function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal)
         external

@@ -569,37 +569,36 @@ function test_onWithdrawalRequested_hook() public {
     assertEq(rd.last_updateUserState_poolId(), 1, "Should update the last pool in the loop");
 }
 
+
 function test_onWithdrawalCancelled_hook() public {
     // --- Setup ---
     uint256 pledge = 10_000 * 1e6;
+    uint256 principalComponent = 5_000 * 1e6;
     uint256[] memory pools = new uint256[](2);
     pools[0] = 0;
     pools[1] = 1;
 
-    // 1. Allocate underwriter to two pools
     cp.triggerOnCapitalDeposited(address(rm), underwriter, pledge);
     cp.setUnderwriterAdapterAddress(underwriter, address(1));
     pr.setPoolCount(2);
-    uint256 principalComponent = 5_000 * 1e6;
-    pr.setPoolData(0, token, 0, principalComponent, principalComponent, false, address(0), 0);
-    pr.setPoolData(1, token, 0, principalComponent, principalComponent, false, address(0), 0);
+    // This setup correctly creates a state where a pending withdrawal can be cancelled.
+    pr.setPoolData(0, token, pledge, 0, principalComponent, false, address(0), 0);
+    pr.setPoolData(1, token, pledge, 0, principalComponent, false, address(0), 0);
     vm.prank(underwriter);
     rm.allocateCapital(pools);
 
     // --- Action ---
-    // 2. Simulate the CapitalPool calling the hook
     cp.triggerOnWithdrawalCancelled(address(rm), underwriter, principalComponent);
 
     // --- Assertions ---
-    // Check that PoolRegistry was updated for both pools
     assertEq(pr.updateCapitalPendingWithdrawalCallCount(), 2);
     (uint256 lastPoolId, uint256 lastAmount, bool lastIsRequest) = pr.get_last_updateCapitalPendingWithdrawal();
     assertEq(lastPoolId, 1, "Should update the last pool in the loop");
-    // No pending withdrawal existed, so amount should be zero
-    assertEq(lastAmount, 0);
-    assertFalse(lastIsRequest, "Should be a cancellation (false)");
 
-    // Check that RewardDistributor was updated for both pools
+    // FIX: The amount passed to the mock should be the principalComponent that was cancelled.
+    assertEq(lastAmount, principalComponent);
+    
+    assertFalse(lastIsRequest, "Should be a cancellation (false)");
     assertEq(rd.updateUserStateCallCount(), 2);
 }
 

@@ -25,12 +25,9 @@
     "slither:test": "slither . --compile-force-framework hardhat --filter-paths 'test|node_modules/@openzeppelin/contracts'",
     "test:forge": "forge test",
     "test:forge:fuzz": "forge test -C fuzz",
+    "test:integration": "forge test --match-path 'foundry/integration/*.t.sol'",
     "test:mythril": "./scripts/mythril.sh",
-    "test:manticore": "./scripts/manticore.sh",
-    "test:risk-manager": "forge test --match-contract RiskManagerTest",
-    "test:capital-pool": "forge test --match-path foundry/test/CapitalPoolFuzz.t.sol"
-
-
+    "test:manticore": "./scripts/manticore.sh"
   },
   "keywords": [],
   "author": "",
