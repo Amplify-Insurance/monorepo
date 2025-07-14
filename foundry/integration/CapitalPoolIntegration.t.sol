@@ -6,24 +6,27 @@ import {ResetApproveERC20} from "contracts/test/ResetApproveERC20.sol";
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
-import {MockPoolRegistry} from "contracts/test/MockPoolRegistry.sol";
-import {MockPolicyManager} from "contracts/test/MockPolicyManager.sol";
-import {MockPolicyNFT} from "contracts/test/MockPolicyNFT.sol";
-import {MockBackstopPool} from "contracts/test/MockBackstopPool.sol";
-import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
-import {MockLossDistributor} from "contracts/test/MockLossDistributor.sol";
+import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
+import {PolicyManager} from "contracts/core/PolicyManager.sol";
+import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
+import {BackstopPool} from "contracts/external/BackstopPool.sol";
+import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
+import {LossDistributor} from "contracts/utils/LossDistributor.sol";
+import {CatShare} from "contracts/tokens/CatShare.sol";
+import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
 
 contract CapitalPoolIntegration is Test {
     ResetApproveERC20 token;
     SimpleYieldAdapter adapter;
     CapitalPool capitalPool;
     RiskManager riskManager;
-    MockPoolRegistry registry;
-    MockPolicyManager policyManager;
-    MockPolicyNFT policyNFT;
-    MockBackstopPool catPool;
-    MockRewardDistributor rewardDistributor;
-    MockLossDistributor lossDistributor;
+    PoolRegistry registry;
+    PolicyManager policyManager;
+    PolicyNFT policyNFT;
+    BackstopPool catPool;
+    RewardDistributor rewardDistributor;
+    LossDistributor lossDistributor;
+    CatShare catShare;
 
     address owner = address(this);
     address user = address(0x1);
@@ -41,15 +44,22 @@ contract CapitalPoolIntegration is Test {
         capitalPool.setBaseYieldAdapter(CapitalPool.YieldPlatform(PLATFORM_OTHER), address(adapter));
         adapter.setDepositor(address(capitalPool));
 
-        registry = new MockPoolRegistry();
-        policyManager = new MockPolicyManager();
-        policyNFT = new MockPolicyNFT(owner);
-        policyManager.setPolicyNFT(address(policyNFT));
-        catPool = new MockBackstopPool(owner);
-        rewardDistributor = new MockRewardDistributor();
-        lossDistributor = new MockLossDistributor();
-
         riskManager = new RiskManager(owner);
+
+        registry = new PoolRegistry(owner, address(riskManager));
+        policyNFT = new PolicyNFT(address(riskManager), owner);
+        policyManager = new PolicyManager(address(policyNFT), owner);
+        policyNFT.setPolicyManagerAddress(address(policyManager));
+
+        catShare = new CatShare();
+        catPool = new BackstopPool(token, catShare, IYieldAdapter(address(0)), owner);
+        catShare.transferOwnership(address(catPool));
+        catPool.initialize();
+
+        rewardDistributor = new RewardDistributor(address(riskManager), address(policyManager));
+        rewardDistributor.setCatPool(address(catPool));
+        lossDistributor = new LossDistributor(address(riskManager));
+
         riskManager.setAddresses(
             address(capitalPool),
             address(registry),
