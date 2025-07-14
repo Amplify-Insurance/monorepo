@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCapitalPoolWriter } from '../../../../lib/capitalPool';
-import { getRiskManagerWriter } from '../../../../lib/riskManager';
+import { getUnderwriterManagerWriter } from '../../../../lib/underwriterManager';
 import deployments from '../../../config/deployments';
 
 export async function POST(req: Request) {
@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     const { amount, yieldChoice, poolIds, deployment: depName } = await req.json();
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
     const cp = getCapitalPoolWriter(dep.capitalPool, dep.name);
-    const rm = getRiskManagerWriter(dep.riskManager, dep.name);
+    const rm = getUnderwriterManagerWriter(dep.underwriterManager, dep.name);
     const tx = await cp.deposit(amount, yieldChoice);
     await tx.wait();
     if (poolIds && poolIds.length > 0) {
