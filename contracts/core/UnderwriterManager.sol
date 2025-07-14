@@ -8,67 +8,12 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // --- Interfaces ---
-// It's best practice to keep interfaces in separate files.
-// For this example, they are included for completeness.
-
-interface IPolicyNFT {
-    struct Policy {
-        uint256 poolId;
-        uint256 coverage;
-        uint256 premium;
-        uint256 activation;
-        uint256 expiration;
-    }
-    function getPolicy(uint256 policyId) external view returns (Policy memory);
-    function ownerOf(uint256 policyId) external view returns (address);
-    function burn(uint256 policyId) external;
-}
-
-interface IPoolRegistry {
-     struct PoolInfo {
-        IERC20 protocolTokenToCover;
-        uint256 totalCapitalPledged;
-        uint256 totalCoverageSold;
-        uint256 capitalPendingWithdrawal;
-        bool isPaused;
-        address feeRecipient;
-        uint256 claimFeeBps;
-    }
-    struct RateModel {
-        uint128 U_1;
-        uint128 U_2;
-        uint128 R_0;
-        uint128 R_1;
-        uint128 R_2;
-    }
-    function getPoolCount() external view returns (uint256);
-    function getPoolData(uint256 poolId) external view returns (IERC20, uint256, uint256, uint256, bool, address, uint256);
-    function getMultiplePoolData(uint256[] calldata poolIds) external view returns (PoolInfo[] memory);
-    function updateCapitalAllocation(uint256 poolId, address adapter, uint256 amount, bool isAllocation) external;
-    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isIncrease) external;
-}
-
-interface ICapitalPool {
-    function getUnderwriterAdapterAddress(address underwriter) external view returns (address);
-    function applyLosses(address underwriter, uint256 amount) external;
-    function underlyingAsset() external view returns (address);
-    function getUnderwriterAccount(address underwriter) external view returns (uint256, uint256, uint256, uint256, uint256);
-    function sharesToValue(uint256 shares) external view returns (uint256);
-}
-
-interface IBackstopPool {
-    function claimProtocolAssetRewardsFor(address user, address protocolToken) external;
-}
-
-interface ILossDistributor {
-    function realizeLosses(address user, uint256 poolId, uint256 pledge) external returns (uint256);
-}
-
-interface IRewardDistributor {
-    function distribute(uint256 poolId, address token, uint256 amount, uint256 totalPledge) external;
-    function claim(address user, uint256 poolId, address token, uint256 pledge) external returns (uint256);
-    function updateUserState(address user, uint256 poolId, address token, uint256 newPledge) external;
-}
+import {IPolicyNFT} from "../interfaces/IPolicyNFT.sol";
+import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
+import {ICapitalPool} from "../interfaces/ICapitalPool.sol";
+import {IBackstopPool} from "../interfaces/IBackstopPool.sol";
+import {ILossDistributor} from "../interfaces/ILossDistributor.sol";
+import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 
 /**
  * @title UnderwriterManager
@@ -146,8 +91,10 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         address _rewardDistributor,
         address _riskManager
     ) external onlyOwner {
-        if (_capitalPool == address(0) || _poolRegistry == address(0) || _catPool == address(0) ||
-            _lossDistributor == address(0) || _rewardDistributor == address(0) || _riskManager == address(0)) {
+        if (
+            _capitalPool == address(0) || _poolRegistry == address(0) || _catPool == address(0)
+                || _lossDistributor == address(0) || _rewardDistributor == address(0) || _riskManager == address(0)
+        ) {
             revert ZeroAddressNotAllowed();
         }
         capitalPool = ICapitalPool(_capitalPool);
@@ -256,7 +203,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
         emit CapitalDeallocated(underwriter, poolId, finalAmountToDeallocate);
     }
-
 
     /* ───────────────── Hooks & State Updaters ───────────────── */
 
@@ -436,9 +382,8 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
 
         uint256 currentPoolPledge = underwriterPoolPledge[underwriter][poolId];
-        uint256 newPoolPledge = (principalComponentRemoved >= currentPoolPledge)
-            ? 0
-            : currentPoolPledge - principalComponentRemoved;
+        uint256 newPoolPledge =
+            (principalComponentRemoved >= currentPoolPledge) ? 0 : currentPoolPledge - principalComponentRemoved;
 
         underwriterPoolPledge[underwriter][poolId] = newPoolPledge;
 
@@ -502,7 +447,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         uint256 currentPledge = underwriterPoolPledge[_underwriter][_poolId];
         require(_amount <= currentPledge, "Amount exceeds pledge");
 
-        (,uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,,,) = poolRegistry.getPoolData(_poolId);
+        (, uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,,,) = poolRegistry.getPoolData(_poolId);
 
         uint256 freeCapital =
             totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;

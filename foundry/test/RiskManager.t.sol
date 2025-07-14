@@ -8,7 +8,14 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
 
 // --- Interfaces (as defined in the contract file) ---
-import {ICapitalPool, IPolicyNFT, IPoolRegistry, IBackstopPool, ILossDistributor, IRewardDistributor, IUnderwriterManager, IPolicyManager} from "contracts/core/RiskManager.sol";
+import {ICapitalPool} from "contracts/interfaces/ICapitalPool.sol";
+import {IPolicyNFT} from "contracts/interfaces/IPolicyNFT.sol";
+import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
+import {IBackstopPool} from "contracts/interfaces/IBackstopPool.sol";
+import {ILossDistributor} from "contracts/interfaces/ILossDistributor.sol";
+import {IRewardDistributor} from "contracts/interfaces/IRewardDistributor.sol";
+import {IUnderwriterManager} from "contracts/interfaces/IUnderwriterManager.sol";
+import {IPolicyManager} from "contracts/interfaces/IPolicyManager.sol";
 
 // --- Mocks ---
 import {MockERC20} from "./mocks/MockERC20.sol";
@@ -120,7 +127,8 @@ contract RiskManagerTest is Test {
         assertEq(payoutData.feeAmount, expectedFee);
 
         // 4. PoolRegistry state updates
-        (uint256 lastUpdatePoolId, , uint256 lastUpdateAmount, bool lastIsAllocation) = pr.get_last_updateCapitalAllocation();
+        (uint256 lastUpdatePoolId,, uint256 lastUpdateAmount, bool lastIsAllocation) =
+            pr.get_last_updateCapitalAllocation();
         assertEq(lastUpdatePoolId, poolId);
         assertEq(lastUpdateAmount, coverage);
         assertFalse(lastIsAllocation);
@@ -154,7 +162,6 @@ contract RiskManagerTest is Test {
         assertEq(cat.drawFundCallCount(), 1, "BackstopPool.drawFund should be called");
         assertEq(cat.last_drawFund_amount(), expectedShortfall, "Incorrect shortfall amount drawn");
     }
-
 
     function test_liquidateInsolventUnderwriter_succeeds() public {
         // --- Arrange ---
