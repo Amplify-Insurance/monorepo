@@ -14,6 +14,42 @@ import {
 } from "../generated/RiskManagerV2/RiskManager";
 import { RiskManager } from "../generated/RiskManagerV2/RiskManager";
 import {
+  CapitalAllocated as UMCapitalAllocated,
+  CapitalDeallocated as UMCapitalDeallocated,
+  AddressesSet as UMAddressesSet,
+  CommitteeSet as UMCommitteeSet,
+  UnderwriterLiquidated as UMUnderwriterLiquidated,
+  PolicyCreated as UMPolicyCreated,
+  PolicyLapsed as UMPolicyLapsed,
+  PremiumPaid as UMPremiumPaid,
+  ClaimProcessed as UMClaimProcessed,
+  OwnershipTransferred as UMOwnershipTransferred
+} from "../generated/UnderwriterManager/RiskManager";
+import {
+  CapitalAllocated as NewRMCapitalAllocated,
+  CapitalDeallocated as NewRMCapitalDeallocated,
+  AddressesSet as NewRMAddressesSet,
+  CommitteeSet as NewRMCommitteeSet,
+  UnderwriterLiquidated as NewRMUnderwriterLiquidated,
+  PolicyCreated as NewRMPolicyCreated,
+  PolicyLapsed as NewRMPolicyLapsed,
+  PremiumPaid as NewRMPremiumPaid,
+  ClaimProcessed as NewRMClaimProcessed,
+  OwnershipTransferred as NewRMOwnershipTransferred
+} from "../generated/RiskManager/RiskManager";
+import {
+  CapitalAllocated as PCCapitalAllocated,
+  CapitalDeallocated as PCCapitalDeallocated,
+  AddressesSet as PCAddressesSet,
+  CommitteeSet as PCCommitteeSet,
+  UnderwriterLiquidated as PCUnderwriterLiquidated,
+  PolicyCreated as PCPolicyCreated,
+  PolicyLapsed as PCPolicyLapsed,
+  PremiumPaid as PCPremiumPaid,
+  ClaimProcessed as PCClaimProcessed,
+  OwnershipTransferred as PCOwnershipTransferred
+} from "../generated/ProtocolConfigurator/RiskManager";
+import {
   RiskManagerSet,
   BaseYieldAdapterSet,
   Deposit,
@@ -136,10 +172,31 @@ export function handleCapitalAllocated(event: CapitalAllocated): void {
   let rm = RiskManager.bind(event.address);
   snapshotPool(rm, event, event.params.poolId);
 }
+export function handleCapitalAllocatedUM(event: UMCapitalAllocated): void {
+  handleCapitalAllocated(changetype<CapitalAllocated>(event));
+}
+export function handleCapitalAllocatedNew(event: NewRMCapitalAllocated): void {
+  handleCapitalAllocated(changetype<CapitalAllocated>(event));
+}
+export function handleCapitalAllocatedPC(event: PCCapitalAllocated): void {
+  handleCapitalAllocated(changetype<CapitalAllocated>(event));
+}
 export function handleCapitalDeallocated(event: CapitalDeallocated): void { saveGeneric(event, "CapitalDeallocated"); }
+export function handleCapitalDeallocatedUM(event: UMCapitalDeallocated): void { handleCapitalDeallocated(changetype<CapitalDeallocated>(event)); }
+export function handleCapitalDeallocatedNew(event: NewRMCapitalDeallocated): void { handleCapitalDeallocated(changetype<CapitalDeallocated>(event)); }
+export function handleCapitalDeallocatedPC(event: PCCapitalDeallocated): void { handleCapitalDeallocated(changetype<CapitalDeallocated>(event)); }
 export function handleAddressesSet(event: AddressesSet): void { saveGeneric(event, "AddressesSet"); }
+export function handleAddressesSetUM(event: UMAddressesSet): void { handleAddressesSet(changetype<AddressesSet>(event)); }
+export function handleAddressesSetNew(event: NewRMAddressesSet): void { handleAddressesSet(changetype<AddressesSet>(event)); }
+export function handleAddressesSetPC(event: PCAddressesSet): void { handleAddressesSet(changetype<AddressesSet>(event)); }
 export function handleCommitteeSet(event: CommitteeSet): void { saveGeneric(event, "CommitteeSet"); }
+export function handleCommitteeSetUM(event: UMCommitteeSet): void { handleCommitteeSet(changetype<CommitteeSet>(event)); }
+export function handleCommitteeSetNew(event: NewRMCommitteeSet): void { handleCommitteeSet(changetype<CommitteeSet>(event)); }
+export function handleCommitteeSetPC(event: PCCommitteeSet): void { handleCommitteeSet(changetype<CommitteeSet>(event)); }
 export function handleUnderwriterLiquidated(event: UnderwriterLiquidated): void { saveGeneric(event, "UnderwriterLiquidated"); }
+export function handleUnderwriterLiquidatedUM(event: UMUnderwriterLiquidated): void { handleUnderwriterLiquidated(changetype<UnderwriterLiquidated>(event)); }
+export function handleUnderwriterLiquidatedNew(event: NewRMUnderwriterLiquidated): void { handleUnderwriterLiquidated(changetype<UnderwriterLiquidated>(event)); }
+export function handleUnderwriterLiquidatedPC(event: PCUnderwriterLiquidated): void { handleUnderwriterLiquidated(changetype<UnderwriterLiquidated>(event)); }
 export function handleBaseYieldAdapterSet(event: BaseYieldAdapterSet): void { saveGeneric(event, "BaseYieldAdapterSet"); }
 export function handleSystemValueSynced(event: SystemValueSynced): void { saveGeneric(event, "SystemValueSynced"); }
 export function handleAdapterCallFailed(event: AdapterCallFailed): void { saveGeneric(event, "AdapterCallFailed"); }
@@ -188,6 +245,15 @@ export function handleRiskManagerOwnershipTransferred(
 ): void {
   saveGeneric(event, "OwnershipTransferred");
   saveOwner(event, event.params.newOwner);
+}
+export function handleRiskManagerOwnershipTransferredUM(event: UMOwnershipTransferred): void {
+  handleRiskManagerOwnershipTransferred(changetype<RiskManagerOwnershipTransferred>(event));
+}
+export function handleRiskManagerOwnershipTransferredNew(event: NewRMOwnershipTransferred): void {
+  handleRiskManagerOwnershipTransferred(changetype<RiskManagerOwnershipTransferred>(event));
+}
+export function handleRiskManagerOwnershipTransferredPC(event: PCOwnershipTransferred): void {
+  handleRiskManagerOwnershipTransferred(changetype<RiskManagerOwnershipTransferred>(event));
 }
 
 export function handleBackstopPoolOwnershipTransferred(
@@ -358,6 +424,15 @@ export function handlePolicyCreated(event: PolicyCreated): void {
   e.transactionHash = event.transaction.hash;
   e.save();
 }
+export function handlePolicyCreatedUM(event: UMPolicyCreated): void {
+  handlePolicyCreated(changetype<PolicyCreated>(event));
+}
+export function handlePolicyCreatedNew(event: NewRMPolicyCreated): void {
+  handlePolicyCreated(changetype<PolicyCreated>(event));
+}
+export function handlePolicyCreatedPC(event: PCPolicyCreated): void {
+  handlePolicyCreated(changetype<PolicyCreated>(event));
+}
 
 export function handlePolicyLapsed(event: PolicyLapsed): void {
   saveGeneric(event, "PolicyLapsed");
@@ -373,6 +448,15 @@ export function handlePolicyLapsed(event: PolicyLapsed): void {
   e.timestamp = event.block.timestamp;
   e.transactionHash = event.transaction.hash;
   e.save();
+}
+export function handlePolicyLapsedUM(event: UMPolicyLapsed): void {
+  handlePolicyLapsed(changetype<PolicyLapsed>(event));
+}
+export function handlePolicyLapsedNew(event: NewRMPolicyLapsed): void {
+  handlePolicyLapsed(changetype<PolicyLapsed>(event));
+}
+export function handlePolicyLapsedPC(event: PCPolicyLapsed): void {
+  handlePolicyLapsed(changetype<PolicyLapsed>(event));
 }
 
 export function handlePremiumPaid(event: PremiumPaid): void {
@@ -393,6 +477,15 @@ export function handlePremiumPaid(event: PremiumPaid): void {
   e.timestamp = event.block.timestamp;
   e.transactionHash = event.transaction.hash;
   e.save();
+}
+export function handlePremiumPaidUM(event: UMPremiumPaid): void {
+  handlePremiumPaid(changetype<PremiumPaid>(event));
+}
+export function handlePremiumPaidNew(event: NewRMPremiumPaid): void {
+  handlePremiumPaid(changetype<PremiumPaid>(event));
+}
+export function handlePremiumPaidPC(event: PCPremiumPaid): void {
+  handlePremiumPaid(changetype<PremiumPaid>(event));
 }
 
 export function handleClaimProcessed(event: ClaimProcessed): void {
@@ -416,4 +509,13 @@ export function handleClaimProcessed(event: ClaimProcessed): void {
   c.timestamp = event.block.timestamp;
   c.transactionHash = event.transaction.hash;
   c.save();
+}
+export function handleClaimProcessedUM(event: UMClaimProcessed): void {
+  handleClaimProcessed(changetype<ClaimProcessed>(event));
+}
+export function handleClaimProcessedNew(event: NewRMClaimProcessed): void {
+  handleClaimProcessed(changetype<ClaimProcessed>(event));
+}
+export function handleClaimProcessedPC(event: PCClaimProcessed): void {
+  handleClaimProcessed(changetype<ClaimProcessed>(event));
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Info, Plus, Minus } from "lucide-react"
-import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getUnderwriterManagerWithSigner } from "../../lib/underwriterManager"
 import { getPolicyManagerWithSigner } from "../../lib/policyManager"
 import { getCapitalPoolWithSigner, getUnderlyingAssetAddress, getUnderlyingAssetDecimals } from "../../lib/capitalPool"
 import { getERC20WithSigner } from "../../lib/erc20"
@@ -143,7 +143,7 @@ export default function ManageCoverageModal({
         if (!poolId) throw new Error("poolId required")
         const depInfo = getDeployment(deployment)
         const cp = await getCapitalPoolWithSigner(depInfo.capitalPool)
-        const rm = await getRiskManagerWithSigner(depInfo.riskManager)
+        const rm = await getUnderwriterManagerWithSigner(depInfo.underwriterManager)
 
         const dec = await getUnderlyingAssetDecimals(depInfo.capitalPool)
         const amountBn = ethers.utils.parseUnits(adjustAmount, dec)

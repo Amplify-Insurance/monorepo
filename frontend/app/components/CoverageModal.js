@@ -5,7 +5,7 @@ import Image from "next/image"
 import { Info } from "lucide-react"
 import { ethers } from "ethers" // v5 namespace import
 import { useAccount } from "wagmi"
-import { getRiskManagerWithSigner } from "../../lib/riskManager"
+import { getUnderwriterManagerWithSigner } from "../../lib/underwriterManager"
 import { getPolicyManagerWithSigner } from "../../lib/policyManager"
 import {
   getCapitalPoolWithSigner,
@@ -192,7 +192,7 @@ export default function CoverageModal({
         const amountBn = ethers.utils.parseUnits(amount, dec)
         const cp = await getCapitalPoolWithSigner(dep.capitalPool)
         const cpAddress = dep.capitalPool
-        const rm = await getRiskManagerWithSigner(dep.riskManager)
+        const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
         const ids = poolIds.length ? poolIds : poolId ? [poolId] : []
 
         // Approve spending if necessary

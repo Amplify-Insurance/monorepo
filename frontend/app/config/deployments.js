@@ -8,6 +8,8 @@ try {
   const mapItem = (item, name = 'default') => ({
     name: item.name || name,
     riskManager: item.RiskManager,
+    underwriterManager: item.UnderwriterManager || item.RiskManager,
+    protocolConfigurator: item.ProtocolConfigurator || item.RiskManager,
     capitalPool: item.CapitalPool,
     backstopPool: item.CatInsurancePool,
     poolRegistry: item.PoolRegistry,

@@ -1,7 +1,7 @@
 // app/api/underwriters/[address]/route.ts
 import { NextResponse } from 'next/server'
 import { getCapitalPool } from '@/lib/capitalPool'
-import { getRiskManager } from '@/lib/riskManager'
+import { getUnderwriterManager } from '@/lib/underwriterManager'
 import { getPoolRegistry } from '@/lib/poolRegistry'
 import deployments from '../../../config/deployments'
 import { getLossDistributor } from '@/lib/lossDistributor'
@@ -19,7 +19,7 @@ export async function GET(
 
     for (const dep of deployments) {
       const cp = getCapitalPool(dep.capitalPool, dep.name)
-      const rm = getRiskManager(dep.riskManager, dep.name)
+      const rm = getUnderwriterManager(dep.underwriterManager, dep.name)
       const pr = getPoolRegistry(dep.poolRegistry, dep.name)
       const ld = getLossDistributor(dep.lossDistributor, dep.name)
       const multicall = getMulticallReader(dep.multicallReader, dep.name)
@@ -28,7 +28,7 @@ export async function GET(
         const baseCalls = [
           { target: dep.capitalPool, callData: cp.interface.encodeFunctionData('getUnderwriterAccount', [addr]) },
           { target: dep.poolRegistry, callData: pr.interface.encodeFunctionData('getPoolCount') },
-          { target: dep.riskManager, callData: rm.interface.encodeFunctionData('underwriterTotalPledge', [addr]) },
+          { target: dep.underwriterManager, callData: rm.interface.encodeFunctionData('underwriterTotalPledge', [addr]) },
         ]
         const baseResults = await multicall.tryAggregate(false, baseCalls)
 
@@ -76,7 +76,7 @@ export async function GET(
         const allocCalls: { target: string; callData: string }[] = []
         for (let i = 0; i < Number(poolCount); i++) {
           allocCalls.push({
-            target: dep.riskManager,
+            target: dep.underwriterManager,
             callData: rm.interface.encodeFunctionData('isAllocatedToPool', [addr, BigInt(i)]),
           })
         }

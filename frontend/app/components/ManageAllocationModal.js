@@ -8,7 +8,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { formatPercentage } from "../utils/formatting"
-import { getRiskManagerWithSigner, getRiskManager } from "../../lib/riskManager"
+import { getUnderwriterManagerWithSigner, getUnderwriterManager } from "../../lib/underwriterManager"
 import { getDeployment } from "../config/deployments"
 import { YieldPlatform } from "../config/yieldPlatforms"
 import { getTxExplorerUrl } from "../utils/explorer"
@@ -54,7 +54,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
     async function loadLimit() {
       try {
         const dep = getDeployment(selectedDeployment)
-        const rm = getRiskManager(dep.riskManager, dep.name)
+        const rm = getUnderwriterManager(dep.underwriterManager, dep.name)
         const lim = await rm.maxAllocationsPerUnderwriter()
         setSelectionLimit(Number(lim.toString()))
       } catch (err) {
@@ -101,7 +101,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
     setIsSubmitting(true)
     try {
       const dep = getDeployment(selectedDeployment)
-      const rm = await getRiskManagerWithSigner(dep.riskManager)
+      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
       const toAllocate = selectedPools.filter((p) => !initialPools.includes(p))
       const toDeallocate = initialPools.filter((p) => !selectedPools.includes(p))
 

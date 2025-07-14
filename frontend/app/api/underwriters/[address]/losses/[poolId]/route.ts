@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getLossDistributor } from '@/lib/lossDistributor'
-import { getRiskManager } from '@/lib/riskManager'
+import { getUnderwriterManager } from '@/lib/underwriterManager'
 import deployments from '../../../../../config/deployments'
 
 export async function GET(_req: Request, { params }: { params: { address: string; poolId: string } }) {
@@ -9,7 +9,7 @@ export async function GET(_req: Request, { params }: { params: { address: string
     const id = BigInt(params.poolId)
     const results: any[] = []
     for (const dep of deployments) {
-      const rm = getRiskManager(dep.riskManager, dep.name)
+      const rm = getUnderwriterManager(dep.underwriterManager, dep.name)
       const ld = getLossDistributor(dep.lossDistributor, dep.name)
       try {
         const pledge = await rm.underwriterTotalPledge(addr)

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getRewardDistributor } from '@/lib/rewardDistributor'
-import { getRiskManager } from '@/lib/riskManager'
+import { getUnderwriterManager } from '@/lib/underwriterManager'
 import { getPoolRegistry } from '@/lib/poolRegistry'
 import deployments from '../../../../../config/deployments'
 
@@ -11,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: { address: string
     const results: any[] = []
     for (const dep of deployments) {
       const rd = getRewardDistributor(dep.rewardDistributor, dep.name)
-      const rm = getRiskManager(dep.riskManager, dep.name)
+      const rm = getUnderwriterManager(dep.underwriterManager, dep.name)
       const pr = getPoolRegistry(dep.poolRegistry, dep.name)
       try {
         const pool = await pr.getPoolData(id)
