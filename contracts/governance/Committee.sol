@@ -85,15 +85,45 @@ contract Committee is Ownable, ReentrancyGuard {
         slashPercentageBps = _slashPercentageBps;
     }
         
-    function createProposal(uint256 poolId, ProposalType pType, uint256 bondAmount) external nonReentrant returns (uint256) {
+    function createProposal(
+        uint256 poolId,
+        ProposalType pType,
+        uint256 bondAmount
+    ) external nonReentrant returns (uint256) {
+        // 1. Validate the creation request
+        _validateProposalCreation(poolId, pType, bondAmount);
+
+        // 2. Create the core proposal object
+        uint256 proposalId = _initProposal(poolId, pType, msg.sender);
+        Proposal storage p = proposals[proposalId];
+
+        // 3. Handle the specific logic for a "Pause" proposal bond
+        if (pType == ProposalType.Pause) {
+            _handlePauseProposalBond(p, bondAmount);
+        }
+
+        emit ProposalCreated(proposalId, msg.sender, poolId, pType);
+        return proposalId;
+    }
+
+    // --- NEW HELPER FUNCTIONS ---
+
+    function _validateProposalCreation(uint256 poolId, ProposalType pType, uint256 bondAmount) internal view {
         require(stakingContract.stakedBalance(msg.sender) > 0, "Must be a staker");
         require(!activeProposalForPool[poolId], "Proposal already exists");
+        if (pType == ProposalType.Pause) {
+            require(bondAmount >= minBondAmount && bondAmount <= maxBondAmount, "Invalid bond");
+        } else {
+            require(bondAmount == 0, "No bond for unpause");
+        }
+    }
 
+    function _initProposal(uint256 poolId, ProposalType pType, address proposer) internal returns (uint256) {
         uint256 proposalId = ++proposalCounter;
         Proposal storage p = proposals[proposalId];
 
         p.id = proposalId;
-        p.proposer = msg.sender;
+        p.proposer = proposer;
         p.poolId = poolId;
         p.pType = pType;
         p.creationTime = block.timestamp;
@@ -101,19 +131,15 @@ contract Committee is Ownable, ReentrancyGuard {
         p.status = ProposalStatus.Active;
         activeProposalForPool[poolId] = true;
 
-        if (pType == ProposalType.Pause) {
-            require(bondAmount >= minBondAmount && bondAmount <= maxBondAmount, "Invalid bond");
-            p.bondAmount = bondAmount;
-            p.proposerFeeShareBps = _calculateFeeShare(bondAmount);
-            governanceToken.safeTransferFrom(msg.sender, address(this), bondAmount);
-        } else {
-            require(bondAmount == 0, "No bond for unpause");
-            p.proposerFeeShareBps = 0;
-        }
-
-        emit ProposalCreated(proposalId, msg.sender, poolId, pType);
         return proposalId;
     }
+
+    function _handlePauseProposalBond(Proposal storage p, uint256 bondAmount) internal {
+        p.bondAmount = bondAmount;
+        p.proposerFeeShareBps = _calculateFeeShare(bondAmount);
+        governanceToken.safeTransferFrom(msg.sender, address(this), bondAmount);
+    }
+
 
     function vote(uint256 proposalId, VoteOption voteOption) external nonReentrant {
         Proposal storage p = proposals[proposalId];
@@ -121,30 +147,38 @@ contract Committee is Ownable, ReentrancyGuard {
         require(block.timestamp < p.votingDeadline, "Voting ended");
         require(voteOption != VoteOption.None, "Invalid vote option");
 
-        VoteOption previousVote = p.votes[msg.sender];
-        uint256 previousWeight = p.voterWeight[msg.sender];
         uint256 currentWeight = stakingContract.stakedBalance(msg.sender);
+        
+        // Use the new helper to manage vote counts
+        _updateVoteTallies(p, msg.sender, voteOption, currentWeight);
 
-        // Adjust tallies for previous vote if it exists
+        // Update the voter's state
+        p.votes[msg.sender] = voteOption;
+        p.voterWeight[msg.sender] = currentWeight;
+
+        stakingContract.recordVote(msg.sender, proposalId);
+        emit Voted(proposalId, msg.sender, voteOption, currentWeight);
+    }
+
+// --- NEW HELPER FUNCTION ---
+
+    function _updateVoteTallies(Proposal storage p, address voter, VoteOption newVote, uint256 newWeight) internal {
+        VoteOption previousVote = p.votes[voter];
+        uint256 previousWeight = p.voterWeight[voter];
+
+        // Subtract previous vote's weight
         if (previousVote == VoteOption.For) {
             p.forVotes -= previousWeight;
         } else if (previousVote == VoteOption.Against) {
             p.againstVotes -= previousWeight;
         }
 
-        // Record new vote and weight
-        p.votes[msg.sender] = voteOption;
-        p.voterWeight[msg.sender] = currentWeight;
-
-        if (voteOption == VoteOption.For) {
-            p.forVotes += currentWeight;
-        } else {
-            p.againstVotes += currentWeight;
+        // Add new vote's weight
+        if (newVote == VoteOption.For) {
+            p.forVotes += newWeight;
+        } else { // Against
+            p.againstVotes += newWeight;
         }
-
-        stakingContract.recordVote(msg.sender, proposalId);
-
-        emit Voted(proposalId, msg.sender, voteOption, currentWeight);
     }
 
     function updateVoteWeight(address voter, uint256 proposalId, uint256 newWeight) external nonReentrant {
@@ -256,30 +290,45 @@ contract Committee is Ownable, ReentrancyGuard {
     }
 
     function claimReward(uint256 proposalId) external nonReentrant {
-        Proposal storage p = proposals[proposalId];
-        require(p.status == ProposalStatus.Resolved || p.status == ProposalStatus.Executed, "Proposal not resolved");
-        require(p.totalRewardFees > 0, "No rewards to claim");
-        require(p.votes[msg.sender] == VoteOption.For, "Must have voted 'For' to claim rewards");
-        require(!hasClaimedReward[proposalId][msg.sender], "Reward already claimed");
-
+        // 1. Validate the claim request
+        _validateRewardClaim(proposalId, msg.sender);
+        
+        // 2. Calculate the user's reward
+        uint256 userReward = _calculateUserReward(proposalId, msg.sender);
+        
+        // 3. Mark as claimed and send the funds
         hasClaimedReward[proposalId][msg.sender] = true;
-        uint256 totalFees = p.totalRewardFees;
-        uint256 proposerBonus = 0;
-        
-        if (msg.sender == p.proposer) {
-            proposerBonus = (totalFees * p.proposerFeeShareBps) / 10000;
-        }
-        
-        uint256 remainingFees = totalFees - proposerBonus;
-        uint256 userWeight = p.voterWeight[msg.sender];
-        uint256 userReward = proposerBonus + (remainingFees * userWeight) / p.forVotes;
-
         payable(msg.sender).sendValue(userReward);
         
         emit RewardClaimed(proposalId, msg.sender, userReward);
     }
 
-    function _calculateFeeShare(uint256 _bondAmount) internal view returns (uint256) {
+    // --- NEW HELPER FUNCTIONS ---
+
+    function _validateRewardClaim(uint256 proposalId, address claimant) internal view {
+        Proposal storage p = proposals[proposalId];
+        require(p.status == ProposalStatus.Resolved || p.status == ProposalStatus.Executed, "Proposal not resolved");
+        require(p.totalRewardFees > 0, "No rewards to claim");
+        require(p.votes[claimant] == VoteOption.For, "Must have voted 'For' to claim rewards");
+        require(!hasClaimedReward[proposalId][claimant], "Reward already claimed");
+    }
+
+    function _calculateUserReward(uint256 proposalId, address claimant) internal view returns (uint256) {
+        Proposal storage p = proposals[proposalId];
+        uint256 totalFees = p.totalRewardFees;
+        uint256 proposerBonus = 0;
+        
+        if (claimant == p.proposer) {
+            proposerBonus = (totalFees * p.proposerFeeShareBps) / 10000;
+        }
+        
+        uint256 remainingFees = totalFees - proposerBonus;
+        uint256 userWeight = p.voterWeight[claimant];
+        
+        return proposerBonus + (remainingFees * userWeight) / p.forVotes;
+    }
+
+    function _calculateFeeShare(uint256 _bondAmount) internal pure returns (uint256) {
         if (_bondAmount <= minBondAmount) {
             return minProposerFeeBps;
         }
