@@ -458,7 +458,9 @@ function deallocateFromPool(uint256 poolId) external nonReentrant {
         for (uint256 i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
 
-            poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, false);
+            uint256 pending = allPoolData[i].capitalPendingWithdrawal;
+            uint256 reduction = Math.min(principalComponent, pending);
+            poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
 
             address protocolToken = address(allPoolData[i].protocolTokenToCover);
 
