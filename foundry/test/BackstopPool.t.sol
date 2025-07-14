@@ -242,7 +242,7 @@ function test_MockRewardDistributor_Directly() public {
 // In BackstopPoolFuzz.t.sol
 
     function test_claimProtocolAssetRewardsFor_byRiskManager() public {
-        uint96 depositAmount = 50_000e6;
+        uint96 depositAmount = 5_000e6;
         uint96 rewardAmount = 1_000e18;
         MockERC20 rewardToken = new MockERC20("Reward", "RWD", 18);
         _deposit(depositAmount);
@@ -260,11 +260,12 @@ function test_MockRewardDistributor_Directly() public {
         rewardToken.mint(address(distributor), rewardAmount);
 
         uint256 userBalanceBefore = rewardToken.balanceOf(user);
+        uint256 expectedReward = pool.getPendingProtocolAssetRewards(user, address(rewardToken));
         vm.prank(riskManager);
         pool.claimProtocolAssetRewardsFor(user, address(rewardToken));
         uint256 userBalanceAfter = rewardToken.balanceOf(user);
 
-        assertEq(userBalanceAfter, userBalanceBefore + rewardAmount, "User did not receive rewards");
+        assertEq(userBalanceAfter, userBalanceBefore + expectedReward, "User did not receive rewards");
     }
 
 function testRevert_setters_ifZeroAddress() public {

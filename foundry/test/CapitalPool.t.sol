@@ -47,7 +47,7 @@ contract CapitalPoolFuzz is Test {
 
     function testFuzz_multipleDeposits(uint96 first, uint96 second) public {
         vm.assume(first > 0 && second > 0);
-        vm.assume(first + second < INITIAL_SUPPLY);
+        vm.assume(uint256(first) + uint256(second) < INITIAL_SUPPLY);
 
         pool.deposit(first, CapitalPool.YieldPlatform.AAVE);
         uint256 msBefore = pool.totalMasterSharesSystem();
@@ -63,7 +63,7 @@ contract CapitalPoolFuzz is Test {
 
     function testFuzz_depositWithYield(uint96 depositAmount, uint96 secondDeposit, uint96 yieldGain) public {
         vm.assume(depositAmount > 0 && secondDeposit > 0);
-        vm.assume(depositAmount + secondDeposit + yieldGain < INITIAL_SUPPLY);
+        vm.assume(uint256(depositAmount) + uint256(secondDeposit) + uint256(yieldGain) < INITIAL_SUPPLY);
 
         pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
 
@@ -73,8 +73,9 @@ contract CapitalPoolFuzz is Test {
 
         uint256 msBefore = pool.totalMasterSharesSystem();
         uint256 tvBefore = pool.totalSystemValue();
+        uint256 expectedShares = (uint256(secondDeposit) * msBefore) / tvBefore;
+        vm.assume(expectedShares > 0);
         pool.deposit(secondDeposit, CapitalPool.YieldPlatform.AAVE);
-        uint256 expectedShares = (secondDeposit * msBefore) / tvBefore;
 
         (,, uint256 shares,) = pool.getUnderwriterAccount(address(this));
         assertEq(shares, depositAmount + expectedShares);
@@ -102,7 +103,7 @@ contract CapitalPoolFuzz is Test {
     {
         vm.assume(depositAmount > 0 && withdrawShares > 0);
         vm.assume(withdrawShares <= depositAmount);
-        vm.assume(depositAmount + yieldGain < INITIAL_SUPPLY);
+        vm.assume(uint256(depositAmount) + uint256(yieldGain) < INITIAL_SUPPLY);
 
         pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
 
