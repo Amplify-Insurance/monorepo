@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -6,15 +6,23 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "../tokens/CatShare.sol"; // Assumes CatShare.sol is in a sub-directory
+import "../tokens/CatShare.sol";
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IRewardDistributor.sol";
 import "../interfaces/IBackstopPool.sol";
+
+/**
+ * @title BackstopPool
+ * @author Gemini
+ * @notice A backstop liquidity pool that generates yield on idle capital and provides a final layer of protection.
+ * @dev This version has been refactored to separate calculation logic from state-changing actions.
+ */
 contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
     using SafeERC20 for IERC20;
 
+    /* ───────────────────────── State Variables ───────────────────────── */
+
     IERC20 public immutable usdc;
-    // --- RESOLUTION: CatShare token is now passed in as an immutable address ---
     CatShare public immutable catShareToken;
 
     IYieldAdapter public adapter;
@@ -22,20 +30,22 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
     address public capitalPoolAddress;
     address public policyManagerAddress;
     IRewardDistributor public rewardDistributor;
-    
-    // --- RESOLUTION: Add a flag to ensure initialization only happens once ---
+
     bool private _initialized;
 
     uint256 public idleUSDC;
-    uint256 private constant INITIAL_SHARES_LOCKED = 1000;
-    uint256 public constant CAT_POOL_REWARD_ID = type(uint256).max;
-    uint256 public constant MIN_USDC_AMOUNT = 1e3; // 1 USDC assuming 6 decimals
-    uint256 public constant NOTICE_PERIOD = 30 days;
-
     mapping(address => uint256) public withdrawalRequestTimestamp;
     mapping(address => uint256) public withdrawalRequestShares;
 
-    // --- Events (add an Initialized event) ---
+    /* ───────────────────────── Constants ───────────────────────── */
+
+    uint256 private constant INITIAL_SHARES_LOCKED = 1000;
+    uint256 public constant CAT_POOL_REWARD_ID = type(uint256).max;
+    uint256 public constant MIN_USDC_AMOUNT = 1e3; // Assumes 6 decimals
+    uint256 public constant NOTICE_PERIOD = 30 days;
+
+    /* ───────────────────────── Events ───────────────────────── */
+
     event Initialized();
     event AdapterChanged(address indexed newAdapter);
     event UsdcPremiumReceived(uint256 amount);
@@ -50,12 +60,12 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
     event CapitalPoolAddressSet(address indexed newCapitalPoolAddress);
     event PolicyManagerAddressSet(address indexed newPolicyManagerAddress);
     event RewardDistributorSet(address indexed newRewardDistributor);
-    // ... other events
-    
-    // --- RESOLUTION: The constructor is now much lighter ---
+
+    /* ───────────────────────── Constructor & Initializer ───────────────────────── */
+
     constructor(
         IERC20 _usdcToken,
-        CatShare _catShareToken, // Pass the already-deployed token in
+        CatShare _catShareToken,
         IYieldAdapter _initialAdapter,
         address _initialOwner
     ) Ownable(_initialOwner) {
@@ -64,20 +74,13 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
 
         usdc = _usdcToken;
         catShareToken = _catShareToken;
-        
+
         if (address(_initialAdapter) != address(0)) {
             adapter = _initialAdapter;
-            usdc.forceApprove(address(_initialAdapter), 0);
             usdc.forceApprove(address(_initialAdapter), type(uint256).max);
         }
     }
 
-    // --- RESOLUTION: New one-time initializer function ---
-    /**
-     * @notice Initializes the pool by minting the initial locked shares.
-     * @dev This function can only be called once by the owner.
-     * The BackstopPool contract must be the owner of the CatShare token before this is called.
-     */
     function initialize() external onlyOwner nonReentrant {
         require(!_initialized, "CIP: Already initialized");
         require(catShareToken.owner() == address(this), "CIP: Pool must be owner of share token");
@@ -86,13 +89,14 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         catShareToken.mint(address(this), INITIAL_SHARES_LOCKED);
         emit Initialized();
     }
-    
+
+    /* ───────────────────────── Modifiers ───────────────────────── */
 
     modifier onlyRiskManager() {
         require(msg.sender == riskManagerAddress, "CIP: Caller is not the RiskManager");
         _;
     }
-    
+
     modifier onlyPolicyManager() {
         require(msg.sender == policyManagerAddress, "CIP: Caller is not the PolicyManager");
         _;
@@ -105,7 +109,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         riskManagerAddress = newRiskManagerAddress;
         emit RiskManagerAddressSet(newRiskManagerAddress);
     }
-    
+
     function setCapitalPoolAddress(address newCapitalPoolAddress) external onlyOwner {
         require(newCapitalPoolAddress != address(0), "CIP: Address cannot be zero");
         capitalPoolAddress = newCapitalPoolAddress;
@@ -117,7 +121,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         policyManagerAddress = newPolicyManagerAddress;
         emit PolicyManagerAddressSet(newPolicyManagerAddress);
     }
-    
+
     function setRewardDistributor(address rewardDistributorAddress) external onlyOwner {
         require(rewardDistributorAddress != address(0), "CIP: Address cannot be zero");
         rewardDistributor = IRewardDistributor(rewardDistributorAddress);
@@ -134,13 +138,10 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
                 uint256 withdrawnAmount = oldAdapter.withdraw(balanceInOldAdapter, address(this));
                 idleUSDC += withdrawnAmount;
             }
-            // Revoke allowance from the old adapter
             usdc.forceApprove(address(oldAdapter), 0);
         }
 
         if (address(adapter) != address(0)) {
-            // Grant allowance to the new adapter safely
-            usdc.forceApprove(address(adapter), 0);
             usdc.forceApprove(address(adapter), type(uint256).max);
         }
         emit AdapterChanged(newAdapterAddress);
@@ -150,57 +151,31 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         require(amount > 0, "CIP: Amount must be > 0");
         require(amount <= idleUSDC, "CIP: Amount exceeds idle USDC");
         require(address(adapter) != address(0), "CIP: Yield adapter not set");
+
         idleUSDC -= amount;
         adapter.deposit(amount);
         emit DepositToAdapter(amount);
     }
 
-    /* ───────────────────── Core Functions ───────────────────── */
-
-    function liquidUsdc() public view returns (uint256) {
-        uint256 adapterBalance = 0;
-        if (address(adapter) != address(0)) {
-            adapterBalance = adapter.getCurrentValueHeld();
-        }
-        return idleUSDC + adapterBalance;
-    }
+    /* ───────────────────── Core Liquidity Functions ───────────────────── */
 
     function depositLiquidity(uint256 usdcAmount) external nonReentrant {
         require(usdcAmount >= MIN_USDC_AMOUNT, "CIP: Amount below minimum");
-        
-        uint256 sharesToMint;
-        uint256 totalCatSharesSupply = catShareToken.totalSupply();
-        uint256 effectiveSupply =
-            totalCatSharesSupply > INITIAL_SHARES_LOCKED
-                ? totalCatSharesSupply - INITIAL_SHARES_LOCKED
-                : 0;
-        uint256 currentTotalValueInPool = liquidUsdc();
+
+        uint256 sharesToMint = _valueToShares(usdcAmount);
+        require(sharesToMint > 0, "CIP: No shares to mint");
 
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
         idleUSDC += usdcAmount;
-
-        // CORRECTED: Handles the first deposit case by checking if total value or effective supply is zero.
-        if (currentTotalValueInPool == 0 || effectiveSupply == 0) {
-            sharesToMint = usdcAmount;
-        } else {
-            sharesToMint = (usdcAmount * effectiveSupply) / currentTotalValueInPool;
-        }
-        require(sharesToMint > 0, "CIP: No shares to mint");
-        
         catShareToken.mint(msg.sender, sharesToMint);
+
         emit CatLiquidityDeposited(msg.sender, usdcAmount, sharesToMint);
     }
 
     function requestWithdrawal(uint256 shareAmount) external nonReentrant {
         require(shareAmount > 0, "CIP: Invalid amount");
-        require(
-            catShareToken.balanceOf(msg.sender) >= shareAmount,
-            "CIP: Insufficient CatShare balance"
-        );
-        require(
-            withdrawalRequestShares[msg.sender] == 0,
-            "CIP: Withdrawal request pending"
-        );
+        require(catShareToken.balanceOf(msg.sender) >= shareAmount, "CIP: Insufficient CatShare balance");
+        require(withdrawalRequestShares[msg.sender] == 0, "CIP: Withdrawal request pending");
 
         withdrawalRequestShares[msg.sender] = shareAmount;
         withdrawalRequestTimestamp[msg.sender] = block.timestamp;
@@ -213,62 +188,37 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         uint256 requested = withdrawalRequestShares[msg.sender];
         require(requested > 0, "CIP: No withdrawal request");
         require(catShareAmountBurn == requested, "CIP: Amount mismatch");
-        require(
-            block.timestamp >= withdrawalRequestTimestamp[msg.sender] + NOTICE_PERIOD,
-            "CIP: Notice period active"
-        );
+        require(block.timestamp >= withdrawalRequestTimestamp[msg.sender] + NOTICE_PERIOD, "CIP: Notice period active");
+        require(catShareToken.balanceOf(msg.sender) >= catShareAmountBurn, "CIP: Insufficient CatShare balance");
 
-        uint256 userCatShareBalance = catShareToken.balanceOf(msg.sender);
-        require(userCatShareBalance >= catShareAmountBurn, "CIP: Insufficient CatShare balance");
-        
-        uint256 totalCatSharesSupply = catShareToken.totalSupply();
-        uint256 effectiveSupply =
-            totalCatSharesSupply > INITIAL_SHARES_LOCKED
-                ? totalCatSharesSupply - INITIAL_SHARES_LOCKED
-                : 0;
-        uint256 currentTotalValueInPool = liquidUsdc();
-        require(effectiveSupply > 0, "CIP: No shares supply");
-        uint256 usdcToWithdraw = (catShareAmountBurn * currentTotalValueInPool) / effectiveSupply;
+        uint256 usdcToWithdraw = _sharesToValue(catShareAmountBurn);
         require(usdcToWithdraw >= MIN_USDC_AMOUNT, "CIP: Withdrawal amount below minimum");
 
+        // --- Effects ---
         delete withdrawalRequestShares[msg.sender];
         delete withdrawalRequestTimestamp[msg.sender];
         catShareToken.burn(msg.sender, catShareAmountBurn);
 
-        if (usdcToWithdraw <= idleUSDC) {
-            idleUSDC -= usdcToWithdraw;
-        } else {
-            uint256 amountNeededFromAdapter = usdcToWithdraw - idleUSDC;
-            idleUSDC = 0;
-            if (address(adapter) != address(0)) {
-                 uint256 actuallyWithdrawn = adapter.withdraw(amountNeededFromAdapter, address(this));
-                 require(actuallyWithdrawn >= amountNeededFromAdapter, "CIP: Adapter withdrawal failed");
-            } else {
-                revert("CIP: Insufficient idle USDC and no adapter");
-            }
-        }
-        
+        // --- Interactions ---
+        _gatherFundsForWithdrawal(usdcToWithdraw);
         usdc.safeTransfer(msg.sender, usdcToWithdraw);
+
         emit CatLiquidityWithdrawn(msg.sender, usdcToWithdraw, catShareAmountBurn);
     }
 
     /* ─────────────────── Trusted Functions ─────────────────── */
 
-    function receiveUsdcPremium(uint256 amount) external onlyPolicyManager {
+    function receiveUsdcPremium(uint256 amount) external override onlyPolicyManager {
         require(amount > 0, "CIP: Premium amount must be positive");
         usdc.safeTransferFrom(msg.sender, address(this), amount);
         idleUSDC += amount;
         emit UsdcPremiumReceived(amount);
     }
 
-    /**
-     * @notice CORRECTED: Added nonReentrant modifier to prevent reentrancy attacks.
-     */
-    function drawFund(uint256 amountToDraw) external onlyRiskManager nonReentrant {
+    function drawFund(uint256 amountToDraw) external override onlyRiskManager nonReentrant {
         require(amountToDraw > 0, "CIP: Draw amount must be positive");
         require(capitalPoolAddress != address(0), "CIP: CapitalPool address not set");
-        uint256 currentPoolLiquidUsdc = liquidUsdc();
-        require(amountToDraw <= currentPoolLiquidUsdc, "CIP: Draw amount exceeds Cat Pool's liquid USDC");
+        require(amountToDraw <= liquidUsdc(), "CIP: Draw amount exceeds Cat Pool's liquid USDC");
 
         uint256 amountSent = 0;
         if (amountToDraw <= idleUSDC) {
@@ -288,6 +238,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
                 amountSent += actuallyWithdrawn;
             }
         }
+
         if (amountSent > 0) {
             emit DrawFromFund(amountToDraw, amountSent);
         }
@@ -302,7 +253,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
 
         uint256 totalCatSharesSupply = catShareToken.totalSupply();
         rewardDistributor.distribute(CAT_POOL_REWARD_ID, protocolAsset, amount, totalCatSharesSupply);
-        
+
         emit ProtocolAssetReceivedForDistribution(protocolAsset, amount);
     }
 
@@ -318,31 +269,67 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         emit ProtocolAssetRewardsClaimed(msg.sender, protocolAsset, claimableAmount);
     }
 
-    function claimProtocolAssetRewardsFor(address user, address protocolAsset)
-        external
-        onlyRiskManager
-        nonReentrant
-    {
+    function claimProtocolAssetRewardsFor(address user, address protocolAsset) external override onlyRiskManager nonReentrant {
         require(address(rewardDistributor) != address(0), "CIP: Reward distributor not set");
         uint256 userShares = catShareToken.balanceOf(user);
 
-        uint256 claimableAmount = rewardDistributor.claimForCatPool(
-            user,
-            CAT_POOL_REWARD_ID,
-            protocolAsset,
-            userShares
-        );
+        uint256 claimableAmount = rewardDistributor.claimForCatPool(user, CAT_POOL_REWARD_ID, protocolAsset, userShares);
 
         require(claimableAmount > 0, "CIP: No rewards to claim for this asset");
         emit ProtocolAssetRewardsClaimed(user, protocolAsset, claimableAmount);
     }
 
-    /* ───────────────────── View Functions ───────────────────── */
+    /* ───────────────────── Internal & View Functions ───────────────────── */
+
+    function _gatherFundsForWithdrawal(uint256 amount) internal {
+        if (amount <= idleUSDC) {
+            idleUSDC -= amount;
+        } else {
+            uint256 amountNeededFromAdapter = amount - idleUSDC;
+            idleUSDC = 0;
+            require(address(adapter) != address(0), "CIP: Insufficient idle USDC and no adapter");
+
+            uint256 actuallyWithdrawn = adapter.withdraw(amountNeededFromAdapter, address(this));
+            require(actuallyWithdrawn >= amountNeededFromAdapter, "CIP: Adapter withdrawal failed");
+        }
+    }
+
+    function _valueToShares(uint256 usdcValue) internal view returns (uint256) {
+        uint256 totalCatSharesSupply = catShareToken.totalSupply();
+        uint256 effectiveSupply = totalCatSharesSupply > INITIAL_SHARES_LOCKED
+            ? totalCatSharesSupply - INITIAL_SHARES_LOCKED
+            : 0;
+
+        uint256 currentTotalValueInPool = liquidUsdc();
+        if (currentTotalValueInPool == 0 || effectiveSupply == 0) {
+            return usdcValue;
+        }
+
+        return (usdcValue * effectiveSupply) / currentTotalValueInPool;
+    }
+
+    function _sharesToValue(uint256 shareAmount) internal view returns (uint256) {
+        uint256 totalCatSharesSupply = catShareToken.totalSupply();
+        uint256 effectiveSupply = totalCatSharesSupply > INITIAL_SHARES_LOCKED
+            ? totalCatSharesSupply - INITIAL_SHARES_LOCKED
+            : 0;
+        if (effectiveSupply == 0) return 0;
+
+        uint256 currentTotalValueInPool = liquidUsdc();
+        return (shareAmount * currentTotalValueInPool) / effectiveSupply;
+    }
+
+    function liquidUsdc() public view returns (uint256) {
+        uint256 adapterBalance = 0;
+        if (address(adapter) != address(0)) {
+            adapterBalance = adapter.getCurrentValueHeld();
+        }
+        return idleUSDC + adapterBalance;
+    }
 
     function getPendingProtocolAssetRewards(address user, address protocolAsset) public view returns (uint256) {
-        if(address(rewardDistributor) == address(0)) return 0;
+        if (address(rewardDistributor) == address(0)) return 0;
         uint256 userShares = catShareToken.balanceOf(user);
         return rewardDistributor.pendingRewards(user, CAT_POOL_REWARD_ID, protocolAsset, userShares);
     }
-    
 }
