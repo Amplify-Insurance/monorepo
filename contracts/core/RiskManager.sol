@@ -9,67 +9,14 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 // --- Interfaces ---
-
-interface IPolicyNFT {
-    struct Policy {
-        uint256 poolId;
-        uint256 coverage;
-        uint256 premium;
-        uint256 activation;
-        uint256 expiration;
-    }
-    function getPolicy(uint256 policyId) external view returns (Policy memory);
-    function ownerOf(uint256 policyId) external view returns (address);
-    function burn(uint256 policyId) external;
-}
-
-interface IPoolRegistry {
-    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
-    function getPoolData(uint256 poolId) external view returns (IERC20, uint256, uint256, uint256, bool, address, uint256);
-    function updateCapitalAllocation(uint256 poolId, address adapter, uint256 amount, bool isAllocation) external;
-    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
-}
-
-interface ICapitalPool {
-    struct PayoutData {
-        address claimant;
-        uint256 claimantAmount;
-        address feeRecipient;
-        uint256 feeAmount;
-        address[] adapters;
-        uint256[] capitalPerAdapter;
-        uint256 totalCapitalFromPoolLPs;
-    }
-    function executePayout(PayoutData calldata data) external;
-    function underlyingAsset() external view returns (address);
-    function getUnderwriterAccount(address underwriter) external view returns (uint256, uint256, uint256, uint256, uint256);
-    function sharesToValue(uint256 shares) external view returns (uint256);
-}
-
-interface IBackstopPool {
-    function drawFund(uint256 amount) external;
-}
-
-interface ILossDistributor {
-    function distributeLoss(uint256 poolId, uint256 lossAmount, uint256 totalPledge) external;
-    function getPendingLosses(address user, uint256 poolId, uint256 pledge) external view returns (uint256);
-}
-
-interface IRewardDistributor {
-    function distribute(uint256 poolId, address token, uint256 amount, uint256 totalPledge) external;
-}
-
-// Interface for the new UnderwriterManager contract
-interface IUnderwriterManager {
-    function getUnderwriterAllocations(address user) external view returns (uint256[] memory);
-    function underwriterPoolPledge(address user, uint256 poolId) external view returns (uint256);
-    function realizeLossesForAllPools(address user) external;
-}
-
-interface IPolicyManager {
-    function policyNFT() external view returns (IPolicyNFT);
-}
-
+import {IPolicyNFT} from "../interfaces/IPolicyNFT.sol";
+import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
+import {ICapitalPool} from "../interfaces/ICapitalPool.sol";
+import {IBackstopPool} from "../interfaces/IBackstopPool.sol";
+import {ILossDistributor} from "../interfaces/ILossDistributor.sol";
+import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
+import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
+import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
 
 /**
  * @title RiskManager
@@ -123,7 +70,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
 
-
     /* ───────────────────────── Errors ───────────────────────── */
     error NotPolicyManager();
     error UnderwriterNotInsolvent();
@@ -143,8 +89,10 @@ contract RiskManager is Ownable, ReentrancyGuard {
         address _rewards,
         address _underwriterManager
     ) external onlyOwner {
-        if (_capital == address(0) || _registry == address(0) || _policyManager == address(0) || _cat == address(0)
-            || _loss == address(0) || _rewards == address(0) || _underwriterManager == address(0)) {
+        if (
+            _capital == address(0) || _registry == address(0) || _policyManager == address(0) || _cat == address(0)
+                || _loss == address(0) || _rewards == address(0) || _underwriterManager == address(0)
+        ) {
             revert ZeroAddressNotAllowed();
         }
 
@@ -201,7 +149,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
             uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
             uint256 protocolCoverage = _scaleAmount(coverage, underlyingDecimals, protocolDecimals);
             data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
-            rewardDistributor.distribute(poolId, address(data.protocolToken), protocolCoverage, data.totalCapitalPledged);
+            rewardDistributor.distribute(
+                poolId, address(data.protocolToken), protocolCoverage, data.totalCapitalPledged
+            );
         }
 
         // --- 3. LOSS DISTRIBUTION ---
@@ -250,7 +200,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
         if (msg.sender != policyManager) revert NotPolicyManager();
         poolRegistry.updateCoverageSold(poolId, amount, isSale);
     }
-
 
     /* ───────────────── Internal Helper Functions ───────────────── */
 
