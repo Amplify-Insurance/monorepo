@@ -148,8 +148,10 @@ contract UnderwriterManagerTest is Test {
 
     function test_claimDistressedAssets() public {
         uint256 pledge = 10_000e6;
-        uint256[] memory pools = new uint256[](1);
+        uint256[] memory pools = new uint256[](3);
         pools[0] = 0;
+        pools[1] = 1;
+        pools[2] = 2;
         _setupAllocatedUnderwriter(pledge, pools);
         pr.setPoolData(0, token, pledge, 0, 0, false, address(0), 0);
         pr.setPoolData(1, token2, pledge, 0, 0, false, address(0), 0);
@@ -257,14 +259,24 @@ contract UnderwriterManagerTest is Test {
         // Request
         vm.prank(address(cp));
         um.onWithdrawalRequested(underwriter, pledge);
-        assertEq(pr.lastUpdateCapitalPendingWithdrawal_amount(), pledge);
-        assertTrue(pr.lastUpdateCapitalPendingWithdrawal_isIncrease());
+        (
+            uint256 lastPoolId,
+            uint256 lastAmount,
+            bool lastIsIncrease
+        ) = pr.get_last_updateCapitalPendingWithdrawal();
+        assertEq(lastAmount, pledge);
+        assertTrue(lastIsIncrease);
 
         // Cancel
         vm.prank(address(cp));
         um.onWithdrawalCancelled(underwriter, pledge);
-        assertEq(pr.lastUpdateCapitalPendingWithdrawal_amount(), pledge);
-        assertFalse(pr.lastUpdateCapitalPendingWithdrawal_isIncrease());
+        (
+            lastPoolId,
+            lastAmount,
+            lastIsIncrease
+        ) = pr.get_last_updateCapitalPendingWithdrawal();
+        assertEq(lastAmount, pledge);
+        assertFalse(lastIsIncrease);
     }
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:*/
@@ -318,6 +330,7 @@ contract UnderwriterManagerTest is Test {
         vm.expectRevert(UnderwriterManager.ExceedsMaxAllocations.selector);
         um.allocateCapital(tooManyPools);
         pr.setPoolCount(1);
+        um.setMaxAllocationsPerUnderwriter(5);
 
         // No capital
         vm.prank(otherUser);
