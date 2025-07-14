@@ -18,15 +18,15 @@ import {IUnderwriterManager} from "contracts/interfaces/IUnderwriterManager.sol"
 import {IPolicyManager} from "contracts/interfaces/IPolicyManager.sol";
 
 // --- Mocks ---
-import {MockERC20} from "./mocks/MockERC20.sol";
-import {MockCapitalPool} from "./mocks/MockCapitalPool.sol";
-import {MockPoolRegistry} from "./mocks/MockPoolRegistry.sol";
-import {MockPolicyNFT} from "./mocks/MockPolicyNFT.sol";
-import {MockPolicyManager} from "./mocks/MockPolicyManager.sol";
-import {MockBackstopPool} from "./mocks/MockBackstopPool.sol";
-import {MockLossDistributor} from "./mocks/MockLossDistributor.sol";
-import {MockRewardDistributor} from "./mocks/MockRewardDistributor.sol";
-import {MockUnderwriterManager} from "./mocks/MockUnderwriterManager.sol";
+import {MockERC20} from "contracts/test/MockERC20.sol";
+import {MockCapitalPool} from "contracts/test/MockCapitalPool.sol";
+import {MockPoolRegistry} from "contracts/test/MockPoolRegistry.sol";
+import {MockPolicyNFT} from "contracts/test/MockPolicyNFT.sol";
+import {MockPolicyManager} from "contracts/test/MockPolicyManager.sol";
+import {MockBackstopPool} from "contracts/test/MockBackstopPool.sol";
+import {MockLossDistributor} from "contracts/test/MockLossDistributor.sol";
+import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
+import {MockUnderwriterManager} from "contracts/test/MockUnderwriterManager.sol";
 
 /// @title RiskManager Unit Tests
 /// @notice This suite uses mock contracts to test the logic of RiskManager in isolation.
@@ -97,9 +97,10 @@ contract RiskManagerTest is Test {
         pr.setPoolData(poolId, protocolToken, totalPledge, 0, 0, false, committee, rm.CLAIM_FEE_BPS());
 
         // 3. Mint tokens to claimant and approve RiskManager for premium
-        protocolToken.mint(claimant, coverage);
+        uint256 protocolCoverage = coverage * 1e12;
+        protocolToken.mint(claimant, protocolCoverage);
         vm.prank(claimant);
-        protocolToken.approve(address(rm), coverage);
+        protocolToken.approve(address(rm), protocolCoverage);
 
         // --- Act ---
         vm.prank(claimant);
@@ -110,7 +111,7 @@ contract RiskManagerTest is Test {
         assertEq(rd.distributeCallCount(), 1);
         assertEq(rd.last_distribute_poolId(), poolId);
         assertEq(rd.last_distribute_protocolToken(), address(protocolToken));
-        assertEq(rd.last_distribute_amount(), coverage);
+        assertEq(rd.last_distribute_amount(), protocolCoverage);
 
         // 2. Loss Distribution
         assertEq(ld.distributeLossCallCount(), 1);
@@ -150,9 +151,10 @@ contract RiskManagerTest is Test {
         nft.setOwnerOf(policyId, claimant);
         pr.setPoolPayoutData(poolId, new address[](0), new uint256[](0), totalPledgeInPool);
         pr.setPoolData(poolId, protocolToken, totalPledgeInPool, 0, 0, false, committee, rm.CLAIM_FEE_BPS());
-        protocolToken.mint(claimant, coverageAmount);
+        uint256 protocolCoverageAmount = coverageAmount * 1e12;
+        protocolToken.mint(claimant, protocolCoverageAmount);
         vm.prank(claimant);
-        protocolToken.approve(address(rm), coverageAmount);
+        protocolToken.approve(address(rm), protocolCoverageAmount);
 
         // --- Act ---
         vm.prank(claimant);
@@ -189,6 +191,7 @@ contract RiskManagerTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, otherUser));
         rm.setAddresses(address(cp), address(pr), address(pm), address(cat), address(ld), address(rd), address(um));
 
+        vm.prank(otherUser);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, otherUser));
         rm.setCommittee(committee);
 
@@ -216,9 +219,10 @@ contract RiskManagerTest is Test {
         nft.setPolicy(policyId, 0, 100, block.timestamp + 1 days); // Activation is in the future
         nft.setOwnerOf(policyId, claimant);
 
-        vm.prank(claimant);
-        vm.expectRevert("Policy not active");
+        vm.startPrank(claimant);
+        vm.expectRevert(bytes("Policy not active"));
         rm.processClaim(policyId);
+        vm.stopPrank();
     }
 
     function testRevert_liquidateInsolventUnderwriter_ifSolvent() public {

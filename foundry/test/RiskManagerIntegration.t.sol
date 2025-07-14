@@ -13,6 +13,7 @@ import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
@@ -29,6 +30,7 @@ contract RiskManagerIntegration is Test {
     RewardDistributor rewardDistributor;
     PolicyNFT policyNFT;
     PolicyManager policyManager;
+    UnderwriterManager um;
 
     address owner = address(this);
     address committee = address(0xBEEF);
@@ -66,6 +68,8 @@ contract RiskManagerIntegration is Test {
         rewardDistributor.setCatPool(address(catPool));
         lossDistributor = new LossDistributor(address(rm));
 
+        um = new UnderwriterManager(owner);
+
         policyNFT.setPolicyManagerAddress(address(policyManager));
         catPool.setPolicyManagerAddress(address(policyManager));
         catPool.setCapitalPoolAddress(address(capitalPool));
@@ -73,18 +77,20 @@ contract RiskManagerIntegration is Test {
         catPool.setRewardDistributor(address(rewardDistributor));
         policyManager.setAddresses(address(registry), address(capitalPool), address(catPool), address(rewardDistributor), address(rm));
 
-        rm.setAddresses(address(capitalPool), address(registry), address(policyManager), address(catPool), address(lossDistributor), address(rewardDistributor));
+        um.setAddresses(address(capitalPool), address(registry), address(catPool), address(lossDistributor), address(rewardDistributor), address(rm));
+
+        rm.setAddresses(address(capitalPool), address(registry), address(policyManager), address(catPool), address(lossDistributor), address(rewardDistributor), address(um));
         rm.setCommittee(committee);
 
         IPoolRegistry.RateModel memory rateModel = IPoolRegistry.RateModel({base: 100, slope1: 0, slope2: 0, kink: 8000});
-        rm.addProtocolRiskPool(address(usdc), rateModel, 0);
+        registry.addProtocolRiskPool(address(usdc), rateModel, 0);
 
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), type(uint256).max);
         capitalPool.deposit(PLEDGE_AMOUNT, CapitalPool.YieldPlatform(PLATFORM));
         uint256[] memory pools = new uint256[](1);
         pools[0] = POOL_ID;
-        rm.allocateCapital(pools);
+        um.allocateCapital(pools);
         vm.stopPrank();
     }
 
@@ -100,31 +106,31 @@ contract RiskManagerIntegration is Test {
 
         uint256 withdrawValue = 2_000e6;
         vm.prank(address(capitalPool));
-        rm.onCapitalWithdrawn(underwriter, withdrawValue, false);
+        um.onCapitalWithdrawn(underwriter, withdrawValue, false);
 
         uint256 expected = PLEDGE_AMOUNT - LOSS_AMOUNT - withdrawValue;
-        assertEq(rm.underwriterTotalPledge(underwriter), expected);
+        assertEq(um.underwriterTotalPledge(underwriter), expected);
         assertEq(lossDistributor.getPendingLosses(underwriter, POOL_ID, PLEDGE_AMOUNT), 0);
     }
 
     function testCommitteeCanPauseAndUnpausePool() public {
-        vm.prank(committee);
-        rm.reportIncident(POOL_ID, true);
+        vm.prank(address(rm));
+        registry.setPauseState(POOL_ID, true);
         (, , , , bool paused,,) = registry.getPoolData(POOL_ID);
         assertTrue(paused);
-        vm.prank(committee);
-        rm.reportIncident(POOL_ID, false);
+        vm.prank(address(rm));
+        registry.setPauseState(POOL_ID, false);
         (, , , , paused,,) = registry.getPoolData(POOL_ID);
         assertFalse(paused);
     }
 
     function testDeallocateAfterRequest() public {
-        rm.setDeallocationNoticePeriod(0);
+        um.setDeallocationNoticePeriod(0);
         vm.startPrank(underwriter);
-        rm.requestDeallocateFromPool(POOL_ID, PLEDGE_AMOUNT);
-        rm.deallocateFromPool(POOL_ID);
+        um.requestDeallocateFromPool(POOL_ID, PLEDGE_AMOUNT);
+        um.deallocateFromPool(POOL_ID);
         vm.stopPrank();
-        assertFalse(rm.isAllocatedToPool(underwriter, POOL_ID));
+        assertFalse(um.isAllocatedToPool(underwriter, POOL_ID));
     }
 
     function testClaimPremiumRewardsAfterDistribution() public {
@@ -134,7 +140,7 @@ contract RiskManagerIntegration is Test {
         rewardDistributor.distribute(POOL_ID, address(usdc), reward, PLEDGE_AMOUNT);
         uint256 beforeBal = usdc.balanceOf(underwriter);
         vm.prank(underwriter);
-        rm.claimPremiumRewards(_singlePoolArray(POOL_ID));
+        um.claimPremiumRewards(_singlePoolArray(POOL_ID));
         uint256 afterBal = usdc.balanceOf(underwriter);
         assertGt(afterBal, beforeBal);
     }
@@ -170,8 +176,8 @@ contract RiskManagerIntegration is Test {
         vm.startPrank(claimant);
         uint256[] memory pools = new uint256[](1);
         pools[0] = POOL_ID;
-        vm.expectRevert(abi.encodeWithSelector(RiskManager.NoCapitalToAllocate.selector));
-        rm.allocateCapital(pools);
+        vm.expectRevert(abi.encodeWithSelector(UnderwriterManager.NoCapitalToAllocate.selector));
+        um.allocateCapital(pools);
         vm.stopPrank();
     }
 
@@ -180,27 +186,27 @@ contract RiskManagerIntegration is Test {
         uint256[] memory pools = new uint256[](1);
         pools[0] = POOL_ID;
         vm.startPrank(underwriter);
-        vm.expectRevert(abi.encodeWithSelector(RiskManager.AlreadyAllocated.selector));
-        rm.allocateCapital(pools);
+        vm.expectRevert(abi.encodeWithSelector(UnderwriterManager.AlreadyAllocated.selector));
+        um.allocateCapital(pools);
         vm.stopPrank();
     }
 
     function testRevert_DeallocateFromPool_NoticePeriodActive() public {
         uint256 noticePeriod = 1 days;
-        rm.setDeallocationNoticePeriod(noticePeriod);
+        um.setDeallocationNoticePeriod(noticePeriod);
 
         vm.startPrank(underwriter);
-        rm.requestDeallocateFromPool(POOL_ID, 1_000e6);
+        um.requestDeallocateFromPool(POOL_ID, 1_000e6);
 
         // Try to deallocate immediately, which should fail
-        vm.expectRevert(abi.encodeWithSelector(RiskManager.NoticePeriodActive.selector));
-        rm.deallocateFromPool(POOL_ID);
+        vm.expectRevert(abi.encodeWithSelector(UnderwriterManager.NoticePeriodActive.selector));
+        um.deallocateFromPool(POOL_ID);
 
         // Warp time forward and it should succeed
         vm.warp(block.timestamp + noticePeriod + 1);
-        rm.deallocateFromPool(POOL_ID);
+        um.deallocateFromPool(POOL_ID);
         vm.stopPrank();
-        assertFalse(rm.isAllocatedToPool(underwriter, POOL_ID));
+        assertFalse(um.isAllocatedToPool(underwriter, POOL_ID));
     }
 
     function testRevert_RequestDeallocate_InsufficientFreeCapital() public {
@@ -210,28 +216,28 @@ contract RiskManagerIntegration is Test {
 
         // Attempting to request deallocation should fail
         vm.startPrank(underwriter);
-        vm.expectRevert(abi.encodeWithSelector(RiskManager.InsufficientFreeCapital.selector));
-        rm.requestDeallocateFromPool(POOL_ID, 1e6); // Request even a small amount
+        vm.expectRevert(abi.encodeWithSelector(UnderwriterManager.InsufficientFreeCapital.selector));
+        um.requestDeallocateFromPool(POOL_ID, 1e6); // Request even a small amount
         vm.stopPrank();
     }
 
     function testRevert_ReportIncident_NotCommittee() public {
         // Any address other than the committee tries to report an incident
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(RiskManager.NotCommittee.selector));
-        rm.reportIncident(POOL_ID, true);
+        vm.expectRevert("PR: Not RiskManager");
+        registry.setPauseState(POOL_ID, true);
     }
 
 function testSetPoolFeeRecipient() public {
         address newRecipient = address(0xDEAD);
         // Should fail if not called by committee
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(RiskManager.NotCommittee.selector));
-        rm.setPoolFeeRecipient(POOL_ID, newRecipient);
+        vm.expectRevert("PR: Not RiskManager");
+        registry.setFeeRecipient(POOL_ID, newRecipient);
 
-        // Should succeed when called by committee
-        vm.prank(committee);
-        rm.setPoolFeeRecipient(POOL_ID, newRecipient);
+        // Should succeed when called by risk manager
+        vm.prank(address(rm));
+        registry.setFeeRecipient(POOL_ID, newRecipient);
 
         // Correctly destructure the return values
         (,,,,, address feeRecipient,) = registry.getPoolData(POOL_ID);
@@ -250,7 +256,7 @@ function testSetPoolFeeRecipient() public {
         rm.liquidateInsolventUnderwriter(underwriter);
 
         // 3. Check that losses have been realized and pledge is zero
-        assertEq(rm.underwriterTotalPledge(underwriter), 0);
+        assertEq(um.underwriterTotalPledge(underwriter), 0);
     }
 
     function testRevert_LiquidateInsolvent_NotEnoughLosses() public {
@@ -301,7 +307,7 @@ function testSetPoolFeeRecipient() public {
         assertEq(catPoolBefore - catPoolAfter, shortfall);
 
         // Underwriter's pledge is wiped out
-        assertEq(rm.underwriterTotalPledge(underwriter), 0);
+        assertEq(um.underwriterTotalPledge(underwriter), 0);
     }
 
 /// @notice Tests the full lifecycle of an underwriter withdrawing their entire stake,
@@ -331,9 +337,9 @@ function testSetPoolFeeRecipient() public {
         assertGt(underwriterBalanceAfter, underwriterBalanceBefore, "Underwriter did not receive USDC.");
 
         // Check that RiskManager state has been cleaned up correctly for the underwriter.
-        assertEq(rm.underwriterTotalPledge(underwriter), 0, "RiskManager total pledge should be zero.");
-        assertFalse(rm.isAllocatedToPool(underwriter, POOL_ID), "Underwriter should no longer be allocated.");
-        assertEq(rm.getUnderwriterAllocations(underwriter).length, 0, "Underwriter's allocations array should be empty.");
+        assertEq(um.underwriterTotalPledge(underwriter), 0, "RiskManager total pledge should be zero.");
+        assertFalse(um.isAllocatedToPool(underwriter, POOL_ID), "Underwriter should no longer be allocated.");
+        assertEq(um.getUnderwriterAllocations(underwriter).length, 0, "Underwriter's allocations array should be empty.");
     }
 }
 
