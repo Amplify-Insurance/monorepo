@@ -22,11 +22,22 @@ contract MockBackstopPool is Ownable {
     uint256 public last_drawFund_amount;
     address public last_distressedAssetReceived_token;
     uint256 public last_distressedAssetReceived_amount;
+
+    uint256 public claimProtocolAssetRewardsForCallCount;
+    address public last_user;
+    address public last_protocolToken;
     
     // Call counters for verification
     uint256 public receiveUsdcPremiumCallCount;
     uint256 public drawFundCallCount;
     uint256 public receiveProtocolAssetsCallCount;
+
+    // Add these to your MockPoolRegistry.sol file
+uint256 public last_updateCapitalAllocation_amount;
+uint256 public last_updateCapitalAllocation_poolId;
+address public last_updateCapitalAllocation_adapter;
+bool    public last_updateCapitalAllocation_isAllocation;
+
     address public last_claimProtocolToken;
     uint256 public claimProtocolRewardsCallCount;
     address public last_claimUser;
@@ -102,9 +113,24 @@ contract MockBackstopPool is Ownable {
         claimProtocolRewardsCallCount++;
     }
 
-    function claimProtocolAssetRewardsFor(address user, address protocolToken) external {
-        last_claimProtocolToken = protocolToken;
-        last_claimUser = user;
-        claimProtocolRewardsCallCount++;
-    }
+
+    // Add this function inside your MockBackstopPool contract
+function claimProtocolAssetRewardsFor(address user, address protocolToken) external {
+    claimProtocolAssetRewardsForCallCount++;
+    last_user = user;
+    last_protocolToken = protocolToken;
+}
+
+// Add this function to your MockPoolRegistry.sol file
+function updateCapitalAllocation(
+    uint256 poolId,
+    address adapter,
+    uint256 amount,
+    bool isAllocation
+) external {
+    last_updateCapitalAllocation_poolId = poolId;
+    last_updateCapitalAllocation_adapter = adapter;
+    last_updateCapitalAllocation_amount = amount;
+    last_updateCapitalAllocation_isAllocation = isAllocation;
+}
 }
