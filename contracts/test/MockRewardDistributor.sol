@@ -49,6 +49,12 @@ contract MockRewardDistributor is IRewardDistributor {
         if (totalPledgeInPool > 0) {
             accumulatedRewardsPerShare[poolId][rewardToken] += (rewardAmount * PRECISION_FACTOR) / totalPledgeInPool;
         }
+
+        last_distribute_poolId = poolId;
+        last_distribute_protocolToken = rewardToken;
+        last_distribute_amount = rewardAmount;
+        last_distribute_totalPledge = totalPledgeInPool;
+        distributeCallCount++;
     }
 
 // In MockRewardDistributor.sol
@@ -98,6 +104,12 @@ function claimForCatPool(address user, uint256 poolId, address rewardToken, uint
     function updateUserState(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override {
         uint256 accumulated = accumulatedRewardsPerShare[poolId][rewardToken];
         rewardDebt[user][poolId][rewardToken] = (userPledge * accumulated) / PRECISION_FACTOR;
+
+        last_updateUserState_user = user;
+        last_updateUserState_poolId = poolId;
+        last_updateUserState_token = rewardToken;
+        last_updateUserState_pledge = userPledge;
+        updateUserStateCallCount++;
     }
 
 
