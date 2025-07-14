@@ -29,7 +29,9 @@ contracts/               Solidity sources
 ├─ governance/           DAO style governance
 │  ├─ Committee.sol
 │  └─ Staking.sol
-├─ peripheral/           Loss and reward accounting helpers
+├─ utils/                Misc utilities
+│  ├─ ContractRegistry.sol
+│  ├─ MulticallReader.sol
 │  ├─ LossDistributor.sol
 │  └─ RewardDistributor.sol
 ├─ adapters/             Yield strategy implementations
@@ -44,8 +46,6 @@ contracts/               Solidity sources
 │  └─ OShare.sol
 ├─ oracles/              Price feeds
 │  └─ PriceOracle.sol
-├─ utils/                Misc utilities
-│  └─ MulticallReader.sol
 ├─ interfaces/           Shared protocol interfaces
 └─ test/                 Mock contracts for unit tests
 
