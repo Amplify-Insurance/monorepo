@@ -222,7 +222,7 @@ contract RiskManagerIntegration is Test {
         rm.reportIncident(POOL_ID, true);
     }
 
-    function testSetPoolFeeRecipient() public {
+function testSetPoolFeeRecipient() public {
         address newRecipient = address(0xDEAD);
         // Should fail if not called by committee
         vm.prank(owner);
@@ -233,7 +233,8 @@ contract RiskManagerIntegration is Test {
         vm.prank(committee);
         rm.setPoolFeeRecipient(POOL_ID, newRecipient);
 
-        (,,,, address feeRecipient,,) = registry.getPoolData(POOL_ID);
+        // Correctly destructure the return values
+        (,,,,, address feeRecipient,) = registry.getPoolData(POOL_ID);
         assertEq(feeRecipient, newRecipient);
     }
 

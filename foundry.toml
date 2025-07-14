@@ -1,35 +1,54 @@
+############################################################
+# Default (root) profile settings — these apply if you do
+#   forge test
+# or any other profile that doesn’t override them.
+############################################################
+
 [profile.default]
-via_ir = true
-optimizer = true
+via_ir         = true
+optimizer      = true
 optimizer_runs = 1000
-src = 'contracts'
-test = 'foundry/test'
-out = 'foundry/out'
-libs = ['lib', 'node_modules']
-remappings = [
-  '@openzeppelin/=node_modules/@openzeppelin/',
-  '@chainlink/contracts/=node_modules/@chainlink/contracts/',
+solc_version   = "0.8.22"
+solc_flags     = ["--no-memory-guard"]
+
+src            = "contracts"
+test           = "foundry/test"
+out            = "foundry/out"
+
+libs = [
+  "lib",
+  "node_modules",
 ]
-solc_version = '0.8.22'
+
+remappings = [
+  "@openzeppelin/=node_modules/@openzeppelin/",
+  "@chainlink/contracts/=node_modules/@chainlink/contracts/",
+]
+
+############################################################
+# Fuzz & integration profiles — only overriding `test`
+############################################################
 
 [profile.pool]
-test = 'foundry/test/PoolRegistryFuzz.t.sol'
+test = "foundry/test/PoolRegistryFuzz.t.sol"
 
 [profile.lossfuzz]
-test = 'foundry/test/LossDistributorFuzz.t.sol'
+test = "foundry/test/LossDistributorFuzz.t.sol"
 
 [profile.committee]
-test = 'foundry/test/CommitteeFuzz.t.sol'
+test = "foundry/test/CommitteeFuzz.t.sol"
+
 [profile.pm]
-test = 'foundry/test/PolicyManagerFuzz.t.sol'
+test = "foundry/test/PolicyManagerFuzz.t.sol"
+
 [profile.rewardfuzz]
-test = 'foundry/test/RewardDistributorFuzz.t.sol'
+test = "foundry/test/RewardDistributorFuzz.t.sol"
+
 [profile.staking]
-test = 'foundry/staking-tests'
+test = "foundry/staking-tests"
+
 [profile.riskfuzz]
-test = 'foundry/test/RiskManagerFuzz.t.sol'
-
-
+test = "foundry/test/RiskManagerFuzz.t.sol"
 
 [profile.integration]
 test = "foundry/integration"
