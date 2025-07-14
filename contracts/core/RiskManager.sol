@@ -15,7 +15,6 @@ import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IPolicyManager.sol";
 import "../interfaces/IRewardDistributor.sol";
 import "../interfaces/IRiskManager.sol";
-// import "../MaliciousPoolRegistry.sol"; // IRiskManager interface
 import "../interfaces/IRiskManagerPMHook.sol";
 
 // Events are defined at the file level so they can be imported directly in tests.
@@ -56,6 +55,21 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
     uint256 public deallocationNoticePeriod;
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestAmount;
+
+    /**
+     * @dev A struct to hold all necessary data for claim processing,
+     * used to avoid "Stack too deep" errors.
+     */
+    struct ClaimData {
+        IPolicyNFT.Policy policy;
+        address claimant;
+        uint256 totalCapitalPledged;
+        IERC20 protocolToken;
+        uint256 poolClaimFeeBps;
+        address[] adapters;
+        uint256[] capitalPerAdapter;
+        uint256 totalCoverageSold;
+    }
 
     function getUnderwriterAllocations(address user) external view returns (uint256[] memory) {
         return underwriterAllocations[user];
@@ -162,82 +176,69 @@ contract RiskManager is Ownable, ReentrancyGuard, IRiskManager, IRiskManagerPMHo
         }
     }
 
+    /**
+     * @notice Submits a request to deallocate capital from a specific pool.
+     * @dev This function is the first step in the deallocation process. It initiates a notice period.
+     * @param poolId The ID of the pool to deallocate from.
+     * @param amount The amount of capital to request for deallocation.
+     */
     function requestDeallocateFromPool(uint256 poolId, uint256 amount) external nonReentrant {
-        address underwriter = msg.sender;
-        uint256 poolCount = poolRegistry.getPoolCount();
-        require(poolId < poolCount, "Invalid poolId");
-        require(isAllocatedToPool[underwriter][poolId], "Not allocated to this pool");
-        if (deallocationRequestTimestamp[underwriter][poolId] != 0) revert DeallocationRequestPending();
+        // --- CHECKS ---
+        // All validation is moved to a separate internal function to avoid
+        // a "stack too deep" error by isolating the stack-intensive call.
+        _checkDeallocationRequest(msg.sender, poolId, amount);
 
-        require(amount > 0, "Invalid amount");
-        uint256 totalPledge = underwriterTotalPledge[underwriter];
-        uint256 currentPledge = underwriterPoolPledge[underwriter][poolId];
-        require(amount <= currentPledge, "Amount exceeds pledge");
-        if (totalPledge == 0) revert NoCapitalToAllocate();
-
-        (
-            IERC20 _pt,
-            uint256 totalPledged,
-            uint256 totalSold,
-            uint256 pendingWithdrawal,
-            bool _paused,
-            address _fr,
-            uint256 _cf
-        ) = poolRegistry.getPoolData(poolId);
-        (_pt, _paused, _fr, _cf);
-        uint256 freeCapital =
-            totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
-        if (amount > freeCapital) revert InsufficientFreeCapital();
-
-        deallocationRequestTimestamp[underwriter][poolId] = block.timestamp;
-        deallocationRequestAmount[underwriter][poolId] = amount;
+        // --- EFFECTS & INTERACTIONS ---
+        // If the checks pass, proceed with the state changes.
+        deallocationRequestTimestamp[msg.sender][poolId] = block.timestamp;
+        deallocationRequestAmount[msg.sender][poolId] = amount;
         poolRegistry.updateCapitalPendingWithdrawal(poolId, amount, true);
-        emit DeallocationRequested(underwriter, poolId, amount, block.timestamp);
+        emit DeallocationRequested(msg.sender, poolId, amount, block.timestamp);
     }
 
-function deallocateFromPool(uint256 poolId) external nonReentrant {
-    address underwriter = msg.sender;
-    uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
-    uint256 requestedAmount = deallocationRequestAmount[underwriter][poolId]; // The original request amount
+    function deallocateFromPool(uint256 poolId) external nonReentrant {
+        address underwriter = msg.sender;
+        uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
+        uint256 requestedAmount = deallocationRequestAmount[underwriter][poolId]; // The original request amount
 
-    // 1. Initial Validation
-    if (requestTime == 0) revert NoDeallocationRequest();
-    if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
+        // 1. Initial Validation
+        if (requestTime == 0) revert NoDeallocationRequest();
+        if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
 
-    // 2. Realize any new losses that occurred since the request was made.
-    _realizeLossesForAllPools(underwriter);
+        // 2. Realize any new losses that occurred since the request was made.
+        _realizeLossesForAllPools(underwriter);
 
-    // 3. The Safety Check (THE FIX)
-    uint256 pledgeAfterLosses = underwriterPoolPledge[underwriter][poolId];
-    
-    // Determine the actual amount to deallocate. It's the lesser of what was
-    // requested and what the underwriter has left after losses.
-    uint256 finalAmountToDeallocate = Math.min(requestedAmount, pledgeAfterLosses);
+        // 3. The Safety Check (THE FIX)
+        uint256 pledgeAfterLosses = underwriterPoolPledge[underwriter][poolId];
 
-    uint256 remainingPledge = pledgeAfterLosses - finalAmountToDeallocate;
+        // Determine the actual amount to deallocate. It's the lesser of what was
+        // requested and what the underwriter has left after losses.
+        uint256 finalAmountToDeallocate = Math.min(requestedAmount, pledgeAfterLosses);
 
-    // 4. State Updates
-    address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
-    require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
+        uint256 remainingPledge = pledgeAfterLosses - finalAmountToDeallocate;
 
-    underwriterPoolPledge[underwriter][poolId] = remainingPledge;
-    
-    // If the user's pledge in this pool is now zero, remove them.
-    if (remainingPledge == 0) {
-        _removeUnderwriterFromPool(underwriter, poolId);
+        // 4. State Updates
+        address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
+        require(userAdapterAddress != address(0), "User has no yield adapter set in CapitalPool");
+
+        underwriterPoolPledge[underwriter][poolId] = remainingPledge;
+
+        // If the user's pledge in this pool is now zero, remove them.
+        if (remainingPledge == 0) {
+            _removeUnderwriterFromPool(underwriter, poolId);
+        }
+
+        // Clear the completed withdrawal request.
+        delete deallocationRequestTimestamp[underwriter][poolId];
+        delete deallocationRequestAmount[underwriter][poolId];
+
+        // 5. Final Interactions
+        // Update the PoolRegistry using the safe, final deallocation amount.
+        poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, finalAmountToDeallocate, false);
+        poolRegistry.updateCapitalPendingWithdrawal(poolId, finalAmountToDeallocate, false);
+
+        emit CapitalDeallocated(underwriter, poolId, finalAmountToDeallocate);
     }
-
-    // Clear the completed withdrawal request.
-    delete deallocationRequestTimestamp[underwriter][poolId];
-    delete deallocationRequestAmount[underwriter][poolId];
-
-    // 5. Final Interactions
-    // Update the PoolRegistry using the safe, final deallocation amount.
-    poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, finalAmountToDeallocate, false);
-    poolRegistry.updateCapitalPendingWithdrawal(poolId, finalAmountToDeallocate, false);
-
-    emit CapitalDeallocated(underwriter, poolId, finalAmountToDeallocate);
-}
 
     // CORRECTED: Added missing governance hook functions
     /* ───────────────────── Governance Hooks ───────────────────── */
@@ -268,6 +269,7 @@ function deallocateFromPool(uint256 poolId) external nonReentrant {
     function liquidateInsolventUnderwriter(address underwriter) external nonReentrant {
         // ─── CHECKS & PREPARE ─────────────────────────────────────────────────
         (uint256 pendingLosses, uint256 shareValue) = _prepareLiquidation(underwriter);
+        (pendingLosses, shareValue); // silence unused variable warning
 
         emit UnderwriterLiquidated(msg.sender, underwriter);
         _realizeLossesForAllPools(underwriter);
@@ -275,84 +277,83 @@ function deallocateFromPool(uint256 poolId) external nonReentrant {
 
     /* ───────────────────── Claim Processing ───────────────────── */
 
+    /**
+     * @notice Processes a claim against a policy.
+     * @dev This function is the core of the claim process, orchestrating loss distribution,
+     * payouts, and state updates. It is protected against "Stack too deep" errors
+     * by using the `_prepareClaimData` helper function.
+     * @param policyId The ID of the policy NFT being claimed.
+     */
     function processClaim(uint256 policyId) external nonReentrant {
-        IPolicyNFT.Policy memory policy = policyNFT.getPolicy(policyId);
-        require(block.timestamp >= policy.activation, "Policy not active");
-        uint256 poolId = policy.poolId;
-        uint256 coverage = policy.coverage;
-        (address[] memory adapters, uint256[] memory capitalPerAdapter, uint256 totalCapitalPledged) =
-            poolRegistry.getPoolPayoutData(poolId);
+        // --- 1. PREPARE & VALIDATE ---
+        // Gather all required data in a memory struct to avoid stack issues.
+        ClaimData memory data = _prepareClaimData(policyId);
 
-        (
-            IERC20 protocolToken,
-            uint256 _pledged0,
-            uint256 _sold0,
-            uint256 _pend0,
-            bool _paused0,
-            address _fr0,
-            uint256 poolClaimFeeBps
-        ) = poolRegistry.getPoolData(poolId);
-        (_pledged0, _sold0, _pend0, _paused0, _fr0);
-        address claimant = policyNFT.ownerOf(policyId);
-        require(msg.sender == claimant, "Only policy owner");
+        // The claimant check must be in the external function for access control.
+        require(msg.sender == data.claimant, "Only policy owner");
+
+        uint256 poolId = data.policy.poolId;
+        uint256 coverage = data.policy.coverage;
+
+        // --- 2. PREMIUM DISTRIBUTION (if applicable) ---
+        // If the policy had coverage, the claimant must have provided the protocol tokens
+        // as a premium. These are distributed to the pool's underwriters.
         if (coverage > 0) {
-            uint8 protocolDecimals = IERC20Metadata(address(protocolToken)).decimals();
+            uint8 protocolDecimals = IERC20Metadata(address(data.protocolToken)).decimals();
             uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
             uint256 protocolCoverage = _scaleAmount(coverage, underlyingDecimals, protocolDecimals);
-            protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
-            rewardDistributor.distribute(poolId, address(protocolToken), protocolCoverage, totalCapitalPledged);
+            data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
+            rewardDistributor.distribute(poolId, address(data.protocolToken), protocolCoverage, data.totalCapitalPledged);
         }
 
-        lossDistributor.distributeLoss(poolId, coverage, totalCapitalPledged);
+        // --- 3. LOSS DISTRIBUTION ---
+        // Distribute the loss across all underwriters in the pool and handle any shortfall.
+        lossDistributor.distributeLoss(poolId, coverage, data.totalCapitalPledged);
 
-        uint256 lossBorneByPool = Math.min(coverage, totalCapitalPledged);
+        uint256 lossBorneByPool = Math.min(coverage, data.totalCapitalPledged);
         uint256 shortfall = coverage > lossBorneByPool ? coverage - lossBorneByPool : 0;
         if (shortfall > 0) {
             catPool.drawFund(shortfall);
         }
 
-        uint256 claimFee = (coverage * poolClaimFeeBps) / BPS;
+        // --- 4. PAYOUT EXECUTION ---
+        // Calculate the claim fee and construct the payout data.
+        uint256 claimFee = (coverage * data.poolClaimFeeBps) / BPS;
 
         ICapitalPool.PayoutData memory payoutData = ICapitalPool.PayoutData({
-            claimant: claimant,
+            claimant: data.claimant,
             claimantAmount: coverage - claimFee,
             feeRecipient: committee,
             feeAmount: claimFee,
-            adapters: adapters,
-            capitalPerAdapter: capitalPerAdapter,
-            totalCapitalFromPoolLPs: totalCapitalPledged
+            adapters: data.adapters,
+            capitalPerAdapter: data.capitalPerAdapter,
+            totalCapitalFromPoolLPs: data.totalCapitalPledged
         });
 
+        // Trigger the payout from the CapitalPool.
         capitalPool.executePayout(payoutData);
 
-        if (lossBorneByPool > 0 && totalCapitalPledged > 0) {
-            for (uint256 i = 0; i < adapters.length; i++) {
-                uint256 adapterLoss = (lossBorneByPool * capitalPerAdapter[i]) / totalCapitalPledged;
+        // --- 5. STATE UPDATES (Post-Payout) ---
+        // Reduce the capital allocation of each underwriter's adapter based on the loss.
+        if (lossBorneByPool > 0 && data.totalCapitalPledged > 0) {
+            for (uint256 i = 0; i < data.adapters.length; i++) {
+                uint256 adapterLoss = (lossBorneByPool * data.capitalPerAdapter[i]) / data.totalCapitalPledged;
                 if (adapterLoss > 0) {
-                    poolRegistry.updateCapitalAllocation(poolId, adapters[i], adapterLoss, false);
+                    poolRegistry.updateCapitalAllocation(poolId, data.adapters[i], adapterLoss, false);
                 }
             }
         }
 
-        // Update coverage sold directly without going through the PolicyManager
-        // hook to avoid the NotPolicyManager revert when processing claims.
-        (
-            IERC20 _pt1,
-            uint256 _pledged1,
-            uint256 totalCoverageSold,
-            uint256 _pend1,
-            bool _paused1,
-            address _fr1,
-            uint256 _cf1
-        ) = poolRegistry.getPoolData(poolId);
-        (_pt1, _pledged1, _pend1, _paused1, _fr1, _cf1);
-        uint256 reduction = Math.min(coverage, totalCoverageSold);
+        // Update the total coverage sold for the pool.
+        uint256 reduction = Math.min(coverage, data.totalCoverageSold);
         if (reduction > 0) {
             poolRegistry.updateCoverageSold(poolId, reduction, false);
         }
 
+        // Burn the used policy NFT.
         policyNFT.burn(policyId);
     }
+
 
     /* ───────────────── Hooks & State Updaters ───────────────── */
 
@@ -395,7 +396,7 @@ function deallocateFromPool(uint256 poolId) external nonReentrant {
 
     /**
      * @notice EXTERNAL “execute” function: pulls in the pre–aggregated tokens
-     *         and makes one isolated external call per token.
+     * and makes one isolated external call per token.
      */
     function claimDistressedAssets(uint256[] calldata poolIds) external nonReentrant {
         address[] memory uniqueTokens = _prepareDistressedAssets(poolIds);
@@ -447,30 +448,30 @@ function deallocateFromPool(uint256 poolId) external nonReentrant {
         }
     }
 
-function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
-    if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+    function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
+        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
 
-    uint256[] memory allocations = underwriterAllocations[underwriter];
+        uint256[] memory allocations = underwriterAllocations[underwriter];
 
-    // FIX: Pre-fetching the data is still efficient, so we keep it.
-    IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
+        // FIX: Pre-fetching the data is still efficient, so we keep it.
+        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
 
-    for (uint256 i = 0; i < allocations.length; i++) {
-        uint256 poolId = allocations[i];
+        for (uint256 i = 0; i < allocations.length; i++) {
+            uint256 poolId = allocations[i];
 
-        // FIX: The reduction amount is simply the principalComponent of the cancelled request.
-        // The Math.min check was incorrect and has been removed. A simple underflow check is sufficient.
-        if (principalComponent > 0 && allPoolData[i].capitalPendingWithdrawal >= principalComponent) {
-             poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, false);
+            // FIX: The reduction amount is simply the principalComponent of the cancelled request.
+            // The Math.min check was incorrect and has been removed. A simple underflow check is sufficient.
+            if (principalComponent > 0 && allPoolData[i].capitalPendingWithdrawal >= principalComponent) {
+                poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, false);
+            }
+
+            address protocolToken = address(allPoolData[i].protocolTokenToCover);
+
+            rewardDistributor.updateUserState(
+                underwriter, poolId, protocolToken, underwriterPoolPledge[underwriter][poolId]
+            );
         }
-
-        address protocolToken = address(allPoolData[i].protocolTokenToCover);
-
-        rewardDistributor.updateUserState(
-            underwriter, poolId, protocolToken, underwriterPoolPledge[underwriter][poolId]
-        );
     }
-}
 
     function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal)
         external
@@ -479,47 +480,127 @@ function onWithdrawalCancelled(address underwriter, uint256 principalComponent) 
         if (msg.sender != address(capitalPool)) revert NotCapitalPool();
         _realizeLossesForAllPools(underwriter);
 
+        // Reduce the underwriter's total pledge.
         uint256 pledgeAfterLosses = underwriterTotalPledge[underwriter];
         uint256 amountToSubtract = Math.min(pledgeAfterLosses, principalComponentRemoved);
         underwriterTotalPledge[underwriter] -= amountToSubtract;
 
         uint256[] memory allocations = underwriterAllocations[underwriter];
 
-        // 1. Fetch all pool data at once, replacing two separate calls inside the loop.
+        // Fetch all pool data at once to avoid multiple external calls inside the loop.
         IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
 
+        // Loop through each allocation and process the withdrawal.
+        // The logic is moved to a helper function to avoid "Stack too deep" errors.
         for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-
-            // 2. Get data from our pre-fetched array instead of making external calls.
-            IPoolRegistry.PoolInfo memory poolData = allPoolData[i];
-            uint256 pendingWithdrawal = poolData.capitalPendingWithdrawal;
-            address protocolToken = address(poolData.protocolTokenToCover);
-
-            uint256 reduction = Math.min(principalComponentRemoved, pendingWithdrawal);
-            if (reduction > 0) {
-                poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
-            }
-
-            uint256 pledgeReduction = principalComponentRemoved > underwriterPoolPledge[underwriter][poolId]
-                ? underwriterPoolPledge[underwriter][poolId]
-                : principalComponentRemoved;
-            underwriterPoolPledge[underwriter][poolId] -= pledgeReduction;
-
-            rewardDistributor.updateUserState(
-                underwriter, poolId, protocolToken, underwriterPoolPledge[underwriter][poolId]
+            _processWithdrawalForPool(
+                underwriter,
+                allocations[i],
+                principalComponentRemoved,
+                isFullWithdrawal,
+                allPoolData[i].capitalPendingWithdrawal,
+                address(allPoolData[i].protocolTokenToCover)
             );
-
-            if (isFullWithdrawal || underwriterPoolPledge[underwriter][poolId] == 0) {
-                _removeUnderwriterFromPool(underwriter, poolId);
-            }
         }
+
+        // If it was a full withdrawal, clear the underwriter's allocation array.
         if (isFullWithdrawal) {
             delete underwriterAllocations[underwriter];
         }
     }
 
     /* ───────────────── Internal Functions ───────────────── */
+
+    /**
+     * @dev Internal function to process the withdrawal logic for a single pool.
+     * @notice This is separated from `onCapitalWithdrawn` to prevent "Stack too deep" errors.
+     * @param pendingWithdrawal The amount of capital pending withdrawal in the pool.
+     * @param protocolToken The protocol token associated with the pool.
+     */
+    function _processWithdrawalForPool(
+        address underwriter,
+        uint256 poolId,
+        uint256 principalComponentRemoved,
+        bool isFullWithdrawal,
+        uint256 pendingWithdrawal,
+        address protocolToken
+    ) internal {
+        // Update the amount of capital pending withdrawal in the pool.
+        uint256 reduction = Math.min(principalComponentRemoved, pendingWithdrawal);
+        if (reduction > 0) {
+            poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
+        }
+
+        // Calculate the new pledge amount for the underwriter in this pool.
+        uint256 currentPoolPledge = underwriterPoolPledge[underwriter][poolId];
+        uint256 newPoolPledge = (principalComponentRemoved >= currentPoolPledge)
+            ? 0
+            : currentPoolPledge - principalComponentRemoved;
+
+        // Update the underwriter's pledge for the pool.
+        underwriterPoolPledge[underwriter][poolId] = newPoolPledge;
+
+        // Update the user's state in the reward distributor with the new pledge amount.
+        rewardDistributor.updateUserState(
+            underwriter, poolId, protocolToken, newPoolPledge
+        );
+
+        // If the pledge is now zero or it's a full withdrawal, remove the underwriter from the pool.
+        if (isFullWithdrawal || newPoolPledge == 0) {
+            _removeUnderwriterFromPool(underwriter, poolId);
+        }
+    }
+
+
+    function _prepareClaimData(uint256 _policyId) internal view returns (ClaimData memory data) {
+        data.policy = policyNFT.getPolicy(_policyId);
+        require(block.timestamp >= data.policy.activation, "Policy not active");
+
+        data.claimant = policyNFT.ownerOf(_policyId);
+
+        (data.adapters, data.capitalPerAdapter, data.totalCapitalPledged) =
+            poolRegistry.getPoolPayoutData(data.policy.poolId);
+
+        (
+            data.protocolToken,
+            , // _pledged
+            data.totalCoverageSold,
+            , // _pending
+            , // _paused
+            , // _feeRecipient
+            data.poolClaimFeeBps
+        ) = poolRegistry.getPoolData(data.policy.poolId);
+    }
+
+
+    function _checkDeallocationRequest(address _underwriter, uint256 _poolId, uint256 _amount) internal view {
+        // --- VALIDATION ---
+        require(_poolId < poolRegistry.getPoolCount(), "Invalid poolId");
+        require(isAllocatedToPool[_underwriter][_poolId], "Not allocated to this pool");
+        if (deallocationRequestTimestamp[_underwriter][_poolId] != 0) revert DeallocationRequestPending();
+
+        require(_amount > 0, "Invalid amount");
+        uint256 currentPledge = underwriterPoolPledge[_underwriter][_poolId];
+        require(_amount <= currentPledge, "Amount exceeds pledge");
+        if (underwriterTotalPledge[_underwriter] == 0) revert NoCapitalToAllocate();
+
+        // The call that returns many variables and causes the stack issue.
+        // We only use the variables we need and discard the rest by leaving them unnamed.
+        (
+            /* IERC20 _pt */,
+            uint256 totalPledged,
+            uint256 totalSold,
+            uint256 pendingWithdrawal,
+            /* bool _paused */,
+            /* address _fr */,
+            /* uint256 _cf */
+        ) = poolRegistry.getPoolData(_poolId);
+
+        // Check if there is enough unutilized capital in the pool.
+        uint256 freeCapital =
+            totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
+        if (_amount > freeCapital) revert InsufficientFreeCapital();
+    }
 
     function _scaleAmount(uint256 amount, uint8 fromDecimals, uint8 toDecimals) internal pure returns (uint256) {
         if (toDecimals > fromDecimals) {
@@ -568,7 +649,7 @@ function onWithdrawalCancelled(address underwriter, uint256 principalComponent) 
 
     /**
      * @dev INTERNAL “prepare” function: collects all unique protocol-tokens
-     *      — **NO** external calls in here.
+     * — **NO** external calls in here.
      */
     function _prepareDistressedAssets(uint256[] calldata _poolIds) internal view returns (address[] memory tokens) {
         // 1. Fetch all pool data at once instead of in a loop.

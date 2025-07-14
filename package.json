@@ -25,7 +25,7 @@
     "slither:test": "slither . --compile-force-framework hardhat --filter-paths 'test|node_modules/@openzeppelin/contracts'",
     "test:forge": "forge test",
     "test:forge:fuzz": "forge test -C fuzz",
-    "test:integration": "forge test --match-path 'foundry/integration/*.t.sol'",
+    "test:integration": "FOUNDRY_PROFILE=integration forge test",
     "test:mythril": "./scripts/mythril.sh",
     "test:manticore": "./scripts/manticore.sh"
   },

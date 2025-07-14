@@ -123,39 +123,22 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         uint256 initialPremiumDeposit
     ) external nonReentrant returns (uint256 policyId) {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
-
-        (
-            IERC20 _pt,
-            uint256 _pledged,
-            uint256 sold,
-            uint256 _pending,
-            bool paused,
-            address _feeR,
-            uint256 _claimFee
-        ) = poolRegistry.getPoolData(poolId);
-        // silence unused variable warnings
-        (_pt, _pledged, _pending, _feeR, _claimFee);
-        if (paused) revert PoolPaused();
         if (coverageAmount == 0 || initialPremiumDeposit == 0) revert InvalidAmount();
         if (initialPremiumDeposit > type(uint128).max) revert InvalidAmount();
 
-        uint256 cap = _getAvailableCapital(poolId);
-        if (sold + coverageAmount > cap) revert InsufficientCapacity();
-
-        uint256 rateBps = _getPremiumRateBpsAnnual(poolId);
-        uint256 minPrem = (coverageAmount * rateBps * 7 days) / (SECS_YEAR * BPS);
-        if (initialPremiumDeposit < minPrem) revert DepositTooLow();
+        // All validation and data fetching is moved to the helper function
+        // to reduce stack depth in this function.
+        uint256 activationTimestamp = _preparePurchase(poolId, coverageAmount, initialPremiumDeposit);
 
         capitalPool.underlyingAsset().safeTransferFrom(msg.sender, address(this), initialPremiumDeposit);
 
-        uint256 activateAt = block.timestamp + coverCooldownPeriod;
         policyId = policyNFT.mint(
           msg.sender,
           poolId,
           coverageAmount,
-          activateAt,
+          activationTimestamp,
           uint128(initialPremiumDeposit),
-          uint128(activateAt)
+          uint128(activationTimestamp)
         );
 
         riskManager.updateCoverageSold(poolId, coverageAmount, true);
@@ -164,33 +147,20 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     function increaseCover(uint256 policyId, uint256 additionalCoverage) external nonReentrant {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
         if (additionalCoverage == 0 || additionalCoverage > type(uint128).max) revert InvalidAmount();
-        if (policyNFT.ownerOf(policyId) != msg.sender) revert NotPolicyOwner();
-
+        
+        // --- CHECKS ---
+        // Perform state-modifying checks first.
         _settleAndDrainPremium(policyId);
+        if (policyNFT.ownerOf(policyId) != msg.sender) revert NotPolicyOwner();
         if (!isPolicyActive(policyId)) revert PolicyNotActive();
 
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
         if (pol.coverage == 0) revert PolicyAlreadyTerminated();
 
-        (
-            IERC20 _pt,
-            uint256 _pledged,
-            uint256 sold,
-            uint256 _pending,
-            bool _p,
-            address _fr,
-            uint256 _cf
-        ) = poolRegistry.getPoolData(pol.poolId);
-        (_pt, _pledged, _pending, _p, _fr, _cf);
-        uint256 cap = _getAvailableCapital(pol.poolId);
-        if (sold + additionalCoverage > cap) revert InsufficientCapacity();
+        // Perform view-based validation in a helper to reduce stack depth.
+        _validateIncreaseCover(policyId, additionalCoverage, pol);
 
-        uint256 newTotal = pol.coverage + pendingCoverageSum[policyId] + additionalCoverage;
-
-        uint256 rateBps = _getPremiumRateBpsAnnual(pol.poolId);
-        uint256 minPrem = (newTotal * rateBps * 7 days) / (SECS_YEAR * BPS);
-        if (pol.premiumDeposit < minPrem) revert DepositTooLow();
-
+        // --- EFFECTS & INTERACTIONS ---
         uint256 activateAt = block.timestamp + coverCooldownPeriod;
         uint256 nodeId     = _nextNodeId++;
         _nodes[nodeId]     = PendingIncreaseNode({
@@ -217,7 +187,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
         uint256 refund = pol.premiumDeposit;
         
-        // FIX: Store the sum *before* it's modified.
         uint256 pendingToCancel = pendingCoverageSum[policyId];
         uint256 cleared = 0;
         uint256 nodeId = pendingIncreaseListHead[policyId];
@@ -226,14 +195,13 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         while (nodeId != 0) {
             if (cleared >= PROCESS_LIMIT) revert TooManyPendingIncreases();
             uint256 nextId = _nodes[nodeId].nextNodeId;
-            delete _nodes[nodeId]; // Simplified: removed redundant _burnNode
+            delete _nodes[nodeId];
             nodeId = nextId;
             cleared++;
         }
         pendingIncreaseListHead[policyId] = 0;
         pendingCoverageSum[policyId] = 0;
 
-        // FIX: Use the stored sum for an accurate calculation.
         uint256 totalToReduce = pol.coverage + pendingToCancel;
         if (totalToReduce > 0) {
             riskManager.updateCoverageSold(pol.poolId, totalToReduce, false);
@@ -254,7 +222,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
         if (pol.coverage == 0) revert PolicyAlreadyTerminated();
         
-        // FIX: Store the sum *before* it's modified.
         uint256 pendingToCancel = pendingCoverageSum[policyId];
         uint256 cleared = 0;
         uint256 nodeId = pendingIncreaseListHead[policyId];
@@ -262,14 +229,13 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         while (nodeId != 0) {
             if (cleared >= PROCESS_LIMIT) revert TooManyPendingIncreases();
             uint256 nextId = _nodes[nodeId].nextNodeId;
-            delete _nodes[nodeId]; // Simplified: removed redundant _burnNode
+            delete _nodes[nodeId];
             nodeId = nextId;
             cleared++;
         }
         pendingIncreaseListHead[policyId] = 0;
         pendingCoverageSum[policyId] = 0;
         
-        // FIX: Use the stored sum for an accurate calculation.
         uint256 totalToReduce = pol.coverage + pendingToCancel;
         if (totalToReduce > 0) {
             riskManager.updateCoverageSold(pol.poolId, totalToReduce, false);
@@ -280,50 +246,150 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
     /* ───────────────── Internal Helpers ────────────────────────── */
 
+    /**
+     * @dev Internal helper to validate a cover increase request.
+     * @notice This function consolidates view-based checks to prevent "Stack too deep" errors.
+     */
+    function _validateIncreaseCover(uint256 policyId, uint256 additionalCoverage, IPolicyNFT.Policy memory pol) internal view {
+        (
+            , // _pt
+            uint256 pledged,
+            uint256 sold,
+            uint256 pendingW,
+            bool paused,
+            , // _fr
+              // _cf
+        ) = poolRegistry.getPoolData(pol.poolId);
+
+        if (paused) revert PoolPaused();
+
+        uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
+        uint256 totalPending = pendingCoverageSum[policyId];
+        if (sold + totalPending + additionalCoverage > availableCapital) revert InsufficientCapacity();
+
+        uint256 newTotalCoverage = pol.coverage + totalPending + additionalCoverage;
+        
+        uint256 rateBps;
+        {
+            IPoolRegistry.RateModel memory rateModel = poolRegistry.getPoolRateModel(pol.poolId);
+            if (availableCapital == 0) {
+                rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + (rateModel.slope2 * (BPS - rateModel.kink)) / BPS;
+            } else {
+                uint256 utilBps = (sold * BPS) / availableCapital;
+                if (utilBps < rateModel.kink) {
+                    rateBps = rateModel.base + (sold * rateModel.slope1) / availableCapital;
+                } else {
+                    uint256 postKink = (sold * BPS) - (rateModel.kink * availableCapital);
+                    rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + ((rateModel.slope2 * postKink) / (availableCapital * BPS));
+                }
+            }
+        }
+
+        // FIX: Combine calculation to save a stack slot for `minPremium`
+        if (pol.premiumDeposit < (newTotalCoverage * rateBps * 7 days) / (SECS_YEAR * BPS)) revert DepositTooLow();
+    }
+
+    /**
+     * @dev Internal helper to validate and prepare data for a new policy purchase.
+     * @notice This function consolidates checks and calculations to prevent "Stack too deep" errors.
+     * @return activationTimestamp The timestamp when the policy will become active.
+     */
+    function _preparePurchase(uint256 poolId, uint256 coverageAmount, uint256 initialPremiumDeposit)
+        internal
+        view
+        returns (uint256 activationTimestamp)
+    {
+        (
+            , // _pt
+            uint256 pledged,
+            uint256 sold,
+            uint256 pendingW,
+            bool paused,
+            , // _feeR
+              // _claimFee
+        ) = poolRegistry.getPoolData(poolId);
+
+        if (paused) revert PoolPaused();
+
+        uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
+        if (sold + coverageAmount > availableCapital) revert InsufficientCapacity();
+
+        uint256 rateBps;
+        {
+            IPoolRegistry.RateModel memory rateModel = poolRegistry.getPoolRateModel(poolId);
+            if (availableCapital == 0) {
+                rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + (rateModel.slope2 * (BPS - rateModel.kink)) / BPS;
+            } else {
+                uint256 utilBps = (sold * BPS) / availableCapital;
+                if (utilBps < rateModel.kink) {
+                    rateBps = rateModel.base + (sold * rateModel.slope1) / availableCapital;
+                } else {
+                    uint256 postKink = (sold * BPS) - (rateModel.kink * availableCapital);
+                    rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + ((rateModel.slope2 * postKink) / (availableCapital * BPS));
+                }
+            }
+        }
+        
+        // FIX: Combine calculation to save a stack slot for `minPremium`
+        if (initialPremiumDeposit < (coverageAmount * rateBps * 7 days) / (SECS_YEAR * BPS)) revert DepositTooLow();
+
+        activationTimestamp = block.timestamp + coverCooldownPeriod;
+    }
+
+    /**
+    * @dev FIX: This function is refactored to reduce local variables and avoid a "Stack too deep" error.
+    */
     function _settleAndDrainPremium(uint256 _policyId) internal {
         _resolvePendingIncrease(_policyId);
 
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
         if (block.timestamp <= pol.lastDrainTime) return;
 
-        uint256 rateBps = _getPremiumRateBpsAnnual(pol.poolId);
-        uint256 elapsed  = block.timestamp - pol.lastDrainTime;
+        ( , uint256 pledged, uint256 sold, uint256 pendingW, , , ) = poolRegistry.getPoolData(pol.poolId);
+
+        uint256 rateBps;
+        {
+            IPoolRegistry.RateModel memory rateModel = poolRegistry.getPoolRateModel(pol.poolId);
+            uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
+            if (availableCapital == 0) {
+                rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + (rateModel.slope2 * (BPS - rateModel.kink)) / BPS;
+            } else {
+                uint256 utilBps = (sold * BPS) / availableCapital;
+                if (utilBps < rateModel.kink) {
+                    rateBps = rateModel.base + (sold * rateModel.slope1) / availableCapital;
+                } else {
+                    uint256 postKink = (sold * BPS) - (rateModel.kink * availableCapital);
+                    rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + ((rateModel.slope2 * postKink) / (availableCapital * BPS));
+                }
+            }
+        }
+
+        uint256 elapsed = block.timestamp - pol.lastDrainTime;
 
         if (rateBps == 0) {
             policyNFT.updatePremiumAccount(_policyId, pol.premiumDeposit, uint128(block.timestamp));
             return;
         }
 
-        uint256 cost      = (pol.coverage * rateBps * elapsed) / (SECS_YEAR * BPS);
-        uint256 toDrain   = Math.min(cost, pol.premiumDeposit);
+        // FIX: Combine `cost` calculation into `Math.min` to save one stack slot.
+        uint256 toDrain = Math.min((pol.coverage * rateBps * elapsed) / (SECS_YEAR * BPS), pol.premiumDeposit);
         if (toDrain < 1) {
             policyNFT.updatePremiumAccount(_policyId, pol.premiumDeposit, uint128(block.timestamp));
             return;
         }
 
-        uint128 newDep = uint128(pol.premiumDeposit - toDrain);
-        policyNFT.updatePremiumAccount(_policyId, newDep, uint128(block.timestamp));
+        // FIX: Calculate new deposit directly in the update call to save another stack slot (`newDep`).
+        policyNFT.updatePremiumAccount(_policyId, uint128(pol.premiumDeposit - toDrain), uint128(block.timestamp));
 
         uint256 catAmt  = (toDrain * catPremiumBps) / BPS;
         uint256 poolInc = toDrain - catAmt;
 
         if (catAmt > 0) {
             IERC20 underlying = capitalPool.underlyingAsset();
-            // approve safely for catastrophe pool
             underlying.forceApprove(address(catPool), catAmt);
             catPool.receiveUsdcPremium(catAmt);
         }
 
-        (
-            IERC20 _pt2,
-            uint256 pledged,
-            uint256 _sold2,
-            uint256 _pending2,
-            bool _pause2,
-            address _fr2,
-            uint256 _cf2
-        ) = poolRegistry.getPoolData(pol.poolId);
-        (_pt2, _sold2, _pending2, _pause2, _fr2, _cf2);
         if (poolInc > 0 && pledged > 0) {
             rewardDistributor.distribute(pol.poolId, address(capitalPool.underlyingAsset()), poolInc, pledged);
         }
@@ -342,7 +408,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
             if (block.timestamp >= node.activationTimestamp) {
                 finalized += node.amount;
                 pendingCoverageSum[_policyId] -= node.amount;
-                // unlink
+
                 if (prev == 0) {
                     pendingIncreaseListHead[_policyId] = nextId;
                 } else {
@@ -380,57 +446,39 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         }
         return list;
     }
-
+    
+    /**
+    * @dev FIX: This function is refactored to reduce local variables and avoid a potential "Stack too deep" error.
+    */
     function isPolicyActive(uint256 policyId) public view returns (bool) {
         if (address(poolRegistry) == address(0)) return false;
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
         if (pol.coverage == 0) return false;
         if (block.timestamp <= pol.lastDrainTime) return pol.premiumDeposit > 0;
 
-        uint256 rateBps = _getPremiumRateBpsAnnual(pol.poolId);
+        ( , uint256 pledged, uint256 sold, uint256 pendingW, , , ) = poolRegistry.getPoolData(pol.poolId);
+
+        uint256 rateBps;
+        {
+            uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
+            IPoolRegistry.RateModel memory rateModel = poolRegistry.getPoolRateModel(pol.poolId);
+            if (availableCapital == 0) {
+                rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + (rateModel.slope2 * (BPS - rateModel.kink)) / BPS;
+            } else {
+                uint256 utilBps = (sold * BPS) / availableCapital;
+                if (utilBps < rateModel.kink) {
+                    rateBps = rateModel.base + (sold * rateModel.slope1) / availableCapital;
+                } else {
+                    uint256 postKink = (sold * BPS) - (rateModel.kink * availableCapital);
+                    rateBps = rateModel.base + (rateModel.slope1 * rateModel.kink) / BPS + ((rateModel.slope2 * postKink) / (availableCapital * BPS));
+                }
+            }
+        }
+        
         if (rateBps == 0) return pol.premiumDeposit > 0;
 
         uint256 elapsed = block.timestamp - pol.lastDrainTime;
-        uint256 cost    = (pol.coverage * rateBps * elapsed) / (SECS_YEAR * BPS);
-        return pol.premiumDeposit > cost;
-    }
-
-    function _getPremiumRateBpsAnnual(uint256 _poolId) internal view returns (uint256) {
-        (
-            IERC20 _pt3,
-            uint256 _pledged3,
-            uint256 sold,
-            uint256 _pend3,
-            bool _paused3,
-            address _fr3,
-            uint256 _cf3
-        ) = poolRegistry.getPoolData(_poolId);
-        (_pt3, _pledged3, _pend3, _paused3, _fr3, _cf3);
-        uint256 cap    = _getAvailableCapital(_poolId);
-        IPoolRegistry.RateModel memory m = poolRegistry.getPoolRateModel(_poolId);
-        if (cap == 0) {
-            return m.base + (m.slope1 * m.kink) / BPS + (m.slope2 * (BPS - m.kink)) / BPS;
-        }
-        uint256 utilBps = (sold * BPS) / cap;
-        if (utilBps < m.kink) {
-            return m.base + (sold * m.slope1) / cap;
-        }
-        uint256 postKink = (sold * BPS) - (m.kink * cap);
-        uint256 slope2Portion = (m.slope2 * postKink) / (cap * BPS);
-        return m.base + (m.slope1 * m.kink) / BPS + slope2Portion;
-    }
-
-    function _getAvailableCapital(uint256 _poolId) internal view returns (uint256) {
-        (
-            IERC20 _pt4,
-            uint256 pledged,
-            uint256 _sold4,
-            uint256 pendingW,
-            bool _paused4,
-            address _fr4,
-            uint256 _cf4
-        ) = poolRegistry.getPoolData(_poolId);
-        (_pt4, _sold4, _paused4, _fr4, _cf4);
-        return pendingW >= pledged ? 0 : pledged - pendingW;
+        // FIX: Combine cost calculation and comparison to save a stack slot for `cost`.
+        return pol.premiumDeposit > (pol.coverage * rateBps * elapsed) / (SECS_YEAR * BPS);
     }
 }
