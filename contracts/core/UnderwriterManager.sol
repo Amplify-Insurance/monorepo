@@ -8,9 +8,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // --- Interfaces ---
-// It's best practice to keep interfaces in separate files.
-// For this example, they are included for completeness.
-
 interface IPolicyNFT {
     struct Policy {
         uint256 poolId;
@@ -82,15 +79,13 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /* ───────────────────────── State Variables ───────────────────────── */
 
-    // --- External Contract Dependencies ---
     ICapitalPool public capitalPool;
     IPoolRegistry public poolRegistry;
     IBackstopPool public catPool;
     ILossDistributor public lossDistributor;
     IRewardDistributor public rewardDistributor;
-    address public riskManager; // The new, lean RiskManager contract
+    address public riskManager;
 
-    // --- Underwriter State ---
     mapping(address => uint256) public underwriterTotalPledge;
     mapping(address => mapping(uint256 => uint256)) public underwriterPoolPledge;
     mapping(uint256 => address[]) public poolSpecificUnderwriters;
@@ -98,15 +93,13 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
     mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
 
-    // --- Configuration ---
     uint256 public maxAllocationsPerUnderwriter = 5;
     uint256 public deallocationNoticePeriod;
 
-    // --- Deallocation State ---
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestAmount;
 
-    /* ───────────────────────── Events ───────────────────────── */
+    /* ───────────────────────── Events & Errors ───────────────────────── */
 
     event AddressesSet(address capital, address registry, address cat, address loss, address rewards, address riskMgr);
     event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
@@ -114,8 +107,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
     event DeallocationNoticePeriodSet(uint256 newPeriod);
     event MaxAllocationsPerUnderwriterSet(uint256 newMax);
-
-    /* ───────────────────────── Errors ───────────────────────── */
 
     error NotCapitalPool();
     error NotRiskManager();
@@ -134,10 +125,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
-    /**
-     * @notice Sets the addresses of crucial external contracts.
-     * @dev Can only be called by the owner. Essential for protocol operation.
-     */
     function setAddresses(
         address _capitalPool,
         address _poolRegistry,
@@ -159,18 +146,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         emit AddressesSet(_capitalPool, _poolRegistry, _catPool, _lossDistributor, _rewardDistributor, _riskManager);
     }
 
-    /**
-     * @notice Sets the maximum number of pools an underwriter can allocate to.
-     */
     function setMaxAllocationsPerUnderwriter(uint256 _newMax) external onlyOwner {
         require(_newMax > 0, "Invalid max");
         maxAllocationsPerUnderwriter = _newMax;
         emit MaxAllocationsPerUnderwriterSet(_newMax);
     }
 
-    /**
-     * @notice Sets the notice period required for deallocating capital.
-     */
     function setDeallocationNoticePeriod(uint256 _newPeriod) external onlyOwner {
         deallocationNoticePeriod = _newPeriod;
         emit DeallocationNoticePeriodSet(_newPeriod);
@@ -178,39 +159,15 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /* ──────────────── Underwriter Capital Management ──────────────── */
 
-    /**
-     * @notice Allocates the underwriter's entire capital pledge to one or more pools.
-     * @param poolIds An array of pool IDs to allocate capital to.
-     */
     function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
         (uint256 totalPledge, address adapter) = _prepareAllocateCapital(poolIds);
-
         for (uint256 i = 0; i < poolIds.length; i++) {
-            uint256 poolId = poolIds[i];
-
-            // --- Effects ---
-            underwriterPoolPledge[msg.sender][poolId] = totalPledge;
-            isAllocatedToPool[msg.sender][poolId] = true;
-            underwriterAllocations[msg.sender].push(poolId);
-            poolSpecificUnderwriters[poolId].push(msg.sender);
-            underwriterIndexInPoolArray[poolId][msg.sender] = poolSpecificUnderwriters[poolId].length - 1;
-
-            // --- Interaction ---
-            poolRegistry.updateCapitalAllocation(poolId, adapter, totalPledge, true);
-
-            emit CapitalAllocated(msg.sender, poolId, totalPledge);
+            _executeAllocation(poolIds[i], totalPledge, adapter);
         }
     }
 
-    /**
-     * @notice Submits a request to deallocate capital from a specific pool.
-     * @dev Initiates a notice period before capital can be fully deallocated.
-     * @param poolId The ID of the pool to deallocate from.
-     * @param amount The amount of capital to request for deallocation.
-     */
     function requestDeallocateFromPool(uint256 poolId, uint256 amount) external nonReentrant {
         _checkDeallocationRequest(msg.sender, poolId, amount);
-
         deallocationRequestTimestamp[msg.sender][poolId] = block.timestamp;
         deallocationRequestAmount[msg.sender][poolId] = amount;
         poolRegistry.updateCapitalPendingWithdrawal(poolId, amount, true);
@@ -219,22 +176,121 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /**
      * @notice Finalizes the deallocation of capital from a pool after the notice period.
-     * @dev Realizes any losses incurred since the request before completing deallocation.
-     * @param poolId The ID of the pool to deallocate from.
+     * @dev This function now acts as an orchestrator, calling internal helpers for each step.
      */
     function deallocateFromPool(uint256 poolId) external nonReentrant {
-        address underwriter = msg.sender;
-        uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
-        uint256 requestedAmount = deallocationRequestAmount[underwriter][poolId];
+        // --- 1. Validate the request ---
+        (uint256 requestedAmount) = _validateDeallocationRequest(msg.sender, poolId);
 
-        if (requestTime == 0) revert NoDeallocationRequest();
-        if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
-
-        // Realize losses before proceeding. This must be called from the RiskManager.
-        // For simplicity in this standalone contract, we assume an external call.
+        // --- 2. Realize any pending losses ---
         // In a real system, this would be `IRiskManager(riskManager).realizeLossesFor(...)`
+        _realizeLossesForAllPools(msg.sender);
+
+        // --- 3. Execute the deallocation logic ---
+        _executeDeallocation(msg.sender, poolId, requestedAmount);
+    }
+
+
+    /* ───────────────── Hooks & State Updaters ───────────────── */
+
+    function onCapitalDeposited(address underwriter, uint256 amount) external nonReentrant {
+        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+        underwriterTotalPledge[underwriter] += amount;
+        _updateAllPoolPledgesOnDeposit(underwriter, amount);
+    }
+
+    function onWithdrawalRequested(address underwriter, uint256 principalComponent) external nonReentrant {
+        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+        _updateAllPoolsOnWithdrawalAction(underwriter, principalComponent, true);
+    }
+
+    function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
+        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+        _updateAllPoolsOnWithdrawalAction(underwriter, principalComponent, false);
+    }
+
+    /**
+     * @notice Hook called by CapitalPool when capital is withdrawn.
+     * @dev This function now acts as an orchestrator.
+     */
+    function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal)
+        external
+        nonReentrant
+    {
+        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+        
+        // --- 1. Realize losses before any capital is removed ---
         _realizeLossesForAllPools(underwriter);
 
+        // --- 2. Update the underwriter's total pledge state ---
+        uint256 pledgeAfterLosses = underwriterTotalPledge[underwriter];
+        uint256 amountToSubtract = Math.min(pledgeAfterLosses, principalComponentRemoved);
+        underwriterTotalPledge[underwriter] -= amountToSubtract;
+
+        // --- 3. Process the withdrawal across all allocated pools ---
+        _processWithdrawalForAllPools(underwriter, principalComponentRemoved, isFullWithdrawal);
+
+        // --- 4. Clean up if it was a full withdrawal ---
+        if (isFullWithdrawal) {
+            delete underwriterAllocations[underwriter];
+        }
+    }
+
+    /* ───────────────── Rewards Claiming ───────────────── */
+
+    function claimPremiumRewards(uint256[] calldata poolIds) external nonReentrant {
+        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(poolIds);
+        for (uint256 i = 0; i < poolIds.length; i++) {
+            uint256 poolId = poolIds[i];
+            if (underwriterPoolPledge[msg.sender][poolId] > 0) {
+                IPoolRegistry.PoolInfo memory poolData = allPoolData[i];
+                rewardDistributor.claim(
+                    msg.sender,
+                    poolId,
+                    address(poolData.protocolTokenToCover),
+                    underwriterPoolPledge[msg.sender][poolId]
+                );
+            }
+        }
+    }
+
+    function claimDistressedAssets(uint256[] calldata poolIds) external nonReentrant {
+        address[] memory uniqueTokens = _prepareDistressedAssets(poolIds);
+        for (uint256 i = 0; i < uniqueTokens.length; i++) {
+            catPool.claimProtocolAssetRewardsFor(msg.sender, uniqueTokens[i]);
+        }
+    }
+
+    /* ───────────────── External Functions for RiskManager ───────────────── */
+
+    function realizeLossesForAllPools(address user) external {
+        if (msg.sender != riskManager) revert NotRiskManager();
+        _realizeLossesForAllPools(user);
+    }
+
+    /* ───────────────── Internal & Private Functions ───────────────── */
+
+    /**
+     * @notice NEW: Internal helper to execute the state changes for capital allocation.
+     */
+    function _executeAllocation(uint256 poolId, uint256 totalPledge, address adapter) internal {
+        // Effects
+        underwriterPoolPledge[msg.sender][poolId] = totalPledge;
+        isAllocatedToPool[msg.sender][poolId] = true;
+        underwriterAllocations[msg.sender].push(poolId);
+        poolSpecificUnderwriters[poolId].push(msg.sender);
+        underwriterIndexInPoolArray[poolId][msg.sender] = poolSpecificUnderwriters[poolId].length - 1;
+
+        // Interaction
+        poolRegistry.updateCapitalAllocation(poolId, adapter, totalPledge, true);
+
+        emit CapitalAllocated(msg.sender, poolId, totalPledge);
+    }
+
+    /**
+     * @notice NEW: Internal helper to execute the core logic of deallocation.
+     */
+    function _executeDeallocation(address underwriter, uint256 poolId, uint256 requestedAmount) internal {
         uint256 pledgeAfterLosses = underwriterPoolPledge[underwriter][poolId];
         uint256 finalAmountToDeallocate = Math.min(requestedAmount, pledgeAfterLosses);
         uint256 remainingPledge = pledgeAfterLosses - finalAmountToDeallocate;
@@ -257,17 +313,21 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         emit CapitalDeallocated(underwriter, poolId, finalAmountToDeallocate);
     }
 
-
-    /* ───────────────── Hooks & State Updaters ───────────────── */
+    /**
+     * @notice NEW: Internal helper to validate a deallocation request.
+     * @return requestedAmount The amount from the original request.
+     */
+    function _validateDeallocationRequest(address underwriter, uint256 poolId) internal view returns (uint256) {
+        uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
+        if (requestTime == 0) revert NoDeallocationRequest();
+        if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
+        return deallocationRequestAmount[underwriter][poolId];
+    }
 
     /**
-     * @notice Hook called by CapitalPool when an underwriter deposits capital.
-     * @dev Updates the underwriter's total pledge and their pledge in each allocated pool.
+     * @notice NEW: Internal helper for the onCapitalDeposited hook logic.
      */
-    function onCapitalDeposited(address underwriter, uint256 amount) external nonReentrant {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
-
-        underwriterTotalPledge[underwriter] += amount;
+    function _updateAllPoolPledgesOnDeposit(address underwriter, uint256 amount) internal {
         uint256[] memory pools = underwriterAllocations[underwriter];
         if (pools.length == 0) return;
 
@@ -283,37 +343,17 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Hook called by CapitalPool when a withdrawal is requested.
+     * @notice NEW: Combined logic for onWithdrawalRequested and onWithdrawalCancelled hooks.
      */
-    function onWithdrawalRequested(address underwriter, uint256 principalComponent) external nonReentrant {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+    function _updateAllPoolsOnWithdrawalAction(address underwriter, uint256 principalComponent, bool isRequest) internal {
         uint256[] memory allocations = underwriterAllocations[underwriter];
         if (allocations.length == 0) return;
 
         IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
         for (uint256 i = 0; i < allocations.length; i++) {
             uint256 poolId = allocations[i];
-            poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, true);
-            address protocolToken = address(allPoolData[i].protocolTokenToCover);
-            rewardDistributor.updateUserState(
-                underwriter, poolId, protocolToken, underwriterPoolPledge[underwriter][poolId]
-            );
-        }
-    }
-
-    /**
-     * @notice Hook called by CapitalPool when a withdrawal is cancelled.
-     */
-    function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
-        uint256[] memory allocations = underwriterAllocations[underwriter];
-        if (allocations.length == 0) return;
-
-        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
-        for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-            if (principalComponent > 0 && allPoolData[i].capitalPendingWithdrawal >= principalComponent) {
-                poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, false);
+            if (isRequest || (principalComponent > 0 && allPoolData[i].capitalPendingWithdrawal >= principalComponent)) {
+                poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, isRequest);
             }
             address protocolToken = address(allPoolData[i].protocolTokenToCover);
             rewardDistributor.updateUserState(
@@ -323,20 +363,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Hook called by CapitalPool when capital is withdrawn.
-     * @dev Realizes losses before processing the withdrawal for each pool.
+     * @notice NEW: Internal helper for the main loop in the onCapitalWithdrawn hook.
      */
-    function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal)
-        external
-        nonReentrant
-    {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
-        _realizeLossesForAllPools(underwriter);
-
-        uint256 pledgeAfterLosses = underwriterTotalPledge[underwriter];
-        uint256 amountToSubtract = Math.min(pledgeAfterLosses, principalComponentRemoved);
-        underwriterTotalPledge[underwriter] -= amountToSubtract;
-
+    function _processWithdrawalForAllPools(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) internal {
         uint256[] memory allocations = underwriterAllocations[underwriter];
         if (allocations.length == 0) return;
 
@@ -352,58 +381,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
                 address(allPoolData[i].protocolTokenToCover)
             );
         }
-
-        if (isFullWithdrawal) {
-            delete underwriterAllocations[underwriter];
-        }
     }
-
-    /* ───────────────── Rewards Claiming ───────────────── */
-
-    /**
-     * @notice Claims premium rewards for multiple pools.
-     * @param poolIds An array of pool IDs to claim rewards from.
-     */
-    function claimPremiumRewards(uint256[] calldata poolIds) external nonReentrant {
-        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(poolIds);
-
-        for (uint256 i = 0; i < poolIds.length; i++) {
-            uint256 poolId = poolIds[i];
-            if (underwriterPoolPledge[msg.sender][poolId] > 0) {
-                IPoolRegistry.PoolInfo memory poolData = allPoolData[i];
-                rewardDistributor.claim(
-                    msg.sender,
-                    poolId,
-                    address(poolData.protocolTokenToCover),
-                    underwriterPoolPledge[msg.sender][poolId]
-                );
-            }
-        }
-    }
-
-    /**
-     * @notice Claims distressed assets (protocol tokens from failed protocols) from the backstop pool.
-     */
-    function claimDistressedAssets(uint256[] calldata poolIds) external nonReentrant {
-        address[] memory uniqueTokens = _prepareDistressedAssets(poolIds);
-        for (uint256 i = 0; i < uniqueTokens.length; i++) {
-            catPool.claimProtocolAssetRewardsFor(msg.sender, uniqueTokens[i]);
-        }
-    }
-
-    /* ───────────────── External Functions for RiskManager ───────────────── */
-
-    /**
-     * @notice Realizes pending losses for a user across all their allocated pools.
-     * @dev Can only be called by the RiskManager contract, typically before a liquidation or withdrawal.
-     * @param user The address of the underwriter to realize losses for.
-     */
-    function realizeLossesForAllPools(address user) external {
-        if (msg.sender != riskManager) revert NotRiskManager();
-        _realizeLossesForAllPools(user);
-    }
-
-    /* ───────────────── Internal & Private Functions ───────────────── */
 
     function _realizeLossesForAllPools(address _user) internal {
         uint256[] memory allocations = underwriterAllocations[_user];

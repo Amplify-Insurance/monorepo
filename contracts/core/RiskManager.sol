@@ -187,62 +187,81 @@ contract RiskManager is Ownable, ReentrancyGuard {
      * payouts, and state updates.
      * @param policyId The ID of the policy NFT being claimed.
      */
-    function processClaim(uint256 policyId) external nonReentrant {
-        // --- 1. PREPARE & VALIDATE ---
-        ClaimData memory data = _prepareClaimData(policyId);
-        if (msg.sender != data.claimant) revert OnlyPolicyOwner();
 
-        uint256 poolId = data.policy.poolId;
-        uint256 coverage = data.policy.coverage;
+     function processClaim(uint256 policyId) external nonReentrant {
+    // --- 1. PREPARE & VALIDATE ---
+    ClaimData memory data = _prepareClaimData(policyId);
+    if (msg.sender != data.claimant) revert OnlyPolicyOwner();
 
-        // --- 2. PREMIUM DISTRIBUTION (if applicable) ---
-        if (coverage > 0) {
-            uint8 protocolDecimals = IERC20Metadata(address(data.protocolToken)).decimals();
-            uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
-            uint256 protocolCoverage = _scaleAmount(coverage, underlyingDecimals, protocolDecimals);
-            data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
-            rewardDistributor.distribute(poolId, address(data.protocolToken), protocolCoverage, data.totalCapitalPledged);
-        }
+    // --- 2. PREMIUM DISTRIBUTION ---
+    _distributePremium(data);
 
-        // --- 3. LOSS DISTRIBUTION ---
-        lossDistributor.distributeLoss(poolId, coverage, data.totalCapitalPledged);
+    // --- 3. LOSS DISTRIBUTION ---
+    uint256 lossBorneByPool = _distributeLosses(data);
 
-        uint256 lossBorneByPool = Math.min(coverage, data.totalCapitalPledged);
-        uint256 shortfall = coverage > lossBorneByPool ? coverage - lossBorneByPool : 0;
-        if (shortfall > 0) {
-            catPool.drawFund(shortfall);
-        }
+    // --- 4. PAYOUT EXECUTION ---
+    _executePayout(data);
 
-        // --- 4. PAYOUT EXECUTION ---
-        uint256 claimFee = (coverage * data.poolClaimFeeBps) / BPS;
-        ICapitalPool.PayoutData memory payoutData = ICapitalPool.PayoutData({
-            claimant: data.claimant,
-            claimantAmount: coverage - claimFee,
-            feeRecipient: committee,
-            feeAmount: claimFee,
-            adapters: data.adapters,
-            capitalPerAdapter: data.capitalPerAdapter,
-            totalCapitalFromPoolLPs: data.totalCapitalPledged
-        });
-        capitalPool.executePayout(payoutData);
+    // --- 5. STATE UPDATES ---
+    _updatePoolState(data, lossBorneByPool);
 
-        // --- 5. STATE UPDATES (Post-Payout) ---
-        if (lossBorneByPool > 0 && data.totalCapitalPledged > 0) {
-            for (uint256 i = 0; i < data.adapters.length; i++) {
-                uint256 adapterLoss = (lossBorneByPool * data.capitalPerAdapter[i]) / data.totalCapitalPledged;
-                if (adapterLoss > 0) {
-                    poolRegistry.updateCapitalAllocation(poolId, data.adapters[i], adapterLoss, false);
-                }
+    policyNFT.burn(policyId);
+}
+
+function _distributePremium(ClaimData memory _data) internal {
+    if (_data.policy.coverage == 0) return;
+
+    uint8 protocolDecimals = IERC20Metadata(address(_data.protocolToken)).decimals();
+    uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
+    uint256 protocolCoverage = _scaleAmount(_data.policy.coverage, underlyingDecimals, protocolDecimals);
+
+    _data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
+    rewardDistributor.distribute(_data.policy.poolId, address(_data.protocolToken), protocolCoverage, _data.totalCapitalPledged);
+}
+
+function _distributeLosses(ClaimData memory _data) internal returns (uint256) {
+    uint256 coverage = _data.policy.coverage;
+    uint256 totalCapitalPledged = _data.totalCapitalPledged;
+
+    lossDistributor.distributeLoss(_data.policy.poolId, coverage, totalCapitalPledged);
+
+    uint256 lossBorneByPool = Math.min(coverage, totalCapitalPledged);
+    uint256 shortfall = coverage > lossBorneByPool ? coverage - lossBorneByPool : 0;
+    if (shortfall > 0) {
+        catPool.drawFund(shortfall);
+    }
+    return lossBorneByPool;
+}
+
+function _executePayout(ClaimData memory _data) internal {
+    uint256 claimFee = (_data.policy.coverage * _data.poolClaimFeeBps) / BPS;
+    ICapitalPool.PayoutData memory payoutData = ICapitalPool.PayoutData({
+        claimant: _data.claimant,
+        claimantAmount: _data.policy.coverage - claimFee,
+        feeRecipient: committee,
+        feeAmount: claimFee,
+        adapters: _data.adapters,
+        capitalPerAdapter: _data.capitalPerAdapter,
+        totalCapitalFromPoolLPs: _data.totalCapitalPledged
+    });
+    capitalPool.executePayout(payoutData);
+}
+
+function _updatePoolState(ClaimData memory _data, uint256 _lossBorneByPool) internal {
+    if (_lossBorneByPool > 0 && _data.totalCapitalPledged > 0) {
+        for (uint256 i = 0; i < _data.adapters.length; i++) {
+            uint256 adapterLoss = (_lossBorneByPool * _data.capitalPerAdapter[i]) / _data.totalCapitalPledged;
+            if (adapterLoss > 0) {
+                poolRegistry.updateCapitalAllocation(_data.policy.poolId, _data.adapters[i], adapterLoss, false);
             }
         }
-
-        uint256 reduction = Math.min(coverage, data.totalCoverageSold);
-        if (reduction > 0) {
-            poolRegistry.updateCoverageSold(poolId, reduction, false);
-        }
-
-        policyNFT.burn(policyId);
     }
+
+    uint256 reduction = Math.min(_data.policy.coverage, _data.totalCoverageSold);
+    if (reduction > 0) {
+        poolRegistry.updateCoverageSold(_data.policy.poolId, reduction, false);
+    }
+}
 
     /* ───────────────── Hooks ───────────────── */
 

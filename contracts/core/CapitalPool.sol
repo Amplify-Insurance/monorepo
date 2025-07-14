@@ -218,6 +218,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
     // REFACTORED: to execute a specific request by index
+    // REFACTORED: to execute a specific request by index and use a helper for accounting
     function executeWithdrawal(uint256 _requestIndex) external nonReentrant {
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
         WithdrawalRequest[] storage requests = withdrawalRequests[msg.sender];
@@ -230,36 +231,32 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         if (sharesToBurn > account.masterShares) revert InconsistentState();
 
         uint256 amountToReceiveBasedOnNAV = sharesToValue(sharesToBurn);
-        uint256 oldMasterShares = account.masterShares;
 
-        // Effects: update user and global state before external interaction
-        uint256 principalComponentRemoved = (account.totalDepositedAssetPrincipal * sharesToBurn) / oldMasterShares;
-        account.totalDepositedAssetPrincipal -= principalComponentRemoved;
-        account.masterShares -= sharesToBurn;
-        account.totalPendingWithdrawalShares -= sharesToBurn;
-        totalMasterSharesSystem -= sharesToBurn;
+        // --- Effects ---
+        // Handle all accounting and state changes in the helper function
+        uint256 principalComponentRemoved = _burnSharesAndRemoveRequest(msg.sender, _requestIndex, sharesToBurn);
 
-        // Remove the executed request from the array using swap-and-pop
-        requests[_requestIndex] = requests[requests.length - 1];
-        requests.pop();
-
-        // Interaction: pull funds from the adapter after state updates
+        // --- Interactions ---
+        // 1. Pull funds from the yield adapter
         uint256 assetsActuallyWithdrawn = 0;
         if (amountToReceiveBasedOnNAV > 0) {
             assetsActuallyWithdrawn = account.yieldAdapter.withdraw(amountToReceiveBasedOnNAV, address(this));
         }
 
+        // 2. Update global system value after withdrawal
         totalSystemValue = totalSystemValue > assetsActuallyWithdrawn ? totalSystemValue - assetsActuallyWithdrawn : 0;
-
-        bool isFullWithdrawal = (account.masterShares == 0);
         
+        // 3. Notify RiskManager
+        bool isFullWithdrawal = (account.masterShares == 0);
         (bool success,) = riskManager.call(abi.encodeWithSignature("onCapitalWithdrawn(address,uint256,bool)", msg.sender, principalComponentRemoved, isFullWithdrawal));
         require(success, "CP: Failed to notify RiskManager of withdrawal");
 
+        // 4. Cleanup if user has fully withdrawn
         if (isFullWithdrawal) {
             delete underwriterAccounts[msg.sender];
         }
 
+        // 5. Transfer funds to the user
         if (assetsActuallyWithdrawn > 0) {
             underlyingAsset.safeTransfer(msg.sender, assetsActuallyWithdrawn);
         }
@@ -268,78 +265,137 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
 
+    /**
+     * @dev Internal function to handle the accounting of burning shares and removing a withdrawal request.
+     * @param _underwriter The address of the user withdrawing.
+     * @param _requestIndex The index of the withdrawal request to process.
+     * @param _sharesToBurn The number of shares to burn for the request.
+     * @return principalComponentRemoved The amount of principal associated with the burned shares.
+     */
+
+    function _burnSharesAndRemoveRequest(
+        address _underwriter,
+        uint256 _requestIndex,
+        uint256 _sharesToBurn
+    ) internal returns (uint256) {
+        UnderwriterAccount storage account = underwriterAccounts[_underwriter];
+        uint256 oldMasterShares = account.masterShares;
+
+        // Calculate the portion of the user's deposited principal that is being withdrawn
+        uint256 principalComponentRemoved = (account.totalDepositedAssetPrincipal * _sharesToBurn) / oldMasterShares;
+
+        // Update user account state
+        account.totalDepositedAssetPrincipal -= principalComponentRemoved;
+        account.masterShares -= _sharesToBurn;
+        account.totalPendingWithdrawalShares -= _sharesToBurn;
+        
+        // Update global state
+        totalMasterSharesSystem -= _sharesToBurn;
+
+        // Remove the executed request from the array using the swap-and-pop pattern
+        WithdrawalRequest[] storage requests = withdrawalRequests[_underwriter];
+        requests[_requestIndex] = requests[requests.length - 1];
+        requests.pop();
+
+        return principalComponentRemoved;
+    }
+
+
+
         /* ───────────────────── Trusted Functions (RiskManager Only) ────────────────── */
-    function executePayout(PayoutData calldata _payoutData) external nonReentrant onlyRiskManager {
-        uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
-        if (totalPayoutAmount == 0) return;
-        if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
+        
+        function executePayout(PayoutData calldata _payoutData) external nonReentrant onlyRiskManager {
+            uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
+            if (totalPayoutAmount == 0) return;
+            if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
 
-        uint256 amountPaidDirectlyByAdapters = 0;
-        if (_payoutData.totalCapitalFromPoolLPs > 0) {
-            IBackstopPool catPool = IRiskManagerWithBackstop(riskManager).catPool();
-            for (uint i = 0; i < _payoutData.adapters.length; i++) {
-                uint256 adapterCapitalShare = _payoutData.capitalPerAdapter[i];
-                if (adapterCapitalShare == 0) continue;
+            // REFACTORED PART: Call the internal helper function to gather funds
+            uint256 amountPaidDirectlyByAdapters = _gatherFundsForPayout(_payoutData);
 
-                uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
-                if (amountToWithdraw == 0) continue;
+            // Determine the amount that should have been gathered in this contract.
+            uint256 requiredContractBalance = totalPayoutAmount - amountPaidDirectlyByAdapters;
+            require(underlyingAsset.balanceOf(address(this)) >= requiredContractBalance, "CP: Payout failed, insufficient funds gathered");
 
-                amountPaidDirectlyByAdapters += _handleWithdrawalAttempt(
-                    IYieldAdapter(_payoutData.adapters[i]),
-                    amountToWithdraw,
-                    _payoutData.claimant,
-                    catPool
-                );
+            totalSystemValue -= totalPayoutAmount;
+
+            // Calculate remaining amount to pay the claimant from this contract.
+            uint256 claimantAmountToPay = _payoutData.claimantAmount > amountPaidDirectlyByAdapters
+                ? _payoutData.claimantAmount - amountPaidDirectlyByAdapters
+                : 0;
+
+            if (claimantAmountToPay > 0) {
+                underlyingAsset.safeTransfer(_payoutData.claimant, claimantAmountToPay);
+            }
+            if (_payoutData.feeAmount > 0 && _payoutData.feeRecipient != address(0)) {
+                underlyingAsset.safeTransfer(_payoutData.feeRecipient, _payoutData.feeAmount);
             }
         }
 
-        // Determine the amount that should have been gathered in this contract.
-        uint256 requiredContractBalance = totalPayoutAmount - amountPaidDirectlyByAdapters;
-        require(underlyingAsset.balanceOf(address(this)) >= requiredContractBalance, "CP: Payout failed, insufficient funds gathered");
+        /**
+        * @dev Internal function to iterate through adapters and withdraw funds needed for a payout.
+        * @return amountPaidDirectly The amount of funds sent directly to the claimant via emergency transfers.
+        */
+        function _gatherFundsForPayout(PayoutData calldata _payoutData) internal returns (uint256) {
+            uint256 amountPaidDirectlyByAdapters = 0;
+            if (_payoutData.totalCapitalFromPoolLPs > 0) {
+                IBackstopPool catPool = IRiskManagerWithBackstop(riskManager).catPool();
+                uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
 
-        totalSystemValue -= totalPayoutAmount;
+                for (uint i = 0; i < _payoutData.adapters.length; i++) {
+                    uint256 adapterCapitalShare = _payoutData.capitalPerAdapter[i];
+                    if (adapterCapitalShare == 0) continue;
 
-        // Calculate remaining amount to pay the claimant from this contract.
-        uint256 claimantAmountToPay = _payoutData.claimantAmount > amountPaidDirectlyByAdapters
-            ? _payoutData.claimantAmount - amountPaidDirectlyByAdapters
-            : 0;
+                    uint256 amountToWithdraw = (totalPayoutAmount * adapterCapitalShare) / _payoutData.totalCapitalFromPoolLPs;
+                    if (amountToWithdraw == 0) continue;
 
-        if (claimantAmountToPay > 0) {
-            underlyingAsset.safeTransfer(_payoutData.claimant, claimantAmountToPay);
+                    amountPaidDirectlyByAdapters += _handleWithdrawalAttempt(
+                        IYieldAdapter(_payoutData.adapters[i]),
+                        amountToWithdraw,
+                        _payoutData.claimant,
+                        catPool
+                    );
+                }
+            }
+            return amountPaidDirectlyByAdapters;
         }
-        if (_payoutData.feeAmount > 0 && _payoutData.feeRecipient != address(0)) {
-            underlyingAsset.safeTransfer(_payoutData.feeRecipient, _payoutData.feeAmount);
-        }
-    }
 
 
     function applyLosses(address _underwriter, uint256 _principalLossAmount) external nonReentrant onlyRiskManager {
         if (_principalLossAmount == 0) revert InvalidAmount();
         UnderwriterAccount storage account = underwriterAccounts[_underwriter];
         if (account.totalDepositedAssetPrincipal == 0) revert NoActiveDeposit();
+
         uint256 actualLoss = Math.min(_principalLossAmount, account.totalDepositedAssetPrincipal);
-        if (account.totalDepositedAssetPrincipal > 0) {
-            uint256 sharesToBurn = (account.masterShares * actualLoss) / account.totalDepositedAssetPrincipal;
-            if (sharesToBurn > account.masterShares) {
-                sharesToBurn = account.masterShares;
-            }
-            account.masterShares -= sharesToBurn;
-            totalMasterSharesSystem -= sharesToBurn;
-            // Note: Pending withdrawals may now be invalid if shares are lost.
-            // The checks in executeWithdrawal() (sharesToBurn > account.masterShares) will catch this
-            // and revert, forcing the user to cancel invalid requests.
-        }
-        account.totalDepositedAssetPrincipal -= actualLoss;
+
+        // REFACTORED PART: Call the internal helper function
+        _applyLossToAccount(account, actualLoss);
+
         totalSystemValue = totalSystemValue > actualLoss ? totalSystemValue - actualLoss : 0;
+        
         bool wipedOut = (account.totalDepositedAssetPrincipal == 0 || account.masterShares == 0);
         if (wipedOut) {
             if(account.masterShares > 0) {
-               totalMasterSharesSystem -= account.masterShares;
+            totalMasterSharesSystem -= account.masterShares;
             }
             delete underwriterAccounts[_underwriter];
             delete withdrawalRequests[_underwriter]; // Also clear any pending requests.
         }
         emit LossesApplied(_underwriter, actualLoss, wipedOut);
+    }
+
+    /**
+    * @dev Internal function to reduce an account's principal and master shares due to a loss.
+    */
+    function _applyLossToAccount(UnderwriterAccount storage account, uint256 _lossAmount) internal {
+        if (account.totalDepositedAssetPrincipal > 0) {
+            uint256 sharesToBurn = (account.masterShares * _lossAmount) / account.totalDepositedAssetPrincipal;
+            if (sharesToBurn > account.masterShares) {
+                sharesToBurn = account.masterShares;
+            }
+            account.masterShares -= sharesToBurn;
+            totalMasterSharesSystem -= sharesToBurn;
+        }
+        account.totalDepositedAssetPrincipal -= _lossAmount;
     }
 
     /* ─────────────────── NAV Synchronization (Keeper Function) ─────────────────── */
