@@ -87,6 +87,252 @@ dataSources:
       file: ./src/mapping.ts
 
   - kind: ethereum/contract
+    name: UnderwriterManager
+    network: mainnet
+    context:
+      deployment: usdc
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RiskManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - PoolUtilizationSnapshot
+      abis:
+        - name: RiskManager
+          file: ./abis/UnderwriterManager.json
+      eventHandlers:
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocatedUM
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocatedUM
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleRiskManagerOwnershipTransferredUM
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreatedUM
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsedUM
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaidUM
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessedUM
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: UnderwriterManagerEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RiskManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - PoolUtilizationSnapshot
+      abis:
+        - name: RiskManager
+          file: ./abis/UnderwriterManager.json
+      eventHandlers:
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocatedUM
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocatedUM
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleRiskManagerOwnershipTransferredUM
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreatedUM
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsedUM
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaidUM
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessedUM
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: RiskManager
+    network: mainnet
+    context:
+      deployment: usdc
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RiskManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - PoolUtilizationSnapshot
+      abis:
+        - name: RiskManager
+          file: ./abis/RiskManager.json
+      eventHandlers:
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocatedNew
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocatedNew
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleRiskManagerOwnershipTransferredNew
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreatedNew
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsedNew
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaidNew
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessedNew
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: RiskManagerEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RiskManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - PoolUtilizationSnapshot
+      abis:
+        - name: RiskManager
+          file: ./abis/RiskManager.json
+      eventHandlers:
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocatedNew
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocatedNew
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleRiskManagerOwnershipTransferredNew
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreatedNew
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsedNew
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaidNew
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessedNew
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: ProtocolConfigurator
+    network: mainnet
+    context:
+      deployment: usdc
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RiskManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - PoolUtilizationSnapshot
+      abis:
+        - name: RiskManager
+          file: ./abis/ProtocolConfigurator.json
+      eventHandlers:
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocatedPC
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocatedPC
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleRiskManagerOwnershipTransferredPC
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreatedPC
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsedPC
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaidPC
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessedPC
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
+    name: ProtocolConfiguratorEth
+    network: mainnet
+    context:
+      deployment: eth
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RiskManager
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GenericEvent
+        - Pool
+        - Underwriter
+        - Policy
+        - ContractOwner
+        - PoolUtilizationSnapshot
+        - PoolUtilizationSnapshot
+      abis:
+        - name: RiskManager
+          file: ./abis/ProtocolConfigurator.json
+      eventHandlers:
+        - event: CapitalAllocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalAllocatedPC
+        - event: CapitalDeallocated(indexed address,indexed uint256,uint256)
+          handler: handleCapitalDeallocatedPC
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleRiskManagerOwnershipTransferredPC
+        - event: PolicyCreated(indexed address,indexed uint256,indexed uint256,uint256,uint256)
+          handler: handlePolicyCreatedPC
+        - event: PolicyLapsed(indexed uint256)
+          handler: handlePolicyLapsedPC
+        - event: PremiumPaid(indexed uint256,uint256,uint256,uint256,uint256)
+          handler: handlePremiumPaidPC
+        - event: ClaimProcessed(indexed uint256,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleClaimProcessedPC
+      file: ./src/mapping.ts
+
+  - kind: ethereum/contract
     name: StakingEth
     network: mainnet
     context:

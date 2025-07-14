@@ -3,14 +3,15 @@
 This directory contains subgraph definitions for indexing the insurance
 protocol contracts using [The Graph](https://thegraph.com/).
 
-The `insurance` subgraph indexes events emitted by `RiskManagerV2`,
+The `insurance` subgraph indexes events emitted by the protocol contracts
+including `UnderwriterManager`, `RiskManager`, `ProtocolConfigurator`,
 `CapitalPool`, `CatInsurancePool` and `PolicyNFT`. Each data source now has a
 `deployment` context so multiple deployments can be indexed by duplicating the
 entries in `subgraph.yaml` with different addresses and `deployment` names. The
-repository now includes blocks for both the original USDC deployment and a new
-ETH deployment so they can be queried from a single subgraph. Update the
-placeholder contract addresses before deployment. The manifest uses the new
-`RiskManagerV2` data source in place of the original `RiskManager` contract.
+repository includes blocks for both the original USDC deployment and a new ETH
+deployment so they can be queried from a single subgraph. Update the placeholder
+contract addresses before deployment. The manifest uses the new contract data
+sources in place of the original monolithic `RiskManager` contract.
 
 Entities include a `deployment` field allowing queries to filter by the
 originating deployment.
