@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // --- Contract and Mocks ---
-import {UnderwriterManager, DeallocationRequested} from "contracts/UnderwriterManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
 import {MockCapitalPool} from "contracts/test/MockCapitalPool.sol";
 import {MockPoolRegistry} from "contracts/test/MockPoolRegistry.sol";
@@ -197,6 +197,7 @@ contract UnderwriterManagerTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, otherUser));
         um.setAddresses(address(cp), address(pr), address(cat), address(ld), address(rd), riskManager);
 
+        vm.prank(otherUser);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, otherUser));
         um.setMaxAllocationsPerUnderwriter(10);
 
