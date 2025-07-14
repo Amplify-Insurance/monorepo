@@ -675,7 +675,7 @@ contract MaliciousToken {
     }
 }
 `;
-fs.writeFileSync(path.join(__dirname, "..", "contracts", "MaliciousToken.sol"), maliciousTokenSource);
+fs.writeFileSync(path.join(__dirname, "..", "contracts", "test", "MaliciousToken.sol"), maliciousTokenSource);
 // Recreate other helper contracts if they were deleted by other test runs
 const maliciousAdapterSource = `
 // SPDX-License-Identifier: MIT
@@ -705,4 +705,4 @@ contract MaliciousAdapter {
     function getCurrentValueHeld() external view returns (uint256) { return asset.balanceOf(address(this)); }
 }
 `;
-fs.writeFileSync(path.join(__dirname, "..", "contracts", "MaliciousAdapter.sol"), maliciousAdapterSource);
+fs.writeFileSync(path.join(__dirname, "..", "contracts", "test", "MaliciousAdapter.sol"), maliciousAdapterSource);
