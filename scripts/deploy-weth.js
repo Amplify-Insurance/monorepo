@@ -104,6 +104,17 @@ async function main() {
     riskManager.target
   );
 
+  /*───────────────────────── ProtocolConfigurator ───────────────────────*/
+  const ProtocolConfigurator = await ethers.getContractFactory("RiskAdmin");
+  const protocolConfigurator = await ProtocolConfigurator.deploy(deployer.address);
+  await protocolConfigurator.waitForDeployment();
+  await protocolConfigurator.initialize(
+    poolRegistry.target,
+    capitalPool.target,
+    policyManager.target,
+    underwriterManager.target
+  );
+
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
   const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
@@ -140,6 +151,7 @@ async function main() {
     LossDistributor:   lossDistributor.target,
     RewardDistributor: rewardDistributor.target,
     RiskManager:       riskManager.target,
+    ProtocolConfigurator: protocolConfigurator.target,
     UnderwriterManager: underwriterManager.target,
     "Aave Adapter":    aaveAdapter.target,
     "Compound Adapter": compoundAdapter.target,
