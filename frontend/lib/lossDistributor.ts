@@ -11,7 +11,7 @@ if (!ADDRESS) {
 }
 
 export function getLossDistributor(address: string = ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, LossDistributor, getProvider(deployment))
+  return new ethers.Contract(address, LossDistributor.abi, getProvider(deployment))
 }
 
 export const lossDistributor = getLossDistributor()
@@ -22,12 +22,12 @@ export async function getLossDistributorWithSigner(address: string = ADDRESS) {
   }
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
   const signer = await browserProvider.getSigner()
-  return new ethers.Contract(address, LossDistributor, signer)
+  return new ethers.Contract(address, LossDistributor.abi, signer)
 }
 
 export function getLossDistributorWriter(address: string = ADDRESS, deployment?: string) {
   const pk = process.env.PRIVATE_KEY
   if (!pk) throw new Error('PRIVATE_KEY not set')
   const signer = new ethers.Wallet(pk, getProvider(deployment))
-  return new ethers.Contract(address, LossDistributor, signer)
+  return new ethers.Contract(address, LossDistributor.abi, signer)
 }

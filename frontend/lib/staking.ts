@@ -12,7 +12,7 @@ if (!ADDRESS) {
 }
 
 export function getStaking(address: string = ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, Staking, getProvider(deployment))
+  return new ethers.Contract(address, Staking.abi, getProvider(deployment))
 }
 
 export const staking = getStaking()
@@ -24,5 +24,5 @@ export async function getStakingWithSigner() {
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
   const signer = await browserProvider.getSigner()
 
-  return new ethers.Contract(ADDRESS, Staking, signer)
+  return new ethers.Contract(ADDRESS, Staking.abi, signer)
 }

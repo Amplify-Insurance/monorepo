@@ -11,7 +11,7 @@ if (!ADDRESS) {
 }
 
 export function getCommittee(address: string = ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, Committee, getProvider(deployment))
+  return new ethers.Contract(address, Committee.abi, getProvider(deployment))
 }
 
 export const committee = getCommittee()
@@ -23,12 +23,12 @@ export async function getCommitteeWithSigner() {
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
   const signer = await browserProvider.getSigner()
 
-  return new ethers.Contract(ADDRESS, Committee, signer)
+  return new ethers.Contract(ADDRESS, Committee.abi, signer)
 }
 
 export function getCommitteeWriter(address: string = ADDRESS, deployment?: string) {
   const pk = process.env.PRIVATE_KEY
   if (!pk) throw new Error('PRIVATE_KEY not set')
   const signer = new ethers.Wallet(pk, getProvider(deployment))
-  return new ethers.Contract(address, Committee, signer)
+  return new ethers.Contract(address, Committee.abi, signer)
 }

@@ -12,7 +12,7 @@ if (!DEFAULT_ADDRESS) {
 }
 
 export function getUnderwriterManager(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, UnderwriterManager, getProvider(deployment));
+  return new ethers.Contract(address, UnderwriterManager.abi, getProvider(deployment));
 }
 
 export const underwriterManager = getUnderwriterManager();
@@ -30,7 +30,7 @@ export async function getUnderwriterManagerWithSigner(address: string = DEFAULT_
     await browserProvider.send('eth_requestAccounts', []);
     const signer = await browserProvider.getSigner();
     console.log('✅  Browser wallet connected – address:', await signer.getAddress());
-    return new ethers.Contract(address, UnderwriterManager, signer);
+    return new ethers.Contract(address, UnderwriterManager.abi, signer);
   } catch (err) {
     console.error('🚨  getUnderwriterManagerWithSigner failed:', err);
     throw err;
@@ -46,7 +46,7 @@ export function getUnderwriterManagerWriter(address: string = DEFAULT_ADDRESS, d
 
     const signer = new ethers.Wallet(pk, getProvider(deployment));
     console.log('✅  Writer signer loaded – address:', signer.address);
-    return new ethers.Contract(address, UnderwriterManager, signer);
+    return new ethers.Contract(address, UnderwriterManager.abi, signer);
   } catch (err) {
     console.error('🚨  getUnderwriterManagerWriter failed:', err);
     throw err;

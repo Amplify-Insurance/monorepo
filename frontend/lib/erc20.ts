@@ -7,7 +7,7 @@ console.log('RPC URL:', rpc);
 
 
 export function getERC20(address: string, deployment?: string) {
-  return new ethers.Contract(address, ERC20, getProvider(deployment))
+  return new ethers.Contract(address, ERC20.abi, getProvider(deployment))
 }
 
 export async function getERC20WithSigner(address: string) {
@@ -15,7 +15,7 @@ export async function getERC20WithSigner(address: string) {
     throw new Error('Wallet not found')
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
   const signer = await browserProvider.getSigner()
-  return new ethers.Contract(address, ERC20, signer)
+  return new ethers.Contract(address, ERC20.abi, signer)
 }
 
 export async function getTokenSymbol(address: string) {

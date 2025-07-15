@@ -12,7 +12,7 @@ if (!DEFAULT_ADDRESS) {
 }
 
 export function getProtocolConfigurator(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, ProtocolConfigurator, getProvider(deployment));
+  return new ethers.Contract(address, ProtocolConfigurator.abi, getProvider(deployment));
 }
 
 export const protocolConfigurator = getProtocolConfigurator();
@@ -29,7 +29,7 @@ export async function getProtocolConfiguratorWithSigner(address: string = DEFAUL
     await browserProvider.send('eth_requestAccounts', []);
     const signer = await browserProvider.getSigner();
     console.log('✅  Browser wallet connected – address:', await signer.getAddress());
-    return new ethers.Contract(address, ProtocolConfigurator, signer);
+    return new ethers.Contract(address, ProtocolConfigurator.abi, signer);
   } catch (err) {
     console.error('🚨  getProtocolConfiguratorWithSigner failed:', err);
     throw err;
@@ -44,7 +44,7 @@ export function getProtocolConfiguratorWriter(address: string = DEFAULT_ADDRESS,
     }
     const signer = new ethers.Wallet(pk, getProvider(deployment));
     console.log('✅  Writer signer loaded – address:', signer.address);
-    return new ethers.Contract(address, ProtocolConfigurator, signer);
+    return new ethers.Contract(address, ProtocolConfigurator.abi, signer);
   } catch (err) {
     console.error('🚨  getProtocolConfiguratorWriter failed:', err);
     throw err;

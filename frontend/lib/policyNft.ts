@@ -15,7 +15,7 @@ if (!READ_ADDRESS) {
 }
 
 export function getPolicyNft(address: string = READ_ADDRESS as string, deployment?: string) {
-  return new ethers.Contract(address, PolicyNFT, getProvider(deployment));
+  return new ethers.Contract(address, PolicyNFT.abi, getProvider(deployment));
 }
 
 export const policyNft = getPolicyNft();
@@ -24,5 +24,5 @@ export function getPolicyNftWriter(address: string = READ_ADDRESS, deployment?: 
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PRIVATE_KEY not set');
   const signer = new ethers.Wallet(pk, getProvider(deployment));
-  return new ethers.Contract(address, PolicyNFT, signer);
+  return new ethers.Contract(address, PolicyNFT.abi, signer);
 }

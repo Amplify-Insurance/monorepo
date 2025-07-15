@@ -16,7 +16,7 @@ if (!DEFAULT_ADDRESS) {
 }
 
 export function getRiskManager(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, RiskManager, getProvider(deployment));
+  return new ethers.Contract(address, RiskManager.abi, getProvider(deployment));
 }
 
 export const riskManager = getRiskManager();
@@ -41,7 +41,7 @@ export async function getRiskManagerWithSigner(address: string = DEFAULT_ADDRESS
     const signer = await browserProvider.getSigner();
     console.log('✅  Browser wallet connected – address:', await signer.getAddress());
 
-    return new ethers.Contract(address, RiskManager, signer);
+    return new ethers.Contract(address, RiskManager.abi, signer);
   } catch (err) {
     console.error('🚨  getRiskManagerWithSigner failed:', err);
     throw err;            // propagate so callers can handle it, too
@@ -62,7 +62,7 @@ export function getRiskManagerWriter(address: string = DEFAULT_ADDRESS, deployme
     const signer = new ethers.Wallet(pk, getProvider(deployment));
     console.log('✅  Writer signer loaded – address:', signer.address);
 
-    return new ethers.Contract(address, RiskManager, signer);
+    return new ethers.Contract(address, RiskManager.abi, signer);
   } catch (err) {
     console.error('🚨  getRiskManagerWriter failed:', err);
     throw err;

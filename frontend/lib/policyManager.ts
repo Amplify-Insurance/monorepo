@@ -11,7 +11,7 @@ if (!DEFAULT_ADDRESS) {
 }
 
 export function getPolicyManager(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, PolicyManager, getProvider(deployment))
+  return new ethers.Contract(address, PolicyManager.abi, getProvider(deployment))
 }
 
 export const policyManager = getPolicyManager()
@@ -22,12 +22,12 @@ export async function getPolicyManagerWithSigner(address: string = DEFAULT_ADDRE
 
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
   const signer = await browserProvider.getSigner()
-  return new ethers.Contract(address, PolicyManager, signer)
+  return new ethers.Contract(address, PolicyManager.abi, signer)
 }
 
 export function getPolicyManagerWriter(address: string = DEFAULT_ADDRESS, deployment?: string) {
   const pk = process.env.PRIVATE_KEY
   if (!pk) throw new Error('PRIVATE_KEY not set')
   const signer = new ethers.Wallet(pk, getProvider(deployment))
-  return new ethers.Contract(address, PolicyManager, signer)
+  return new ethers.Contract(address, PolicyManager.abi, signer)
 }

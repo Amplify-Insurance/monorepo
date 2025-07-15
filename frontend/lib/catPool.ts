@@ -11,7 +11,7 @@ if (!DEFAULT_ADDRESS) {
 }
 
 export function getCatPool(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, CatPool, getProvider(deployment));
+  return new ethers.Contract(address, CatPool.abi, getProvider(deployment));
 }
 export const catPool = getCatPool();
 
@@ -19,7 +19,7 @@ export function getCatPoolWriter(address: string = DEFAULT_ADDRESS, deployment?:
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PRIVATE_KEY not set');
   const signer = new ethers.Wallet(pk, getProvider(deployment));
-  return new ethers.Contract(address, CatPool, signer);
+  return new ethers.Contract(address, CatPool.abi, signer);
 }
 
 export async function getCatPoolWithSigner() {
@@ -31,7 +31,7 @@ export async function getCatPoolWithSigner() {
 
   return new ethers.Contract(
     DEFAULT_ADDRESS,
-    CatPool,
+    CatPool.abi,
     signer,
   );
 }
