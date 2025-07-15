@@ -10,6 +10,7 @@ import {BackstopPool} from "contracts/external/BackstopPool.sol";
 import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
 import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {USDCoin} from "contracts/tokens/USDCoin.sol";
 import {CatShare} from "contracts/tokens/CatShare.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
@@ -25,6 +26,7 @@ contract PolicyNFTIntegration is Test {
     RewardDistributor rewards;
     LossDistributor lossDist;
     RiskManager rm;
+    UnderwriterManager um;
     USDCoin token;
     CatShare catShare;
 
@@ -41,6 +43,7 @@ contract PolicyNFTIntegration is Test {
         rm = new RiskManager(address(this));
         registry = new PoolRegistry(address(this), address(rm));
         capital = new CapitalPool(address(this), address(token));
+        um = new UnderwriterManager(address(this));
 
         catShare = new CatShare();
         cat = new BackstopPool(IERC20(address(token)), catShare, IYieldAdapter(address(0)), address(this));
@@ -58,7 +61,8 @@ contract PolicyNFTIntegration is Test {
         cat.setPolicyManagerAddress(address(pm));
         cat.setRewardDistributor(address(rewards));
 
-        rm.setAddresses(address(capital), address(registry), address(pm), address(cat), address(lossDist), address(rewards));
+        um.setAddresses(address(capital), address(registry), address(cat), address(lossDist), address(rewards), address(rm));
+        rm.setAddresses(address(capital), address(registry), address(pm), address(cat), address(lossDist), address(rewards), address(um));
         pm.setAddresses(address(registry), address(capital), address(cat), address(rewards), address(rm));
 
         IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base: 100, slope1: 0, slope2: 0, kink: 8000});

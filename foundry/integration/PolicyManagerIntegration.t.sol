@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
 import {BackstopPool} from "contracts/external/BackstopPool.sol";
@@ -18,6 +19,7 @@ import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 contract PolicyManagerIntegration is Test {
     PolicyManager pm;
     RiskManager rm;
+    UnderwriterManager um;
     PoolRegistry registry;
     CapitalPool capital;
     BackstopPool cat;
@@ -49,8 +51,11 @@ contract PolicyManagerIntegration is Test {
         rewards = new RewardDistributor(address(rm), address(pm));
         losses = new LossDistributor(address(rm));
 
+        um = new UnderwriterManager(address(this));
+
         pm.setAddresses(address(registry), address(capital), address(cat), address(rewards), address(rm));
-        rm.setAddresses(address(capital), address(registry), address(pm), address(cat), address(losses), address(rewards));
+        um.setAddresses(address(capital), address(registry), address(cat), address(losses), address(rewards), address(rm));
+        rm.setAddresses(address(capital), address(registry), address(pm), address(cat), address(losses), address(rewards), address(um));
 
         IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base: 100, slope1: 200, slope2: 500, kink: 8000});
         vm.prank(address(rm));
