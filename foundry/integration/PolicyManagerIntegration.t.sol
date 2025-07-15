@@ -53,34 +53,47 @@ contract PolicyManagerIntegration is Test {
         yieldAdapter = new SimpleYieldAdapter(address(token), address(this), owner);
 
         // --- Deploy Core Contracts ---
-        nft = new PolicyNFT(address(this), address(this));
-        pm = new PolicyManager(address(nft), address(this));
-        nft.setPolicyManagerAddress(address(pm));
+        // The PolicyNFT needs to know about the PolicyManager, but the PolicyManager also needs the NFT.
+        // We deploy the NFT first, giving it temporary addresses, then deploy the PM,
+        // and finally update the NFT with the real PM address.
+        nft = new PolicyNFT(address(this), address(this)); // Temp owner/manager
+        pm = new PolicyManager(address(nft), owner);
+        nft.setPolicyManagerAddress(address(pm)); // Correctly link the NFT to the PM
 
-        rm = new RiskManager(address(this));
-        registry = new PoolRegistry(address(this), address(rm));
-        capital = new CapitalPool(address(this), address(token));
+        rm = new RiskManager(owner);
+        // CORRECTED: Swapped constructor arguments, assuming the intended order is (riskManager, owner).
+        // This ensures the registry correctly stores the RiskManager's address.
+        registry = new PoolRegistry(address(rm), owner);
+        capital = new CapitalPool(owner, address(token));
         capital.setBaseYieldAdapter(YieldPlatform.OTHER_YIELD, address(yieldAdapter));
         yieldAdapter.setDepositor(address(capital));
 
         catShare = new CatShare();
-        cat = new BackstopPool(token, catShare, IYieldAdapter(address(0)), address(this));
+        // Deploy BackstopPool (cat) before trying to mint tokens to it.
+        cat = new BackstopPool(token, catShare, IYieldAdapter(address(0)), owner);
         cat.setPolicyManagerAddress(address(pm));
+        token.mint(address(cat), 1_000_000e6); // Mint tokens to the now-deployed cat pool
 
         rewards = new MockRewardDistributor();
         losses = new LossDistributor(address(rm));
-        um = new UnderwriterManager(address(this));
+        um = new UnderwriterManager(owner);
 
         // --- Link Contracts ---
+        // Set all the necessary addresses for inter-contract communication.
         pm.setAddresses(address(registry), address(capital), address(cat), address(rewards), address(rm));
         um.setAddresses(address(capital), address(registry), address(cat), address(losses), address(rewards), address(rm));
         rm.setAddresses(address(capital), address(registry), address(pm), address(cat), address(losses), address(rewards), address(um));
         capital.setRiskManager(address(rm));
         capital.setUnderwriterManager(address(um));
+        capital.setRewardDistributor(address(rewards)); // Link reward distributor to capital pool
+        catShare.transferOwnership(address(cat)); // Transfer ownership of CatShare to the BackstopPool
+        cat.initialize(); // Initialize the BackstopPool
 
         // --- Setup Initial Pool State ---
         IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base: 100, slope1: 200, slope2: 500, kink: 8000});
-        vm.prank(address(this)); // Owner of registry
+        
+        // The RiskManager must add the pool, not the owner.
+        vm.prank(address(rm));
         registry.addProtocolRiskPool(address(token), rate, 0);
 
         // Underwriter provides capital to the pool
@@ -99,6 +112,7 @@ contract PolicyManagerIntegration is Test {
         vm.prank(user);
         token.approve(address(pm), type(uint256).max);
     }
+
 
     function _minPremium(uint256 coverage) internal view returns (uint256) {
         uint256 annualRate = 100; // from rate model

@@ -64,15 +64,14 @@ contract CapitalPoolIntegration is Test {
     // CORRECTED: Removed the constant declaration to fix the compiler error.
     // The full enum path will be used directly in function calls.
 
-    function setUp() public {
+   function setUp() public {
         // --- Deploy Tokens ---
         token = new ResetApproveERC20("USD", "USD", 6);
         token.mint(owner, 1_000_000e6);
         token.mint(userA, 1_000_000e6);
         token.mint(userB, 1_000_000e6);
         token.mint(claimant, 1_000_000e6);
-        token.mint(address(catPool), 1_000_000e6); // Fund the catpool
-
+        
         // --- Deploy Adapters & Core Contracts ---
         adapter = new SimpleYieldAdapter(address(token), address(0xdead), owner);
         capitalPool = new CapitalPool(owner, address(token));
@@ -81,13 +80,18 @@ contract CapitalPoolIntegration is Test {
         policyNFT = new PolicyNFT(address(riskManager), owner);
         policyManager = new PolicyManager(address(policyNFT), owner);
         catShare = new CatShare();
+
+        // 1. DEPLOY catPool FIRST
         catPool = new BackstopPool(token, catShare, IYieldAdapter(address(0)), owner);
+        
+        // 2. NOW MINT tokens to the deployed catPool address
+        token.mint(address(catPool), 1_000_000e6); 
+
         rewardDistributor = new MockRewardDistributor();
         lossDistributor = new LossDistributor(address(riskManager));
         um = new UnderwriterManager(owner);
 
         // --- Link Contracts ---
-        // CORRECTED: Use the global YieldPlatform enum
         capitalPool.setBaseYieldAdapter(YieldPlatform.OTHER_YIELD, address(adapter));
         adapter.setDepositor(address(capitalPool));
         policyNFT.setPolicyManagerAddress(address(policyManager));

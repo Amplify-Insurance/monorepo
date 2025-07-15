@@ -41,9 +41,10 @@ contract RewardDistributorIntegrationTest is Test {
     address secondUnderwriter = address(0x3);
     address attacker = address(0xBAD);
 
-    // Constants
-    uint256 constant POOL_ID = 1; // Pool IDs start from 1
-    uint256 constant PLEDGE_AMOUNT = 1_000_000e6; // Increased for better precision tests
+
+    // CORRECTED: The first pool created will have ID 0.
+    uint256 constant POOL_ID = 0;
+    uint256 constant PLEDGE_AMOUNT = 1_000_000e6;
     uint256 constant REWARD_AMOUNT = 100_000e6;
     uint256 PRECISION;
 
@@ -74,10 +75,19 @@ contract RewardDistributorIntegrationTest is Test {
         adapter.setDepositor(address(capitalPool));
         policyNFT.setPolicyManagerAddress(address(policyManager));
         rewardDistributor.setCatPool(address(catPool));
+        
+        // Link all contracts that depend on each other
         um.setAddresses(address(capitalPool), address(poolRegistry), address(catPool), address(lossDistributor), address(rewardDistributor), address(riskManager));
         riskManager.setAddresses(address(capitalPool), address(poolRegistry), address(policyManager), address(catPool), address(lossDistributor), address(rewardDistributor), address(um));
-        capitalPool.setRiskManager(address(riskManager));
         policyManager.setAddresses(address(poolRegistry), address(capitalPool), address(catPool), address(rewardDistributor), address(riskManager));
+        
+        // Link CapitalPool to its dependencies
+        capitalPool.setRiskManager(address(riskManager));
+        // CORRECTED: The CapitalPool must know about the UnderwriterManager to forward deposit hooks.
+        capitalPool.setUnderwriterManager(address(um));
+        capitalPool.setRewardDistributor(address(rewardDistributor));
+
+        // Link BackstopPool (cat) to its dependencies
         catPool.setRiskManagerAddress(address(riskManager));
         catPool.setPolicyManagerAddress(address(policyManager));
         catPool.setCapitalPoolAddress(address(capitalPool));
@@ -87,6 +97,7 @@ contract RewardDistributorIntegrationTest is Test {
         // --- Create Pool ---
         IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base: 100, slope1: 0, slope2: 0, kink: 8000});
         vm.prank(address(riskManager));
+        // This creates a pool with ID 0
         poolRegistry.addProtocolRiskPool(address(usdc), rate, 0);
 
         // --- Initial Underwriter Deposit & Allocation ---
@@ -94,8 +105,9 @@ contract RewardDistributorIntegrationTest is Test {
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), type(uint256).max);
         capitalPool.deposit(PLEDGE_AMOUNT, YieldPlatform(3));
+        
         uint256[] memory pools = new uint256[](1);
-        pools[0] = POOL_ID;
+        pools[0] = POOL_ID; // Allocate to the correct pool ID (0)
         um.allocateCapital(pools);
         vm.stopPrank();
 
