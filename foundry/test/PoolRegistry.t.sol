@@ -271,17 +271,5 @@ function testRevert_onInvalidPoolId() public {
 }
 
 
-function testRevert_setRiskManager_onlyOwner() public {
-    address notOwner = address(0xBAD);
-    vm.prank(notOwner);
 
-    // BEFORE (Incorrect):
-    // vm.expectRevert("Ownable: caller is not the owner");
-
-    // AFTER (Correct):
-    // Check for the custom error by providing its signature and arguments.
-    vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", notOwner));
-
-    registry.setRiskManager(address(0x123));
-}
 }

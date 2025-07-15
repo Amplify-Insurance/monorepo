@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-// CORRECTED: Import the new interface
+// Interface Imports
 import "../interfaces/ICapitalPool.sol";
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IYieldAdapterEmergency.sol";
@@ -23,7 +23,6 @@ import "../interfaces/IRiskManagerWithBackstop.sol";
  * @dev It manages the principal capital of underwriters and interacts with an external
  * RewardDistributor contract to handle the distribution of yield.
  */
-// CORRECTED: Implements the new interface
 contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     using SafeERC20 for IERC20;
 
@@ -37,7 +36,6 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     IUnderwriterManager public underwriterManager;
     uint256 public underwriterNoticePeriod = 0;
 
-    // CORRECTED: The YieldPlatform enum is now defined in ICapitalPool.sol and removed from here.
     mapping(YieldPlatform => IYieldAdapter) public baseYieldAdapters;
     address[] public activeYieldAdapterAddresses;
     mapping(address => bool) public isAdapterActive;
@@ -213,7 +211,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         }));
         
         uint256 requestIndex = withdrawalRequests[msg.sender].length - 1;
-        emit WithdrawalRequested(msg.sender, _sharesToBurn, block.timestamp, requestIndex);
+        emit WithdrawalRequested(msg.sender, _sharesToBurn, unlockTime, requestIndex);
     }
 
     function cancelWithdrawalRequest(uint256 _requestIndex) external nonReentrant {
@@ -389,6 +387,8 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
 
         uint256 actualLoss = Math.min(_principalLossAmount, account.totalDepositedAssetPrincipal);
 
+        // This is the key change: The loss is socialized by reducing the total value of the pool.
+        // The underwriter's shares are NOT burned.
         _applyLossToAccount(account, actualLoss);
 
         if (totalSystemValue >= actualLoss) {
@@ -414,15 +414,12 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         emit LossesApplied(_underwriter, actualLoss, wipedOut);
     }
 
+    /**
+     * @notice CORRECTED: This function no longer burns shares. A loss reduces the value
+     * of all shares by decreasing totalSystemValue, but does not change the number of shares.
+     */
     function _applyLossToAccount(UnderwriterAccount storage account, uint256 _lossAmount) internal {
-        if (account.totalDepositedAssetPrincipal > 0) {
-            uint256 sharesToBurn = Math.mulDiv(_lossAmount, account.masterShares, account.totalDepositedAssetPrincipal);
-            if (sharesToBurn > account.masterShares) {
-                sharesToBurn = account.masterShares;
-            }
-            account.masterShares -= sharesToBurn;
-            totalMasterSharesSystem -= sharesToBurn;
-        }
+        // Only reduce the principal. Do not touch the shares.
         account.totalDepositedAssetPrincipal -= _lossAmount;
     }
 

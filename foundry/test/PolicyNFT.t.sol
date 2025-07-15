@@ -23,7 +23,7 @@ contract PolicyNFTTest is Test {
         assertEq(nft.policyManagerContract(), policyManager);
         
         // FIX: The contract's name is hardcoded as "Policy" in its constructor.
-        assertEq(nft.name(), "Policy");
+        assertEq(nft.name(), "Policy"); 
         
         assertEq(nft.symbol(), "PCOVER");
     }
