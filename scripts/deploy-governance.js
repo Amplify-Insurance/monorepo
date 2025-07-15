@@ -15,8 +15,9 @@ const { ethers } = hre;
 const fs = require("fs");
 const path = require("path");
 
-// TODO: set this to the deployed RiskManager address
+// TODO: set these to the deployed addresses
 const RISK_MANAGER_ADDRESS = "0xD1c640f4C9ff53ba46B42959ECB9a76f2dB9Cb2b";
+const PROTOCOL_CONFIGURATOR_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const VOTING_PERIOD = 7 * 24 * 60 * 60;       // 7 days
 const CHALLENGE_PERIOD = 7 * 24 * 60 * 60;    // 7 days
@@ -32,6 +33,10 @@ async function main() {
   const riskManager = await ethers.getContractAt(
     "RiskManager",
     RISK_MANAGER_ADDRESS
+  );
+  const protocolConfigurator = await ethers.getContractAt(
+    "RiskAdmin",
+    PROTOCOL_CONFIGURATOR_ADDRESS
   );
 
   /*───────────────────────── Governance token ─────────────────────────*/
@@ -61,7 +66,7 @@ async function main() {
 
   // Wire committee address in staking contract
   await staking.setCommitteeAddress(committee.target);
-  await riskManager.setCommittee(committee.target)
+  await protocolConfigurator.setCommittee(committee.target, RISK_MANAGER_ADDRESS);
 
   /*──────────────────────────── Output ────────────────────────────────*/
   const addresses = {

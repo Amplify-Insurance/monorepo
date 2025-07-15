@@ -87,7 +87,6 @@ async function main() {
   await capitalPool.waitForDeployment();
 
   // Wire permissions and addresses
-  await capitalPool.setRiskManager(riskManager.target);
   await catPool.setRiskManagerAddress(riskManager.target);
   await catPool.setCapitalPoolAddress(capitalPool.target);
   await catPool.setPolicyManagerAddress(policyManager.target);
@@ -125,6 +124,10 @@ async function main() {
     underwriterManager.target
   );
 
+  // Use configurator for initial setup
+  await protocolConfigurator.setPoolRegistryRiskManager(riskManager.target);
+  await protocolConfigurator.setCapitalPoolRiskManager(riskManager.target);
+
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
   const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
@@ -140,19 +143,28 @@ async function main() {
 
   /*──────────────── Register adapters in CapitalPool (enum indices) ──────*/
   // 1=AAVE, 2=COMPOUND, 3=MOONWELL, 4=MORPHO, 5=EULER
-  await capitalPool.setBaseYieldAdapter(1, aaveAdapter.target);
-  await capitalPool.setBaseYieldAdapter(2, compoundAdapter.target);
+  await protocolConfigurator.setCapitalPoolBaseYieldAdapter(1, aaveAdapter.target);
+  await protocolConfigurator.setCapitalPoolBaseYieldAdapter(2, compoundAdapter.target);
 
   /*────────────────────── Protocol risk‑pool examples ───────────────────*/
   const defaultRateModel = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
 
   // USDC pools across all five platforms
-  await riskManager.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 500);
-  await riskManager.addProtocolRiskPool(COMPOUND_COMET_USDC, defaultRateModel, 500);
-  await riskManager.addProtocolRiskPool(MOONWELL_MUSDC, defaultRateModel, 500);
-  await riskManager.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500);
-  await riskManager.addProtocolRiskPool(DAI, defaultRateModel, 250);
-  await riskManager.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250);
+  await protocolConfigurator.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 500);
+  await protocolConfigurator.addProtocolRiskPool(COMPOUND_COMET_USDC, defaultRateModel, 500);
+  await protocolConfigurator.addProtocolRiskPool(MOONWELL_MUSDC, defaultRateModel, 500);
+  await protocolConfigurator.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500);
+  await protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250);
+  await protocolConfigurator.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250);
+
+  // Transfer ownership of core contracts to the configurator
+  await poolRegistry.transferOwnership(protocolConfigurator.target);
+  await capitalPool.transferOwnership(protocolConfigurator.target);
+  await policyManager.transferOwnership(protocolConfigurator.target);
+  await riskManager.transferOwnership(protocolConfigurator.target);
+  await underwriterManager.transferOwnership(protocolConfigurator.target);
+  await rewardDistributor.transferOwnership(protocolConfigurator.target);
+  await catPool.transferOwnership(protocolConfigurator.target);
 
 
   /*──────────────────────────────── Output ──────────────────────────────*/
