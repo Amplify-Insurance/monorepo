@@ -260,7 +260,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
      * @dev Checks if an underwriter's pending losses exceed their total capital value.
      */
     function _checkInsolvency(address _underwriter) internal view {
-        (, , uint256 masterShares, , ) = capitalPool.getUnderwriterAccount(_underwriter);
+        (, , uint256 masterShares, ) = capitalPool.getUnderwriterAccount(_underwriter);
         if (masterShares == 0) revert UnderwriterNotInsolvent();
 
         uint256 totalValue = capitalPool.sharesToValue(masterShares);
