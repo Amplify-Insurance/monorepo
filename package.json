@@ -27,7 +27,8 @@
     "test:forge:fuzz": "forge test -C fuzz",
     "test:integration": "FOUNDRY_PROFILE=integration forge test",
     "test:mythril": "./scripts/mythril.sh",
-    "test:manticore": "./scripts/manticore.sh"
+    "test:manticore": "./scripts/manticore.sh",
+    "check:frontend": "node scripts/check-frontend-compat.js"
   },
   "keywords": [],
   "author": "",
