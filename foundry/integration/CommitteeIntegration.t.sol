@@ -101,7 +101,7 @@ contract CommitteeIntegration is Test {
         (,,,, bool paused, address feeRecipient,) = registry.getPoolData(POOL_ID);
         assertTrue(paused);
         assertEq(feeRecipient, address(committee));
-        (,,,,,, Committee.ProposalStatus status,, uint256 challengeDeadline,,) = committee.proposals(id);
+        (,,,,,,,, Committee.ProposalStatus status, , , uint256 challengeDeadline, ) = committee.proposals(id);
         assertEq(uint256(status), uint256(Committee.ProposalStatus.Challenged));
         assertGt(challengeDeadline, block.timestamp);
     }
@@ -128,7 +128,7 @@ contract CommitteeIntegration is Test {
 
         (,,,, bool paused,,) = registry.getPoolData(POOL_ID);
         assertFalse(paused);
-        (,,,,,, Committee.ProposalStatus status,,,,) = committee.proposals(id2);
+        (,,,,,,,, Committee.ProposalStatus status, , , ,) = committee.proposals(id2);
         assertEq(uint256(status), uint256(Committee.ProposalStatus.Executed));
     }
 

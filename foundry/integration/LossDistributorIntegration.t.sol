@@ -16,7 +16,7 @@ import {CatShare} from "contracts/tokens/CatShare.sol";
 import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
 import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 // CORRECTED: Import the new ICapitalPool interface to access the enum
-import {ICapitalPool} from "contracts/interfaces/ICapitalPool.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
 
 contract LossDistributorIntegrationTest is Test {
     // Core contracts
@@ -70,7 +70,7 @@ contract LossDistributorIntegrationTest is Test {
         poolRegistry = new PoolRegistry(owner, address(riskManager));
         
         // --- Configure Contract Dependencies ---
-        capitalPool.setBaseYieldAdapter(ICapitalPool.YieldPlatform.OTHER_YIELD, address(adapter));
+        capitalPool.setBaseYieldAdapter(YieldPlatform.OTHER_YIELD, address(adapter));
         adapter.setDepositor(address(capitalPool));
         catShare.transferOwnership(address(catPool));
         catPool.initialize();
@@ -110,7 +110,7 @@ contract LossDistributorIntegrationTest is Test {
         usdc.mint(underwriter, TOTAL_PLEDGE);
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), TOTAL_PLEDGE);
-        capitalPool.deposit(TOTAL_PLEDGE, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(TOTAL_PLEDGE, YieldPlatform.OTHER_YIELD);
         um.allocateCapital(_arr(POOL_ID));
         vm.stopPrank();
 
@@ -136,8 +136,8 @@ contract LossDistributorIntegrationTest is Test {
 
     function test_InitialState() public {
         assertEq(lossDistributor.riskManager(), address(riskManager));
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, 0);
-        assertEq(lossDistributor.userLossStates(underwriter, POOL_ID).lossDebt, 0);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), 0);
+        assertEq(lossDistributor.userLossStates(underwriter, POOL_ID), 0);
     }
 
     function testRevert_CallerNotRiskManager() public {
@@ -161,14 +161,14 @@ contract LossDistributorIntegrationTest is Test {
         riskManager.processClaim(POLICY_ID);
         
         uint256 expectedLossPerShare = (COVERAGE * PRECISION) / TOTAL_PLEDGE;
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, expectedLossPerShare);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), expectedLossPerShare);
     }
 
     function test_AccumulatesLossForMultipleClaims() public {
         vm.prank(claimant);
         riskManager.processClaim(POLICY_ID);
         uint256 expectedLoss1 = (COVERAGE * PRECISION) / TOTAL_PLEDGE;
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, expectedLoss1);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), expectedLoss1);
 
         uint256 cover2 = 20_000e6;
         uint256 remainingPledge = TOTAL_PLEDGE - COVERAGE;
@@ -179,14 +179,14 @@ contract LossDistributorIntegrationTest is Test {
 
         uint256 expectedLoss2 = (cover2 * PRECISION) / remainingPledge;
         uint256 totalExpectedLoss = expectedLoss1 + expectedLoss2;
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, totalExpectedLoss);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), totalExpectedLoss);
     }
 
     function test_DistributeLoss_ZeroAmountDoesNothing() public {
-        uint256 trackerBefore = lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare;
+        uint256 trackerBefore = lossDistributor.poolLossTrackers(POOL_ID);
         vm.prank(address(riskManager));
         lossDistributor.distributeLoss(POOL_ID, 0, TOTAL_PLEDGE);
-        uint256 trackerAfter = lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare;
+        uint256 trackerAfter = lossDistributor.poolLossTrackers(POOL_ID);
         assertEq(trackerBefore, trackerAfter);
     }
 
@@ -199,8 +199,8 @@ contract LossDistributorIntegrationTest is Test {
         riskManager.processClaim(largePolicyId);
 
         uint256 expectedLossPerShare = PRECISION;
-        assertTrue(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare <= expectedLossPerShare);
-        assertTrue(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare > expectedLossPerShare - 100);
+        assertTrue(lossDistributor.poolLossTrackers(POOL_ID) <= expectedLossPerShare);
+        assertTrue(lossDistributor.poolLossTrackers(POOL_ID) > expectedLossPerShare - 100);
 
         uint256 pledge = um.underwriterTotalPledge(underwriter);
         uint256 pendingLoss = lossDistributor.getPendingLosses(underwriter, POOL_ID, pledge);
@@ -221,13 +221,13 @@ contract LossDistributorIntegrationTest is Test {
         riskManager.processClaim(POLICY_ID);
 
         uint256 expectedTracker = (COVERAGE * PRECISION) / TOTAL_PLEDGE;
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, expectedTracker);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), expectedTracker);
         
         uint256 newPledge = 50_000e6;
         usdc.mint(secondUnderwriter, newPledge);
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), newPledge);
-        capitalPool.deposit(newPledge, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(newPledge, YieldPlatform.OTHER_YIELD);
         um.allocateCapital(_arr(POOL_ID));
         vm.stopPrank();
 
@@ -284,9 +284,9 @@ contract LossDistributorIntegrationTest is Test {
         assertEq(um.underwriterTotalPledge(underwriter), expectedPledgeAfter, "Pledge after partial withdrawal is incorrect");
         assertEq(usdc.balanceOf(underwriter), balanceBefore + withdrawalAmount, "Final balance is incorrect");
 
-        uint256 tracker = lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare;
+        uint256 tracker = lossDistributor.poolLossTrackers(POOL_ID);
         uint256 expectedLossDebt = (um.underwriterPoolPledge(underwriter, POOL_ID) * tracker) / PRECISION;
-        assertEq(lossDistributor.userLossStates(underwriter, POOL_ID).lossDebt, expectedLossDebt);
+        assertEq(lossDistributor.userLossStates(underwriter, POOL_ID), expectedLossDebt);
     }
     
     /* ───────────────────────── MULTI-POOL & COMPLEX SCENARIOS ───────────────────────── */
@@ -300,7 +300,7 @@ contract LossDistributorIntegrationTest is Test {
         usdc.mint(secondUnderwriter, secondPledge);
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), secondPledge);
-        capitalPool.deposit(secondPledge, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(secondPledge, YieldPlatform.OTHER_YIELD);
         um.allocateCapital(_arr(POOL_ID_2));
         vm.stopPrank();
 
@@ -308,8 +308,8 @@ contract LossDistributorIntegrationTest is Test {
         riskManager.processClaim(POLICY_ID);
 
         uint256 expectedLossPerShare = (COVERAGE * PRECISION) / TOTAL_PLEDGE;
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, expectedLossPerShare);
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID_2).accumulatedLossPerShare, 0);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), expectedLossPerShare);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID_2), 0);
 
         uint256 balanceBefore = usdc.balanceOf(secondUnderwriter);
         vm.prank(address(capitalPool));
@@ -325,13 +325,13 @@ contract LossDistributorIntegrationTest is Test {
         vm.prank(claimant);
         riskManager.processClaim(POLICY_ID);
         uint256 tracker1 = (COVERAGE * PRECISION) / TOTAL_PLEDGE;
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, tracker1);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), tracker1);
         
         uint256 secondPledge = 50_000e6;
         usdc.mint(secondUnderwriter, secondPledge);
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), secondPledge);
-        capitalPool.deposit(secondPledge, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(secondPledge, YieldPlatform.OTHER_YIELD);
         um.allocateCapital(_arr(POOL_ID));
         vm.stopPrank();
 
@@ -346,7 +346,8 @@ contract LossDistributorIntegrationTest is Test {
         assertEq(um.underwriterTotalPledge(underwriter), firstUW_pledge_after_withdraw);
         
         uint256 cover2 = 10_000e6;
-        uint256 totalPledgeAfterWithdrawalAndLoss = um.getTotalPledgeInPool(POOL_ID);
+        uint256 totalPledgeAfterWithdrawalAndLoss;
+        (, totalPledgeAfterWithdrawalAndLoss,, ,,,) = poolRegistry.getPoolData(POOL_ID);
         
         vm.prank(address(riskManager));
         uint256 policy2 = policyNFT.mint(claimant, POOL_ID, cover2, 0, 0, 0);
@@ -355,7 +356,7 @@ contract LossDistributorIntegrationTest is Test {
 
         uint256 lossPerShare2 = (cover2 * PRECISION) / totalPledgeAfterWithdrawalAndLoss;
         uint256 tracker2 = tracker1 + lossPerShare2;
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, tracker2);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), tracker2);
 
         uint256 firstUW_pledge_before_final_withdraw = um.underwriterTotalPledge(underwriter);
         uint256 firstUW_pendingLoss2 = (firstUW_pledge_before_final_withdraw * lossPerShare2) / PRECISION;
@@ -389,7 +390,7 @@ contract LossDistributorIntegrationTest is Test {
             usdc.mint(newUser, pledgePerUnderwriter);
             vm.startPrank(newUser);
             usdc.approve(address(capitalPool), pledgePerUnderwriter);
-            capitalPool.deposit(pledgePerUnderwriter, ICapitalPool.YieldPlatform.OTHER_YIELD);
+            capitalPool.deposit(pledgePerUnderwriter, YieldPlatform.OTHER_YIELD);
             um.allocateCapital(_arr(POOL_ID));
             vm.stopPrank();
         }
@@ -398,12 +399,13 @@ contract LossDistributorIntegrationTest is Test {
         vm.prank(address(riskManager));
         uint256 policyId = policyNFT.mint(claimant, POOL_ID, claimAmount, 0, 0, 0);
 
-        vm.snapshot();
+        uint256 snap = vm.snapshot();
+        uint256 gasBefore = gasleft();
         vm.prank(claimant);
         riskManager.processClaim(policyId);
-        uint256 gasUsed = vm.gasUsed();
-        vm.revertToLastSnapshot();
-        
+        uint256 gasUsed = gasBefore - gasleft();
+        vm.revertTo(snap);
+
         assertTrue(gasUsed < 250_000, "Gas cost for claim processing is too high");
     }
 
@@ -412,7 +414,7 @@ contract LossDistributorIntegrationTest is Test {
     function test_Lifecycle_UnderwriterLeavesAndRejoins() public {
         vm.prank(claimant);
         riskManager.processClaim(POLICY_ID);
-        uint256 tracker1 = lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare;
+        uint256 tracker1 = lossDistributor.poolLossTrackers(POOL_ID);
         uint256 loss1 = (TOTAL_PLEDGE * tracker1) / PRECISION;
 
         vm.prank(address(capitalPool));
@@ -422,20 +424,21 @@ contract LossDistributorIntegrationTest is Test {
         uint256 newPledge = 80_000e6;
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), newPledge);
-        capitalPool.deposit(newPledge, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(newPledge, YieldPlatform.OTHER_YIELD);
         um.allocateCapital(_arr(POOL_ID));
         vm.stopPrank();
         
         assertEq(lossDistributor.getPendingLosses(underwriter, POOL_ID, newPledge), 0);
 
         uint256 cover2 = 5_000e6;
-        uint256 currentPledgeInPool = um.getTotalPledgeInPool(POOL_ID);
+        uint256 currentPledgeInPool;
+        (, currentPledgeInPool,, ,,,) = poolRegistry.getPoolData(POOL_ID);
         vm.prank(address(riskManager));
         uint256 policy2 = policyNFT.mint(claimant, POOL_ID, cover2, 0, 0, 0);
         vm.prank(claimant);
         riskManager.processClaim(policy2);
 
-        uint256 tracker2 = lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare;
+        uint256 tracker2 = lossDistributor.poolLossTrackers(POOL_ID);
         uint256 lossPerShareSinceRejoin = tracker2 - tracker1;
         uint256 expectedFinalLoss = (newPledge * lossPerShareSinceRejoin) / PRECISION;
 
@@ -446,9 +449,11 @@ contract LossDistributorIntegrationTest is Test {
     function test_Lifecycle_ClaimOnEmptyPool() public {
         vm.prank(address(capitalPool));
         um.onCapitalWithdrawn(underwriter, TOTAL_PLEDGE, true);
-        assertEq(um.getTotalPledgeInPool(POOL_ID), 0);
+        uint256 currentPledge;
+        (, currentPledge,, ,,,) = poolRegistry.getPoolData(POOL_ID);
+        assertEq(currentPledge, 0);
 
-        uint256 trackerBefore = lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare;
+        uint256 trackerBefore = lossDistributor.poolLossTrackers(POOL_ID);
 
         vm.prank(address(riskManager));
         uint256 newPolicyId = policyNFT.mint(claimant, POOL_ID, 100e6, 0, 0, 0);
@@ -456,7 +461,7 @@ contract LossDistributorIntegrationTest is Test {
         vm.prank(claimant);
         riskManager.processClaim(newPolicyId);
 
-        uint256 trackerAfter = lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare;
+        uint256 trackerAfter = lossDistributor.poolLossTrackers(POOL_ID);
         assertEq(trackerBefore, trackerAfter, "Tracker should not change for an empty pool");
     }
 
@@ -470,7 +475,7 @@ contract LossDistributorIntegrationTest is Test {
         usdc.mint(secondUnderwriter, dustPledge);
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), dustPledge);
-        capitalPool.deposit(dustPledge, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(dustPledge, YieldPlatform.OTHER_YIELD);
         um.allocateCapital(_arr(POOL_ID));
         vm.stopPrank();
 
@@ -481,8 +486,8 @@ contract LossDistributorIntegrationTest is Test {
         riskManager.processClaim(dustPolicyId);
 
         uint256 expectedLossPerShare = (dustCoverage * PRECISION) / dustPledge;
-        assert(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare > 0);
-        assertEq(lossDistributor.poolLossTrackers(POOL_ID).accumulatedLossPerShare, expectedLossPerShare);
+        assert(lossDistributor.poolLossTrackers(POOL_ID) > 0);
+        assertEq(lossDistributor.poolLossTrackers(POOL_ID), expectedLossPerShare);
         
         uint256 pendingLoss = lossDistributor.getPendingLosses(secondUnderwriter, POOL_ID, dustPledge);
         assertEq(pendingLoss, dustCoverage);

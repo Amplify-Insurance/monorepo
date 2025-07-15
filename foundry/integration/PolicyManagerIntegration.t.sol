@@ -11,13 +11,14 @@ import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
 import {BackstopPool} from "contracts/external/BackstopPool.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
-import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
+import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 import {USDCoin} from "contracts/tokens/USDCoin.sol";
 import {CatShare} from "contracts/tokens/CatShare.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {IPolicyNFT} from "contracts/interfaces/IPolicyNFT.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
 
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 
@@ -30,7 +31,7 @@ contract PolicyManagerIntegration is Test {
     CapitalPool capital;
     BackstopPool cat;
     PolicyNFT nft;
-    RewardDistributor rewards;
+    MockRewardDistributor rewards;
     LossDistributor losses;
     USDCoin token;
     CatShare catShare;
@@ -59,14 +60,14 @@ contract PolicyManagerIntegration is Test {
         rm = new RiskManager(address(this));
         registry = new PoolRegistry(address(this), address(rm));
         capital = new CapitalPool(address(this), address(token));
-        capital.setBaseYieldAdapter(CapitalPool.YieldPlatform.OTHER_YIELD, address(yieldAdapter));
+        capital.setBaseYieldAdapter(YieldPlatform.OTHER_YIELD, address(yieldAdapter));
         yieldAdapter.setDepositor(address(capital));
 
         catShare = new CatShare();
         cat = new BackstopPool(token, catShare, IYieldAdapter(address(0)), address(this));
         cat.setPolicyManagerAddress(address(pm));
 
-        rewards = new RewardDistributor(address(rm), address(pm));
+        rewards = new MockRewardDistributor();
         losses = new LossDistributor(address(rm));
         um = new UnderwriterManager(address(this));
 
@@ -85,7 +86,7 @@ contract PolicyManagerIntegration is Test {
         // Underwriter provides capital to the pool
         vm.startPrank(underwriter);
         token.approve(address(capital), type(uint256).max);
-        capital.deposit(1_000_000e6, CapitalPool.YieldPlatform.OTHER_YIELD);
+        capital.deposit(1_000_000e6, YieldPlatform.OTHER_YIELD);
         vm.stopPrank();
         
         // Underwriter allocates capital to our test pool
@@ -333,8 +334,9 @@ contract PolicyManagerIntegration is Test {
     
     function testRevert_purchaseCover_ifPoolIsPaused() public {
         vm.prank(address(this));
-        registry.setPoolPauseStatus(POOL_ID, true);
-        assertTrue(registry.isPoolPaused(POOL_ID));
+        registry.setPauseState(POOL_ID, true);
+        (, , , , bool paused,,) = registry.getPoolData(POOL_ID);
+        assertTrue(paused);
 
         uint256 coverage = 1_000e6;
         uint256 deposit = _minPremium(coverage);
@@ -349,7 +351,7 @@ contract PolicyManagerIntegration is Test {
         uint256 policyId = pm.purchaseCover(POOL_ID, 500e6, 1_000_000e6);
         
         vm.prank(address(this));
-        registry.setPoolPauseStatus(POOL_ID, true);
+        registry.setPauseState(POOL_ID, true);
 
         vm.prank(user);
         vm.expectRevert(PolicyManager.PoolPaused.selector);

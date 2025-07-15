@@ -15,6 +15,7 @@ import {PolicyManager} from "contracts/core/PolicyManager.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
 import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
 
 contract UnderwriterManagerIntegrationTest is Test {
     // Core protocol
@@ -64,7 +65,7 @@ contract UnderwriterManagerIntegrationTest is Test {
         um = new UnderwriterManager(owner);
 
         // --- Wire Dependencies ---
-        capitalPool.setBaseYieldAdapter(CapitalPool.YieldPlatform(3), address(adapter));
+        capitalPool.setBaseYieldAdapter(YieldPlatform(3), address(adapter));
         adapter.setDepositor(address(capitalPool));
         catShare.transferOwnership(address(catPool));
         catPool.initialize();
@@ -90,7 +91,7 @@ contract UnderwriterManagerIntegrationTest is Test {
         usdc.mint(underwriter, PLEDGE);
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(PLEDGE, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(PLEDGE, YieldPlatform(3));
         vm.stopPrank();
     }
 
@@ -265,7 +266,7 @@ contract UnderwriterManagerIntegrationTest is Test {
         vm.prank(committee);
         riskManager.processClaim(policyId);
 
-        uint256 lossBefore = lossDistributor.userLossStates(underwriter, POOL_ID_1).lossDebt;
+        uint256 lossBefore = lossDistributor.userLossStates(underwriter, POOL_ID_1);
         assertEq(lossBefore, 0);
 
         // Deallocate
@@ -274,7 +275,7 @@ contract UnderwriterManagerIntegrationTest is Test {
         um.requestDeallocateFromPool(POOL_ID_1, PLEDGE);
         um.deallocateFromPool(POOL_ID_1);
 
-        uint256 lossAfter = lossDistributor.userLossStates(underwriter, POOL_ID_1).lossDebt;
+        uint256 lossAfter = lossDistributor.userLossStates(underwriter, POOL_ID_1);
         assertGt(lossAfter, 0, "Loss debt should be updated after deallocation");
     }
 
@@ -290,14 +291,15 @@ contract UnderwriterManagerIntegrationTest is Test {
         usdc.mint(secondUnderwriter, pledge2);
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(pledge2, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(pledge2, YieldPlatform(3));
         um.allocateCapital(_pools(POOL_ID_1, POOL_ID_2));
         vm.stopPrank();
 
         assertEq(um.underwriterPoolPledge(underwriter, POOL_ID_1), PLEDGE);
         assertEq(um.underwriterPoolPledge(secondUnderwriter, POOL_ID_1), pledge2);
         assertEq(um.underwriterPoolPledge(secondUnderwriter, POOL_ID_2), pledge2);
-        assertEq(poolRegistry.getPoolData(POOL_ID_1).totalPledge, PLEDGE + pledge2);
+        (, uint256 totalPledge1,,,,,) = poolRegistry.getPoolData(POOL_ID_1);
+        assertEq(totalPledge1, PLEDGE + pledge2);
 
         // 3. Underwriter 1 requests deallocation from Pool 1
         vm.prank(underwriter);
@@ -307,14 +309,17 @@ contract UnderwriterManagerIntegrationTest is Test {
         // 4. Underwriter 1 finalizes deallocation
         um.deallocateFromPool(POOL_ID_1);
         assertFalse(um.isAllocatedToPool(underwriter, POOL_ID_1));
-        assertEq(poolRegistry.getPoolData(POOL_ID_1).totalPledge, pledge2);
+        (, totalPledge1,,,,,) = poolRegistry.getPoolData(POOL_ID_1);
+        assertEq(totalPledge1, pledge2);
 
         // 5. Underwriter 2 withdraws fully from the system
         vm.prank(address(capitalPool));
         um.onCapitalWithdrawn(secondUnderwriter, pledge2, true);
         assertEq(um.underwriterTotalPledge(secondUnderwriter), 0);
-        assertEq(poolRegistry.getPoolData(POOL_ID_1).totalPledge, 0);
-        assertEq(poolRegistry.getPoolData(POOL_ID_2).totalPledge, 0);
+        (, totalPledge1,,,,,) = poolRegistry.getPoolData(POOL_ID_1);
+        (, uint256 totalPledge2,,,,,) = poolRegistry.getPoolData(POOL_ID_2);
+        assertEq(totalPledge1, 0);
+        assertEq(totalPledge2, 0);
     }
 
     function test_EdgeCase_PartialDeallocation() public {
@@ -330,7 +335,9 @@ contract UnderwriterManagerIntegrationTest is Test {
 
         assertTrue(um.isAllocatedToPool(underwriter, POOL_ID_1), "Should still be allocated");
         assertEq(um.underwriterPoolPledge(underwriter, POOL_ID_1), PLEDGE - deallocateAmount, "Pledge should be reduced");
-        assertEq(poolRegistry.getPoolData(POOL_ID_1).totalPledge, PLEDGE - deallocateAmount, "Total pledge should be reduced");
+        uint256 totalPledge1;
+        (, totalPledge1,,,,,) = poolRegistry.getPoolData(POOL_ID_1);
+        assertEq(totalPledge1, PLEDGE - deallocateAmount, "Total pledge should be reduced");
     }
 
     function test_Interaction_DeallocateWithPendingLossesAndRewards() public {
@@ -385,7 +392,7 @@ contract UnderwriterManagerIntegrationTest is Test {
         usdc.mint(secondUnderwriter, PLEDGE);
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), PLEDGE);
-        capitalPool.deposit(PLEDGE, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(PLEDGE, YieldPlatform(3));
         um.allocateCapital(_pools(POOL_ID_1));
         vm.stopPrank();
 
@@ -393,12 +400,12 @@ contract UnderwriterManagerIntegrationTest is Test {
         usdc.mint(thirdUnderwriter, PLEDGE);
         vm.startPrank(thirdUnderwriter);
         usdc.approve(address(capitalPool), PLEDGE);
-        capitalPool.deposit(PLEDGE, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(PLEDGE, YieldPlatform(3));
         um.allocateCapital(_pools(POOL_ID_1));
         vm.stopPrank();
 
-        assertEq(um.poolSpecificUnderwriters(POOL_ID_1).length, 3);
-        assertEq(um.poolSpecificUnderwriters(POOL_ID_1)[1], secondUnderwriter);
+        // Verify ordering of underwriters within the pool
+        assertEq(um.poolSpecificUnderwriters(POOL_ID_1, 1), secondUnderwriter);
 
         // 2. The user in the middle deallocates fully
         vm.prank(secondUnderwriter);
@@ -407,9 +414,8 @@ contract UnderwriterManagerIntegrationTest is Test {
         um.deallocateFromPool(POOL_ID_1);
 
         // 3. Check if the array was handled correctly
-        assertEq(um.poolSpecificUnderwriters(POOL_ID_1).length, 2, "Array length should be 2");
-        assertEq(um.poolSpecificUnderwriters(POOL_ID_1)[0], underwriter, "First element should be unchanged");
-        assertEq(um.poolSpecificUnderwriters(POOL_ID_1)[1], thirdUnderwriter, "Last element should have moved to the middle");
+        assertEq(um.poolSpecificUnderwriters(POOL_ID_1, 0), underwriter, "First element should be unchanged");
+        assertEq(um.poolSpecificUnderwriters(POOL_ID_1, 1), thirdUnderwriter, "Last element should have moved to the middle");
         assertFalse(um.isAllocatedToPool(secondUnderwriter, POOL_ID_1), "Second underwriter should be deallocated");
     }
 

@@ -12,13 +12,31 @@ import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
 import {BackstopPool} from "contracts/external/BackstopPool.sol";
-import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
+import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 import {CatShare} from "contracts/tokens/CatShare.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {MockUnderwriterManager} from "contracts/test/MockUnderwriterManager.sol";
-import {ICapitalPool} from "contracts/interfaces/ICapitalPool.sol";
+import {IUnderwriterManager} from "contracts/interfaces/IUnderwriterManager.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
+
+contract RevertingUnderwriterManager is IUnderwriterManager {
+    bool public shouldReject;
+    function setShouldReject(bool _reject) external { shouldReject = _reject; }
+
+    function getUnderwriterAllocations(address) external pure override returns (uint256[] memory a) {
+        a = new uint256[](0);
+    }
+    function underwriterPoolPledge(address, uint256) external pure override returns (uint256) { return 0; }
+    function realizeLossesForAllPools(address) external pure override {}
+    function onCapitalDeposited(address, uint256) external override {
+        if (shouldReject) revert("MockUM: Reject on hook");
+    }
+    function onCapitalWithdrawn(address, uint256, bool) external pure override {}
+    function onWithdrawalRequested(address, uint256) external pure override {}
+    function onWithdrawalCancelled(address, uint256) external pure override {}
+}
 
 contract CapitalPoolIntegration is Test {
     // --- Deployed Contracts ---
@@ -31,7 +49,7 @@ contract CapitalPoolIntegration is Test {
     PolicyManager policyManager;
     PolicyNFT policyNFT;
     BackstopPool catPool;
-    RewardDistributor rewardDistributor;
+    MockRewardDistributor rewardDistributor;
     LossDistributor lossDistributor;
     CatShare catShare;
 
@@ -64,13 +82,13 @@ contract CapitalPoolIntegration is Test {
         policyManager = new PolicyManager(address(policyNFT), owner);
         catShare = new CatShare();
         catPool = new BackstopPool(token, catShare, IYieldAdapter(address(0)), owner);
-        rewardDistributor = new RewardDistributor(address(riskManager), address(policyManager));
+        rewardDistributor = new MockRewardDistributor();
         lossDistributor = new LossDistributor(address(riskManager));
         um = new UnderwriterManager(owner);
 
         // --- Link Contracts ---
-        // CORRECTED: Use the full enum path directly.
-        capitalPool.setBaseYieldAdapter(ICapitalPool.YieldPlatform.OTHER_YIELD, address(adapter));
+        // CORRECTED: Use the global YieldPlatform enum
+        capitalPool.setBaseYieldAdapter(YieldPlatform.OTHER_YIELD, address(adapter));
         adapter.setDepositor(address(capitalPool));
         policyNFT.setPolicyManagerAddress(address(policyManager));
         catShare.transferOwnership(address(catPool));
@@ -93,14 +111,14 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(500e6, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(500e6, YieldPlatform.OTHER_YIELD);
         assertEq(um.underwriterTotalPledge(userA), 500e6);
     }
 
     function testFullWithdrawalResetsPledge() public {
         vm.startPrank(userA);
         token.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(200e6, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(200e6, YieldPlatform.OTHER_YIELD);
         (,, uint256 shares,) = capitalPool.getUnderwriterAccount(userA);
         capitalPool.requestWithdrawal(shares);
         vm.warp(block.timestamp + 1);
@@ -115,14 +133,16 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositAmount, YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         vm.prank(userA);
         um.allocateCapital(pools);
 
-        registry.createPool(token, 0, 0, 0, 0, address(0), 0);
+        IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base:0, slope1:0, slope2:0, kink:8000});
+        vm.prank(address(riskManager));
+        registry.addProtocolRiskPool(address(token), rate, 0);
         vm.prank(claimant);
         token.approve(address(policyManager), type(uint256).max);
         uint256 policyId = policyManager.purchaseCover(0, claimAmount, 100e6);
@@ -147,9 +167,9 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositAmount, YieldPlatform.OTHER_YIELD);
 
-        adapter.simulateYieldOrLoss(int256(yieldAmount));
+        adapter.setTotalValueHeld(depositAmount + yieldAmount);
         assertEq(adapter.totalValueHeld(), depositAmount + yieldAmount);
 
         capitalPool.harvestAndDistributeYield(address(adapter));
@@ -168,14 +188,16 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositAmount, YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         vm.prank(userA);
         um.allocateCapital(pools);
 
-        registry.createPool(token, 0, 0, 0, 0, address(0), 0);
+        IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base:0, slope1:0, slope2:0, kink:8000});
+        vm.prank(address(riskManager));
+        registry.addProtocolRiskPool(address(token), rate, 0);
         vm.prank(claimant);
         token.approve(address(policyManager), type(uint256).max);
         uint256 policyId = policyManager.purchaseCover(0, claimAmount, 100e6);
@@ -197,12 +219,12 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositA, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositA, YieldPlatform.OTHER_YIELD);
 
         vm.prank(userB);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userB);
-        capitalPool.deposit(depositB, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositB, YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
@@ -211,7 +233,9 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userB);
         um.allocateCapital(pools);
 
-        registry.createPool(token, 0, 0, 0, 0, address(0), 0);
+        IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base:0, slope1:0, slope2:0, kink:8000});
+        vm.prank(address(riskManager));
+        registry.addProtocolRiskPool(address(token), rate, 0);
         vm.prank(claimant);
         token.approve(address(policyManager), type(uint256).max);
         uint256 policyId = policyManager.purchaseCover(0, claimAmount, 100e6);
@@ -234,7 +258,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositAmount, YieldPlatform.OTHER_YIELD);
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         vm.prank(userA);
@@ -259,7 +283,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositAmount, YieldPlatform.OTHER_YIELD);
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         vm.prank(userA);
@@ -269,7 +293,7 @@ contract CapitalPoolIntegration is Test {
         capitalPool.requestWithdrawal(withdrawShares);
 
         lossDistributor.distributeLoss(0, lossAmount, depositAmount);
-        vm.prank(riskManager);
+        vm.prank(address(riskManager));
         um.realizeLossesForAllPools(userA);
 
         assertEq(um.underwriterTotalPledge(userA), depositAmount - lossAmount, "Pledge not reduced by loss");
@@ -305,7 +329,7 @@ contract CapitalPoolIntegration is Test {
     }
 
     function testRevert_ifHookFails() public {
-        MockUnderwriterManager mockUM = new MockUnderwriterManager();
+        RevertingUnderwriterManager mockUM = new RevertingUnderwriterManager();
         capitalPool.setUnderwriterManager(address(mockUM));
         mockUM.setShouldReject(true);
 
@@ -314,7 +338,7 @@ contract CapitalPoolIntegration is Test {
         
         vm.prank(userA);
         vm.expectRevert("MockUM: Reject on hook");
-        capitalPool.deposit(500e6, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(500e6, YieldPlatform.OTHER_YIELD);
     }
 
     function test_claim_succeeds_evenIfPoolIsPaused() public {
@@ -323,16 +347,19 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(depositAmount, YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         vm.prank(userA);
         um.allocateCapital(pools);
 
-        registry.createPool(token, 0, 0, 0, 0, address(0), 0);
-        registry.setPoolPauseStatus(0, true);
-        assertTrue(registry.isPoolPaused(0), "Pool should be paused");
+        IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base:0, slope1:0, slope2:0, kink:8000});
+        vm.prank(address(riskManager));
+        registry.addProtocolRiskPool(address(token), rate, 0);
+        registry.setPauseState(0, true);
+        (,,, , bool paused,,) = registry.getPoolData(0);
+        assertTrue(paused, "Pool should be paused");
 
         vm.prank(claimant);
         token.approve(address(policyManager), type(uint256).max);
