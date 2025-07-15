@@ -6,12 +6,22 @@ import {PolicyManager} from "contracts/core/PolicyManager.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {IPolicyNFT} from "contracts/interfaces/IPolicyNFT.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /* ───────────────────────── Mock Contracts ───────────────────────── */
 // By defining mocks inside the test file, we can ensure they have the necessary
 // public state variables for our assertions.
 
 contract MockPoolRegistry is IPoolRegistry {
+    struct Pool {
+        IERC20 token;
+        uint256 pledged;
+        uint256 sold;
+        uint256 pendingWithdrawals;
+        bool paused;
+        address riskManager;
+        uint256 lossTrackId;
+    }
     mapping(uint256 => Pool) public pools;
     mapping(uint256 => RateModel) public rateModels;
 
@@ -34,6 +44,47 @@ contract MockPoolRegistry is IPoolRegistry {
 
     function setPoolPaused(uint256 id, bool isPaused) public {
         pools[id].paused = isPaused;
+    }
+
+    function getPoolPayoutData(uint256)
+        external
+        view
+        returns (address[] memory, uint256[] memory, uint256)
+    {
+        address[] memory a;
+        uint256[] memory b;
+        return (a, b, 0);
+    }
+
+    function getPoolActiveAdapters(uint256) external view returns (address[] memory) {
+        address[] memory a;
+        return a;
+    }
+
+    function getCapitalPerAdapter(uint256, address) external view returns (uint256) {
+        return 0;
+    }
+
+    function addProtocolRiskPool(address, RateModel calldata, uint256) external returns (uint256) {
+        return 0;
+    }
+
+    function updateCapitalAllocation(uint256, address, uint256, bool) external {}
+
+    function updateCapitalPendingWithdrawal(uint256, uint256, bool) external {}
+
+    function updateCoverageSold(uint256, uint256, bool) external {}
+
+    function getPoolCount() external view returns (uint256) {
+        return 0;
+    }
+
+    function setPauseState(uint256, bool) external {}
+
+    function setFeeRecipient(uint256, address) external {}
+
+    function getMultiplePoolData(uint256[] calldata) external view returns (IPoolRegistry.PoolInfo[] memory infos) {
+        infos = new IPoolRegistry.PoolInfo[](0);
     }
 }
 
@@ -133,10 +184,17 @@ contract MockRiskManagerHook {
     }
 }
 
+contract PolicyManagerHarness is PolicyManager {
+    constructor(address _nft) PolicyManager(_nft, msg.sender) {}
+    function settlePremiums(uint256 policyId) external {
+        _settleAndDrainPremium(policyId);
+    }
+}
+
 /* ───────────────────────── Test Contract ───────────────────────── */
 
 contract PolicyManagerFuzz is Test {
-    PolicyManager pm;
+    PolicyManagerHarness pm;
     MockPoolRegistry registry;
     MockCapitalPool capital;
     MockBackstopPool cat;
@@ -162,7 +220,7 @@ contract PolicyManagerFuzz is Test {
         rewards = new MockRewardDistributor();
         rm = new MockRiskManagerHook();
 
-        pm = new PolicyManager(address(nft), address(this));
+        pm = new PolicyManagerHarness(address(nft));
         // In the mock, we don't need to set the cover pool address on the NFT.
         pm.setAddresses(address(registry), address(capital), address(cat), address(rewards), address(rm));
 
