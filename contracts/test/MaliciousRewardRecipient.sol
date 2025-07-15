@@ -45,7 +45,7 @@ contract MaliciousRewardRecipient {
         uint256 _amount
     ) external {
         // Store necessary variables for the re-entrant call
-        usdcToken = _capitalPool.asset();
+        usdcToken = address(_capitalPool.underlyingAsset());
         poolIdToAttack = _poolId;
         pledgeToAttack = _amount;
 
