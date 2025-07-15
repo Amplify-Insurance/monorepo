@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
-import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
 import {CatShare} from "contracts/tokens/CatShare.sol";
@@ -14,6 +13,7 @@ import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
@@ -67,6 +67,7 @@ contract RiskManagerIntegration is Test {
         rewardDistributor = new RewardDistributor(address(rm), address(policyManager));
         rewardDistributor.setCatPool(address(catPool));
         lossDistributor = new LossDistributor(address(rm));
+
         um = new UnderwriterManager(owner);
 
         policyNFT.setPolicyManagerAddress(address(policyManager));
@@ -82,7 +83,6 @@ contract RiskManagerIntegration is Test {
         rm.setCommittee(committee);
 
         IPoolRegistry.RateModel memory rateModel = IPoolRegistry.RateModel({base: 100, slope1: 0, slope2: 0, kink: 8000});
-        vm.prank(address(rm));
         registry.addProtocolRiskPool(address(usdc), rateModel, 0);
 
         vm.startPrank(underwriter);
@@ -114,11 +114,11 @@ contract RiskManagerIntegration is Test {
     }
 
     function testCommitteeCanPauseAndUnpausePool() public {
-        vm.prank(committee);
+        vm.prank(address(rm));
         registry.setPauseState(POOL_ID, true);
         (, , , , bool paused,,) = registry.getPoolData(POOL_ID);
         assertTrue(paused);
-        vm.prank(committee);
+        vm.prank(address(rm));
         registry.setPauseState(POOL_ID, false);
         (, , , , paused,,) = registry.getPoolData(POOL_ID);
         assertFalse(paused);
@@ -228,17 +228,18 @@ contract RiskManagerIntegration is Test {
         registry.setPauseState(POOL_ID, true);
     }
 
-    function testSetPoolFeeRecipient() public {
+function testSetPoolFeeRecipient() public {
         address newRecipient = address(0xDEAD);
         // Should fail if not called by committee
         vm.prank(owner);
         vm.expectRevert("PR: Not RiskManager");
         registry.setFeeRecipient(POOL_ID, newRecipient);
 
-        // Should succeed when called by committee
-        vm.prank(committee);
+        // Should succeed when called by risk manager
+        vm.prank(address(rm));
         registry.setFeeRecipient(POOL_ID, newRecipient);
 
+        // Correctly destructure the return values
         (,,,,, address feeRecipient,) = registry.getPoolData(POOL_ID);
         assertEq(feeRecipient, newRecipient);
     }
