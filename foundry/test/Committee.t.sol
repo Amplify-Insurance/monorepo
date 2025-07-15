@@ -75,19 +75,19 @@ contract CommitteeFuzz is Test {
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Pause, bond);
 
         (
-            ,
+            uint256 __ignored,
             Committee.ProposalType pType,
             address prop,
-            ,
-            ,
-            ,
-            ,
-            ,
+            uint256 __p1,
+            uint256 __p2,
+            uint256 __p3,
+            uint256 __p4,
+            uint256 __p5,
             Committee.ProposalStatus status,
             uint256 storedBond,
-            ,
-            ,
-            ,
+            uint256 __p6,
+            uint256 __p7,
+            uint256 __p8
         ) = committee.proposals(id);
 
         assertEq(uint256(pType), uint256(Committee.ProposalType.Pause));
@@ -122,19 +122,19 @@ contract CommitteeFuzz is Test {
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Unpause, 0);
 
         (
-            ,
+            uint256 __u0,
             Committee.ProposalType pType,
             address prop,
-            ,
-            ,
-            ,
-            ,
-            ,
+            uint256 __u1,
+            uint256 __u2,
+            uint256 __u3,
+            uint256 __u4,
+            uint256 __u5,
             Committee.ProposalStatus status,
             uint256 storedBond,
-            ,
-            ,
-            ,
+            uint256 __u6,
+            uint256 __u7,
+            uint256 __u8
         ) = committee.proposals(id);
 
         assertEq(uint256(pType), uint256(Committee.ProposalType.Unpause));
