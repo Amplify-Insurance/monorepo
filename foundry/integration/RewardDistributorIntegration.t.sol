@@ -13,6 +13,7 @@ import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
 import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
 import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 
 contract RewardDistributorIntegration is Test {
@@ -27,6 +28,7 @@ contract RewardDistributorIntegration is Test {
     RewardDistributor rewardDistributor;
     LossDistributor lossDistributor;
     RiskManager riskManager;
+    UnderwriterManager um;
 
     address owner = address(this);
     address committee = address(0x1);
@@ -60,15 +62,26 @@ contract RewardDistributorIntegration is Test {
         rewardDistributor = new RewardDistributor(address(riskManager), address(policyManager));
         rewardDistributor.setCatPool(address(catPool));
         lossDistributor = new LossDistributor(address(riskManager));
+        um = new UnderwriterManager(owner);
 
         // Wire up addresses
+        um.setAddresses(
+            address(capitalPool),
+            address(poolRegistry),
+            address(catPool),
+            address(lossDistributor),
+            address(rewardDistributor),
+            address(riskManager)
+        );
+
         riskManager.setAddresses(
             address(capitalPool),
             address(poolRegistry),
             address(policyManager),
             address(catPool),
             address(lossDistributor),
-            address(rewardDistributor)
+            address(rewardDistributor),
+            address(um)
         );
         capitalPool.setRiskManager(address(riskManager));
         policyManager.setAddresses(
@@ -86,7 +99,8 @@ contract RewardDistributorIntegration is Test {
 
         // Create pool
         IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base: 100, slope1: 0, slope2: 0, kink: 8000});
-        riskManager.addProtocolRiskPool(address(usdc), rate, 0);
+        vm.prank(address(riskManager));
+        poolRegistry.addProtocolRiskPool(address(usdc), rate, 0);
 
         // Initial deposit & allocation
         usdc.mint(underwriter, PLEDGE_AMOUNT);
@@ -95,7 +109,7 @@ contract RewardDistributorIntegration is Test {
         capitalPool.deposit(PLEDGE_AMOUNT, CapitalPool.YieldPlatform.AAVE);
         uint256[] memory pools = new uint256[](1);
         pools[0] = POOL_ID;
-        riskManager.allocateCapital(pools);
+        um.allocateCapital(pools);
         vm.stopPrank();
 
         // Fund distributor
@@ -110,13 +124,13 @@ contract RewardDistributorIntegration is Test {
 
     function testClaimViaRiskManager() public {
         _distribute();
-        uint256 pledge = riskManager.underwriterPoolPledge(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         uint256 beforeBal = usdc.balanceOf(underwriter);
         uint256[] memory ids = new uint256[](1);
         ids[0] = POOL_ID;
         vm.prank(underwriter);
-        riskManager.claimPremiumRewards(ids);
+        um.claimPremiumRewards(ids);
         uint256 afterBal = usdc.balanceOf(underwriter);
         assertEq(afterBal - beforeBal, expected);
     }
@@ -126,7 +140,7 @@ contract RewardDistributorIntegration is Test {
         uint256[] memory ids = new uint256[](1);
         ids[0] = POOL_ID;
         vm.prank(underwriter);
-        riskManager.claimPremiumRewards(ids);
+        um.claimPremiumRewards(ids);
 
         uint256 extra = 500e6;
         usdc.mint(underwriter, extra);
@@ -139,11 +153,11 @@ contract RewardDistributorIntegration is Test {
         poolRegistry.updateCapitalAllocation(POOL_ID, address(adapter), extra, true);
 
         _distribute();
-        uint256 pledge = riskManager.underwriterPoolPledge(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         uint256 beforeBal = usdc.balanceOf(underwriter);
         vm.prank(underwriter);
-        riskManager.claimPremiumRewards(ids);
+        um.claimPremiumRewards(ids);
         uint256 afterBal = usdc.balanceOf(underwriter);
         assertEq(afterBal - beforeBal, expected);
     }
@@ -153,27 +167,27 @@ contract RewardDistributorIntegration is Test {
         uint256[] memory ids = new uint256[](1);
         ids[0] = POOL_ID;
         vm.prank(underwriter);
-        riskManager.claimPremiumRewards(ids);
+        um.claimPremiumRewards(ids);
 
         uint256 withdrawAmount = 400e6;
         vm.prank(address(capitalPool));
-        riskManager.onCapitalWithdrawn(underwriter, withdrawAmount, false);
+        um.onCapitalWithdrawn(underwriter, withdrawAmount, false);
         vm.prank(address(riskManager));
         poolRegistry.updateCapitalAllocation(POOL_ID, address(adapter), withdrawAmount, false);
 
         _distribute();
-        uint256 pledge = riskManager.underwriterPoolPledge(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         uint256 beforeBal = usdc.balanceOf(underwriter);
         vm.prank(underwriter);
-        riskManager.claimPremiumRewards(ids);
+        um.claimPremiumRewards(ids);
         uint256 afterBal = usdc.balanceOf(underwriter);
         assertEq(afterBal - beforeBal, expected);
     }
 
     function testCatPoolClaimsForUser() public {
         _distribute();
-        uint256 pledge = riskManager.underwriterPoolPledge(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         vm.prank(address(catPool));
         rewardDistributor.claimForCatPool(underwriter, POOL_ID, address(usdc), pledge);
@@ -188,14 +202,14 @@ contract RewardDistributorIntegration is Test {
     function testRewardsAccumulate() public {
         _distribute();
         _distribute();
-        uint256 pledge = riskManager.underwriterPoolPledge(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         assertEq(expected, REWARD_AMOUNT * 2);
         uint256 beforeBal = usdc.balanceOf(underwriter);
         uint256[] memory ids = new uint256[](1);
         ids[0] = POOL_ID;
         vm.prank(underwriter);
-        riskManager.claimPremiumRewards(ids);
+        um.claimPremiumRewards(ids);
         uint256 afterBal = usdc.balanceOf(underwriter);
         assertEq(afterBal - beforeBal, expected);
     }
@@ -215,7 +229,7 @@ contract RewardDistributorIntegration is Test {
         rewardDistributor.setCatPool(address(newCat));
 
         _distribute();
-        uint256 pledge = riskManager.underwriterPoolPledge(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         vm.prank(address(newCat));
         rewardDistributor.claimForCatPool(underwriter, POOL_ID, address(usdc), pledge);

@@ -8,6 +8,7 @@ import {ResetApproveERC20} from "contracts/test/ResetApproveERC20.sol";
 import {RewardDistributor} from "contracts/utils/RewardDistributor.sol";
 import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
 import {LossDistributor} from "contracts/utils/LossDistributor.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
@@ -34,6 +35,7 @@ contract BackstopPoolIntegration is Test {
     BackstopPool catPool;
     CapitalPool capitalPool;
     RiskManager rm;
+    UnderwriterManager um;
 
     // components for policy manager test
     PolicyManager pm;
@@ -58,13 +60,15 @@ contract BackstopPoolIntegration is Test {
         capitalPool = new CapitalPool(owner, address(usdc));
         rm = new RiskManager(owner);
         registry = new PoolRegistry(owner, address(rm));
+        um = new UnderwriterManager(owner);
         nft = new PolicyNFT(address(this), owner);
         pm = new PolicyManager(address(nft), owner);
         nft.setPolicyManagerAddress(address(pm));
         rewardDist = new RewardDistributor(address(rm), address(pm));
         lossDist = new LossDistributor(address(rm));
         pm.setAddresses(address(registry), address(capitalPool), address(catPool), address(rewardDist), address(rm));
-        rm.setAddresses(address(capitalPool), address(registry), address(pm), address(catPool), address(lossDist), address(rewardDist));
+        um.setAddresses(address(capitalPool), address(registry), address(catPool), address(lossDist), address(rewardDist), address(rm));
+        rm.setAddresses(address(capitalPool), address(registry), address(pm), address(catPool), address(lossDist), address(rewardDist), address(um));
         capitalPool.setRiskManager(address(rm));
         catPool.setRiskManagerAddress(address(capitalPool));
         catPool.setCapitalPoolAddress(address(capitalPool));
@@ -112,13 +116,15 @@ contract BackstopPoolIntegration is Test {
         capitalPool = new CapitalPool(owner, address(usdc));
         rm = new RiskManager(owner);
         registry = new PoolRegistry(owner, address(rm));
+        um = new UnderwriterManager(owner);
         nft = new PolicyNFT(address(this), owner);
         pm = new PolicyManager(address(nft), owner);
         nft.setPolicyManagerAddress(address(pm));
         rewardDist = new RewardDistributor(address(rm), address(pm));
         lossDist = new LossDistributor(address(rm));
         pm.setAddresses(address(registry), address(capitalPool), address(catPool), address(rewardDist), address(rm));
-        rm.setAddresses(address(capitalPool), address(registry), address(pm), address(catPool), address(lossDist), address(rewardDist));
+        um.setAddresses(address(capitalPool), address(registry), address(catPool), address(lossDist), address(rewardDist), address(rm));
+        rm.setAddresses(address(capitalPool), address(registry), address(pm), address(catPool), address(lossDist), address(rewardDist), address(um));
         capitalPool.setRiskManager(address(rm));
         catPool.setPolicyManagerAddress(address(pm));
         catPool.setRiskManagerAddress(address(capitalPool));

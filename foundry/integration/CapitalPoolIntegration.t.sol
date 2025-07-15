@@ -6,6 +6,7 @@ import {ResetApproveERC20} from "contracts/test/ResetApproveERC20.sol";
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
@@ -20,6 +21,7 @@ contract CapitalPoolIntegration is Test {
     SimpleYieldAdapter adapter;
     CapitalPool capitalPool;
     RiskManager riskManager;
+    UnderwriterManager um;
     PoolRegistry registry;
     PolicyManager policyManager;
     PolicyNFT policyNFT;
@@ -60,13 +62,17 @@ contract CapitalPoolIntegration is Test {
         rewardDistributor.setCatPool(address(catPool));
         lossDistributor = new LossDistributor(address(riskManager));
 
+        um = new UnderwriterManager(owner);
+        um.setAddresses(address(capitalPool), address(registry), address(catPool), address(lossDistributor), address(rewardDistributor), address(riskManager));
+
         riskManager.setAddresses(
             address(capitalPool),
             address(registry),
             address(policyManager),
             address(catPool),
             address(lossDistributor),
-            address(rewardDistributor)
+            address(rewardDistributor),
+            address(um)
         );
         capitalPool.setRiskManager(address(riskManager));
     }
@@ -76,7 +82,7 @@ contract CapitalPoolIntegration is Test {
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(user);
         capitalPool.deposit(500e6, CapitalPool.YieldPlatform(PLATFORM_OTHER));
-        assertEq(riskManager.underwriterTotalPledge(user), 500e6);
+        assertEq(um.underwriterTotalPledge(user), 500e6);
     }
 
     function testFullWithdrawalResetsPledge() public {
@@ -88,6 +94,6 @@ contract CapitalPoolIntegration is Test {
         vm.warp(block.timestamp + 1);
         capitalPool.executeWithdrawal(0);
         vm.stopPrank();
-        assertEq(riskManager.underwriterTotalPledge(user), 0);
+        assertEq(um.underwriterTotalPledge(user), 0);
     }
 }

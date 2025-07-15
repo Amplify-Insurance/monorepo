@@ -6,6 +6,7 @@ import {ResetApproveERC20} from "contracts/test/ResetApproveERC20.sol";
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
 import {RiskManager} from "contracts/core/RiskManager.sol";
+import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {PolicyNFT} from "contracts/tokens/PolicyNFT.sol";
 import {PolicyManager} from "contracts/core/PolicyManager.sol";
 import {PoolRegistry} from "contracts/core/PoolRegistry.sol";
@@ -22,6 +23,7 @@ contract LossDistributorIntegration is Test {
     SimpleYieldAdapter adapter;
     CapitalPool capitalPool;
     RiskManager riskManager;
+    UnderwriterManager um;
     PoolRegistry poolRegistry;
     PolicyNFT policyNFT;
     PolicyManager policyManager;
@@ -57,6 +59,7 @@ contract LossDistributorIntegration is Test {
         adapter.setDepositor(address(capitalPool));
 
         riskManager = new RiskManager(owner);
+        um = new UnderwriterManager(owner);
 
         catShare = new CatShare();
         catPool = new BackstopPool(usdc, catShare, adapter, owner);
@@ -82,13 +85,23 @@ contract LossDistributorIntegration is Test {
             address(riskManager)
         );
 
+        um.setAddresses(
+            address(capitalPool),
+            address(poolRegistry),
+            address(catPool),
+            address(lossDistributor),
+            address(rewardDistributor),
+            address(riskManager)
+        );
+
         riskManager.setAddresses(
             address(capitalPool),
             address(poolRegistry),
             address(policyManager),
             address(catPool),
             address(lossDistributor),
-            address(rewardDistributor)
+            address(rewardDistributor),
+            address(um)
         );
         riskManager.setCommittee(committee);
         poolRegistry.setRiskManager(address(riskManager));
@@ -96,13 +109,14 @@ contract LossDistributorIntegration is Test {
         capitalPool.setRiskManager(address(riskManager));
 
         IPoolRegistry.RateModel memory rate = IPoolRegistry.RateModel({base:0, slope1:0, slope2:0, kink:8000});
-        POOL_ID = riskManager.addProtocolRiskPool(address(protocolToken), rate, 500);
+        vm.prank(address(riskManager));
+        POOL_ID = poolRegistry.addProtocolRiskPool(address(protocolToken), rate, 500);
 
         usdc.mint(underwriter, TOTAL_PLEDGE);
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), TOTAL_PLEDGE);
         capitalPool.deposit(TOTAL_PLEDGE, CapitalPool.YieldPlatform(PLATFORM_OTHER));
-        riskManager.allocateCapital(_arr(POOL_ID));
+        um.allocateCapital(_arr(POOL_ID));
         vm.stopPrank();
 
         protocolToken.mint(claimant, 100_000e6);
@@ -133,8 +147,8 @@ contract LossDistributorIntegration is Test {
         // Simulate the capital pool calling the withdrawal hook directly to
         // avoid reentrancy issues in this test environment.
         vm.prank(address(capitalPool));
-        riskManager.onCapitalWithdrawn(underwriter, TOTAL_PLEDGE, true);
-        assertEq(riskManager.underwriterTotalPledge(underwriter), 0);
+        um.onCapitalWithdrawn(underwriter, TOTAL_PLEDGE, true);
+        assertEq(um.underwriterTotalPledge(underwriter), 0);
     }
 
     function testAccumulatesLossForMultipleClaims() public {
@@ -158,7 +172,7 @@ contract LossDistributorIntegration is Test {
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), newPledge);
         capitalPool.deposit(newPledge, CapitalPool.YieldPlatform(PLATFORM_OTHER));
-        riskManager.allocateCapital(_arr(POOL_ID));
+        um.allocateCapital(_arr(POOL_ID));
         vm.stopPrank();
 
         uint256 expectedTracker = (COVERAGE * PRECISION) / TOTAL_PLEDGE;
@@ -168,7 +182,7 @@ contract LossDistributorIntegration is Test {
 
         // Realize the losses via the RiskManager hook directly
         vm.prank(address(capitalPool));
-        riskManager.onCapitalWithdrawn(secondUnderwriter, newPledge, true);
+        um.onCapitalWithdrawn(secondUnderwriter, newPledge, true);
     }
 }
 
