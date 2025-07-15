@@ -9,6 +9,7 @@ import {MockRiskManager} from "contracts/test/MockRiskManager.sol";
 import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
 import {MockBackstopPool} from "contracts/test/MockBackstopPool.sol";
 import {IYieldAdapterEmergency} from "contracts/interfaces/IYieldAdapterEmergency.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
 
 contract CapitalPoolTest is Test {
     // --- Contracts and Mocks ---
@@ -45,7 +46,7 @@ contract CapitalPoolTest is Test {
 
         adapter = new MockYieldAdapter(address(token), address(0), owner);
         adapter.setDepositor(address(pool));
-        pool.setBaseYieldAdapter(CapitalPool.YieldPlatform.AAVE, address(adapter));
+        pool.setBaseYieldAdapter(YieldPlatform.AAVE, address(adapter));
 
         vm.prank(userA);
         token.approve(address(pool), type(uint256).max);
@@ -62,7 +63,7 @@ contract CapitalPoolTest is Test {
         
         // --- Deposit ---
         vm.prank(userA);
-        pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(depositAmount, YieldPlatform.AAVE);
 
         (uint256 principal, , uint256 shares, ) = pool.getUnderwriterAccount(userA);
         assertEq(principal, depositAmount, "Principal mismatch after deposit");
@@ -90,7 +91,7 @@ contract CapitalPoolTest is Test {
         uint256 lossAmount = 5_000e6;
 
         vm.prank(userA);
-        pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(depositAmount, YieldPlatform.AAVE);
         
         vm.prank(address(rm));
         pool.applyLosses(userA, lossAmount);
@@ -106,7 +107,7 @@ contract CapitalPoolTest is Test {
     function test_cancelWithdrawalRequest() public {
         uint96 amount = 10_000e6;
         vm.prank(userA);
-        pool.deposit(amount, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(amount, YieldPlatform.AAVE);
         
         vm.prank(userA);
         pool.requestWithdrawal(2_000e6); // index 0
@@ -132,7 +133,7 @@ contract CapitalPoolTest is Test {
         uint256 yieldAmount = 5_000e6;
 
         vm.prank(userA);
-        pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(depositAmount, YieldPlatform.AAVE);
         assertEq(pool.principalInAdapter(address(adapter)), depositAmount);
 
         adapter.simulateYieldOrLoss(int256(yieldAmount));
@@ -155,7 +156,7 @@ contract CapitalPoolTest is Test {
     function test_harvestAndDistributeYield_noYield() public {
         uint256 depositAmount = 50_000e6;
         vm.prank(userA);
-        pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(depositAmount, YieldPlatform.AAVE);
         assertEq(adapter.totalValueHeld(), depositAmount);
 
         vm.prank(harvester);
@@ -169,7 +170,7 @@ contract CapitalPoolTest is Test {
         uint256 depositAmount = 50_000e6;
         int256 lossAmount = -5_000e6;
         vm.prank(userA);
-        pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(depositAmount, YieldPlatform.AAVE);
 
         adapter.simulateYieldOrLoss(lossAmount);
         assertEq(adapter.totalValueHeld(), uint256(int256(depositAmount) + lossAmount));
@@ -188,12 +189,12 @@ contract CapitalPoolTest is Test {
     function test_executePayout() public {
         MockYieldAdapter adapterB = new MockYieldAdapter(address(token), address(0), owner);
         adapterB.setDepositor(address(pool));
-        pool.setBaseYieldAdapter(CapitalPool.YieldPlatform.COMPOUND, address(adapterB));
+        pool.setBaseYieldAdapter(YieldPlatform.COMPOUND, address(adapterB));
 
         vm.prank(userA);
-        pool.deposit(60_000e6, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(60_000e6, YieldPlatform.AAVE);
         vm.prank(userB);
-        pool.deposit(40_000e6, CapitalPool.YieldPlatform.COMPOUND);
+        pool.deposit(40_000e6, YieldPlatform.COMPOUND);
 
         CapitalPool.PayoutData memory payout;
         payout.claimant = vm.addr(0xC);
@@ -235,17 +236,17 @@ contract CapitalPoolTest is Test {
 
     function testRevert_deposit_noSharesToMint() public {
         vm.prank(userA);
-        pool.deposit(1_000_000e6, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(1_000_000e6, YieldPlatform.AAVE);
 
         vm.prank(userB);
         vm.expectRevert(CapitalPool.NoSharesToMint.selector);
-        pool.deposit(1, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(1, YieldPlatform.AAVE);
     }
 
     function testRevert_requestWithdrawal_ifExceedsTotalShares() public {
         uint96 depositAmount = 10_000e6;
         vm.prank(userA);
-        pool.deposit(depositAmount, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(depositAmount, YieldPlatform.AAVE);
         
         vm.prank(userA);
         pool.requestWithdrawal(8_000e6);
@@ -260,7 +261,7 @@ contract CapitalPoolTest is Test {
         pool.setUnderwriterNoticePeriod(noticePeriod);
         
         vm.prank(userA);
-        pool.deposit(10_000e6, CapitalPool.YieldPlatform.AAVE);
+        pool.deposit(10_000e6, YieldPlatform.AAVE);
         vm.prank(userA);
         pool.requestWithdrawal(5_000e6);
 

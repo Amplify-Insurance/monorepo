@@ -61,9 +61,7 @@ contract PolicyManagerIntegration is Test {
         nft.setPolicyManagerAddress(address(pm)); // Correctly link the NFT to the PM
 
         rm = new RiskManager(owner);
-        // CORRECTED: Swapped constructor arguments, assuming the intended order is (riskManager, owner).
-        // This ensures the registry correctly stores the RiskManager's address.
-        registry = new PoolRegistry(address(rm), owner);
+        registry = new PoolRegistry(owner, address(rm));
         capital = new CapitalPool(owner, address(token));
         capital.setBaseYieldAdapter(YieldPlatform.OTHER_YIELD, address(yieldAdapter));
         yieldAdapter.setDepositor(address(capital));
