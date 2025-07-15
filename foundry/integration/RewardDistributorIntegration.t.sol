@@ -16,6 +16,7 @@ import {RiskManager} from "contracts/core/RiskManager.sol";
 import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {MaliciousRewardRecipient} from "contracts/test/MaliciousRewardRecipient.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
 
 contract RewardDistributorIntegrationTest is Test {
     // Core Contracts
@@ -67,7 +68,7 @@ contract RewardDistributorIntegrationTest is Test {
         um = new UnderwriterManager(owner);
 
         // --- Configure Dependencies ---
-        capitalPool.setBaseYieldAdapter(CapitalPool.YieldPlatform(3), address(adapter));
+        capitalPool.setBaseYieldAdapter(YieldPlatform(3), address(adapter));
         catShare.transferOwnership(address(catPool));
         catPool.initialize();
         adapter.setDepositor(address(capitalPool));
@@ -92,7 +93,7 @@ contract RewardDistributorIntegrationTest is Test {
         usdc.mint(underwriter, PLEDGE_AMOUNT);
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(PLEDGE_AMOUNT, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(PLEDGE_AMOUNT, YieldPlatform(3));
         uint256[] memory pools = new uint256[](1);
         pools[0] = POOL_ID;
         um.allocateCapital(pools);
@@ -141,7 +142,7 @@ contract RewardDistributorIntegrationTest is Test {
 
     function test_ClaimViaUnderwriterManager() public {
         _distribute(address(usdc), REWARD_AMOUNT);
-        uint256 pledge = um.underwriterPledgeInPool(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         
         uint256 beforeBal = usdc.balanceOf(underwriter);
@@ -162,7 +163,7 @@ contract RewardDistributorIntegrationTest is Test {
         usdc.mint(secondUnderwriter, secondPledge);
         vm.startPrank(secondUnderwriter);
         usdc.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(secondPledge, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(secondPledge, YieldPlatform(3));
         uint256[] memory ids = new uint256[](1);
         ids[0] = POOL_ID;
         um.allocateCapital(ids);
@@ -171,11 +172,11 @@ contract RewardDistributorIntegrationTest is Test {
         uint256 totalPledge = PLEDGE_AMOUNT + secondPledge;
         _distribute(address(usdc), REWARD_AMOUNT);
 
-        uint256 pledge1 = um.underwriterPledgeInPool(underwriter, POOL_ID);
+        uint256 pledge1 = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected1 = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge1);
         assertApproxEqAbs(expected1, (REWARD_AMOUNT * PLEDGE_AMOUNT) / totalPledge, 1);
 
-        uint256 pledge2 = um.underwriterPledgeInPool(secondUnderwriter, POOL_ID);
+        uint256 pledge2 = um.underwriterPoolPledge(secondUnderwriter, POOL_ID);
         uint256 expected2 = rewardDistributor.pendingRewards(secondUnderwriter, POOL_ID, address(usdc), pledge2);
         assertApproxEqAbs(expected2, (REWARD_AMOUNT * secondPledge) / totalPledge, 1);
     }
@@ -184,7 +185,7 @@ contract RewardDistributorIntegrationTest is Test {
         _distribute(address(usdc), REWARD_AMOUNT);
         _distribute(address(protocolToken), REWARD_AMOUNT * 1e12);
 
-        uint256 pledge = um.underwriterPledgeInPool(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expectedUsdc = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         uint256 expectedPtkn = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(protocolToken), pledge);
 
@@ -206,11 +207,11 @@ contract RewardDistributorIntegrationTest is Test {
 
         vm.prank(address(capitalPool));
         um.onCapitalWithdrawn(underwriter, PLEDGE_AMOUNT, true);
-        assertEq(um.underwriterPledgeInPool(underwriter, POOL_ID), 0);
+        assertEq(um.underwriterPoolPledge(underwriter, POOL_ID), 0);
         assertEq(rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), 0), 0);
 
         vm.startPrank(underwriter);
-        capitalPool.deposit(PLEDGE_AMOUNT, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(PLEDGE_AMOUNT, YieldPlatform(3));
         uint256[] memory ids = new uint256[](1);
         ids[0] = POOL_ID;
         um.allocateCapital(ids);
@@ -218,7 +219,7 @@ contract RewardDistributorIntegrationTest is Test {
 
         _distribute(address(usdc), REWARD_AMOUNT);
 
-        uint256 pledge = um.underwriterPledgeInPool(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 expected = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         assertEq(expected, REWARD_AMOUNT);
     }
@@ -226,11 +227,12 @@ contract RewardDistributorIntegrationTest is Test {
     function test_EdgeCase_DistributeToEmptyPool() public {
         vm.prank(address(capitalPool));
         um.onCapitalWithdrawn(underwriter, PLEDGE_AMOUNT, true);
-        assertEq(poolRegistry.getPoolData(POOL_ID).totalPledge, 0);
+        (, uint256 totalPledge,,,,,) = poolRegistry.getPoolData(POOL_ID);
+        assertEq(totalPledge, 0);
 
-        uint256 trackerBefore = rewardDistributor.poolRewardTrackers(POOL_ID, address(usdc)).accumulatedRewardsPerShare;
+        uint256 trackerBefore = rewardDistributor.poolRewardTrackers(POOL_ID, address(usdc));
         _distribute(address(usdc), REWARD_AMOUNT);
-        uint256 trackerAfter = rewardDistributor.poolRewardTrackers(POOL_ID, address(usdc)).accumulatedRewardsPerShare;
+        uint256 trackerAfter = rewardDistributor.poolRewardTrackers(POOL_ID, address(usdc));
 
         assertEq(trackerBefore, trackerAfter, "Tracker should not change for empty pool");
     }
@@ -243,7 +245,7 @@ contract RewardDistributorIntegrationTest is Test {
         um.onCapitalWithdrawn(underwriter, withdrawAmount, false);
 
         uint256 remainingPledge = PLEDGE_AMOUNT - withdrawAmount;
-        assertEq(um.underwriterPledgeInPool(underwriter, POOL_ID), remainingPledge);
+        assertEq(um.underwriterPoolPledge(underwriter, POOL_ID), remainingPledge);
 
         _distribute(address(usdc), REWARD_AMOUNT);
 
@@ -268,7 +270,7 @@ contract RewardDistributorIntegrationTest is Test {
         vm.startPrank(secondUnderwriter);
         usdc.mint(secondUnderwriter, dustPledge);
         usdc.approve(address(capitalPool), dustPledge);
-        capitalPool.deposit(dustPledge, CapitalPool.YieldPlatform(3));
+        capitalPool.deposit(dustPledge, YieldPlatform(3));
         uint256[] memory ids = new uint256[](1);
         ids[0] = POOL_ID;
         um.allocateCapital(ids);
@@ -276,11 +278,11 @@ contract RewardDistributorIntegrationTest is Test {
 
         _distribute(address(usdc), dustReward);
 
-        uint256 pledge = um.underwriterPledgeInPool(secondUnderwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(secondUnderwriter, POOL_ID);
         uint256 pending = rewardDistributor.pendingRewards(secondUnderwriter, POOL_ID, address(usdc), pledge);
         
         // With dust amounts, the reward might be slightly off due to precision loss, but should be very close.
-        assert(pending > 0, "Pending rewards should be greater than zero");
+        assertGt(pending, 0, "Pending rewards should be greater than zero");
         assertApproxEqAbs(pending, dustReward * dustPledge / (PLEDGE_AMOUNT + dustPledge), 1);
     }
 
@@ -291,7 +293,7 @@ contract RewardDistributorIntegrationTest is Test {
             _distribute(address(usdc), smallReward);
         }
 
-        uint256 pledge = um.underwriterPledgeInPool(underwriter, POOL_ID);
+        uint256 pledge = um.underwriterPoolPledge(underwriter, POOL_ID);
         uint256 pending = rewardDistributor.pendingRewards(underwriter, POOL_ID, address(usdc), pledge);
         
         assertApproxEqAbs(pending, iterations * smallReward, 1, "Sequential small rewards did not accumulate correctly");
@@ -302,7 +304,7 @@ contract RewardDistributorIntegrationTest is Test {
     function testRevert_ReentrancyAttackOnClaim() public {
         MaliciousRewardRecipient maliciousActor = new MaliciousRewardRecipient(address(rewardDistributor), address(riskManager));
         usdc.mint(address(maliciousActor), PLEDGE_AMOUNT);
-        maliciousActor.depositAndAllocate(address(capitalPool), address(um), POOL_ID, PLEDGE_AMOUNT);
+        maliciousActor.depositAndAllocate(capitalPool, um, POOL_ID, PLEDGE_AMOUNT);
 
         usdc.transfer(address(rewardDistributor), REWARD_AMOUNT);
         _distribute(address(usdc), REWARD_AMOUNT);
@@ -315,8 +317,10 @@ contract RewardDistributorIntegrationTest is Test {
     function testRevert_Claim_InsufficientDistributorBalance() public {
         // Drain the distributor's balance
         uint256 distributorBalance = usdc.balanceOf(address(rewardDistributor));
-        vm.prank(owner);
-        rewardDistributor.recoverERC20(address(usdc), distributorBalance);
+        if (distributorBalance > 0) {
+            vm.prank(address(rewardDistributor));
+            usdc.transfer(owner, distributorBalance);
+        }
         assertEq(usdc.balanceOf(address(rewardDistributor)), 0);
 
         // Distribute rewards (this only updates accounting, doesn't require balance)

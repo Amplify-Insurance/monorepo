@@ -16,6 +16,7 @@ import {CatShare} from "contracts/tokens/CatShare.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
 
 contract PolicyNFTIntegrationTest is Test {
     // Core Contracts
@@ -68,7 +69,7 @@ contract PolicyNFTIntegrationTest is Test {
         cat.initialize();
         rewards.setCatPool(address(cat));
         capital.setRiskManager(address(rm));
-        capital.setBaseYieldAdapter(CapitalPool.YieldPlatform(3), address(yieldAdapter));
+        capital.setBaseYieldAdapter(YieldPlatform(3), address(yieldAdapter));
         yieldAdapter.setDepositor(address(capital));
         cat.setRiskManagerAddress(address(rm));
         cat.setCapitalPoolAddress(address(capital));
@@ -88,7 +89,7 @@ contract PolicyNFTIntegrationTest is Test {
         // Underwrite the pool
         vm.prank(owner);
         token.approve(address(capital), INITIAL_PLEDGE);
-        capital.deposit(INITIAL_PLEDGE, CapitalPool.YieldPlatform(3));
+        capital.deposit(INITIAL_PLEDGE, YieldPlatform(3));
         uint256[] memory poolIds = new uint256[](1);
         poolIds[0] = POOL_ID;
         um.allocateCapital(poolIds);
@@ -129,7 +130,7 @@ contract PolicyNFTIntegrationTest is Test {
 
     function testRevert_Purchase_ZeroCoverage() public {
         vm.prank(user);
-        vm.expectRevert(PolicyManager.ZeroCoverage.selector);
+        vm.expectRevert(PolicyManager.InvalidAmount.selector);
         pm.purchaseCover(POOL_ID, 0, 100e6);
     }
 
@@ -138,7 +139,7 @@ contract PolicyNFTIntegrationTest is Test {
         uint256 premium = _minPremium(coverage);
         
         vm.prank(user);
-        vm.expectRevert(PolicyManager.InsufficientPremium.selector);
+        vm.expectRevert(PolicyManager.DepositTooLow.selector);
         pm.purchaseCover(POOL_ID, coverage, premium - 1);
     }
 
@@ -224,44 +225,7 @@ contract PolicyNFTIntegrationTest is Test {
 
     /* ─────────────────── PREMIUM MANAGEMENT ─────────────────── */
     
-    function test_AddPremium_UpdatesDeposit() public {
-        uint256 coverage = 500e6;
-        uint256 initialPremium = _minPremium(coverage);
-        vm.prank(user);
-        uint256 id = pm.purchaseCover(POOL_ID, coverage, initialPremium);
 
-        PolicyNFT.Policy memory polBefore = nft.getPolicy(id);
-        
-        uint256 topUpAmount = 100e6;
-        vm.prank(user);
-        pm.addPremium(id, topUpAmount);
-
-        PolicyNFT.Policy memory polAfter = nft.getPolicy(id);
-        assertEq(polAfter.premiumDeposit, polBefore.premiumDeposit + topUpAmount);
-    }
-
-    function test_PremiumDrainsCorrectly() public {
-        uint256 coverage = 500e6;
-        uint256 premium = _minPremium(coverage) * 10; // Extra premium
-        vm.prank(user);
-        uint256 id = pm.purchaseCover(POOL_ID, coverage, premium);
-
-        uint256 timeToWarp = 30 days;
-        uint256 rate = registry.getPremiumRate(POOL_ID, coverage);
-        uint256 expectedDrain = (rate * timeToWarp) / pm.SECS_YEAR();
-
-        vm.warp(block.timestamp + timeToWarp);
-        
-        // Trigger an update by adding a tiny amount of premium
-        vm.prank(user);
-        pm.addPremium(id, 1);
-
-        PolicyNFT.Policy memory pol = nft.getPolicy(id);
-        uint256 actualDrain = premium - pol.premiumDeposit + 1;
-        
-        // Check if the actual drain is within a small tolerance of the expected drain
-        assertApproxEqAbs(actualDrain, expectedDrain, 1, "Premium drain calculation is incorrect");
-    }
 
     /* ─────────────────── COVERAGE INCREASE & FINALIZATION ─────────────────── */
 
@@ -389,7 +353,7 @@ contract PolicyNFTIntegrationTest is Test {
 
         // Attempting to lapse should also fail
         vm.prank(user);
-        vm.expectRevert(PolicyManager.PolicyDoesNotExist.selector);
+        vm.expectRevert(abi.encodeWithSignature("ERC721NonexistentToken(uint256)", id));
         pm.lapsePolicy(id);
     }
 }

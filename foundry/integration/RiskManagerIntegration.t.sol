@@ -17,6 +17,7 @@ import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol";
 
 contract RiskManagerIntegration is Test {
     MockERC20 usdc;
@@ -37,7 +38,7 @@ contract RiskManagerIntegration is Test {
     address underwriter = address(0xFACE);
     address claimant = address(0xCA11);
 
-    uint8 constant PLATFORM = 1; // CapitalPool.YieldPlatform.AAVE
+    uint8 constant PLATFORM = 1; // YieldPlatform.AAVE
     uint256 constant POOL_ID = 0;
     uint256 constant PLEDGE_AMOUNT = 10_000e6;
     uint256 constant LOSS_AMOUNT = 1_000e6;
@@ -53,7 +54,7 @@ contract RiskManagerIntegration is Test {
         registry = new PoolRegistry(owner, address(rm));
         capitalPool = new CapitalPool(owner, address(usdc));
         capitalPool.setRiskManager(address(rm));
-        capitalPool.setBaseYieldAdapter(CapitalPool.YieldPlatform(PLATFORM), address(adapter));
+        capitalPool.setBaseYieldAdapter(YieldPlatform(PLATFORM), address(adapter));
         adapter.setDepositor(address(capitalPool));
 
         catShare = new CatShare();
@@ -87,7 +88,7 @@ contract RiskManagerIntegration is Test {
 
         vm.startPrank(underwriter);
         usdc.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(PLEDGE_AMOUNT, CapitalPool.YieldPlatform(PLATFORM));
+        capitalPool.deposit(PLEDGE_AMOUNT, YieldPlatform(PLATFORM));
         uint256[] memory pools = new uint256[](1);
         pools[0] = POOL_ID;
         um.allocateCapital(pools);
