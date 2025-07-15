@@ -31,6 +31,7 @@ contracts/               Solidity sources
 │  └─ Staking.sol
 ├─ utils/                Misc utilities
 │  ├─ ContractRegistry.sol
+│  ├─ DeploymentRegistry.sol
 │  ├─ MulticallReader.sol
 │  ├─ LossDistributor.sol
 │  └─ RewardDistributor.sol
@@ -122,6 +123,7 @@ The default network configuration uses Hardhat's in‑memory chain.  Modify `har
 - **PoolRegistry** – Stores pool parameters, rate models and active adapters for each risk pool.
 - **BackstopPool** – Collects a share of premiums and provides additional liquidity during large claims. Calling `setRewardDistributor` now configures the distributor's cat pool automatically so users can claim protocol asset rewards without extra setup.
 - **Governance (Committee & Staking)** – Simple on‑chain governance used for pausing pools and slashing misbehaving stakers.
+- **DeploymentRegistry** – Records the addresses of all protocol components for each deployment.
 
 ## Running a Local Node
 
