@@ -141,51 +141,130 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         emit BaseYieldAdapterSet(_platform, _adapterAddress);
     }
 
-    /* ───────────────── Underwriter Deposit & Withdrawal ────────────────── */
-    function deposit(uint256 _amount, YieldPlatform _yieldChoice) external nonReentrant {
-        if (_amount == 0) revert InvalidAmount();
-        if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
-        UnderwriterAccount storage account = underwriterAccounts[msg.sender];
-        IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
-        if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
-        if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
-            revert("CP: Cannot change yield platform; withdraw first.");
-        }
-        
-        uint256 sharesToMint;
-        // CORRECTED: Use effective shares (total - locked) for consistent calculations.
-        uint256 effectiveShares = totalMasterSharesSystem - INITIAL_SHARES_LOCKED;
-        if (totalSystemValue == 0 || effectiveShares == 0) {
-            sharesToMint = _amount;
-        } else {
-            sharesToMint = Math.mulDiv(_amount, effectiveShares, totalSystemValue);
-        }
-        if (sharesToMint == 0) revert NoSharesToMint();
-        
-        if (account.masterShares == 0) {
-            account.yieldChoice = _yieldChoice;
-            account.yieldAdapter = chosenAdapter;
-        }
-        
-        account.totalDepositedAssetPrincipal += _amount;
-        account.masterShares += sharesToMint;
-        totalMasterSharesSystem += sharesToMint;
-        totalSystemValue += _amount;
+    /* ───────────────── Underwriter Deposit & Withdrawal ────────────────── */    
+    
 
-        underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
-        underlyingAsset.forceApprove(address(chosenAdapter), _amount);
-        chosenAdapter.deposit(_amount);
+/**
+ * @notice The main entry point for an underwriter to deposit capital.
+ * @dev This function orchestrates the deposit process by calling internal helpers for
+ * validation, share calculation, state updates, and external interactions.
+ * It follows the Checks-Effects-Interactions pattern.
+ * @param _amount The amount of the underlying asset to deposit.
+ * @param _yieldChoice The target yield platform for the deposited capital.
+ */
+function deposit(uint256 _amount, YieldPlatform _yieldChoice) external nonReentrant {
+    // State needed by helpers
+    UnderwriterAccount storage account = underwriterAccounts[msg.sender];
+    IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
 
-        principalInAdapter[address(chosenAdapter)] += _amount;
-        
-        if (address(rewardDistributor) != address(0)) {
-            rewardDistributor.updateUserState(msg.sender, 0, address(underlyingAsset), account.masterShares);
-        }
-        
-        (bool success,) = riskManager.call(abi.encodeWithSignature("onCapitalDeposited(address,uint256)", msg.sender, _amount));
-        require(success, "CP: Failed to notify RiskManager of deposit");
-        emit Deposit(msg.sender, _amount, sharesToMint, _yieldChoice);
+    // 1. Checks: Validate all preconditions for the deposit.
+    _validateDeposit(account, _amount, _yieldChoice, chosenAdapter);
+
+    // 2. Calculations: Determine the number of shares to mint for the deposit.
+    uint256 sharesToMint = _calculateSharesToMint(_amount);
+
+    // 3. Effects: Update all relevant contract state variables.
+    _updateStateOnDeposit(account, _amount, sharesToMint, _yieldChoice, chosenAdapter);
+
+    // 4. Interactions: Execute external calls to other contracts.
+    _executeDepositAndHooks(msg.sender, _amount, sharesToMint, chosenAdapter);
+
+    // 5. Emit Event
+    emit Deposit(msg.sender, _amount, sharesToMint, _yieldChoice);
+}
+
+
+/**
+ * @dev Validates all inputs and state conditions before proceeding with a deposit.
+ */
+function _validateDeposit(
+    UnderwriterAccount storage account,
+    uint256 _amount,
+    YieldPlatform _yieldChoice,
+    IYieldAdapter chosenAdapter
+) internal view {
+    if (_amount == 0) revert InvalidAmount();
+    if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
+    if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
+
+    // Prevent user from depositing into a new yield platform before withdrawing from the old one.
+    if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
+        revert("CP: Cannot change yield platform; withdraw first.");
     }
+}
+
+/**
+ * @dev Calculates the number of master shares to mint for a given deposit amount.
+ */
+    function _calculateSharesToMint(uint256 _amount) internal view returns (uint256) {
+        // Subtract the locked shares to get the active supply
+        uint256 effectiveShares = totalMasterSharesSystem - INITIAL_SHARES_LOCKED;
+
+        // First depositor or empty pool mints 1:1
+        if (totalSystemValue == 0 || effectiveShares == 0) {
+            return _amount;
+        }
+
+        // Compute the ceiling of current NAV per share
+        uint256 pricePerShare = Math.ceilDiv(totalSystemValue, effectiveShares);
+        // Require deposit to exceed cost of one share
+        if (_amount <= pricePerShare) {
+            revert NoSharesToMint();
+        }
+
+        // Mint floor(_amount * activeShares / totalSystemValue)
+        return Math.mulDiv(_amount, effectiveShares, totalSystemValue);
+    }
+
+
+/**
+ * @dev Updates all system and user state variables related to the deposit.
+ */
+function _updateStateOnDeposit(
+    UnderwriterAccount storage account,
+    uint256 _amount,
+    uint256 _sharesToMint,
+    YieldPlatform _yieldChoice,
+    IYieldAdapter _chosenAdapter
+) internal {
+    // Set the user's yield choice on their first deposit.
+    if (account.masterShares == 0) {
+        account.yieldChoice  = _yieldChoice;
+        account.yieldAdapter = _chosenAdapter;
+    }
+
+    account.totalDepositedAssetPrincipal += _amount;
+    account.masterShares                 += _sharesToMint;
+    totalMasterSharesSystem             += _sharesToMint;
+    totalSystemValue                    += _amount;
+
+    principalInAdapter[address(_chosenAdapter)] += _amount;
+}
+
+/**
+ * @dev Executes all external calls: token transfers, adapter deposits, and hooks.
+ */
+function _executeDepositAndHooks(
+    address _depositor,
+    uint256 _amount,
+    uint256 _sharesToMint,
+    IYieldAdapter _chosenAdapter
+) internal {
+    // Core interaction with the yield adapter
+    underlyingAsset.safeTransferFrom(_depositor, address(this), _amount);
+    underlyingAsset.forceApprove(address(_chosenAdapter), _amount);
+    _chosenAdapter.deposit(_amount);
+
+    // Post-deposit hooks for other system components
+    if (address(rewardDistributor) != address(0)) {
+        rewardDistributor.updateUserState(_depositor, 0, address(underlyingAsset), _sharesToMint);
+    }
+
+    (bool success,) = riskManager.call(
+        abi.encodeWithSignature("onCapitalDeposited(address,uint256)", _depositor, _amount)
+    );
+    require(success, "CP: Failed to notify RiskManager of deposit");
+}
 
     function requestWithdrawal(uint256 _sharesToBurn) external nonReentrant {
         if (_sharesToBurn == 0) revert InvalidAmount();

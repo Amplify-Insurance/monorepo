@@ -58,33 +58,27 @@ contract MockRewardDistributor is IRewardDistributor {
         override
         returns (uint256)
     {
-        // Update test trackers
         lastClaimUser = user;
         lastClaimPoolId = poolId;
         lastClaimToken = rewardToken;
         lastClaimPledge = userPledge;
         claimCallCount++;
 
-        // Perform the actual claim logic
         uint256 reward = pendingRewards(user, poolId, rewardToken, userPledge);
         if (reward > 0) {
             rewardDebt[user][poolId][rewardToken] = (userPledge * accumulatedRewardsPerShare[poolId][rewardToken]) / PRECISION_FACTOR;
-            // In a real test, ensure this mock contract holds tokens to transfer.
-            // For simplicity, we don't do the transfer here, just return the value.
+            // CORRECTED: The mock must perform the transfer to satisfy the test assertions.
+            IERC20(rewardToken).safeTransfer(user, reward);
         }
         return reward;
     }
 
-    /**
-     * @notice CORRECTED: Added the missing implementation for claimForCatPool.
-     */
     function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge)
         external
         override
         returns (uint256)
     {
         // This mock can share logic with the regular claim function.
-        // In a real test, you'd fund this contract with tokens to test the transfer.
         return this.claim(user, poolId, rewardToken, userPledge);
     }
 
@@ -107,7 +101,7 @@ contract MockRewardDistributor is IRewardDistributor {
     {
         uint256 accumulated = (userPledge * accumulatedRewardsPerShare[poolId][rewardToken]) / PRECISION_FACTOR;
         if (accumulated < rewardDebt[user][poolId][rewardToken]) {
-            return 0; // Should not happen with positive rewards, but a safeguard.
+            return 0;
         }
         return accumulated - rewardDebt[user][poolId][rewardToken];
     }
