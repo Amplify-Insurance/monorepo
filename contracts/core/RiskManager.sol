@@ -1,360 +1,292 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-// --- Contract Under Test ---
-import {RiskManager} from "contracts/core/RiskManager.sol";
+import {IPolicyNFT} from "../interfaces/IPolicyNFT.sol";
+import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
+import {ICapitalPool} from "../interfaces/ICapitalPool.sol";
+import {IBackstopPool} from "../interfaces/IBackstopPool.sol";
+import {ILossDistributor} from "../interfaces/ILossDistributor.sol";
+import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
+import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
+import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
 
-// --- Interfaces (as defined in the contract file) ---
-import {ICapitalPool} from "contracts/interfaces/ICapitalPool.sol";
-import {IPolicyNFT} from "contracts/interfaces/IPolicyNFT.sol";
-import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
-import {IBackstopPool} from "contracts/interfaces/IBackstopPool.sol";
-import {ILossDistributor} from "contracts/interfaces/ILossDistributor.sol";
-import {IRewardDistributor} from "contracts/interfaces/IRewardDistributor.sol";
-import {IUnderwriterManager} from "contracts/interfaces/IUnderwriterManager.sol";
-import {IPolicyManager} from "contracts/interfaces/IPolicyManager.sol";
+/**
+ * @title RiskManager
+ * @notice Orchestrates claim processing and liquidations for the protocol.
+ */
+contract RiskManager is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
 
-// --- Mocks ---
-import {MockERC20} from "contracts/test/MockERC20.sol";
-import {MockCapitalPool} from "contracts/test/MockCapitalPool.sol";
-import {MockPoolRegistry} from "contracts/test/MockPoolRegistry.sol";
-import {MockPolicyNFT} from "contracts/test/MockPolicyNFT.sol";
-import {MockPolicyManager} from "contracts/test/MockPolicyManager.sol";
-import {MockBackstopPool} from "contracts/test/MockBackstopPool.sol";
-import {MockLossDistributor} from "contracts/test/MockLossDistributor.sol";
-import {MockRewardDistributor} from "contracts/test/MockRewardDistributor.sol";
-import {MockUnderwriterManager} from "contracts/test/MockUnderwriterManager.sol";
+    // --- State Variables ---
 
-/// @title RiskManager Unit Tests
-/// @notice This suite uses mock contracts to test the logic of RiskManager in isolation.
-contract RiskManagerTest is Test {
-    // --- Contract and Mocks ---
-    RiskManager rm;
-    MockCapitalPool cp;
-    MockPoolRegistry pr;
-    MockPolicyNFT nft;
-    MockPolicyManager pm;
-    MockBackstopPool cat;
-    MockLossDistributor ld;
-    MockRewardDistributor rd;
-    MockUnderwriterManager um;
-    MockERC20 usdc;
-    MockERC20 protocolToken;
+    ICapitalPool public capitalPool;
+    IPoolRegistry public poolRegistry;
+    IPolicyNFT public policyNFT;
+    IBackstopPool public catPool;
+    ILossDistributor public lossDistributor;
+    IRewardDistributor public rewardDistributor;
+    IUnderwriterManager public underwriterManager;
+    address public policyManager;
+    address public committee;
 
-    // --- Actors ---
-    address owner = address(this);
-    address committee = address(0xBEEF);
-    address underwriter = address(0xFACE);
-    address claimant = address(0xC1A1);
-    address liquidator = address(0xDEAD);
-    address otherUser = address(0xBAD);
+    uint256 public constant CLAIM_FEE_BPS = 500; // 5%
+    uint256 public constant BPS = 10_000;
+
+    // --- Structs ---
+
+    struct ClaimData {
+        IPolicyNFT.Policy policy;
+        address claimant;
+        uint256 totalCapitalPledged;
+        IERC20 protocolToken;
+        uint256 poolClaimFeeBps;
+        address[] adapters;
+        uint256[] capitalPerAdapter;
+        uint256 totalCoverageSold;
+    }
 
     // --- Events ---
+
+    event AddressesSet(
+        address capital,
+        address registry,
+        address policyMgr,
+        address cat,
+        address loss,
+        address rewards,
+        address underwriterMgr
+    );
+    event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
 
-    function setUp() public {
-        // --- Deploy Mocks ---
-        usdc = new MockERC20("USD Coin", "USDC", 6);
-        protocolToken = new MockERC20("Protocol Token", "PT", 18);
-        cp = new MockCapitalPool(owner, address(usdc));
-        pr = new MockPoolRegistry();
-        nft = new MockPolicyNFT(owner);
-        pm = new MockPolicyManager();
-        cat = new MockBackstopPool(owner);
-        ld = new MockLossDistributor();
-        rd = new MockRewardDistributor();
-        um = new MockUnderwriterManager();
+    // --- Errors ---
 
-        // --- Deploy Contract Under Test ---
-        rm = new RiskManager(owner);
+    error NotPolicyManager();
+    error UnderwriterNotInsolvent();
+    error ZeroAddressNotAllowed();
+    error OnlyPolicyOwner();
 
-        // --- Link Mocks and Set Initial State ---
-        pm.setPolicyNFT(address(nft));
-        rm.setAddresses(address(cp), address(pr), address(pm), address(cat), address(ld), address(rd), address(um));
-        rm.setCommittee(committee);
+    // --- Constructor ---
+
+    constructor(address _initialOwner) Ownable(_initialOwner) {}
+
+    // --- Owner Functions ---
+
+    /**
+     * @notice Set core contract addresses. Owner only.
+     */
+    function setAddresses(
+        address _capital,
+        address _registry,
+        address _policyManager,
+        address _cat,
+        address _loss,
+        address _rewards,
+        address _underwriterManager
+    ) external onlyOwner {
+        if (
+            _capital == address(0) ||
+            _registry == address(0) ||
+            _policyManager == address(0) ||
+            _cat == address(0) ||
+            _loss == address(0) ||
+            _rewards == address(0) ||
+            _underwriterManager == address(0)
+        ) revert ZeroAddressNotAllowed();
+
+        capitalPool = ICapitalPool(_capital);
+        poolRegistry = IPoolRegistry(_registry);
+        policyManager = _policyManager;
+        policyNFT = IPolicyManager(_policyManager).policyNFT();
+        catPool = IBackstopPool(_cat);
+        lossDistributor = ILossDistributor(_loss);
+        rewardDistributor = IRewardDistributor(_rewards);
+        underwriterManager = IUnderwriterManager(_underwriterManager);
+
+        emit AddressesSet(_capital, _registry, _policyManager, _cat, _loss, _rewards, _underwriterManager);
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:*/
-    /* PROCESS CLAIM TESTS                               */
-    /*.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.*/
-
-    function test_processClaim_succeeds() public {
-        // --- Arrange ---
-        uint256 poolId = 0;
-        uint256 policyId = 1;
-        uint256 coverage = 50_000e6;
-        uint256 totalPledge = 100_000e6;
-
-        // 1. Set up the policy in the NFT mock
-        nft.setPolicy(policyId, poolId, coverage, block.timestamp - 1 days);
-        nft.setOwnerOf(policyId, claimant);
-
-        // 2. Set up pool data in the registry mock
-        address[] memory adapters = new address[](1);
-        adapters[0] = address(0xA1);
-        uint256[] memory capitalPerAdapter = new uint256[](1);
-        capitalPerAdapter[0] = totalPledge;
-        pr.setPoolPayoutData(poolId, adapters, capitalPerAdapter, totalPledge);
-        pr.setPoolData(poolId, protocolToken, totalPledge, 0, 0, false, committee, rm.CLAIM_FEE_BPS());
-
-        // 3. Mint tokens to claimant and approve RiskManager for premium
-        uint256 protocolCoverage = coverage * 1e12; // Scale to 18 decimals
-        protocolToken.mint(claimant, protocolCoverage);
-        vm.prank(claimant);
-        protocolToken.approve(address(rm), protocolCoverage);
-
-        // --- Act ---
-        vm.prank(claimant);
-        rm.processClaim(policyId);
-
-        // --- Assert ---
-        // 1. Premium Distribution
-        assertEq(rd.distributeCallCount(), 1);
-        assertEq(rd.last_distribute_poolId(), poolId);
-        assertEq(rd.last_distribute_protocolToken(), address(protocolToken));
-        assertEq(rd.last_distribute_amount(), protocolCoverage);
-
-        // 2. Loss Distribution
-        assertEq(ld.distributeLossCallCount(), 1);
-        assertEq(ld.last_distributeLoss_poolId(), poolId);
-        assertEq(ld.last_distributeLoss_lossAmount(), coverage);
-
-        // 3. Capital Pool Payout
-        assertEq(cp.executePayoutCallCount(), 1);
-        ICapitalPool.PayoutData memory payoutData = cp.last_executePayout_payoutData();
-        uint256 expectedFee = (coverage * rm.CLAIM_FEE_BPS()) / rm.BPS();
-        assertEq(payoutData.claimant, claimant);
-        assertEq(payoutData.claimantAmount, coverage - expectedFee);
-        assertEq(payoutData.feeRecipient, committee);
-        assertEq(payoutData.feeAmount, expectedFee);
-
-        // 4. PoolRegistry state updates
-        (uint256 lastUpdatePoolId,, uint256 lastUpdateAmount, bool lastIsAllocation) =
-            pr.get_last_updateCapitalAllocation();
-        assertEq(lastUpdatePoolId, poolId);
-        assertEq(lastUpdateAmount, coverage);
-        assertFalse(lastIsAllocation);
-
-        // 5. NFT Burn
-        assertEq(nft.burnCallCount(), 1);
-        assertEq(nft.lastBurnedTokenId(), policyId);
+    /**
+     * @notice Update the committee address. Owner only.
+     */
+    function setCommittee(address _newCommittee) external onlyOwner {
+        if (_newCommittee == address(0)) revert ZeroAddressNotAllowed();
+        committee = _newCommittee;
+        emit CommitteeSet(_newCommittee);
     }
 
-    function test_processClaim_withShortfall() public {
-        // --- Arrange ---
-        uint256 poolId = 0;
-        uint256 policyId = 1;
-        uint256 totalPledgeInPool = 50_000e6;
-        uint256 coverageAmount = 80_000e6;
-        uint256 expectedShortfall = coverageAmount - totalPledgeInPool;
+    // --- Public Functions ---
 
-        nft.setPolicy(policyId, poolId, coverageAmount, block.timestamp - 1 days);
-        nft.setOwnerOf(policyId, claimant);
-        pr.setPoolPayoutData(poolId, new address[](0), new uint256[](0), totalPledgeInPool);
-        pr.setPoolData(poolId, protocolToken, totalPledgeInPool, 0, 0, false, committee, rm.CLAIM_FEE_BPS());
-        uint256 protocolCoverageAmount = coverageAmount * 1e12;
-        protocolToken.mint(claimant, protocolCoverageAmount);
-        vm.prank(claimant);
-        protocolToken.approve(address(rm), protocolCoverageAmount);
-
-        // --- Act ---
-        vm.prank(claimant);
-        rm.processClaim(policyId);
-
-        // --- Assert ---
-        assertEq(cat.drawFundCallCount(), 1, "BackstopPool.drawFund should be called");
-        assertEq(cat.last_drawFund_amount(), expectedShortfall, "Incorrect shortfall amount drawn");
+    /**
+     * @notice Liquidate an underwriter if their pending losses exceed their capital.
+     */
+    function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
+        _checkInsolvency(_underwriter);
+        underwriterManager.realizeLossesForAllPools(_underwriter);
+        emit UnderwriterLiquidated(msg.sender, _underwriter);
     }
 
-    function test_processClaim_withZeroFee() public {
-        uint256 poolId = 0;
-        uint256 policyId = 1;
-        uint256 coverage = 50_000e6;
-        uint256 totalPledge = 100_000e6;
+    /**
+     * @notice Process a claim: distribute premium, allocate losses, payout claimant, update state, burn policy.
+     */
+    function processClaim(uint256 policyId) external nonReentrant {
+        ClaimData memory data = _prepareClaimData(policyId);
+        if (msg.sender != data.claimant) revert OnlyPolicyOwner();
 
-        nft.setPolicy(policyId, poolId, coverage, block.timestamp - 1 days);
-        nft.setOwnerOf(policyId, claimant);
-        pr.setPoolPayoutData(poolId, new address[](0), new uint256[](0), totalPledge);
-        // Set claim fee to 0
-        pr.setPoolData(poolId, protocolToken, totalPledge, 0, 0, false, committee, 0);
+        _distributePremium(data);
+        uint256 lossBorneByPool = _distributeLosses(data);
+        _executePayout(data);
+        _updatePoolState(data, lossBorneByPool);
 
-        uint256 protocolCoverage = coverage * 1e12;
-        protocolToken.mint(claimant, protocolCoverage);
-        vm.prank(claimant);
-        protocolToken.approve(address(rm), protocolCoverage);
-
-        vm.prank(claimant);
-        rm.processClaim(policyId);
-
-        ICapitalPool.PayoutData memory payoutData = cp.last_executePayout_payoutData();
-        assertEq(payoutData.claimantAmount, coverage, "Claimant amount should equal full coverage with zero fee");
-        assertEq(payoutData.feeAmount, 0, "Fee amount should be zero");
+        policyNFT.burn(policyId);
     }
 
-    function test_processClaim_withMultipleAdapters() public {
-        uint256 poolId = 0;
-        uint256 policyId = 1;
-        uint256 coverage = 50_000e6;
-        uint256 totalPledge = 100_000e6;
-
-        nft.setPolicy(policyId, poolId, coverage, block.timestamp - 1 days);
-        nft.setOwnerOf(policyId, claimant);
-
-        // Set up payout data with two adapters
-        address[] memory adapters = new address[](2);
-        adapters[0] = address(0xA1);
-        adapters[1] = address(0xA2);
-        uint256[] memory capitalPerAdapter = new uint256[](2);
-        capitalPerAdapter[0] = 60_000e6; // 60%
-        capitalPerAdapter[1] = 40_000e6; // 40%
-        pr.setPoolPayoutData(poolId, adapters, capitalPerAdapter, totalPledge);
-        pr.setPoolData(poolId, protocolToken, totalPledge, 0, 0, false, committee, rm.CLAIM_FEE_BPS());
-
-        uint256 protocolCoverage = coverage * 1e12;
-        protocolToken.mint(claimant, protocolCoverage);
-        vm.prank(claimant);
-        protocolToken.approve(address(rm), protocolCoverage);
-
-        vm.prank(claimant);
-        rm.processClaim(policyId);
-
-        // Assert that the payout data passed to the capital pool is correct
-        ICapitalPool.PayoutData memory payoutData = cp.last_executePayout_payoutData();
-        assertEq(payoutData.adapters.length, 2);
-        assertEq(payoutData.capitalPerAdapter.length, 2);
-        assertEq(payoutData.capitalPerAdapter[0], 60_000e6);
-        assertEq(payoutData.capitalPerAdapter[1], 40_000e6);
+    /**
+     * @notice Update coverage sold; only callable by PolicyManager.
+     */
+    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external {
+        if (msg.sender != policyManager) revert NotPolicyManager();
+        poolRegistry.updateCoverageSold(poolId, amount, isSale);
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:*/
-    /* LIQUIDATION TESTS                                 */
-    /*.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.*/
+    // --- Internal Functions ---
 
-    function test_liquidateInsolventUnderwriter_succeeds() public {
-        // --- Arrange ---
-        uint256[] memory allocs = new uint256[](1);
-        allocs[0] = 0;
-        um.setUnderwriterAllocations(underwriter, allocs);
-        cp.setUnderwriterAccount(underwriter, 0, 10_000e6, 0, 0); // 10k shares
-        cp.setSharesToValue(10_000e6, 10_000e6); // 1-to-1 value
-        ld.setPendingLosses(underwriter, 0, 0, 15_000e6); // Pending losses > share value
+    /**
+     * @dev Distributes premium to the reward distributor if applicable.
+     */
+    function _distributePremium(ClaimData memory _data) internal {
+        if (_data.policy.coverage == 0 || address(_data.protocolToken) == address(0)) return;
 
-        // --- Act ---
-        vm.expectEmit(true, true, false, false);
-        emit UnderwriterLiquidated(liquidator, underwriter);
-        vm.prank(liquidator);
-        rm.liquidateInsolventUnderwriter(underwriter);
+        uint8 protocolDecimals = IERC20Metadata(address(_data.protocolToken)).decimals();
+        uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
+        uint256 protocolCoverage = _scaleAmount(_data.policy.coverage, underlyingDecimals, protocolDecimals);
 
-        // --- Assert ---
-        assertEq(um.realizeLossesForAllPoolsCallCount(), 1);
-        assertEq(um.last_realizeLossesForAllPools_user(), underwriter);
+        _data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
+        rewardDistributor.distribute(
+            _data.policy.poolId,
+            address(_data.protocolToken),
+            protocolCoverage,
+            _data.totalCapitalPledged
+        );
     }
 
-    function test_liquidateInsolventUnderwriter_ifNoAllocations() public {
-        // Underwriter has shares but no allocations in UnderwriterManager
-        um.setUnderwriterAllocations(underwriter, new uint256[](0));
-        cp.setUnderwriterAccount(underwriter, 0, 10_000e6, 0, 0);
-        cp.setSharesToValue(10_000e6, 10_000e6);
-        ld.setPendingLosses(underwriter, 0, 0, 0); // Total pending losses will be 0
+    /**
+     * @dev Distributes losses to LPs and draws from the backstop pool if there's a shortfall.
+     */
+    function _distributeLosses(ClaimData memory _data) internal returns (uint256) {
+        uint256 coverage = _data.policy.coverage;
+        uint256 totalCapital = _data.totalCapitalPledged;
 
-        // Liquidation should fail because totalPendingLosses (0) < totalShareValue (10k)
-        vm.prank(liquidator);
-        vm.expectRevert(RiskManager.UnderwriterNotInsolvent.selector);
-        rm.liquidateInsolventUnderwriter(underwriter);
+        lossDistributor.distributeLoss(_data.policy.poolId, coverage, totalCapital);
+
+        uint256 lossBorneByPool = Math.min(coverage, totalCapital);
+        uint256 shortfall = coverage > lossBorneByPool ? coverage - lossBorneByPool : 0;
+        if (shortfall > 0) {
+            catPool.drawFund(shortfall);
+        }
+        return lossBorneByPool;
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:*/
-    /* HOOKS AND PERMISSIONS TESTS                       */
-    /*.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.•°:°.´+˚.*°.˚:*.´•°.*/
+    /**
+     * @dev Executes the claim payout to the claimant and sends the fee to the committee.
+     */
+    function _executePayout(ClaimData memory _data) internal {
+        uint256 claimFee = (_data.policy.coverage * _data.poolClaimFeeBps) / BPS;
+        uint256 payoutAmount = _data.policy.coverage > claimFee ? _data.policy.coverage - claimFee : 0;
 
-    function test_hook_updateCoverageSold_succeeds() public {
-        uint256 poolId = 0;
-        uint256 amount = 1000;
-
-        vm.prank(address(pm)); // Must be called by PolicyManager
-        rm.updateCoverageSold(poolId, amount, true);
-
-        assertEq(pr.updateCoverageSoldCallCount(), 1);
-        assertEq(pr.last_updateCoverageSold_poolId(), poolId);
-        assertEq(pr.last_updateCoverageSold_amount(), amount);
-        assertTrue(pr.last_updateCoverageSold_isSale());
+        ICapitalPool.PayoutData memory payoutData = ICapitalPool.PayoutData({
+            claimant: _data.claimant,
+            claimantAmount: payoutAmount,
+            feeRecipient: committee,
+            feeAmount: claimFee,
+            adapters: _data.adapters,
+            capitalPerAdapter: _data.capitalPerAdapter,
+            totalCapitalFromPoolLPs: _data.totalCapitalPledged
+        });
+        capitalPool.executePayout(payoutData);
     }
 
-    function testRevert_permissions() public {
-        // --- Owner Functions ---
-        vm.prank(otherUser);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, otherUser));
-        rm.setAddresses(address(cp), address(pr), address(pm), address(cat), address(ld), address(rd), address(um));
-
-        vm.prank(otherUser);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, otherUser));
-        rm.setCommittee(committee);
-
-        // --- PolicyManager-Only Function ---
-        vm.prank(otherUser);
-        vm.expectRevert(RiskManager.NotPolicyManager.selector);
-        rm.updateCoverageSold(0, 100, true);
+    /**
+     * @dev Updates the pool's capital allocation and total coverage sold after a claim.
+     */
+    function _updatePoolState(ClaimData memory _data, uint256 lossBorneByPool) internal {
+        if (lossBorneByPool > 0 && _data.totalCapitalPledged > 0) {
+            for (uint256 i = 0; i < _data.adapters.length; i++) {
+                uint256 adapterLoss = Math.mulDiv(
+                    lossBorneByPool,
+                    _data.capitalPerAdapter[i],
+                    _data.totalCapitalPledged
+                );
+                if (adapterLoss > 0) {
+                    poolRegistry.updateCapitalAllocation(_data.policy.poolId, _data.adapters[i], adapterLoss, false);
+                }
+            }
+        }
+        // Only reduce coverage sold if there is existing coverage to deduct
+        uint256 reduction = Math.min(_data.policy.coverage, _data.totalCoverageSold);
+        if (reduction > 0) {
+            poolRegistry.updateCoverageSold(_data.policy.poolId, reduction, false);
+        }
     }
 
-    function testRevert_setAddresses_ifZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(RiskManager.ZeroAddressNotAllowed.selector);
-        rm.setAddresses(address(0), address(pr), address(pm), address(cat), address(ld), address(rd), address(um));
-
-        vm.prank(owner);
-        vm.expectRevert(RiskManager.ZeroAddressNotAllowed.selector);
-        rm.setCommittee(address(0));
+    /**
+     * @dev Gather all data needed for claim processing and enforce activation.
+     */
+    function _prepareClaimData(uint256 _policyId) internal view returns (ClaimData memory data) {
+        data.policy = policyNFT.getPolicy(_policyId);
+        require(block.timestamp >= data.policy.activation, "Policy not active");
+        data.claimant = policyNFT.ownerOf(_policyId);
+        (data.adapters, data.capitalPerAdapter, data.totalCapitalPledged) =
+            poolRegistry.getPoolPayoutData(data.policy.poolId);
+        (
+            data.protocolToken,
+            ,
+            data.totalCoverageSold,
+            ,
+            ,
+            ,
+            data.poolClaimFeeBps
+        ) = poolRegistry.getPoolData(data.policy.poolId);
     }
 
-    function testRevert_processClaim_ifNotPolicyOwner() public {
-        nft.setOwnerOf(1, claimant);
-        vm.prank(otherUser); // Not the owner
-        vm.expectRevert(RiskManager.OnlyPolicyOwner.selector);
-        rm.processClaim(1);
+    /**
+     * @dev Checks if an underwriter's pending losses exceed their total capital value.
+     */
+    function _checkInsolvency(address _underwriter) internal view {
+        (, , uint256 masterShares, , ) = capitalPool.getUnderwriterAccount(_underwriter);
+        if (masterShares == 0) revert UnderwriterNotInsolvent();
+
+        uint256 totalValue = capitalPool.sharesToValue(masterShares);
+        uint256[] memory allocs = underwriterManager.getUnderwriterAllocations(_underwriter);
+        uint256 totalPendingLosses;
+        for (uint256 i = 0; i < allocs.length; i++) {
+            uint256 pid = allocs[i];
+            uint256 pledge = underwriterManager.underwriterPoolPledge(_underwriter, pid);
+            totalPendingLosses += lossDistributor.getPendingLosses(_underwriter, pid, pledge);
+        }
+        if (totalPendingLosses <= totalValue) revert UnderwriterNotInsolvent();
     }
 
-    function testRevert_processClaim_ifPolicyNotActive() public {
-        uint256 policyId = 1;
-        nft.setPolicy(policyId, 0, 100, block.timestamp + 1 days); // Activation is in the future
-        nft.setOwnerOf(policyId, claimant);
-
-        vm.prank(claimant);
-        vm.expectRevert(bytes("Policy not active"));
-        rm.processClaim(policyId);
-    }
-
-    function testRevert_processClaim_ifInsufficientPremium() public {
-        uint256 policyId = 1;
-        uint256 coverage = 50_000e6;
-        nft.setPolicy(policyId, 0, coverage, block.timestamp - 1 days);
-        nft.setOwnerOf(policyId, claimant);
-        pr.setPoolPayoutData(0, new address[](0), new uint256[](0), 100_000e6);
-        pr.setPoolData(0, protocolToken, 100_000e6, 0, 0, false, committee, rm.CLAIM_FEE_BPS());
-
-        // Mint less than required and approve
-        uint256 insufficientAmount = coverage * 1e12 - 1;
-        protocolToken.mint(claimant, insufficientAmount);
-        vm.prank(claimant);
-        protocolToken.approve(address(rm), insufficientAmount);
-
-        vm.prank(claimant);
-        vm.expectRevert(); // Expects a generic ERC20 "insufficient balance" or "insufficient allowance"
-        rm.processClaim(policyId);
-    }
-
-    function testRevert_liquidateInsolventUnderwriter_ifSolvent() public {
-        // --- Arrange ---
-        // Share value is GREATER than pending losses
-        cp.setUnderwriterAccount(underwriter, 0, 10_000e6, 0, 0);
-        cp.setSharesToValue(10_000e6, 10_000e6);
-        ld.setPendingLosses(underwriter, 0, 0, 5_000e6);
-
-        // --- Act & Assert ---
-        vm.prank(liquidator);
-        vm.expectRevert(RiskManager.UnderwriterNotInsolvent.selector);
-        rm.liquidateInsolventUnderwriter(underwriter);
+    /**
+     * @dev Scales an amount between different decimal precisions.
+     */
+    function _scaleAmount(
+        uint256 amount,
+        uint8 fromDecimals,
+        uint8 toDecimals
+    ) internal pure returns (uint256) {
+        if (toDecimals > fromDecimals) {
+            return amount * (10**(toDecimals - fromDecimals));
+        } else if (toDecimals < fromDecimals) {
+            return amount / (10**(fromDecimals - toDecimals));
+        }
+        return amount;
     }
 }

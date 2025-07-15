@@ -1,13 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+// NEW: Import the IBackstopPool interface
+import "../interfaces/IBackstopPool.sol";
+
 contract MockRiskManager {
     bool public shouldReject;
+
+    // --- State variable to hold the address ---
+    address public catPoolAddress;
 
     event CapitalDeposited(address indexed underwriter, uint256 amount);
     event WithdrawalRequested(address indexed underwriter, uint256 principal);
     event CapitalWithdrawn(address indexed underwriter, uint256 principal, bool isFullWithdrawal);
+    event WithdrawalCancelled(address indexed underwriter, uint256 valueCancelled);
 
+
+    /**
+    * @notice Mock function to set the address of the Backstop Pool.
+    */
+    function setCatPool(address _catPoolAddress) external {
+        catPoolAddress = _catPoolAddress;
+    }
+
+    /**
+    * @notice Mock view function to return the configured Backstop Pool address.
+    * @dev This mimics the function on the real IRiskManagerWithBackstop interface.
+    */
+    function catPool() external view returns (IBackstopPool) {
+        return IBackstopPool(catPoolAddress);
+    }
+    
     function setShouldReject(bool _reject) external {
         shouldReject = _reject;
     }
@@ -27,8 +50,7 @@ contract MockRiskManager {
         emit CapitalWithdrawn(_underwriter, _principal, _isFullWithdrawal);
     }
 
-    function onWithdrawalCancelled(address underwriter, uint256 valueCancelled) external {
-    // This function can be empty for the test to pass. Its existence is what matters.
-    // You can optionally add state variables to track calls if needed for assertions.
-}
+    function onWithdrawalCancelled(address _underwriter, uint256 _valueCancelled) external {
+        emit WithdrawalCancelled(_underwriter, _valueCancelled);
+    }
 }
