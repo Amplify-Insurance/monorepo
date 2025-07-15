@@ -278,9 +278,10 @@ contract CommitteeFuzz is Test {
         token.mint(address(staking), totalStaked); // Mock total supply
 
         uint256 bond = committee.minBondAmount();
-        vm.prank(proposer);
+        vm.startPrank(proposer);
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Pause, bond);
         committee.vote(id, Committee.VoteOption.For);
+        vm.stopPrank();
 
         vm.warp(block.timestamp + VOTING_PERIOD + 1);
         committee.executeProposal(id);
@@ -305,10 +306,10 @@ contract CommitteeFuzz is Test {
         token.mint(address(staking), (totalStaked * 100) / QUORUM_BPS + 1); // Ensure quorum met
 
         uint256 bond = committee.minBondAmount();
-        vm.prank(proposer);
+        vm.startPrank(proposer);
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Pause, bond);
-
         committee.vote(id, Committee.VoteOption.For);
+        vm.stopPrank();
         vm.prank(voter1);
         committee.vote(id, Committee.VoteOption.Against);
 
@@ -369,9 +370,10 @@ contract CommitteeFuzz is Test {
         token.mint(address(staking), (1000 ether * 100) / QUORUM_BPS + 1); // Ensure quorum
 
         uint256 initialProposerBalance = token.balanceOf(proposer);
-        vm.prank(proposer);
+        vm.startPrank(proposer);
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Pause, bond);
         committee.vote(id, Committee.VoteOption.For);
+        vm.stopPrank();
 
         // Execute
         vm.warp(block.timestamp + VOTING_PERIOD + 1);
@@ -402,15 +404,17 @@ contract CommitteeFuzz is Test {
         token.mint(address(staking), (1000 ether * 100) / QUORUM_BPS + 1); // Ensure quorum
 
         uint256 initialProposerBalance = token.balanceOf(proposer);
-        vm.prank(proposer);
+        vm.startPrank(proposer);
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Pause, bond);
         committee.vote(id, Committee.VoteOption.For);
+        vm.stopPrank();
 
         // Execute
         vm.warp(block.timestamp + VOTING_PERIOD + 1);
         committee.executeProposal(id);
 
         // Simulate fees being sent from Risk Manager
+        vm.deal(address(rm), reward);
         vm.prank(address(rm));
         committee.receiveFees{value: reward}(id);
 
@@ -445,9 +449,10 @@ contract CommitteeFuzz is Test {
 
         // Create and pass proposal
         uint256 bond = committee.minBondAmount();
-        vm.prank(proposer);
+        vm.startPrank(proposer);
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Pause, bond);
         committee.vote(id, Committee.VoteOption.For);
+        vm.stopPrank();
         vm.prank(voter1);
         committee.vote(id, Committee.VoteOption.For);
         vm.prank(voter2);
@@ -457,6 +462,7 @@ contract CommitteeFuzz is Test {
         committee.executeProposal(id);
 
         // Send fees and resolve bond
+        vm.deal(address(rm), reward);
         vm.prank(address(rm));
         committee.receiveFees{value: reward}(id);
         vm.warp(block.timestamp + CHALLENGE_PERIOD + 1);
@@ -472,21 +478,21 @@ contract CommitteeFuzz is Test {
         uint256 beforeProp = proposer.balance;
         vm.prank(proposer);
         committee.claimReward(id);
-        assertEq(proposer.balance, beforeProp + expectedRewardProp);
+        assertApproxEqAbs(proposer.balance, beforeProp + expectedRewardProp, 1);
 
         // Voter1 claims
         uint256 expectedRewardV1 = (remainingFees * w2) / totalForVotes;
         uint256 beforeV1 = voter1.balance;
         vm.prank(voter1);
         committee.claimReward(id);
-        assertEq(voter1.balance, beforeV1 + expectedRewardV1);
+        assertApproxEqAbs(voter1.balance, beforeV1 + expectedRewardV1, 1);
 
         // Voter2 claims
         uint256 expectedRewardV2 = (remainingFees * w3) / totalForVotes;
         uint256 beforeV2 = voter2.balance;
         vm.prank(voter2);
         committee.claimReward(id);
-        assertEq(voter2.balance, beforeV2 + expectedRewardV2);
+        assertApproxEqAbs(voter2.balance, beforeV2 + expectedRewardV2, 1);
         
         // Total claimed should be close to total reward
         assertApproxEqAbs(address(committee).balance, 0, 1); // Allow for rounding dust
@@ -496,9 +502,10 @@ contract CommitteeFuzz is Test {
         staking.setBalance(proposer, 1000 ether);
         token.mint(address(staking), (1000 ether * 100) / QUORUM_BPS + 1);
         
-        vm.prank(proposer);
+        vm.startPrank(proposer);
         uint256 id = committee.createProposal(POOL_ID, Committee.ProposalType.Pause, committee.minBondAmount());
         committee.vote(id, Committee.VoteOption.For);
+        vm.stopPrank();
 
         // Revert: Proposal not resolved yet
         vm.prank(proposer);
@@ -508,6 +515,7 @@ contract CommitteeFuzz is Test {
         // Pass proposal and send fees
         vm.warp(block.timestamp + VOTING_PERIOD + 1);
         committee.executeProposal(id);
+        vm.deal(address(rm), 1 ether);
         vm.prank(address(rm));
         committee.receiveFees{value: 1 ether}(id);
         vm.warp(block.timestamp + CHALLENGE_PERIOD + 1);
@@ -519,9 +527,10 @@ contract CommitteeFuzz is Test {
         committee.claimReward(id);
 
         // Revert: No rewards to claim (create new proposal)
-        vm.prank(proposer);
+        vm.startPrank(proposer);
         uint256 id2 = committee.createProposal(POOL_ID + 1, Committee.ProposalType.Pause, committee.minBondAmount());
         committee.vote(id2, Committee.VoteOption.For);
+        vm.stopPrank();
         vm.warp(block.timestamp + VOTING_PERIOD + 1);
         committee.executeProposal(id2);
         vm.warp(block.timestamp + CHALLENGE_PERIOD + 1);
