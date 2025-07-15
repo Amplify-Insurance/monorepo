@@ -94,6 +94,8 @@ contract RiskManagerComprehensiveTest is Test {
         pm.setPolicyNFT(address(nft));
         rm.setAddresses(address(cp), address(pr), address(pm), address(cat), address(ld), address(rd), address(um));
         rm.setCommittee(committee);
+
+        nft.setCoverPoolAddress(address(rm));
     }
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:*/
@@ -288,8 +290,9 @@ contract RiskManagerComprehensiveTest is Test {
         _setupPool(DEFAULT_POOL_ID, 100_000e6, 1e6, committee);
 
         // --- Act & Assert ---
-    vm.prank(claimant);
-    vm.expectRevert("Policy not active");  // ← matches the require message
+        vm.prank(claimant);
+        // FIX: Expect the custom error, not a string revert.
+        vm.expectRevert(RiskManager.PolicyNotActive.selector);
         rm.processClaim(DEFAULT_POLICY_ID);
     }
 

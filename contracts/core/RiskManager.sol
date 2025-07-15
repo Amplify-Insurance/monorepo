@@ -50,6 +50,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         address[] adapters;
         uint256[] capitalPerAdapter;
         uint256 totalCoverageSold;
+        bool isCoverPool; // FIX: Added isCoverPool flag
     }
 
     // --- Events ---
@@ -72,6 +73,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     error UnderwriterNotInsolvent();
     error ZeroAddressNotAllowed();
     error OnlyPolicyOwner();
+    error PolicyNotActive(); // FIX: Added custom error for clarity
 
     // --- Constructor ---
 
@@ -137,8 +139,14 @@ contract RiskManager is Ownable, ReentrancyGuard {
      * @notice Process a claim: distribute premium, allocate losses, payout claimant, update state, burn policy.
      */
     function processClaim(uint256 policyId) external nonReentrant {
-        ClaimData memory data = _prepareClaimData(policyId);
-        if (msg.sender != data.claimant) revert OnlyPolicyOwner();
+        // FIX: Moved owner and activation checks to the top for fail-fast logic.
+        address claimant = policyNFT.ownerOf(policyId);
+        if (msg.sender != claimant) revert OnlyPolicyOwner();
+
+        IPolicyNFT.Policy memory policy = policyNFT.getPolicy(policyId);
+        if (block.timestamp < policy.activation) revert PolicyNotActive();
+
+        ClaimData memory data = _prepareClaimData(policyId, policy, claimant);
 
         _distributePremium(data);
         uint256 lossBorneByPool = _distributeLosses(data);
@@ -229,29 +237,37 @@ contract RiskManager is Ownable, ReentrancyGuard {
                 }
             }
         }
-        // Only reduce coverage sold if there is existing coverage to deduct
-        uint256 reduction = Math.min(_data.policy.coverage, _data.totalCoverageSold);
-        if (reduction > 0) {
-            poolRegistry.updateCoverageSold(_data.policy.poolId, reduction, false);
+        // FIX: Only reduce coverage sold for cover pools and if there is existing coverage to deduct.
+        if (_data.isCoverPool) {
+            uint256 reduction = Math.min(_data.policy.coverage, _data.totalCoverageSold);
+            if (reduction > 0) {
+                poolRegistry.updateCoverageSold(_data.policy.poolId, reduction, false);
+            }
         }
     }
 
     /**
-     * @dev Gather all data needed for claim processing and enforce activation.
+     * @dev Gather all data needed for claim processing.
      */
-    function _prepareClaimData(uint256 _policyId) internal view returns (ClaimData memory data) {
-        data.policy = policyNFT.getPolicy(_policyId);
-        require(block.timestamp >= data.policy.activation, "Policy not active");
-        data.claimant = policyNFT.ownerOf(_policyId);
+    function _prepareClaimData(
+        uint256 _policyId,
+        IPolicyNFT.Policy memory _policy,
+        address _claimant
+    ) internal view returns (ClaimData memory data) {
+        data.policy = _policy;
+        data.claimant = _claimant;
+
         (data.adapters, data.capitalPerAdapter, data.totalCapitalPledged) =
             poolRegistry.getPoolPayoutData(data.policy.poolId);
+        
+        // FIX: Correctly destructure the tuple based on the compiler error.
         (
             data.protocolToken,
-            ,
+            , // e.g., totalValueLocked (uint256)
             data.totalCoverageSold,
-            ,
-            ,
-            ,
+            , // e.g., totalShares (uint256)
+            data.isCoverPool, // The bool flag
+            , // e.g., feeRecipient (address)
             data.poolClaimFeeBps
         ) = poolRegistry.getPoolData(data.policy.poolId);
     }
