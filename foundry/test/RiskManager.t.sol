@@ -423,8 +423,19 @@ contract RiskManagerComprehensiveTest is Test {
         address policyOwner,
         uint256 activationTimestamp
     ) internal {
-        nft.setPolicy(policyId, poolId, coverage, activationTimestamp);
-        nft.setOwnerOf(policyId, policyOwner);
+        // Use the flexible helper that allows setting all policy fields so
+        // tests can control the activation timestamp. The mock function also
+        // assigns the owner, so a separate `setOwnerOf` call is unnecessary.
+        nft.mock_setPolicy(
+            policyId,
+            policyOwner,
+            poolId,
+            coverage,
+            activationTimestamp, // start
+            activationTimestamp, // activation
+            0,
+            0
+        );
     }
 
     function _setupPool(
