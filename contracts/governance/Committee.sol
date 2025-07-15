@@ -316,16 +316,15 @@ contract Committee is Ownable, ReentrancyGuard {
     function _calculateUserReward(uint256 proposalId, address claimant) internal view returns (uint256) {
         Proposal storage p = proposals[proposalId];
         uint256 totalFees = p.totalRewardFees;
-        uint256 proposerBonus = 0;
-        
-        if (claimant == p.proposer) {
-            proposerBonus = (totalFees * p.proposerFeeShareBps) / 10000;
-        }
-        
+        uint256 proposerBonus = (totalFees * p.proposerFeeShareBps) / 10000;
         uint256 remainingFees = totalFees - proposerBonus;
         uint256 userWeight = p.voterWeight[claimant];
-        
-        return proposerBonus + (remainingFees * userWeight) / p.forVotes;
+
+        uint256 reward = (remainingFees * userWeight) / p.forVotes;
+        if (claimant == p.proposer) {
+            reward += proposerBonus;
+        }
+        return reward;
     }
 
     function _calculateFeeShare(uint256 _bondAmount) internal pure returns (uint256) {
