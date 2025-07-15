@@ -2,9 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
 import {ResetApproveERC20} from "contracts/test/ResetApproveERC20.sol";
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
@@ -20,6 +18,7 @@ import {CatShare} from "contracts/tokens/CatShare.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {MockUnderwriterManager} from "contracts/test/MockUnderwriterManager.sol";
+import {ICapitalPool} from "contracts/interfaces/ICapitalPool.sol";
 
 contract CapitalPoolIntegration is Test {
     // --- Deployed Contracts ---
@@ -44,7 +43,8 @@ contract CapitalPoolIntegration is Test {
     address liquidator = address(0xD);
     address otherUser = address(0xE);
 
-    uint8 constant PLATFORM_OTHER = 3; // CapitalPool.YieldPlatform.OTHER_YIELD
+    // CORRECTED: Removed the constant declaration to fix the compiler error.
+    // The full enum path will be used directly in function calls.
 
     function setUp() public {
         // --- Deploy Tokens ---
@@ -69,7 +69,8 @@ contract CapitalPoolIntegration is Test {
         um = new UnderwriterManager(owner);
 
         // --- Link Contracts ---
-        capitalPool.setBaseYieldAdapter(CapitalPool.YieldPlatform(PLATFORM_OTHER), address(adapter));
+        // CORRECTED: Use the full enum path directly.
+        capitalPool.setBaseYieldAdapter(ICapitalPool.YieldPlatform.OTHER_YIELD, address(adapter));
         adapter.setDepositor(address(capitalPool));
         policyNFT.setPolicyManagerAddress(address(policyManager));
         catShare.transferOwnership(address(catPool));
@@ -92,14 +93,14 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(500e6, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(500e6, ICapitalPool.YieldPlatform.OTHER_YIELD);
         assertEq(um.underwriterTotalPledge(userA), 500e6);
     }
 
     function testFullWithdrawalResetsPledge() public {
         vm.startPrank(userA);
         token.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(200e6, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(200e6, ICapitalPool.YieldPlatform.OTHER_YIELD);
         (,, uint256 shares,) = capitalPool.getUnderwriterAccount(userA);
         capitalPool.requestWithdrawal(shares);
         vm.warp(block.timestamp + 1);
@@ -114,7 +115,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
@@ -146,7 +147,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
 
         adapter.simulateYieldOrLoss(int256(yieldAmount));
         assertEq(adapter.totalValueHeld(), depositAmount + yieldAmount);
@@ -167,7 +168,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
@@ -196,12 +197,12 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositA, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositA, ICapitalPool.YieldPlatform.OTHER_YIELD);
 
         vm.prank(userB);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userB);
-        capitalPool.deposit(depositB, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositB, ICapitalPool.YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
@@ -233,7 +234,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         vm.prank(userA);
@@ -258,7 +259,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         vm.prank(userA);
@@ -304,18 +305,16 @@ contract CapitalPoolIntegration is Test {
     }
 
     function testRevert_ifHookFails() public {
-        // This test requires a MockUnderwriterManager with a `setShouldReject` function.
-        // Assuming such a mock exists for this test.
         MockUnderwriterManager mockUM = new MockUnderwriterManager();
         capitalPool.setUnderwriterManager(address(mockUM));
-        mockUM.setShouldReject(true); // Configure mock to revert
+        mockUM.setShouldReject(true);
 
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         
         vm.prank(userA);
         vm.expectRevert("MockUM: Reject on hook");
-        capitalPool.deposit(500e6, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(500e6, ICapitalPool.YieldPlatform.OTHER_YIELD);
     }
 
     function test_claim_succeeds_evenIfPoolIsPaused() public {
@@ -324,7 +323,7 @@ contract CapitalPoolIntegration is Test {
         vm.prank(userA);
         token.approve(address(capitalPool), type(uint256).max);
         vm.prank(userA);
-        capitalPool.deposit(depositAmount, CapitalPool.YieldPlatform(PLATFORM_OTHER));
+        capitalPool.deposit(depositAmount, ICapitalPool.YieldPlatform.OTHER_YIELD);
 
         uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
@@ -332,7 +331,6 @@ contract CapitalPoolIntegration is Test {
         um.allocateCapital(pools);
 
         registry.createPool(token, 0, 0, 0, 0, address(0), 0);
-        // PAUSE the pool
         registry.setPoolPauseStatus(0, true);
         assertTrue(registry.isPoolPaused(0), "Pool should be paused");
 
@@ -343,7 +341,6 @@ contract CapitalPoolIntegration is Test {
         vm.prank(claimant);
         token.approve(address(riskManager), type(uint256).max);
         
-        // The claim should still succeed even though the pool is paused.
         riskManager.processClaim(policyId);
 
         assertEq(um.underwriterPoolPledge(userA, 0), depositAmount - claimAmount, "Underwriter pledge not reduced on claim in paused pool");

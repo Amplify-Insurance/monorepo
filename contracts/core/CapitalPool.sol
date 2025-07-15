@@ -7,10 +7,13 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+// CORRECTED: Import the new interface
+import "../interfaces/ICapitalPool.sol";
 import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IYieldAdapterEmergency.sol";
 import "../interfaces/IRewardDistributor.sol";
-import "../interfaces/IUnderwriterManager.sol"; // NEW: Import UnderwriterManager
+import "../interfaces/IUnderwriterManager.sol";
 import "../interfaces/IRiskManagerWithBackstop.sol";
 
 /**
@@ -20,7 +23,8 @@ import "../interfaces/IRiskManagerWithBackstop.sol";
  * @dev It manages the principal capital of underwriters and interacts with an external
  * RewardDistributor contract to handle the distribution of yield.
  */
-contract CapitalPool is ReentrancyGuard, Ownable {
+// CORRECTED: Implements the new interface
+contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     using SafeERC20 for IERC20;
 
     /* ───────────────────────── Constants ───────────────────────── */
@@ -30,10 +34,10 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     /* ───────────────────────── State Variables ───────────────────────── */
     address public riskManager;
     IRewardDistributor public rewardDistributor;
-    IUnderwriterManager public underwriterManager; // NEW: Direct reference
+    IUnderwriterManager public underwriterManager;
     uint256 public underwriterNoticePeriod = 0;
 
-    enum YieldPlatform { NONE, AAVE, COMPOUND, OTHER_YIELD }
+    // CORRECTED: The YieldPlatform enum is now defined in ICapitalPool.sol and removed from here.
     mapping(YieldPlatform => IYieldAdapter) public baseYieldAdapters;
     address[] public activeYieldAdapterAddresses;
     mapping(address => bool) public isAdapterActive;
@@ -65,16 +69,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         _;
     }
     
-    struct PayoutData {
-        address claimant;
-        uint256 claimantAmount;
-        address feeRecipient;
-        uint256 feeAmount;
-        address[] adapters;
-        uint256[] capitalPerAdapter;
-        uint256 totalCapitalFromPoolLPs;
-    }
-
     error ZeroAddress();
     error InvalidAmount();
     error NoSharesToMint();
@@ -91,7 +85,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     /* ───────────────────────── Events ──────────────────────────── */
     event RiskManagerSet(address indexed newRiskManager);
     event RewardDistributorSet(address indexed newRewardDistributor);
-    event UnderwriterManagerSet(address indexed newUnderwriterManager); // NEW
+    event UnderwriterManagerSet(address indexed newUnderwriterManager);
     event BaseYieldAdapterSet(YieldPlatform indexed platform, address indexed adapterAddress);
     event Deposit(address indexed user, uint256 amount, uint256 sharesMinted, YieldPlatform yieldChoice);
     event WithdrawalRequested(address indexed user, uint256 sharesToBurn, uint256 timestamp, uint256 requestIndex);
@@ -124,7 +118,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         emit RewardDistributorSet(_rewardDistributor);
     }
 
-    // NEW: Setter for the UnderwriterManager
     function setUnderwriterManager(address _underwriterManager) external onlyOwner {
         if (_underwriterManager == address(0)) revert ZeroAddress();
         underwriterManager = IUnderwriterManager(_underwriterManager);
@@ -152,7 +145,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
     /* ───────────────── Underwriter Deposit & Withdrawal ────────────────── */
-    function deposit(uint256 _amount, YieldPlatform _yieldChoice) external nonReentrant {
+    function deposit(uint256 _amount, YieldPlatform _yieldChoice) external override nonReentrant {
         if (_amount == 0) revert InvalidAmount();
         if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
@@ -191,7 +184,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
             rewardDistributor.updateUserState(msg.sender, 0, address(underlyingAsset), account.masterShares);
         }
         
-        // CORRECTED: Call UnderwriterManager directly
         if (address(underwriterManager) != address(0)) {
             underwriterManager.onCapitalDeposited(msg.sender, _amount);
         }
@@ -210,7 +202,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
         uint256 valueToWithdraw = sharesToValue(_sharesToBurn);
         
-        // CORRECTED: Call UnderwriterManager directly
         if (address(underwriterManager) != address(0)) {
             underwriterManager.onWithdrawalRequested(msg.sender, valueToWithdraw);
         }
@@ -232,7 +223,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         uint256 sharesToCancel = requests[_requestIndex].shares;
         uint256 valueCancelled = sharesToValue(sharesToCancel);
 
-        // CORRECTED: Call UnderwriterManager directly
         if (address(underwriterManager) != address(0)) {
             underwriterManager.onWithdrawalCancelled(msg.sender, valueCancelled);
         }
@@ -278,7 +268,6 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
         bool isFullWithdrawal = (account.masterShares == 0);
         
-        // CORRECTED: Call UnderwriterManager directly
         if (address(underwriterManager) != address(0)) {
             underwriterManager.onCapitalWithdrawn(msg.sender, principalComponentRemoved, isFullWithdrawal);
         }
@@ -349,7 +338,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
 
     /* ───────────────────── Trusted Functions (RiskManager Only) ─────────────────── */
     
-    function executePayout(PayoutData calldata _payoutData) external nonReentrant onlyRiskManager {
+    function executePayout(PayoutData calldata _payoutData) external override nonReentrant onlyRiskManager {
         uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
         if (totalPayoutAmount == 0) return;
         if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
@@ -393,7 +382,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         }
     }
 
-    function applyLosses(address _underwriter, uint256 _principalLossAmount) external nonReentrant onlyRiskManager {
+    function applyLosses(address _underwriter, uint256 _principalLossAmount) external override nonReentrant onlyRiskManager {
         if (_principalLossAmount == 0) revert InvalidAmount();
         UnderwriterAccount storage account = underwriterAccounts[_underwriter];
         if (account.totalDepositedAssetPrincipal == 0) revert NoActiveDeposit();
@@ -438,13 +427,14 @@ contract CapitalPool is ReentrancyGuard, Ownable {
     }
 
     /* ───────────────────────── View Functions ──────────────────────── */
-    function getUnderwriterAdapterAddress(address _underwriter) external view returns(address) {
+    function getUnderwriterAdapterAddress(address _underwriter) external view override returns(address) {
         return address(underwriterAccounts[_underwriter].yieldAdapter);
     }
     
     function getUnderwriterAccount(address _underwriter)
         external
         view
+        override
         returns (
             uint256 totalDepositedAssetPrincipal,
             YieldPlatform yieldChoice,
@@ -488,7 +478,7 @@ contract CapitalPool is ReentrancyGuard, Ownable {
         return withdrawalRequests[_underwriter].length;
     }
 
-    function sharesToValue(uint256 _shares) public view returns (uint256) {
+    function sharesToValue(uint256 _shares) public view override returns (uint256) {
         if (totalMasterSharesSystem <= INITIAL_SHARES_LOCKED) return 0;
         return Math.mulDiv(_shares, totalSystemValue, totalMasterSharesSystem - INITIAL_SHARES_LOCKED);
     }

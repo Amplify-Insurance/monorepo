@@ -17,6 +17,8 @@ import {USDCoin} from "contracts/tokens/USDCoin.sol";
 import {CatShare} from "contracts/tokens/CatShare.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
+import {IPolicyNFT} from "contracts/interfaces/IPolicyNFT.sol";
+
 import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 
 contract PolicyManagerIntegration is Test {

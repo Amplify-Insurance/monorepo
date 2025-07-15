@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CapitalPool} from "contracts/core/CapitalPool.sol";
 import {UnderwriterManager} from "contracts/core/UnderwriterManager.sol";
 import {IRewardDistributor} from "contracts/interfaces/IRewardDistributor.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol"; // CORRECTED: Import the interface and the enum
 
 /**
  * @title MaliciousRewardRecipient
@@ -51,7 +52,8 @@ contract MaliciousRewardRecipient {
 
         // Standard deposit and allocation flow
         IERC20(usdcToken).approve(address(_capitalPool), _amount);
-        _capitalPool.deposit(_amount, CapitalPool.YieldPlatform(3));
+        // CORRECTED: Use the enum directly as it's defined at the file level.
+        _capitalPool.deposit(_amount, YieldPlatform.OTHER_YIELD);
         
         uint256[] memory pools = new uint256[](1);
         pools[0] = _poolId;

@@ -17,6 +17,7 @@ import {SimpleYieldAdapter} from "contracts/adapters/SimpleYieldAdapter.sol";
 import {IYieldAdapter} from "contracts/interfaces/IYieldAdapter.sol";
 import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ICapitalPool, YieldPlatform} from "contracts/interfaces/ICapitalPool.sol"; // CORRECTED: Import the interface and the enum
 
 // Helper adapter that always reverts on withdraw
 contract RevertingAdapter is IYieldAdapter {
@@ -79,16 +80,17 @@ contract BackstopPoolIntegration is Test {
 
         // fund capital pool so system value is positive
         SimpleYieldAdapter cpAdapter = new SimpleYieldAdapter(address(usdc), address(0xdead), owner);
-        capitalPool.setBaseYieldAdapter(CapitalPool.YieldPlatform.OTHER_YIELD, address(cpAdapter));
+        // CORRECTED: Use the imported enum directly
+        capitalPool.setBaseYieldAdapter(YieldPlatform.OTHER_YIELD, address(cpAdapter));
         cpAdapter.setDepositor(address(capitalPool));
         usdc.approve(address(capitalPool), type(uint256).max);
-        capitalPool.deposit(1_000e6, CapitalPool.YieldPlatform.OTHER_YIELD);
+        capitalPool.deposit(1_000e6, YieldPlatform.OTHER_YIELD);
     }
 
     function test_drawFund_called_when_adapter_reverts() public {
         _deployBackstopWithCapital();
         // prepare payout data
-        CapitalPool.PayoutData memory data;
+        ICapitalPool.PayoutData memory data;
         data.claimant = user;
         data.claimantAmount = 500e6;
         data.feeRecipient = address(0);
