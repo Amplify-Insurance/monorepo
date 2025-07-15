@@ -7,6 +7,7 @@ import {IPoolRegistry} from "contracts/interfaces/IPoolRegistry.sol";
 import {IPolicyNFT} from "contracts/interfaces/IPolicyNFT.sol";
 import {MockERC20} from "contracts/test/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /* ───────────────────────── Mock Contracts ───────────────────────── */
 // By defining mocks inside the test file, we can ensure they have the necessary
@@ -89,6 +90,8 @@ contract MockPoolRegistry is IPoolRegistry {
 }
 
 contract MockCapitalPool {
+    using SafeERC20 for IERC20;
+
     address public owner;
     IERC20 public asset;
     uint256 public totalDeposited;
@@ -101,14 +104,23 @@ contract MockCapitalPool {
     function underlyingAsset() external view returns (IERC20) {
         return asset;
     }
+
+    function deposit(uint256 amount) external {
+        asset.safeTransferFrom(msg.sender, address(this), amount);
+        totalDeposited += amount;
+    }
 }
 
 contract MockBackstopPool {
+    using SafeERC20 for IERC20;
+
     address public owner;
+    IERC20 public asset;
     uint256 public totalDeposited;
 
-    constructor(address _owner) {
+    constructor(address _owner, address _asset) {
         owner = _owner;
+        asset = IERC20(_asset);
     }
 
     function receiveUsdcPremium(uint256 amount) external {
@@ -167,7 +179,25 @@ contract MockPolicyNFT is IPolicyNFT {
 }
 
 contract MockRewardDistributor {
-    function distribute(uint256, address, uint256, uint256) external {}
+    using SafeERC20 for IERC20;
+
+    MockCapitalPool public capital;
+    IERC20 public token;
+
+    constructor(address _capital, address _token) {
+        capital = MockCapitalPool(_capital);
+        token = IERC20(_token);
+        token.approve(address(capital), type(uint256).max);
+    }
+
+    function setCapitalPool(address _cap) external {
+        capital = MockCapitalPool(_cap);
+        token.approve(_cap, type(uint256).max);
+    }
+
+    function distribute(uint256, address, uint256 amount, uint256) external {
+        capital.deposit(amount);
+    }
 }
 
 // **FIXED**: The MockRiskManagerHook now has a public `coverageSold` mapping
@@ -215,9 +245,9 @@ contract PolicyManagerFuzz is Test {
 
         registry = new MockPoolRegistry();
         capital = new MockCapitalPool(address(this), address(token));
-        cat = new MockBackstopPool(address(this));
+        cat = new MockBackstopPool(address(this), address(token));
         nft = new MockPolicyNFT(address(this));
-        rewards = new MockRewardDistributor();
+        rewards = new MockRewardDistributor(address(capital), address(token));
         rm = new MockRiskManagerHook();
 
         pm = new PolicyManagerHarness(address(nft));
@@ -246,8 +276,8 @@ contract PolicyManagerFuzz is Test {
     function testFuzz_adminSetters(uint16 bps, uint32 cooldown) public {
         bps = uint16(bound(bps, 0, 5000));
 
-        MockBackstopPool newCat = new MockBackstopPool(address(this));
-        MockRewardDistributor newRewards = new MockRewardDistributor();
+        MockBackstopPool newCat = new MockBackstopPool(address(this), address(token));
+        MockRewardDistributor newRewards = new MockRewardDistributor(address(capital), address(token));
 
         pm.setCatPremiumShareBps(bps);
         pm.setCoverCooldownPeriod(cooldown);
@@ -340,8 +370,8 @@ contract PolicyManagerFuzz is Test {
     }
 
     function testFuzz_revert_increaseCover(uint96 coverage, uint96 addAmount) public {
-        uint256 deposit = 1_000_000e6;
         coverage = uint96(bound(coverage, 100e6, POOL_CAPACITY / 2));
+        uint256 deposit = _minPremium(coverage) * 2;
         addAmount = uint96(bound(addAmount, 1e6, POOL_CAPACITY / 2));
 
         vm.prank(user);
@@ -374,6 +404,7 @@ contract PolicyManagerFuzz is Test {
         vm.warp(block.timestamp + 2 days);
 
         uint256 balBefore = token.balanceOf(user);
+        vm.prank(user);
         pm.cancelCover(policyId);
         uint256 balAfter = token.balanceOf(user);
 
@@ -388,11 +419,12 @@ contract PolicyManagerFuzz is Test {
         coverage = uint96(bound(coverage, 100e6, POOL_CAPACITY));
         uint256 deposit = _minPremium(coverage) * 2;
 
+        pm.setCoverCooldownPeriod(1 days);
         vm.prank(user);
         uint256 policyId = pm.purchaseCover(POOL_ID, coverage, deposit);
 
         // Revert if cooldown is active
-        pm.setCoverCooldownPeriod(1 days);
+        vm.prank(user);
         vm.expectRevert(PolicyManager.CooldownActive.selector);
         pm.cancelCover(policyId);
         vm.warp(block.timestamp + 2 days); // Pass cooldown
@@ -448,7 +480,7 @@ contract PolicyManagerFuzz is Test {
         pm.setCoverCooldownPeriod(3 days);
 
         // 2. Purchase
-        vm.prank(user);
+        vm.startPrank(user);
         uint256 policyId = pm.purchaseCover(POOL_ID, c1, deposit);
         assertEq(rm.coverageSold(POOL_ID), c1);
 
@@ -461,6 +493,8 @@ contract PolicyManagerFuzz is Test {
         pm.increaseCover(policyId, c3);
         assertEq(pm.pendingCoverageSum(policyId), uint256(c2) + uint256(c3));
         assertEq(rm.coverageSold(POOL_ID), totalCoverage);
+
+        vm.stopPrank();
 
         // 5. Settle pending increases
         vm.warp(block.timestamp + 4 days); // Pass cooldown
@@ -482,7 +516,8 @@ contract PolicyManagerFuzz is Test {
         assertEq(token.balanceOf(address(pm)), 0);
         assertTrue(capital.totalDeposited() > 0);
         assertTrue(cat.totalDeposited() > 0);
-        assertApproxEqAbs(capital.totalDeposited() + cat.totalDeposited(), balBeforeLapse, 1);
+        uint256 totalDistributed = capital.totalDeposited() + cat.totalDeposited();
+        assertApproxEqAbs(totalDistributed, deposit, 1);
     }
 
     function testFuzz_premiumDrainingAndDistribution(uint96 coverage) public {

@@ -336,17 +336,17 @@ function _distributeDrainedPremium(uint256 poolId, uint256 amount) internal {
     uint256 poolInc = amount - catAmt;
 
     if (catAmt > 0) {
-        // Using forceApprove is acceptable here as it's an internal, trusted interaction.
-        capitalPool.underlyingAsset().forceApprove(address(catPool), catAmt);
+        IERC20 asset = capitalPool.underlyingAsset();
+        asset.safeTransfer(address(catPool), catAmt);
         catPool.receiveUsdcPremium(catAmt);
     }
 
     if (poolInc > 0) {
-        // A direct call is cleaner if the reward distributor knows the total pledge.
-        // If not, the original logic is fine.
         ( , uint256 pledged, , , , , ) = poolRegistry.getPoolData(poolId);
         if (pledged > 0) {
-           rewardDistributor.distribute(poolId, address(capitalPool.underlyingAsset()), poolInc, pledged);
+            IERC20 asset = capitalPool.underlyingAsset();
+            asset.safeTransfer(address(rewardDistributor), poolInc);
+            rewardDistributor.distribute(poolId, address(asset), poolInc, pledged);
         }
     }
 }
