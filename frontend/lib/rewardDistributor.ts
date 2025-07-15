@@ -11,7 +11,7 @@ if (!ADDRESS) {
 }
 
 export function getRewardDistributor(address: string = ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, RewardDistributor, getProvider(deployment))
+  return new ethers.Contract(address, RewardDistributor.abi, getProvider(deployment))
 }
 
 export const rewardDistributor = getRewardDistributor()
@@ -22,12 +22,12 @@ export async function getRewardDistributorWithSigner(address: string = ADDRESS) 
   }
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
   const signer = await browserProvider.getSigner()
-  return new ethers.Contract(address, RewardDistributor, signer)
+  return new ethers.Contract(address, RewardDistributor.abi, signer)
 }
 
 export function getRewardDistributorWriter(address: string = ADDRESS, deployment?: string) {
   const pk = process.env.PRIVATE_KEY
   if (!pk) throw new Error('PRIVATE_KEY not set')
   const signer = new ethers.Wallet(pk, getProvider(deployment))
-  return new ethers.Contract(address, RewardDistributor, signer)
+  return new ethers.Contract(address, RewardDistributor.abi, signer)
 }

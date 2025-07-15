@@ -11,7 +11,7 @@ if (!DEFAULT_ADDRESS) {
 }
 
 export function getCapitalPool(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, CapitalPool, getProvider(deployment));
+  return new ethers.Contract(address, CapitalPool.abi, getProvider(deployment));
 }
 
 export const capitalPool = getCapitalPool();
@@ -23,14 +23,14 @@ export async function getCapitalPoolWithSigner(address: string = DEFAULT_ADDRESS
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum);
   const signer = await browserProvider.getSigner();
 
-  return new ethers.Contract(address, CapitalPool, signer);
+  return new ethers.Contract(address, CapitalPool.abi, signer);
 }
 
 export function getCapitalPoolWriter(address: string = DEFAULT_ADDRESS, deployment?: string) {
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error('PRIVATE_KEY not set');
   const signer = new ethers.Wallet(pk, getProvider(deployment));
-  return new ethers.Contract(address, CapitalPool, signer);
+  return new ethers.Contract(address, CapitalPool.abi, signer);
 }
 
 // Helper to query the underlying ERC20 asset used by the capital pool

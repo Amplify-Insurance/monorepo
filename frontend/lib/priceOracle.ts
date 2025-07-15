@@ -6,7 +6,7 @@ import deployments, { PRICE_ORACLE_ADDRESS } from '../app/config/deployments'
 const DEFAULT_ADDRESS = PRICE_ORACLE_ADDRESS as string;
 
 export function getPriceOracle(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, PriceOracle, getProvider(deployment));
+  return new ethers.Contract(address, PriceOracle.abi, getProvider(deployment));
 }
 
 export const priceOracle = getPriceOracle();

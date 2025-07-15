@@ -11,7 +11,7 @@ if (!DEFAULT_ADDRESS) {
 }
 
 export function getPoolRegistry(address: string = DEFAULT_ADDRESS, deployment?: string) {
-  return new ethers.Contract(address, PoolRegistry, getProvider(deployment))
+  return new ethers.Contract(address, PoolRegistry.abi, getProvider(deployment))
 }
 
 export const poolRegistry = getPoolRegistry()
@@ -22,12 +22,12 @@ export async function getPoolRegistryWithSigner(address: string = DEFAULT_ADDRES
 
   const browserProvider = new ethers.providers.Web3Provider(window.ethereum)
   const signer = await browserProvider.getSigner()
-  return new ethers.Contract(address, PoolRegistry, signer)
+  return new ethers.Contract(address, PoolRegistry.abi, signer)
 }
 
 export function getPoolRegistryWriter(address: string = DEFAULT_ADDRESS, deployment?: string) {
   const pk = process.env.PRIVATE_KEY
   if (!pk) throw new Error('PRIVATE_KEY not set')
   const signer = new ethers.Wallet(pk, getProvider(deployment))
-  return new ethers.Contract(address, PoolRegistry, signer)
+  return new ethers.Contract(address, PoolRegistry.abi, signer)
 }
