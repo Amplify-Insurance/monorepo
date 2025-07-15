@@ -42,9 +42,9 @@ contract UnderwriterManagerIntegrationTest is Test {
 
     // Constants
     uint256 constant PLEDGE = 1_000_000e6;
-    uint256 constant POOL_ID_1 = 1;
-    uint256 constant POOL_ID_2 = 2;
-    uint256 constant POOL_ID_3 = 3;
+    uint256 constant POOL_ID_1 = 0;
+    uint256 constant POOL_ID_2 = 1;
+    uint256 constant POOL_ID_3 = 2;
 
 
     function setUp() public {

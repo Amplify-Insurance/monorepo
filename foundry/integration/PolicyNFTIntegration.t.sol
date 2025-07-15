@@ -41,7 +41,7 @@ contract PolicyNFTIntegrationTest is Test {
     address committee = address(0xBEEF);
 
     // Constants
-    uint256 constant POOL_ID = 1; // Pool IDs start from 1
+    uint256 constant POOL_ID = 0; // First pool has ID 0
     uint256 constant INITIAL_PLEDGE = 1_000_000e6;
 
     function setUp() public {
