@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "../interfaces/IRiskManagerWithBackstop.sol";
 import "../interfaces/IBackstopPool.sol";
 import "../core/CapitalPool.sol";
+import "../interfaces/ICapitalPool.sol";
 
 contract MockRiskManagerWithBackstop is IRiskManagerWithBackstop {
     IBackstopPool public override catPool;
@@ -37,6 +38,6 @@ contract MockRiskManagerWithBackstop is IRiskManagerWithBackstop {
     }
 
     function applyLossesOnPool(address pool, address underwriter, uint256 amount) external {
-        CapitalPool(pool).applyLosses(underwriter, amount);
+        ICapitalPool(pool).applyLosses(underwriter, amount);
     }
 }
