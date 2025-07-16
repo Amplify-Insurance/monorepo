@@ -18,11 +18,21 @@ interface ICapitalPool {
         uint256 totalCapitalFromPoolLPs;
     }
     
+
+    function yieldAdapterRewardPoolId(address) external view returns (uint256);
     function deposit(uint256 amount, YieldPlatform yieldChoice) external;
     function getUnderwriterAdapterAddress(address underwriter) external view returns(address);
-    function applyLosses(address underwriter, uint256 amount) external;
+    // function applyLosses(address underwriter, uint256 amount) external;
     function underlyingAsset() external view returns (IERC20);
     function getUnderwriterAccount(address underwriter) external view returns (uint256, YieldPlatform, uint256, uint256);
     function sharesToValue(uint256 shares) external view returns (uint256);
+    function valueToShares(uint256 value) external view returns (uint256);
     function executePayout(PayoutData calldata payoutData) external;
+
+    function burnSharesForLoss(
+        address[] calldata underwriters,
+        uint256[] calldata sharesToBurn,
+        uint256 totalLossAmount
+    ) external;
 }
+

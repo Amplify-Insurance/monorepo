@@ -6,55 +6,62 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IRewardDistributor.sol";
+import "../interfaces/IPoolRegistry.sol";
+import "../interfaces/IUnderwriterManager.sol";
+import "../interfaces/ICapitalPool.sol";
+
 
 /**
  * @title RewardDistributor
  * @author Gemini
  * @notice Manages the scalable distribution of rewards to underwriters using the "pull-over-push" pattern.
- * This avoids gas-intensive loops by tracking rewards on a per-share basis.
+ * @dev Access control has been updated to support multiple, isolated reward streams.
  */
 contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    address public riskManager;
+    // --- System Contracts ---
+    IPoolRegistry public poolRegistry;
     address public policyManager;
+    address public capitalPool;
+    address public underwriterManager;
     address public catPool;
 
+    // --- Events ---
+    event PoolRegistrySet(address indexed newPoolRegistry);
+    event PolicyManagerSet(address indexed newPolicyManager);
+    event CapitalPoolSet(address indexed newCapitalPool);
+    event UnderwriterManagerSet(address indexed newUnderwriterManager);
     event CatPoolSet(address indexed newCatPool);
-    event RiskManagerAddressSet(address indexed newRiskManager);
-    event PolicyManagerAddressSet(address indexed newPolicyManager);
-
+    
     // --- Accounting Structs ---
     struct RewardTracker {
-        // Total accumulated rewards for a token in a pool, divided by the total pledge at the time of distribution.
-        // This value is stored with high precision to minimize rounding errors.
         uint256 accumulatedRewardsPerShare;
     }
 
     struct UserRewardState {
-        // The reward-per-share value at the time of the user's last interaction (deposit, withdrawal, or claim).
-        // Used to calculate how many new rewards they've earned since.
         uint256 rewardDebt;
     }
 
     // --- State Variables ---
-    // poolId => rewardTokenAddress => RewardTracker
     mapping(uint256 => mapping(address => RewardTracker)) public poolRewardTrackers;
-
-    // userAddress => poolId => rewardTokenAddress => UserRewardState
     mapping(address => mapping(uint256 => mapping(address => UserRewardState))) public userRewardStates;
     
     uint256 public constant PRECISION_FACTOR = 1e18;
 
     /* ───────────────────────── Modifiers & Errors ──────────────────────── */
-    modifier onlyRiskManager() {
-        require(msg.sender == riskManager, "RD: Not RiskManager");
+    modifier onlyDistributors() {
+        require(msg.sender == policyManager || msg.sender == capitalPool, "RD: Not an authorized distributor");
+        _;
+    }
+    
+    modifier onlyUnderwriterManager() {
+        require(msg.sender == underwriterManager, "RD: Not UnderwriterManager");
         _;
     }
 
-
-    modifier onlyApproved() {
-        require(msg.sender == riskManager || msg.sender == policyManager, "RD: Not RiskManager or policyManager");
+    modifier onlyStateUpdaters() {
+        require(msg.sender == capitalPool || msg.sender == underwriterManager, "RD: Not CapitalPool or UnderwriterManager");
         _;
     }
 
@@ -67,45 +74,59 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
 
     /* ───────────────────────── Constructor & Setup ──────────────────────── */
 
-    constructor(address _riskManagerAddress, address _policyManagerAddress) Ownable(msg.sender) {
-        if (_riskManagerAddress == address(0)) revert ZeroAddress();
-        if (_policyManagerAddress == address(0)) revert ZeroAddress();
-       
-        policyManager = _policyManagerAddress;
-        riskManager = _riskManagerAddress;
-        emit RiskManagerAddressSet(_riskManagerAddress);
-        emit PolicyManagerAddressSet(_policyManagerAddress);
+    constructor(
+        address _poolRegistry,
+        address _policyManager,
+        address _capitalPool,
+        address _underwriterManager
+    ) Ownable(msg.sender) {
+        if (_poolRegistry == address(0) || _policyManager == address(0) || _capitalPool == address(0) || _underwriterManager == address(0)) {
+            revert ZeroAddress();
+        }
+        poolRegistry = IPoolRegistry(_poolRegistry);
+        policyManager = _policyManager;
+        capitalPool = _capitalPool;
+        underwriterManager = _underwriterManager;
     }
 
-    function setCatPool(address catPoolAddress) external onlyOwner {
-        if (catPoolAddress == address(0)) revert ZeroAddress();
-        catPool = catPoolAddress;
-        emit CatPoolSet(catPoolAddress);
-    }
-
-    function setRiskManager(address newRiskManager) external onlyOwner {
-        if (newRiskManager == address(0)) revert ZeroAddress();
-        riskManager = newRiskManager;
-        emit RiskManagerAddressSet(newRiskManager);
+    function setPoolRegistry(address newPoolRegistry) external onlyOwner {
+        if (newPoolRegistry == address(0)) revert ZeroAddress();
+        poolRegistry = IPoolRegistry(newPoolRegistry);
+        emit PoolRegistrySet(newPoolRegistry);
     }
 
     function setPolicyManager(address newPolicyManager) external onlyOwner {
         if (newPolicyManager == address(0)) revert ZeroAddress();
         policyManager = newPolicyManager;
-        emit PolicyManagerAddressSet(newPolicyManager);
+        emit PolicyManagerSet(newPolicyManager);
+    }
+
+    function setCapitalPool(address newCapitalPool) external onlyOwner {
+        if (newCapitalPool == address(0)) revert ZeroAddress();
+        capitalPool = newCapitalPool;
+        emit CapitalPoolSet(newCapitalPool);
+    }
+
+    function setUnderwriterManager(address newUnderwriterManager) external onlyOwner {
+        if (newUnderwriterManager == address(0)) revert ZeroAddress();
+        underwriterManager = newUnderwriterManager;
+        emit UnderwriterManagerSet(newUnderwriterManager);
+    }
+
+    function setCatPool(address newCatPool) external onlyOwner {
+        if (newCatPool == address(0)) revert ZeroAddress();
+        catPool = newCatPool;
+        emit CatPoolSet(newCatPool);
     }
 
     /* ───────────────────────── Core Logic ──────────────────────── */
 
-    /**
-     * @notice Distributes a new batch of rewards by updating the pool's rewards-per-share metric.
-     * @dev Called by the RiskManager when premiums or fees are to be distributed.
-     * @param poolId The ID of the pool receiving rewards.
-     * @param rewardToken The address of the token being distributed.
-     * @param rewardAmount The total amount of the reward to distribute.
-     * @param totalPledgeInPool The total capital pledged to the pool at this moment.
-     */
-    function distribute(uint256 poolId, address rewardToken, uint256 rewardAmount, uint256 totalPledgeInPool) external override onlyApproved {
+    function distribute(
+        uint256 poolId,
+        address rewardToken,
+        uint256 rewardAmount,
+        uint256 totalPledgeInPool
+    ) external override onlyDistributors {
         if (rewardAmount == 0 || totalPledgeInPool == 0) {
             return;
         }
@@ -113,16 +134,12 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
         tracker.accumulatedRewardsPerShare += (rewardAmount * PRECISION_FACTOR) / totalPledgeInPool;
     }
 
-    /**
-     * @notice Allows a user to claim their pending rewards for a specific token in a pool.
-     * @dev Called by the RiskManager on behalf of a user.
-     * @param user The user for whom to claim rewards.
-     * @param poolId The pool to claim from.
-     * @param rewardToken The reward token to claim.
-     * @param userPledge The user's current capital pledge.
-     * @return The amount of rewards claimed.
-     */
-    function claim(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyRiskManager nonReentrant returns (uint256) {
+    function claim(
+        address user,
+        uint256 poolId,
+        address rewardToken,
+        uint256 userPledge
+    ) external override onlyUnderwriterManager nonReentrant returns (uint256) {
         uint256 rewards = pendingRewards(user, poolId, rewardToken, userPledge);
         
         if (rewards > 0) {
@@ -135,7 +152,12 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
         return rewards;
     }
 
-    function claimForCatPool(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyCatPool nonReentrant returns (uint256) {
+    function claimForCatPool(
+        address user,
+        uint256 poolId,
+        address rewardToken,
+        uint256 userPledge
+    ) external override onlyCatPool nonReentrant returns (uint256) {
         uint256 rewards = pendingRewards(user, poolId, rewardToken, userPledge);
         if (rewards > 0) {
             UserRewardState storage userState = userRewardStates[user][poolId][rewardToken];
@@ -148,33 +170,56 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
 
     /**
      * @notice Updates a user's state, typically after they deposit or withdraw.
-     * @dev This "snapshots" their debt so future reward calculations are correct.
-     * @param user The user whose state is being updated.
-     * @param poolId The relevant pool ID.
-     * @param rewardToken The relevant reward token.
-     * @param userPledge The user's new capital pledge amount.
+     * @dev FIX: This function NO LONGER transfers tokens. It only updates the user's
+     * reward debt. This prevents a potential cross-contract reentrancy attack.
+     * Users must now explicitly call `claim` to receive their rewards.
      */
-    function updateUserState(address user, uint256 poolId, address rewardToken, uint256 userPledge) external override onlyRiskManager {
+    function updateUserState(
+        address user,
+        uint256 poolId,
+        address rewardToken,
+        uint256 newUserPledge
+    ) external override onlyStateUpdaters {
+        // 1. Get the user's OLD pledge before the state change.
+        uint256 oldPledge = userPledgeFor(user, poolId);
+
+        // 2. Calculate pending rewards based on the OLD pledge.
+        uint256 rewards = pendingRewards(user, poolId, rewardToken, oldPledge);
+
+        // 3. Update the user's debt based on the NEW pledge.
+        // The total accumulated rewards for the user is their old debt + new pending rewards.
         RewardTracker storage tracker = poolRewardTrackers[poolId][rewardToken];
         UserRewardState storage userState = userRewardStates[user][poolId][rewardToken];
-        userState.rewardDebt = (userPledge * tracker.accumulatedRewardsPerShare) / PRECISION_FACTOR;
+        uint256 newTotalRewardsEarned = userState.rewardDebt + rewards;
+        
+        // Calculate what the new debt *should* be based on the new pledge, and adjust.
+        // This ensures that if the user's pledge changes, their debt reflects what they've
+        // already earned, plus what they would owe at the current rate with their new pledge.
+        uint256 newDebtFromRate = (newUserPledge * tracker.accumulatedRewardsPerShare) / PRECISION_FACTOR;
+        userState.rewardDebt = newDebtFromRate - (newTotalRewardsEarned - userState.rewardDebt);
     }
+
 
     /* ───────────────────────── View Functions ──────────────────────── */
     
-    /**
-     * @notice Calculates the pending rewards for a user for a specific token in a pool.
-     * @param user The user's address.
-     * @param poolId The pool ID.
-     * @param rewardToken The reward token address.
-     * @param userPledge The user's current capital pledge.
-     * @return The amount of claimable rewards.
-     */
-    function pendingRewards(address user, uint256 poolId, address rewardToken, uint256 userPledge) public view override returns (uint256) {
+    function pendingRewards(
+        address user,
+        uint256 poolId,
+        address rewardToken,
+        uint256 userPledge
+    ) public view override returns (uint256) {
         RewardTracker storage tracker = poolRewardTrackers[poolId][rewardToken];
         UserRewardState storage userState = userRewardStates[user][poolId][rewardToken];
+        uint256 totalRewardsEarned = (userPledge * tracker.accumulatedRewardsPerShare) / PRECISION_FACTOR;
+        return totalRewardsEarned > userState.rewardDebt ? totalRewardsEarned - userState.rewardDebt : 0;
+    }
 
-        uint256 accumulated = (userPledge * tracker.accumulatedRewardsPerShare) / PRECISION_FACTOR;
-        return accumulated - userState.rewardDebt;
+    function userPledgeFor(address user, uint256 poolId) internal view returns (uint256) {
+        if (poolRegistry.isYieldRewardPool(poolId)) {
+            (,,uint256 shares,) = ICapitalPool(capitalPool).getUnderwriterAccount(user);
+            return shares;
+        } else {
+            return IUnderwriterManager(underwriterManager).underwriterPoolPledge(user, poolId);
+        }
     }
 }

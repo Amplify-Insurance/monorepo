@@ -20,6 +20,7 @@ import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
 /**
  * @title RiskManager
  * @notice Orchestrates claim processing and liquidations for the protocol.
+ * @dev UPDATED: Now supports partial claims on policies.
  */
 contract RiskManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -50,7 +51,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         address[] adapters;
         uint256[] capitalPerAdapter;
         uint256 totalCoverageSold;
-        bool isCoverPool; // FIX: Added isCoverPool flag
+        bool isCoverPool;
     }
 
     // --- Events ---
@@ -66,6 +67,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     );
     event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
+    event ClaimProcessed(uint256 indexed policyId, uint256 amountClaimed, bool isFullClaim); // NEW
 
     // --- Errors ---
 
@@ -73,7 +75,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
     error UnderwriterNotInsolvent();
     error ZeroAddressNotAllowed();
     error OnlyPolicyOwner();
-    error PolicyNotActive(); // FIX: Added custom error for clarity
+    error PolicyNotActive();
+    error InvalidClaimAmount(); // NEW
 
     // --- Constructor ---
 
@@ -81,9 +84,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     // --- Owner Functions ---
 
-    /**
-     * @notice Set core contract addresses. Owner only.
-     */
     function setAddresses(
         address _capital,
         address _registry,
@@ -94,12 +94,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
         address _underwriterManager
     ) external onlyOwner {
         if (
-            _capital == address(0) ||
-            _registry == address(0) ||
-            _policyManager == address(0) ||
-            _cat == address(0) ||
-            _loss == address(0) ||
-            _rewards == address(0) ||
+            _capital == address(0) || _registry == address(0) || _policyManager == address(0) ||
+            _cat == address(0) || _loss == address(0) || _rewards == address(0) ||
             _underwriterManager == address(0)
         ) revert ZeroAddressNotAllowed();
 
@@ -115,9 +111,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
         emit AddressesSet(_capital, _registry, _policyManager, _cat, _loss, _rewards, _underwriterManager);
     }
 
-    /**
-     * @notice Update the committee address. Owner only.
-     */
     function setCommittee(address _newCommittee) external onlyOwner {
         if (_newCommittee == address(0)) revert ZeroAddressNotAllowed();
         committee = _newCommittee;
@@ -126,9 +119,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     // --- Public Functions ---
 
-    /**
-     * @notice Liquidate an underwriter if their pending losses exceed their capital.
-     */
     function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
         _checkInsolvency(_underwriter);
         underwriterManager.realizeLossesForAllPools(_underwriter);
@@ -136,29 +126,43 @@ contract RiskManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Process a claim: distribute premium, allocate losses, payout claimant, update state, burn policy.
+     * @notice Process a partial or full claim against a policy.
+     * @dev UPDATED: Now takes a `claimAmount` to support partial claims.
+     * @param policyId The ID of the policy being claimed against.
+     * @param claimAmount The amount of the loss to claim. Must be > 0 and <= remaining coverage.
      */
-    function processClaim(uint256 policyId) external nonReentrant {
-        // FIX: Moved owner and activation checks to the top for fail-fast logic.
+    function processClaim(uint256 policyId, uint256 claimAmount) external nonReentrant {
         address claimant = policyNFT.ownerOf(policyId);
         if (msg.sender != claimant) revert OnlyPolicyOwner();
 
         IPolicyNFT.Policy memory policy = policyNFT.getPolicy(policyId);
         if (block.timestamp < policy.activation) revert PolicyNotActive();
+        if (claimAmount == 0 || claimAmount > policy.coverage) revert InvalidClaimAmount();
 
         ClaimData memory data = _prepareClaimData(policyId, policy, claimant);
 
-        _distributePremium(data);
-        uint256 lossBorneByPool = _distributeLosses(data);
-        _executePayout(data);
-        _updatePoolState(data, lossBorneByPool);
+        // NOTE: The premium payment logic is based on the original contract's pattern.
+        // It assumes the claimant pays a premium proportional to the claim amount.
+        _distributePremium(data, claimAmount);
+        
+        uint256 lossBorneByPool = _distributeLosses(data, claimAmount);
+        _executePayout(data, claimAmount);
+        _updatePoolState(data, lossBorneByPool, claimAmount);
 
-        policyNFT.burn(policyId);
+        bool isFullClaim = (claimAmount == policy.coverage);
+        
+        if (isFullClaim) {
+            // If the full remaining coverage is claimed, burn the policy NFT.
+            policyNFT.burn(policyId);
+        } else {
+            // For a partial claim, reduce the policy's coverage amount.
+            // NOTE: This requires a new function on the IPolicyNFT interface.
+            policyNFT.reduceCoverage(policyId, claimAmount);
+        }
+
+        emit ClaimProcessed(policyId, claimAmount, isFullClaim);
     }
 
-    /**
-     * @notice Update coverage sold; only callable by PolicyManager.
-     */
     function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external {
         if (msg.sender != policyManager) revert NotPolicyManager();
         poolRegistry.updateCoverageSold(poolId, amount, isSale);
@@ -166,15 +170,12 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     // --- Internal Functions ---
 
-    /**
-     * @dev Distributes premium to the reward distributor if applicable.
-     */
-    function _distributePremium(ClaimData memory _data) internal {
-        if (_data.policy.coverage == 0 || address(_data.protocolToken) == address(0)) return;
+    function _distributePremium(ClaimData memory _data, uint256 _claimAmount) internal {
+        if (_claimAmount == 0 || address(_data.protocolToken) == address(0)) return;
 
         uint8 protocolDecimals = IERC20Metadata(address(_data.protocolToken)).decimals();
         uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
-        uint256 protocolCoverage = _scaleAmount(_data.policy.coverage, underlyingDecimals, protocolDecimals);
+        uint256 protocolCoverage = _scaleAmount(_claimAmount, underlyingDecimals, protocolDecimals);
 
         _data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
         rewardDistributor.distribute(
@@ -185,29 +186,20 @@ contract RiskManager is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Distributes losses to LPs and draws from the backstop pool if there's a shortfall.
-     */
-    function _distributeLosses(ClaimData memory _data) internal returns (uint256) {
-        uint256 coverage = _data.policy.coverage;
-        uint256 totalCapital = _data.totalCapitalPledged;
+    function _distributeLosses(ClaimData memory _data, uint256 _claimAmount) internal returns (uint256) {
+        lossDistributor.distributeLoss(_data.policy.poolId, _claimAmount, _data.totalCapitalPledged);
 
-        lossDistributor.distributeLoss(_data.policy.poolId, coverage, totalCapital);
-
-        uint256 lossBorneByPool = Math.min(coverage, totalCapital);
-        uint256 shortfall = coverage > lossBorneByPool ? coverage - lossBorneByPool : 0;
+        uint256 lossBorneByPool = Math.min(_claimAmount, _data.totalCapitalPledged);
+        uint256 shortfall = _claimAmount > lossBorneByPool ? _claimAmount - lossBorneByPool : 0;
         if (shortfall > 0) {
             catPool.drawFund(shortfall);
         }
         return lossBorneByPool;
     }
 
-    /**
-     * @dev Executes the claim payout to the claimant and sends the fee to the committee.
-     */
-    function _executePayout(ClaimData memory _data) internal {
-        uint256 claimFee = (_data.policy.coverage * _data.poolClaimFeeBps) / BPS;
-        uint256 payoutAmount = _data.policy.coverage > claimFee ? _data.policy.coverage - claimFee : 0;
+    function _executePayout(ClaimData memory _data, uint256 _claimAmount) internal {
+        uint256 claimFee = (_claimAmount * _data.poolClaimFeeBps) / BPS;
+        uint256 payoutAmount = _claimAmount > claimFee ? _claimAmount - claimFee : 0;
 
         ICapitalPool.PayoutData memory payoutData = ICapitalPool.PayoutData({
             claimant: _data.claimant,
@@ -221,10 +213,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         capitalPool.executePayout(payoutData);
     }
 
-    /**
-     * @dev Updates the pool's capital allocation and total coverage sold after a claim.
-     */
-    function _updatePoolState(ClaimData memory _data, uint256 lossBorneByPool) internal {
+    function _updatePoolState(ClaimData memory _data, uint256 lossBorneByPool, uint256 _claimAmount) internal {
         if (lossBorneByPool > 0 && _data.totalCapitalPledged > 0) {
             for (uint256 i = 0; i < _data.adapters.length; i++) {
                 uint256 adapterLoss = Math.mulDiv(
@@ -237,44 +226,34 @@ contract RiskManager is Ownable, ReentrancyGuard {
                 }
             }
         }
-        // FIX: Only reduce coverage sold for cover pools and if there is existing coverage to deduct.
         if (_data.isCoverPool) {
-            uint256 reduction = Math.min(_data.policy.coverage, _data.totalCoverageSold);
+            uint256 reduction = Math.min(_claimAmount, _data.totalCoverageSold);
             if (reduction > 0) {
                 poolRegistry.updateCoverageSold(_data.policy.poolId, reduction, false);
             }
         }
     }
 
-    /**
-     * @dev Gather all data needed for claim processing.
-     */
     function _prepareClaimData(
-        uint256 _policyId,
+        uint256, // _policyId - no longer needed here but kept for signature consistency
         IPolicyNFT.Policy memory _policy,
         address _claimant
     ) internal view returns (ClaimData memory data) {
         data.policy = _policy;
         data.claimant = _claimant;
-
         (data.adapters, data.capitalPerAdapter, data.totalCapitalPledged) =
             poolRegistry.getPoolPayoutData(data.policy.poolId);
-        
-        // FIX: Correctly destructure the tuple based on the compiler error.
         (
             data.protocolToken,
-            , // e.g., totalValueLocked (uint256)
+            ,
             data.totalCoverageSold,
-            , // e.g., totalShares (uint256)
-            data.isCoverPool, // The bool flag
-            , // e.g., feeRecipient (address)
+            ,
+            data.isCoverPool,
+            ,
             data.poolClaimFeeBps
         ) = poolRegistry.getPoolData(data.policy.poolId);
     }
 
-    /**
-     * @dev Checks if an underwriter's pending losses exceed their total capital value.
-     */
     function _checkInsolvency(address _underwriter) internal view {
         (, , uint256 masterShares, ) = capitalPool.getUnderwriterAccount(_underwriter);
         if (masterShares == 0) revert UnderwriterNotInsolvent();
@@ -290,9 +269,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
         if (totalPendingLosses <= totalValue) revert UnderwriterNotInsolvent();
     }
 
-    /**
-     * @dev Scales an amount between different decimal precisions.
-     */
     function _scaleAmount(
         uint256 amount,
         uint8 fromDecimals,

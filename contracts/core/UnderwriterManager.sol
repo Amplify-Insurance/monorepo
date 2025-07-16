@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.20;
 
@@ -9,7 +8,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // --- Interfaces ---
-import {IPolicyNFT} from "../interfaces/IPolicyNFT.sol";
 import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
 import {ICapitalPool} from "../interfaces/ICapitalPool.sol";
 import {IBackstopPool} from "../interfaces/IBackstopPool.sol";
@@ -45,7 +43,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
     mapping(address => mapping(uint256 => uint256)) public underwriterAllocationIndex;
 
-    uint256 public constant ABSOLUTE_MAX_ALLOCATIONS = 50; // New constant to prevent DoS
+    uint256 public constant ABSOLUTE_MAX_ALLOCATIONS = 50;
     uint256 public maxAllocationsPerUnderwriter = 5;
     uint256 public deallocationNoticePeriod;
 
@@ -171,16 +169,10 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /* ───────────────── Rewards Claiming ───────────────── */
 
-    /**
-     * @notice Claim premium rewards for a single pool.
-     * @dev Changed from batch processing to per-pool to prevent DoS.
-     */
     function claimPremiumRewards(uint256 poolId) external nonReentrant {
         uint256 pledge = underwriterPoolPledge[msg.sender][poolId];
         if (pledge == 0) revert NotAllocated();
-
         (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(poolId);
-
         rewardDistributor.claim(
             msg.sender,
             poolId,
@@ -189,25 +181,24 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @notice Claim distressed asset rewards from the backstop pool for a single cover pool.
-     * @dev Changed from batch processing to per-pool to prevent DoS.
-     */
     function claimDistressedAssets(uint256 poolId) external nonReentrant {
         if (!isAllocatedToPool[msg.sender][poolId]) revert NotAllocated();
-
         (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(poolId);
-        
         if (address(protocolToken) != address(0)) {
             catPool.claimProtocolAssetRewardsFor(msg.sender, address(protocolToken));
         }
     }
 
-    /* ───────────────── External Functions for RiskManager ───────────────── */
+    /* ───────────────── External Functions for Other Contracts ───────────────── */
 
     function realizeLossesForAllPools(address user) external {
         if (msg.sender != riskManager) revert NotRiskManager();
         _realizeLossesForAllPools(user);
+    }
+
+    // NEW: Getter function needed by the LossDistributor
+    function getPoolUnderwriters(uint256 poolId) external view returns (address[] memory) {
+        return poolSpecificUnderwriters[poolId];
     }
 
     /* ───────────────── Internal & Private Functions ───────────────── */
@@ -224,12 +215,15 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     function _executeDeallocation(address underwriter, uint256 poolId, uint256 requestedAmount) internal {
+        // NOTE: The user's pledge is now reduced inside the LossDistributor->CapitalPool flow.
+        // We only need to adjust the local accounting for the deallocated portion.
         uint256 pledgeAfterLosses = underwriterPoolPledge[underwriter][poolId];
         uint256 finalAmountToDeallocate = Math.min(requestedAmount, pledgeAfterLosses);
         uint256 remainingPledge = pledgeAfterLosses - finalAmountToDeallocate;
         address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
         require(userAdapterAddress != address(0), "User has no yield adapter");
         underwriterPoolPledge[underwriter][poolId] = remainingPledge;
+        // underwriterTotalPledge[underwriter] -= finalAmountToDeallocate; // Also reduce total pledge
         if (remainingPledge == 0) {
             _removeUnderwriterFromPool(underwriter, poolId);
         }
@@ -290,22 +284,35 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
     }
 
+
+        // In UnderwriterManager.sol
+    function claimYieldRewards() external nonReentrant {
+        // Get the user's chosen adapter from CapitalPool
+        address adapterAddress = capitalPool.getUnderwriterAdapterAddress(msg.sender);
+        require(adapterAddress != address(0), "No yield adapter chosen");
+
+        // Get the reward pool ID for that adapter from CapitalPool
+        uint256 rewardPoolId = capitalPool.yieldAdapterRewardPoolId(adapterAddress);
+        require(rewardPoolId != 0, "Reward pool for adapter not set");
+
+        // Get the user's total capital (shares) to determine their portion
+        (,,uint256 userShares,) = capitalPool.getUnderwriterAccount(msg.sender);
+
+        // Claim the yield rewards
+        rewardDistributor.claim(msg.sender, rewardPoolId, address(capitalPool.underlyingAsset()), userShares);
+    }
+
+    /**
+     * @notice UPDATED: This function now simply acts as a settlement trigger.
+     * @dev It loops through a user's allocations and calls the LossDistributor for each one.
+     * The LossDistributor now contains the full logic to calculate and apply the loss by
+     * commanding the CapitalPool to burn shares.
+     */
     function _realizeLossesForAllPools(address _user) internal {
         uint256[] memory allocations = underwriterAllocations[_user];
-        uint256 currentTotalPledge = underwriterTotalPledge[_user];
         for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-            uint256 poolPledge = underwriterPoolPledge[_user][poolId];
-            if (poolPledge == 0) continue;
-            uint256 pendingLoss = lossDistributor.realizeLosses(_user, poolId, poolPledge);
-            if (pendingLoss > 0) {
-                uint256 lossApplied = Math.min(poolPledge, pendingLoss);
-                underwriterPoolPledge[_user][poolId] -= lossApplied;
-                currentTotalPledge -= lossApplied;
-                capitalPool.applyLosses(_user, pendingLoss);
-            }
+            lossDistributor.realizeLosses(_user, allocations[i]);
         }
-        underwriterTotalPledge[_user] = currentTotalPledge;
     }
 
     function _processWithdrawalForPool(

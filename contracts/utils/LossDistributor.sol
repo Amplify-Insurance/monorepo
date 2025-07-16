@@ -3,36 +3,39 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ILossDistributor.sol";
+import "../interfaces/IUnderwriterManager.sol";
+import "../interfaces/ICapitalPool.sol";
 
 /**
  * @title LossDistributor
  * @author Gemini
  * @notice Manages the scalable accounting of losses for underwriters using the "pull-over-push" pattern.
- * This avoids gas-intensive loops by tracking losses on a per-share basis and realizing them on demand.
+ * @dev This avoids gas-intensive loops by tracking losses on a per-share basis and realizing them on demand.
  */
 contract LossDistributor is ILossDistributor, Ownable {
+    // --- Dependencies ---
     address public riskManager;
+    IUnderwriterManager public underwriterManager;
+    ICapitalPool public capitalPool;
 
-    event RiskManagerAddressSet(address indexed newRiskManager);
+    // --- Events ---
+    event RiskManagerSet(address indexed newRiskManager);
+    event UnderwriterManagerSet(address indexed newUnderwriterManager);
+    event CapitalPoolSet(address indexed newCapitalPool);
 
-    // --- Accounting Structs ---
+    // --- Accounting Structs for the "Pull-over-Push" Pattern ---
     struct LossTracker {
-        // Total accumulated losses for a pool, divided by the total pledge at the time of distribution.
-        // This value is stored with high precision to minimize rounding errors.
-        uint256 accumulatedLossPerShare;
+        // Total accumulated losses for a pool, per unit of pledge, stored with high precision.
+        uint256 accumulatedLossPerPledge;
     }
 
     struct UserLossState {
-        // The loss-per-share value at the time of the user's last interaction.
-        // Used to calculate how many new losses they've incurred since.
+        // The total loss the user has already realized and "paid" for.
         uint256 lossDebt;
     }
 
     // --- State Variables ---
-    // poolId => LossTracker
     mapping(uint256 => LossTracker) public poolLossTrackers;
-
-    // userAddress => poolId => UserLossState
     mapping(address => mapping(uint256 => UserLossState)) public userLossStates;
     
     uint256 public constant PRECISION_FACTOR = 1e18;
@@ -43,72 +46,113 @@ contract LossDistributor is ILossDistributor, Ownable {
         _;
     }
 
+    modifier onlyUnderwriterManager() {
+        require(msg.sender == address(underwriterManager), "LD: Not UnderwriterManager");
+        _;
+    }
+
     error ZeroAddress();
 
     /* ───────────────────────── Constructor & Setup ──────────────────────── */
 
-    constructor(address _riskManagerAddress) Ownable(msg.sender) {
-        if (_riskManagerAddress == address(0)) revert ZeroAddress();
-        riskManager = _riskManagerAddress;
+    constructor(
+        address _riskManager,
+        address _underwriterManager,
+        address _capitalPool
+    ) Ownable(msg.sender) {
+        if (_riskManager == address(0) || _underwriterManager == address(0) || _capitalPool == address(0)) {
+            revert ZeroAddress();
+        }
+        riskManager = _riskManager;
+        underwriterManager = IUnderwriterManager(_underwriterManager);
+        capitalPool = ICapitalPool(_capitalPool);
     }
 
     function setRiskManager(address newRiskManager) external onlyOwner {
         if (newRiskManager == address(0)) revert ZeroAddress();
         riskManager = newRiskManager;
-        emit RiskManagerAddressSet(newRiskManager);
+        emit RiskManagerSet(newRiskManager);
+    }
+
+    function setUnderwriterManager(address newUnderwriterManager) external onlyOwner {
+        if (newUnderwriterManager == address(0)) revert ZeroAddress();
+        underwriterManager = IUnderwriterManager(newUnderwriterManager);
+        emit UnderwriterManagerSet(newUnderwriterManager);
+    }
+
+    function setCapitalPool(address newCapitalPool) external onlyOwner {
+        if (newCapitalPool == address(0)) revert ZeroAddress();
+        capitalPool = ICapitalPool(newCapitalPool);
+        emit CapitalPoolSet(newCapitalPool);
     }
 
     /* ───────────────────────── Core Logic ──────────────────────── */
 
     /**
-     * @notice Records a new loss by updating the pool's loss-per-share metric.
-     * @dev Called by the RiskManager when a claim is processed.
-     * @param poolId The ID of the pool where the loss occurred.
-     * @param lossAmount The total amount of the loss to distribute.
-     * @param totalPledgeInPool The total capital pledged to the pool at this moment.
+     * @notice Records a new loss by updating the pool's loss-per-pledge metric.
+     * @dev This is now a highly scalable O(1) operation.
      */
-    function distributeLoss(uint256 poolId, uint256 lossAmount, uint256 totalPledgeInPool) external override onlyRiskManager {
+    function distributeLoss(
+        uint256 poolId,
+        uint256 lossAmount,
+        uint256 totalPledgeInPool
+    ) external override onlyRiskManager {
         if (lossAmount == 0 || totalPledgeInPool == 0) {
             return;
         }
         LossTracker storage tracker = poolLossTrackers[poolId];
-        tracker.accumulatedLossPerShare += (lossAmount * PRECISION_FACTOR) / totalPledgeInPool;
+        tracker.accumulatedLossPerPledge += (lossAmount * PRECISION_FACTOR) / totalPledgeInPool;
     }
 
     /**
-     * @notice Calculates a user's pending, unrealized losses and updates their debt.
-     * @dev This is called by the RiskManager before an action like a withdrawal to ensure
-     * the user's capital is correctly reduced first.
-     * @param user The user for whom to realize losses.
-     * @param poolId The pool to realize losses from.
-     * @param userPledge The user's current capital pledge.
-     * @return The amount of loss to be applied to the user's principal.
+     * @notice Realizes a user's pending losses by calculating what they owe, burning their
+     * shares in the CapitalPool, and updating their debt.
+     * @dev Called by the UnderwriterManager before an action like a withdrawal.
      */
-    function realizeLosses(address user, uint256 poolId, uint256 userPledge) external override onlyRiskManager returns (uint256) {
-        uint256 pending = getPendingLosses(user, poolId, userPledge);
+    function realizeLosses(address user, uint256 poolId) external override onlyUnderwriterManager {
+        uint256 userPledge = underwriterManager.underwriterPoolPledge(user, poolId);
+        if (userPledge == 0) return;
+
+        uint256 pendingLossValue = getPendingLosses(user, poolId, userPledge);
         
-        if (pending > 0) {
-            UserLossState storage userState = userLossStates[user][poolId];
+        if (pendingLossValue > 0) {
+            // Convert the value of the loss into the number of shares to burn
+            uint256 sharesToBurn = capitalPool.valueToShares(pendingLossValue);
+
+            // Command the CapitalPool to burn the shares
+            address[] memory underwriters = new address[](1);
+            underwriters[0] = user;
+            uint256[] memory burnAmounts = new uint256[](1);
+            burnAmounts[0] = sharesToBurn;
+            capitalPool.burnSharesForLoss(underwriters, burnAmounts, pendingLossValue);
+
+            // Update the user's debt to the new total
             LossTracker storage tracker = poolLossTrackers[poolId];
-            userState.lossDebt = (userPledge * tracker.accumulatedLossPerShare) / PRECISION_FACTOR;
+            UserLossState storage userState = userLossStates[user][poolId];
+            userState.lossDebt = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
         }
-        return pending;
     }
 
     /* ───────────────────────── View Functions ──────────────────────── */
     
     /**
      * @notice Calculates the pending, unrealized losses for a user in a specific pool.
-     * @param user The user's address.
-     * @param poolId The pool ID.
-     * @param userPledge The user's current capital pledge.
-     * @return The amount of unrealized losses.
      */
-    function getPendingLosses(address user, uint256 poolId, uint256 userPledge) public view override returns (uint256) {
+    function getPendingLosses(
+        address user,
+        uint256 poolId,
+        uint256 userPledge
+    ) public view override returns (uint256) {
         LossTracker storage tracker = poolLossTrackers[poolId];
         UserLossState storage userState = userLossStates[user][poolId];
 
-        uint256 totalLossIncurred = (userPledge * tracker.accumulatedLossPerShare) / PRECISION_FACTOR;
+        uint256 totalLossIncurred = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
+        
+        // Ensure we don't return a negative number due to rounding
+        if (totalLossIncurred <= userState.lossDebt) {
+            return 0;
+        }
+        
         return totalLossIncurred - userState.lossDebt;
     }
 }

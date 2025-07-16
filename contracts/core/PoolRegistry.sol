@@ -36,9 +36,14 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     address public riskManager;
     address public underwriterManager;
 
+    // NEW: Mapping to differentiate pool types for the RewardDistributor
+    mapping(uint256 => bool) public isYieldRewardPool;
+
 
     event RiskManagerAddressSet(address indexed newRiskManager);
-    event UnderwriterManagerAddressSet(address indexed newUnderwriterManager); // FIX: Added dedicated event
+    event UnderwriterManagerAddressSet(address indexed newUnderwriterManager);
+    event PoolTypeSet(uint256 indexed poolId, bool isYieldPool); // NEW Event
+
 
     modifier onlyRiskManager() {
         require(msg.sender == riskManager, "PR: Not RiskManager");
@@ -58,7 +63,6 @@ contract PoolRegistry is IPoolRegistry, Ownable {
 
     constructor(address initialOwner, address riskManagerAddress, address underwriterManagerAddress) Ownable(initialOwner) {
         require(riskManagerAddress != address(0), "PR: Zero address for RM");
-        // FIX: Added check for underwriterManagerAddress
         require(underwriterManagerAddress != address(0), "PR: Zero address for UM");
         riskManager = riskManagerAddress;
         underwriterManager = underwriterManagerAddress;
@@ -73,19 +77,30 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     function setUnderwriterManagerAddress(address newUnderwriterManager) external onlyOwner {
         require(newUnderwriterManager != address(0), "PR: Zero address");
         underwriterManager = newUnderwriterManager;
-        // FIX: Emit the correct event
         emit UnderwriterManagerAddressSet(newUnderwriterManager);
     }
 
 
     function setPauseState(uint256 poolId, bool isPaused) external onlyOwner {
+        require(poolId < protocolRiskPools.length, "PR: Invalid poolId");
         PoolData storage pool = protocolRiskPools[poolId];
         pool.isPaused = isPaused;
         pool.pauseTimestamp = isPaused ? block.timestamp : 0;
     }
     
     function setFeeRecipient(uint256 poolId, address recipient) external onlyOwner {
+        require(poolId < protocolRiskPools.length, "PR: Invalid poolId");
         protocolRiskPools[poolId].feeRecipient = recipient;
+    }
+
+    /**
+     * @notice NEW: Sets whether a pool ID is for yield rewards.
+     * @dev This allows the RewardDistributor to distinguish between reward types.
+     */
+    function setIsYieldRewardPool(uint256 poolId, bool isYieldPool) external onlyOwner {
+        require(poolId < protocolRiskPools.length, "PR: Invalid poolId");
+        isYieldRewardPool[poolId] = isYieldPool;
+        emit PoolTypeSet(poolId, isYieldPool);
     }
 
     /* ───────────────────── State Modifying Functions (RM only) ───────────────────── */

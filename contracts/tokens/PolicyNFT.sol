@@ -10,7 +10,7 @@ import "../interfaces/IPolicyNFT.sol";
  * @title PolicyNFT
  * @author Gemini
  * @notice This contract manages the ownership and state of insurance policies as NFTs.
- * This version is simplified to work with a PolicyManager that handles pending increase logic externally.
+ * @dev UPDATED: Now includes a `reduceCoverage` function to support partial claims.
  */
 contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
 
@@ -22,6 +22,7 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
     // --- Events ---
     event PolicyPremiumAccountUpdated(uint256 indexed policyId, uint128 newDeposit, uint128 newDrainTime);
     event PolicyCoverageIncreased(uint256 indexed policyId, uint256 newTotalCoverage);
+    event PolicyCoverageReduced(uint256 indexed policyId, uint256 newTotalCoverage); // NEW
     event PolicyManagerAddressSet(address indexed newPolicyManagerAddress);
     event RiskManagerAddressSet(address indexed newRiskManagerAddress);
 
@@ -39,7 +40,8 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
     }
 
     constructor(address _initialPolicyManager, address initialOwner) ERC721("Policy", "PCOVER") Ownable(initialOwner) {
-        // require(_initialPolicyManager != address(0), "PolicyNFT: PolicyManager address cannot be zero");
+        // NOTE: The require check for a non-zero address was removed to allow for a two-step deployment pattern.
+        // It's crucial that the address is set via setPolicyManagerAddress before any minting can occur.
         policyManagerContract = _initialPolicyManager;
     }
 
@@ -69,7 +71,6 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
         id = nextId++;
         _safeMint(to, id);
         
-        // MODIFIED: Initialize the simpler struct.
         policies[id] = IPolicyNFT.Policy({
             coverage: coverage,
             poolId: pid,
@@ -82,9 +83,9 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
     }
 
     /**
-     * @notice Burns a policy NFT. Only callable by the authorized PolicyManager.
+     * @notice Burns a policy NFT. Only callable by the authorized PolicyManager or RiskManager.
      */
-    function burn(uint256 id) external onlyRMOrPM {
+    function burn(uint256 id) external override onlyRMOrPM {
         _burn(id);
         delete policies[id];
     }
@@ -93,7 +94,6 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
      * @notice Updates the premium details for a policy.
      */
     function updatePremiumAccount(uint256 id, uint128 newDeposit, uint128 newDrainTime) external onlyPolicyManager {
-        // A non-zero 'start' time confirms the policy exists.
         require(policies[id].start != 0, "PolicyNFT: Policy does not exist or has been burned");
         
         IPolicyNFT.Policy storage policy = policies[id];
@@ -103,10 +103,7 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
     }
     
     /**
-     * @notice NEW: Finalizes one or more matured increases, adding the total amount to the main coverage.
-     * @dev Called by the PolicyManager after it has processed its queue of pending increases.
-     * @param id The ID of the policy NFT.
-     * @param totalAmountToAdd The sum of all matured coverage increases to be added.
+     * @notice Finalizes one or more matured increases, adding the total amount to the main coverage.
      */
     function finalizeIncreases(uint256 id, uint256 totalAmountToAdd) external onlyPolicyManager {
         require(policies[id].start != 0, "PolicyNFT: Policy does not exist or has been burned");
@@ -117,10 +114,27 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
         
         emit PolicyCoverageIncreased(id, policy.coverage);
     }
+
+    /**
+     * @notice NEW: Reduces a policy's coverage after a partial claim.
+     * @dev Called by the RiskManager after a partial claim is processed.
+     * @param id The ID of the policy NFT.
+     * @param reductionAmount The amount to reduce the coverage by.
+     */
+    function reduceCoverage(uint256 id, uint256 reductionAmount) external override onlyRMOrPM {
+        IPolicyNFT.Policy storage policy = policies[id];
+        require(policy.start != 0, "PolicyNFT: Policy does not exist or has been burned");
+        require(reductionAmount > 0 && reductionAmount < policy.coverage, "PolicyNFT: Invalid reduction amount");
+
+        policy.coverage -= reductionAmount;
+        
+        emit PolicyCoverageReduced(id, policy.coverage);
+    }
+
     /**
      * @notice Retrieves the data for a specific policy.
      */
-    function getPolicy(uint256 id) external view returns (IPolicyNFT.Policy memory) {
+    function getPolicy(uint256 id) external view override returns (IPolicyNFT.Policy memory) {
         return policies[id];
     }
 

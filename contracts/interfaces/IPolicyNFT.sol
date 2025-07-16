@@ -33,7 +33,7 @@ interface IPolicyNFT {
     function ownerOf(uint256 policyId) external view returns (address);
     function getPolicy(uint256 policyId) external view returns (Policy memory);
     function updatePremiumAccount(uint256 policyId, uint128 newDeposit, uint128 newDrainTime) external;
-
+    function reduceCoverage(uint256 id, uint256 reductionAmount) external;
     // REMOVED: These functions are no longer needed as the logic is in PolicyManager
     // function addPendingIncrease(uint256 policyId, uint256 amount, uint256 activationTimestamp) external;
     // function finalizeIncrease(uint256 policyId) external;

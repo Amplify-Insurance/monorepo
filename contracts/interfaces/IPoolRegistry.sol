@@ -33,6 +33,7 @@ interface IPoolRegistry {
         uint256 claimFeeBps
     );
 
+    function isYieldRewardPool(uint256 poolId) external view returns (bool);
     function getPoolRateModel(uint256 poolId) external view returns (RateModel memory);
     function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
     function getPoolActiveAdapters(uint256 poolId) external view returns (address[] memory);
