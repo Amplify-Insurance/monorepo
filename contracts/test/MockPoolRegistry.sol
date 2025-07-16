@@ -107,6 +107,10 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
         claimFeeBps = d.claimFeeBps;
     }
 
+    function isYieldRewardPool(uint256) external view override returns (bool) {
+        return false;
+    }
+
     function getPoolRateModel(uint256 poolId) external view override returns (RateModel memory) {
         return rateModels[poolId];
     }

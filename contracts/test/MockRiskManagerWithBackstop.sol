@@ -38,6 +38,10 @@ contract MockRiskManagerWithBackstop is IRiskManagerWithBackstop {
     }
 
     function applyLossesOnPool(address pool, address underwriter, uint256 amount) external {
-        ICapitalPool(pool).applyLosses(underwriter, amount);
+        address[] memory users = new address[](1);
+        users[0] = underwriter;
+        uint256[] memory burns = new uint256[](1);
+        burns[0] = amount;
+        ICapitalPool(pool).burnSharesForLoss(users, burns, amount);
     }
 }

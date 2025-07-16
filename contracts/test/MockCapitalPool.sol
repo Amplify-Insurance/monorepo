@@ -23,12 +23,17 @@ contract MockCapitalPool is Ownable {
     uint256 public last_applyLosses_principalLossAmount;
     uint256 public applyLossesCallCount;
 
+    // Variables for burnSharesForLoss tracking
+    uint256 public burnSharesForLossCallCount;
+    uint256 public last_burnSharesForLoss_totalLoss;
+
     // --- Events for Testing ---
 
     event LossesAppliedCalled(address indexed underwriter, uint256 principalLossAmount);
     event RevertOnApplyLossesSet(bool shouldRevert);
     event RiskManagerNotifiedOfDeposit(address indexed underwriter, uint256 amount);
     event RiskManagerNotifiedOfWithdrawal(address indexed underwriter, uint256 principal, bool isFull);
+    event BurnSharesForLossCalled(uint256 totalLossAmount);
 
     struct Account {
         uint256 dummy1;
@@ -86,6 +91,16 @@ contract MockCapitalPool is Ownable {
         applyLossesCallCount++;
 
         emit LossesAppliedCalled(_underwriter, _principalLossAmount);
+    }
+
+    function burnSharesForLoss(
+        address[] calldata,
+        uint256[] calldata,
+        uint256 totalLossAmount
+    ) external {
+        burnSharesForLossCallCount++;
+        last_burnSharesForLoss_totalLoss = totalLossAmount;
+        emit BurnSharesForLossCalled(totalLossAmount);
     }
 
     /**
