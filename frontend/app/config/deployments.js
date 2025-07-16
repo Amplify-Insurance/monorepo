@@ -11,7 +11,7 @@ try {
     underwriterManager: item.UnderwriterManager || item.RiskManager,
     protocolConfigurator: item.ProtocolConfigurator || item.RiskManager,
     capitalPool: item.CapitalPool,
-    backstopPool: item.CatInsurancePool,
+    backstopPool: item.CatInsurancePool || item.BackstopPool,
     poolRegistry: item.PoolRegistry,
     policyManager: item.PolicyManager,
     priceOracle: item.PriceOracle,
