@@ -19,6 +19,7 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
     mapping(uint256 => PoolData) public pools;
     mapping(uint256 => mapping(address => uint256)) public capitalPerAdapter;
     mapping(uint256 => RateModel) public rateModels;
+    mapping(uint256 => bool) public isYieldRewardPool;
     uint256 public poolCount;
     address[] public payoutAdapters;
     uint256[] public payoutAmounts;
@@ -38,6 +39,10 @@ contract MockPoolRegistry is IPoolRegistry, Ownable {
     bool public last_updateCapitalPendingWithdrawal_isRequest;
 
     constructor() Ownable(msg.sender) {}
+
+    function setIsYieldRewardPool(uint256 poolId, bool isYield) external onlyOwner {
+        isYieldRewardPool[poolId] = isYield;
+    }
 
     function setPoolData(
         uint256 poolId,

@@ -39,9 +39,14 @@ contract MockLossDistributor is ILossDistributor {
         emit LossDistributed(poolId, lossAmount, totalPledgeInPool);
     }
 
-    function realizeLosses(address user, uint256 poolId, uint256 userPledge) external override returns (uint256) {
-        // `userPledge` is unused in this mock but kept for interface compatibility
-        userPledge; // Silence unused variable warning
+    // Updated interface now expects a 2-argument function without a return value
+    function realizeLosses(address user, uint256 poolId) external override {
+        pending[user][poolId] = 0;
+    }
+
+    // Legacy helper used by older tests which returns the realized amount
+    function realizeLosses(address user, uint256 poolId, uint256 userPledge) external returns (uint256) {
+        userPledge; // silence unused variable warning
         uint256 amount = pending[user][poolId];
         pending[user][poolId] = 0;
         return amount;
