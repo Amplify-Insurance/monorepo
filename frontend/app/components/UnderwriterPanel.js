@@ -6,6 +6,7 @@ import { Info, ChevronDown, Filter, HelpCircle } from "lucide-react"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from "next/image"
 import { useAccount } from "wagmi"
+import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
@@ -40,7 +41,8 @@ const protocolCategories = [
 
 
 export default function UnderwriterPanel({ displayCurrency }) {
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
+  const { details } = useUnderwriterDetails(address)
   const { pools, loading } = usePools()
   // Token list should only contain underlying assets used for providing
   // coverage. Previously this also included the protocol tokens which led to
@@ -96,6 +98,29 @@ export default function UnderwriterPanel({ displayCurrency }) {
       prev.filter((id) => Number(id) !== selectedYield),
     )
   }, [selectedYield])
+
+  useEffect(() => {
+    if (!details || !selectedToken || pools.length === 0) return
+    const deployment = tokenDeploymentMap[selectedToken.address.toLowerCase()]
+    const detail = details.find((d) => d.deployment === deployment)
+    if (!detail) {
+      setSelectedMarkets([])
+      return
+    }
+    const marketIds = detail.allocatedPoolIds
+      .map((pid) => {
+        const pool = pools.find(
+          (p) =>
+            p.deployment === deployment &&
+            Number(p.id) === Number(pid) &&
+            p.underlyingAsset.toLowerCase() ===
+              selectedToken.address.toLowerCase(),
+        )
+        return pool ? String(pool.id) : null
+      })
+      .filter((x) => x !== null)
+    setSelectedMarkets(Array.from(new Set(marketIds)))
+  }, [details, selectedToken, pools])
 
 
   const markets = Object.values(
