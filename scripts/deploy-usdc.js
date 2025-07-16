@@ -52,7 +52,7 @@ async function main() {
   await policyNFT.waitForDeployment();
 
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
-  const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target);
+  const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target, underwriterManager.target);
   await poolRegistry.waitForDeployment();
 
   const LossDistributor = await ethers.getContractFactory("LossDistributor");
@@ -63,6 +63,7 @@ async function main() {
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
   await policyNFT.setPolicyManagerAddress(policyManager.target);
+  await policyNFT.setRiskManagerAddress(riskManager.target);
 
   
   const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
@@ -85,6 +86,10 @@ async function main() {
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
   const capitalPool = await CapitalPool.deploy(deployer.address, USDC_ADDRESS);
   await capitalPool.waitForDeployment();
+
+  await capitalPool.setRiskManagerAddress(riskManager.target);
+  await capitalPool.setUnderwriterManagerAddress(underwriterManager.target);
+
 
   // Wire permissions and addresses
   await catPool.setRiskManagerAddress(riskManager.target);
@@ -124,10 +129,6 @@ async function main() {
     underwriterManager.target
   );
 
-  // Use configurator for initial setup
-  await protocolConfigurator.setPoolRegistryRiskManager(riskManager.target);
-  await protocolConfigurator.setCapitalPoolRiskManager(riskManager.target);
-
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
   const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
@@ -141,6 +142,18 @@ async function main() {
   await compoundAdapter.waitForDeployment();
   await compoundAdapter.setCapitalPoolAddress(capitalPool.target);
 
+  // Transfer ownership of core contracts to the configurator
+  await poolRegistry.transferOwnership(protocolConfigurator.target);
+  await capitalPool.transferOwnership(protocolConfigurator.target);
+  await policyManager.transferOwnership(protocolConfigurator.target);
+  await riskManager.transferOwnership(protocolConfigurator.target);
+  await underwriterManager.transferOwnership(protocolConfigurator.target);
+  await rewardDistributor.transferOwnership(protocolConfigurator.target);
+  await catPool.transferOwnership(protocolConfigurator.target);
+
+  // Use configurator for initial setup
+  await protocolConfigurator.setRiskManager(poolRegistry.target, riskManager.target);
+  await protocolConfigurator.setRiskManager(capitalPool.target,riskManager.target);
   /*──────────────── Register adapters in CapitalPool (enum indices) ──────*/
   // 1=AAVE, 2=COMPOUND, 3=MOONWELL, 4=MORPHO, 5=EULER
   await protocolConfigurator.setCapitalPoolBaseYieldAdapter(1, aaveAdapter.target);
@@ -156,16 +169,6 @@ async function main() {
   await protocolConfigurator.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500);
   await protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250);
   await protocolConfigurator.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250);
-
-  // Transfer ownership of core contracts to the configurator
-  await poolRegistry.transferOwnership(protocolConfigurator.target);
-  await capitalPool.transferOwnership(protocolConfigurator.target);
-  await policyManager.transferOwnership(protocolConfigurator.target);
-  await riskManager.transferOwnership(protocolConfigurator.target);
-  await underwriterManager.transferOwnership(protocolConfigurator.target);
-  await rewardDistributor.transferOwnership(protocolConfigurator.target);
-  await catPool.transferOwnership(protocolConfigurator.target);
-
 
   /*──────────────────────────────── Output ──────────────────────────────*/
   const addresses = {

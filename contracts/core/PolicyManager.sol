@@ -70,6 +70,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     event CatPoolSet(address indexed newCatPool);
     event CoverCooldownPeriodSet(uint256 newPeriod);
     event CoverIncreaseRequested(uint256 indexed policyId, uint256 additionalCoverage, uint256 activationTimestamp);
+    event PremiumAdded(uint256 indexed policyId, uint256 amount); // NEW: Event for adding premium
 
     /* ───────────────────────── Constructor ───────────────────────── */
     constructor(address _policyNFT, address _initialOwner) Ownable(_initialOwner) {
@@ -141,6 +142,33 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         riskManager.updateCoverageSold(poolId, coverageAmount, true);
     }
 
+    /**
+     * @notice NEW: Allows a policyholder to add more funds to their premium deposit, extending the coverage duration.
+     * @param policyId The ID of the policy to top up.
+     * @param amount The amount of premium to add.
+     */
+    function addPremium(uint256 policyId, uint256 amount) external nonReentrant {
+        if (address(poolRegistry) == address(0)) revert AddressesNotSet();
+        if (amount == 0) revert InvalidAmount();
+        if (amount > type(uint128).max) revert InvalidAmount();
+
+        _settleAndDrainPremium(policyId);
+        if (policyNFT.ownerOf(policyId) != msg.sender) revert NotPolicyOwner();
+        if (!isPolicyActive(policyId)) revert PolicyNotActive();
+
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
+        if (pol.coverage == 0) revert PolicyAlreadyTerminated();
+
+        // Transfer funds from user
+        capitalPool.underlyingAsset().safeTransferFrom(msg.sender, address(this), amount);
+
+        // Update the policy's deposit balance. The lastDrainTime is updated by _settleAndDrainPremium.
+        uint128 newDeposit = pol.premiumDeposit + uint128(amount);
+        policyNFT.updatePremiumAccount(policyId, newDeposit, pol.lastDrainTime);
+
+        emit PremiumAdded(policyId, amount);
+    }
+
     function increaseCover(uint256 policyId, uint256 additionalCoverage) external nonReentrant {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
         if (additionalCoverage == 0 || additionalCoverage > type(uint128).max) revert InvalidAmount();
@@ -169,60 +197,48 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         emit CoverIncreaseRequested(policyId, additionalCoverage, activateAt);
     }
 
-function cancelCover(uint256 policyId) external nonReentrant {
-    if (address(poolRegistry) == address(0)) revert AddressesNotSet();
-    if (policyNFT.ownerOf(policyId) != msg.sender) revert NotPolicyOwner();
+    function cancelCover(uint256 policyId) external nonReentrant {
+        if (address(poolRegistry) == address(0)) revert AddressesNotSet();
+        if (policyNFT.ownerOf(policyId) != msg.sender) revert NotPolicyOwner();
 
-    // Settle premiums before any state changes.
-    _settleAndDrainPremium(policyId);
+        _settleAndDrainPremium(policyId);
 
-    IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
-    if (pol.coverage == 0) revert PolicyAlreadyTerminated();
-    if (block.timestamp < pol.activation) revert CooldownActive();
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
+        if (pol.coverage == 0) revert PolicyAlreadyTerminated();
+        if (block.timestamp < pol.activation) revert CooldownActive();
 
-    // Call the shared termination logic.
-    _terminatePolicy(policyId, pol);
+        _terminatePolicy(policyId, pol);
 
-    // Refund any remaining premium deposit.
-    if (pol.premiumDeposit > 0) {
-        capitalPool.underlyingAsset().safeTransfer(msg.sender, pol.premiumDeposit);
-    }
-}
-
-function lapsePolicy(uint256 policyId) external nonReentrant {
-    if (address(poolRegistry) == address(0)) revert AddressesNotSet();
-
-    _settleAndDrainPremium(policyId);
-    if (isPolicyActive(policyId)) revert PolicyIsActive();
-
-    IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
-    if (pol.coverage == 0) revert PolicyAlreadyTerminated();
-
-    // Call the shared termination logic.
-    _terminatePolicy(policyId, pol);
-}
-
-/**
- * @notice NEW: Shared logic to terminate a policy by clearing state and burning the NFT.
- */
-function _terminatePolicy(uint256 policyId, IPolicyNFT.Policy memory pol) internal {
-    // Clear any pending increases that were requested but not yet active.
-    uint256 pendingToCancel = _clearAllPendingIncreases(policyId);
-    uint256 totalToReduce = pol.coverage + pendingToCancel;
-
-    if (totalToReduce > 0) {
-        riskManager.updateCoverageSold(pol.poolId, totalToReduce, false);
+        if (pol.premiumDeposit > 0) {
+            capitalPool.underlyingAsset().safeTransfer(msg.sender, pol.premiumDeposit);
+        }
     }
 
-    policyNFT.burn(policyId);
-}
+    function lapsePolicy(uint256 policyId) external nonReentrant {
+        if (address(poolRegistry) == address(0)) revert AddressesNotSet();
+
+        _settleAndDrainPremium(policyId);
+        if (isPolicyActive(policyId)) revert PolicyIsActive();
+
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
+        if (pol.coverage == 0) revert PolicyAlreadyTerminated();
+
+        _terminatePolicy(policyId, pol);
+    }
+
+    function _terminatePolicy(uint256 policyId, IPolicyNFT.Policy memory pol) internal {
+        uint256 pendingToCancel = _clearAllPendingIncreases(policyId);
+        uint256 totalToReduce = pol.coverage + pendingToCancel;
+
+        if (totalToReduce > 0) {
+            riskManager.updateCoverageSold(pol.poolId, totalToReduce, false);
+        }
+
+        policyNFT.burn(policyId);
+    }
 
     /* ───────────────── Internal Helpers ────────────────────────── */
 
-    /**
-     * @notice NEW: Clears all pending increases for a policy.
-     * @return totalCancelled The sum of coverage amounts from all cleared nodes.
-     */
     function _clearAllPendingIncreases(uint256 policyId) internal returns (uint256 totalCancelled) {
         totalCancelled = pendingCoverageSum[policyId];
         if (totalCancelled == 0) return 0;
@@ -275,81 +291,61 @@ function _terminatePolicy(uint256 policyId, IPolicyNFT.Policy memory pol) intern
         activationTimestamp = block.timestamp + coverCooldownPeriod;
     }
 
-function _settleAndDrainPremium(uint256 _policyId) internal {
-    // 1. First, resolve any pending increases that are now active.
-    _resolvePendingIncrease(_policyId);
-
-    // 2. Then, calculate and drain the premium owed since the last check.
-    _drainOwedPremium(_policyId);
-}
-
-/**
- * @notice NEW: Calculates and drains the premium for the elapsed time.
- * @dev It fetches the latest policy state after potential updates from _resolvePendingIncrease.
- */
-function _drainOwedPremium(uint256 _policyId) internal {
-    IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
-    if (block.timestamp <= pol.lastDrainTime) {
-        return; // Nothing to drain yet.
+    function _settleAndDrainPremium(uint256 _policyId) internal {
+        _resolvePendingIncrease(_policyId);
+        _drainOwedPremium(_policyId);
     }
 
-    // Calculate the cost for the elapsed time.
-    (uint256 cost,) = _calculatePremiumCost(pol);
-    uint256 toDrain = Math.min(cost, pol.premiumDeposit);
+    function _drainOwedPremium(uint256 _policyId) internal {
+        IPolicyNFT.Policy memory pol = policyNFT.getPolicy(_policyId);
+        if (block.timestamp <= pol.lastDrainTime) {
+            return;
+        }
 
-    if (toDrain < 1) {
-        // Even if no premium is drained, we must update the drain time to prevent re-calculation.
-        policyNFT.updatePremiumAccount(_policyId, uint128(pol.premiumDeposit), uint128(block.timestamp));
-        return;
+        (uint256 cost,) = _calculatePremiumCost(pol);
+        uint256 toDrain = Math.min(cost, pol.premiumDeposit);
+
+        if (toDrain < 1) {
+            policyNFT.updatePremiumAccount(_policyId, uint128(pol.premiumDeposit), uint128(block.timestamp));
+            return;
+        }
+
+        uint128 newDeposit = uint128(pol.premiumDeposit - toDrain);
+        policyNFT.updatePremiumAccount(_policyId, newDeposit, uint128(block.timestamp));
+
+        _distributeDrainedPremium(pol.poolId, toDrain);
     }
 
-    // Update the policy's premium deposit on-chain.
-    uint128 newDeposit = uint128(pol.premiumDeposit - toDrain);
-    policyNFT.updatePremiumAccount(_policyId, newDeposit, uint128(block.timestamp));
+    function _calculatePremiumCost(IPolicyNFT.Policy memory pol) internal view returns (uint256 cost, uint256 rateBps) {
+        ( , uint256 pledged, uint256 sold, uint256 pendingW, , , ) = poolRegistry.getPoolData(pol.poolId);
+        uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
+        rateBps = _getCurrentRateBps(pol.poolId, sold, availableCapital);
 
-    // Distribute the collected premium.
-    _distributeDrainedPremium(pol.poolId, toDrain);
-}
+        if (rateBps == 0) return (0, 0);
 
-
-/**
- * @notice NEW: Calculates premium cost based on current state.
- * @return cost The calculated cost for the elapsed period.
- * @return rateBps The rate used for the calculation.
- */
-function _calculatePremiumCost(IPolicyNFT.Policy memory pol) internal view returns (uint256 cost, uint256 rateBps) {
-    ( , uint256 pledged, uint256 sold, uint256 pendingW, , , ) = poolRegistry.getPoolData(pol.poolId);
-    uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
-    rateBps = _getCurrentRateBps(pol.poolId, sold, availableCapital);
-
-    if (rateBps == 0) return (0, 0);
-
-    uint256 elapsed = block.timestamp - pol.lastDrainTime;
-    cost = (pol.coverage * rateBps * elapsed) / (SECS_YEAR * BPS);
-}
-
-/**
- * @notice NEW: Distributes the collected premium between the CAT and Capital pools.
- */
-function _distributeDrainedPremium(uint256 poolId, uint256 amount) internal {
-    uint256 catAmt = (amount * catPremiumBps) / BPS;
-    uint256 poolInc = amount - catAmt;
-
-    if (catAmt > 0) {
-        IERC20 asset = capitalPool.underlyingAsset();
-        asset.safeTransfer(address(catPool), catAmt);
-        catPool.receiveUsdcPremium(catAmt);
+        uint256 elapsed = block.timestamp - pol.lastDrainTime;
+        cost = (pol.coverage * rateBps * elapsed) / (SECS_YEAR * BPS);
     }
 
-    if (poolInc > 0) {
-        ( , uint256 pledged, , , , , ) = poolRegistry.getPoolData(poolId);
-        if (pledged > 0) {
+    function _distributeDrainedPremium(uint256 poolId, uint256 amount) internal {
+        uint256 catAmt = (amount * catPremiumBps) / BPS;
+        uint256 poolInc = amount - catAmt;
+
+        if (catAmt > 0) {
             IERC20 asset = capitalPool.underlyingAsset();
-            asset.safeTransfer(address(rewardDistributor), poolInc);
-            rewardDistributor.distribute(poolId, address(asset), poolInc, pledged);
+            asset.safeTransfer(address(catPool), catAmt);
+            catPool.receiveUsdcPremium(catAmt);
+        }
+
+        if (poolInc > 0) {
+            ( , uint256 pledged, , , , , ) = poolRegistry.getPoolData(poolId);
+            if (pledged > 0) {
+                IERC20 asset = capitalPool.underlyingAsset();
+                asset.safeTransfer(address(rewardDistributor), poolInc);
+                rewardDistributor.distribute(poolId, address(asset), poolInc, pledged);
+            }
         }
     }
-}
 
     function _resolvePendingIncrease(uint256 _policyId) internal {
         uint256 nodeId = pendingIncreaseListHead[_policyId];
@@ -383,9 +379,6 @@ function _distributeDrainedPremium(uint256 poolId, uint256 amount) internal {
         }
     }
 
-    /**
-     * @notice NEW: Calculates the current premium rate based on pool utilization.
-     */
     function _getCurrentRateBps(uint256 poolId, uint256 sold, uint256 availableCapital) internal view returns (uint256) {
         IPoolRegistry.RateModel memory rateModel = poolRegistry.getPoolRateModel(poolId);
         if (availableCapital == 0) {
@@ -402,9 +395,6 @@ function _distributeDrainedPremium(uint256 poolId, uint256 amount) internal {
         }
     }
 
-    /**
-     * @notice NEW: Calculates the minimum premium required for 7 days of cover.
-     */
     function _getMinPremium(uint256 coverage, uint256 rateBps) internal pure returns (uint256) {
         return (coverage * rateBps * 7 days) / (SECS_YEAR * BPS);
     }

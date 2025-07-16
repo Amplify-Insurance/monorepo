@@ -9,20 +9,22 @@ import "../interfaces/IPoolRegistry.sol";
  * @title PoolRegistry
  * @author Gemini
  * @notice This contract is the single source of truth for creating and managing risk pools.
- * It is owned and controlled by the RiskManager contract.
  */
 contract PoolRegistry is IPoolRegistry, Ownable {
 
     struct PoolData {
+        // Group smaller types together for gas savings
         IERC20 protocolTokenToCover;
-        RateModel rateModel;
+        address feeRecipient;
+        bool isPaused;
+        // --- uint256 variables ---
         uint256 totalCapitalPledgedToPool;
         uint256 capitalPendingWithdrawal;
         uint256 totalCoverageSold;
         uint256 claimFeeBps;
-        bool isPaused;
         uint256 pauseTimestamp;
-        address feeRecipient;
+        // Complex types at the end
+        RateModel rateModel;
         mapping(address => uint256) capitalPerAdapter;
         address[] activeAdapters;
         mapping(address => uint256) adapterIndex;
@@ -30,36 +32,69 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     }
 
 
-
-
     PoolData[] public protocolRiskPools;
     address public riskManager;
+    address public underwriterManager;
+
 
     event RiskManagerAddressSet(address indexed newRiskManager);
+    event UnderwriterManagerAddressSet(address indexed newUnderwriterManager); // FIX: Added dedicated event
 
     modifier onlyRiskManager() {
         require(msg.sender == riskManager, "PR: Not RiskManager");
         _;
     }
 
-    constructor(address initialOwner, address riskManagerAddress) Ownable(initialOwner) {
-        require(riskManagerAddress != address(0), "PR: Zero address");
-        riskManager = riskManagerAddress;
+    modifier onlyUnderwriterManager() {
+        require(msg.sender == underwriterManager, "PR: Not UnderwriterManager");
+        _;
     }
 
-    function setRiskManager(address newRiskManager) external onlyOwner {
+    modifier onlyUMOrRM() {
+        require(msg.sender == underwriterManager || msg.sender == riskManager , "PR: Not RiskManager or UnderwriterManager");
+        _;
+    }
+
+
+    constructor(address initialOwner, address riskManagerAddress, address underwriterManagerAddress) Ownable(initialOwner) {
+        require(riskManagerAddress != address(0), "PR: Zero address for RM");
+        // FIX: Added check for underwriterManagerAddress
+        require(underwriterManagerAddress != address(0), "PR: Zero address for UM");
+        riskManager = riskManagerAddress;
+        underwriterManager = underwriterManagerAddress;
+    }
+
+    function setRiskManagerAddress(address newRiskManager) external onlyOwner {
         require(newRiskManager != address(0), "PR: Zero address");
         riskManager = newRiskManager;
         emit RiskManagerAddressSet(newRiskManager);
     }
+
+    function setUnderwriterManagerAddress(address newUnderwriterManager) external onlyOwner {
+        require(newUnderwriterManager != address(0), "PR: Zero address");
+        underwriterManager = newUnderwriterManager;
+        // FIX: Emit the correct event
+        emit UnderwriterManagerAddressSet(newUnderwriterManager);
+    }
+
+
+    function setPauseState(uint256 poolId, bool isPaused) external onlyOwner {
+        PoolData storage pool = protocolRiskPools[poolId];
+        pool.isPaused = isPaused;
+        pool.pauseTimestamp = isPaused ? block.timestamp : 0;
+    }
     
+    function setFeeRecipient(uint256 poolId, address recipient) external onlyOwner {
+        protocolRiskPools[poolId].feeRecipient = recipient;
+    }
+
     /* ───────────────────── State Modifying Functions (RM only) ───────────────────── */
 
     function addProtocolRiskPool(
         address protocolTokenToCover,
         RateModel calldata rateModel,
         uint256 claimFeeBps
-    ) external onlyRiskManager returns (uint256) {
+    ) external onlyOwner returns (uint256) {
         uint256 poolId = protocolRiskPools.length;
         protocolRiskPools.push();
         PoolData storage pool = protocolRiskPools[poolId];
@@ -69,7 +104,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         return poolId;
     }
 
-    function updateCapitalAllocation(uint256 poolId, address adapterAddress, uint256 pledgeAmount, bool isAllocation) external onlyRiskManager {
+    function updateCapitalAllocation(uint256 poolId, address adapterAddress, uint256 pledgeAmount, bool isAllocation) external onlyUMOrRM {
         PoolData storage pool = protocolRiskPools[poolId];
         if (isAllocation) {
             pool.totalCapitalPledgedToPool += pledgeAmount;
@@ -88,7 +123,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         }
     }
 
-    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external onlyRiskManager {
+    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external onlyUnderwriterManager {
         PoolData storage pool = protocolRiskPools[poolId];
         if (isRequest) {
             pool.capitalPendingWithdrawal += amount;
@@ -105,17 +140,6 @@ contract PoolRegistry is IPoolRegistry, Ownable {
             pool.totalCoverageSold -= amount;
         }
     }
-
-    function setPauseState(uint256 poolId, bool isPaused) external onlyRiskManager {
-        PoolData storage pool = protocolRiskPools[poolId];
-        pool.isPaused = isPaused;
-        pool.pauseTimestamp = isPaused ? block.timestamp : 0;
-    }
-    
-    function setFeeRecipient(uint256 poolId, address recipient) external onlyRiskManager {
-        protocolRiskPools[poolId].feeRecipient = recipient;
-    }
-
     /* ───────────────────── View Functions ───────────────────── */
 
     function getPoolCount() external view returns (uint256) {
@@ -144,11 +168,6 @@ contract PoolRegistry is IPoolRegistry, Ownable {
     }
 
 
-    /**
-    * @notice Gets the data for multiple pools in a single call.
-    * @param poolIds An array of IDs for the pools to query.
-    * @return A memory array of PoolInfo structs containing the data for each requested pool.
-    */
     function getMultiplePoolData(uint256[] calldata poolIds) external view returns (IPoolRegistry.PoolInfo[] memory) {
         uint256 numPools = poolIds.length;
         IPoolRegistry.PoolInfo[] memory multiplePoolData = new IPoolRegistry.PoolInfo[](numPools);
@@ -183,9 +202,6 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         return protocolRiskPools[poolId].capitalPerAdapter[adapter];
     }
     
-    /**
-     * @notice CORRECTED: This function is now implemented to serve the on-chain needs of the RiskManager.
-     */
     function getPoolPayoutData(uint256 poolId) external view override returns (address[] memory, uint256[] memory, uint256) {
         PoolData storage pool = protocolRiskPools[poolId];
         address[] memory adapters = pool.activeAdapters;

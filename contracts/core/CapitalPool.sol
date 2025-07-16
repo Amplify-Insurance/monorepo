@@ -66,6 +66,11 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         require(msg.sender == riskManager, "CP: Caller is not the RiskManager");
         _;
     }
+
+    modifier onlyUnderwriterManager() {
+        require(msg.sender == address(underwriterManager), "CP: Caller is not the UnderwriterManager");
+        _;
+    }
     
     error ZeroAddress();
     error InvalidAmount();
@@ -104,10 +109,16 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     }
 
     /* ───────────────────── Admin Functions ────────────────── */
-    function setRiskManager(address _riskManager) external onlyOwner {
+    function setRiskManagerAddress(address _riskManager) external onlyOwner {
         if (_riskManager == address(0)) revert ZeroAddress();
         riskManager = _riskManager;
         emit RiskManagerSet(_riskManager);
+    }
+
+    function setUnderwriterManagerAddress(address _underwriterManager) external onlyOwner {
+        if (_underwriterManager == address(0)) revert ZeroAddress();
+        underwriterManager = IUnderwriterManager(_underwriterManager);
+        emit UnderwriterManagerSet(_underwriterManager);
     }
 
     function setRewardDistributor(address _rewardDistributor) external onlyOwner {
@@ -116,11 +127,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         emit RewardDistributorSet(_rewardDistributor);
     }
 
-    function setUnderwriterManager(address _underwriterManager) external onlyOwner {
-        if (_underwriterManager == address(0)) revert ZeroAddress();
-        underwriterManager = IUnderwriterManager(_underwriterManager);
-        emit UnderwriterManagerSet(_underwriterManager);
-    }
+
 
     function setUnderwriterNoticePeriod(uint256 _newPeriod) external onlyOwner {
         underwriterNoticePeriod = _newPeriod;
@@ -380,7 +387,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         }
     }
 
-    function applyLosses(address _underwriter, uint256 _principalLossAmount) external override nonReentrant onlyRiskManager {
+    function applyLosses(address _underwriter, uint256 _principalLossAmount) external override nonReentrant onlyUnderwriterManager {
         if (_principalLossAmount == 0) revert InvalidAmount();
         UnderwriterAccount storage account = underwriterAccounts[_underwriter];
         if (account.totalDepositedAssetPrincipal == 0) revert NoActiveDeposit();

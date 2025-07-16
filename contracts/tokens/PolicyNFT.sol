@@ -17,11 +17,13 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
     uint256 public nextId = 1;
     mapping(uint256 => IPolicyNFT.Policy) public policies;
     address public policyManagerContract;
+    address public riskManagerContract;
 
     // --- Events ---
     event PolicyPremiumAccountUpdated(uint256 indexed policyId, uint128 newDeposit, uint128 newDrainTime);
     event PolicyCoverageIncreased(uint256 indexed policyId, uint256 newTotalCoverage);
     event PolicyManagerAddressSet(address indexed newPolicyManagerAddress);
+    event RiskManagerAddressSet(address indexed newRiskManagerAddress);
 
 
     modifier onlyPolicyManager() {
@@ -30,8 +32,14 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
         _;
     }
 
+    modifier onlyRMOrPM() {
+        require(riskManagerContract != address(0) || policyManagerContract != address(0), "PolicyNFT: Address not set");
+        require(msg.sender == riskManagerContract || msg.sender == policyManagerContract , "PolicyNFT: Caller is not authorized");
+        _;
+    }
+
     constructor(address _initialPolicyManager, address initialOwner) ERC721("Policy", "PCOVER") Ownable(initialOwner) {
-        require(_initialPolicyManager != address(0), "PolicyNFT: PolicyManager address cannot be zero");
+        // require(_initialPolicyManager != address(0), "PolicyNFT: PolicyManager address cannot be zero");
         policyManagerContract = _initialPolicyManager;
     }
 
@@ -39,6 +47,12 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
         require(newPolicyManagerAddress != address(0), "PolicyNFT: Address cannot be zero");
         policyManagerContract = newPolicyManagerAddress;
         emit PolicyManagerAddressSet(newPolicyManagerAddress);
+    }
+
+    function setRiskManagerAddress(address newRiskManagerAddress) external onlyOwner {
+        require(newRiskManagerAddress != address(0), "PolicyNFT: Address cannot be zero");
+        riskManagerContract = newRiskManagerAddress;
+        emit RiskManagerAddressSet(newRiskManagerAddress);
     }
 
     /**
@@ -70,7 +84,7 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
     /**
      * @notice Burns a policy NFT. Only callable by the authorized PolicyManager.
      */
-    function burn(uint256 id) external onlyPolicyManager {
+    function burn(uint256 id) external onlyRMOrPM {
         _burn(id);
         delete policies[id];
     }

@@ -9,7 +9,8 @@ interface ICapitalPoolAdmin {
         OTHER_YIELD
     }
 
-    function setRiskManager(address _riskManager) external;
+    function setRiskManagerAddress(address _riskManager) external;
+    function setUnderwriterManagerAddress(address _underwriterManager) external;
     function setUnderwriterNoticePeriod(uint256 _newPeriod) external;
     function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external;
 }

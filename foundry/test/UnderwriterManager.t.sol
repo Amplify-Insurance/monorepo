@@ -131,13 +131,14 @@ contract UnderwriterManagerTest is Test {
 
     function test_claimPremiumRewards() public {
         uint256 pledge = 10_000e6;
-          uint256[] memory pools = new uint256[](1);
+        uint256[] memory pools = new uint256[](1);
         pools[0] = 0;
         _setupAllocatedUnderwriter(pledge, pools);
         pr.setPoolData(0, token, pledge, 0, 0, false, address(0), 0);
 
         vm.prank(underwriter);
-        um.claimPremiumRewards(pools);
+        // FIX: Call the function with a single pool ID, not an array.
+        um.claimPremiumRewards(0);
 
         assertEq(rd.claimCallCount(), 1);
         assertEq(rd.lastClaimUser(), underwriter);
@@ -157,11 +158,17 @@ contract UnderwriterManagerTest is Test {
         pr.setPoolData(1, token2, pledge, 0, 0, false, address(0), 0);
         pr.setPoolData(2, token, pledge, 0, 0, false, address(0), 0); // Duplicate token
 
+        // FIX: Call the function once for each pool ID.
         vm.prank(underwriter);
-        um.claimDistressedAssets(pools);
+        um.claimDistressedAssets(0);
+        vm.prank(underwriter);
+        um.claimDistressedAssets(1);
+        vm.prank(underwriter);
+        um.claimDistressedAssets(2);
 
-        // Should be called twice, once for each unique token
-        assertEq(cat.claimProtocolAssetRewardsForCallCount(), 2);
+        // FIX: The mock will now be called 3 times, as the logic for finding
+        // unique tokens was removed to prevent DoS.
+        assertEq(cat.claimProtocolAssetRewardsForCallCount(), 3);
     }
 
     function test_multiUser_interactions() public {
