@@ -47,8 +47,8 @@ async function main() {
   await underwriterManager.waitForDeployment();
 
   const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
-  // Pass zero address for PolicyManager placeholder; set actual address later
-  const policyNFT = await PolicyNFT.deploy(ethers.ZeroAddress, deployer.address);
+  // Deploy with the deployer as a temporary PolicyManager; updated after
+  const policyNFT = await PolicyNFT.deploy(deployer.address, deployer.address);
   await policyNFT.waitForDeployment();
 
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
