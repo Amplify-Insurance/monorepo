@@ -32,11 +32,6 @@ async function main() {
   console.log("Deploying with:", deployer.address);
 
   /*──────────────────────────── Core contracts ───────────────────────────*/
-  const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
-  // Deploy with deployer as a temporary PolicyManager; updated after
-  const policyNFT = await PolicyNFT.deploy(deployer.address, deployer.address);
-  await policyNFT.waitForDeployment();
-
   const RiskManager = await ethers.getContractFactory("RiskManager");
   const riskManager = await RiskManager.deploy(deployer.address);
   await riskManager.waitForDeployment();
@@ -45,22 +40,45 @@ async function main() {
   const underwriterManager = await UnderwriterManager.deploy(deployer.address);
   await underwriterManager.waitForDeployment();
 
+  const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
+  // Deploy with deployer as a temporary PolicyManager; updated after
+  const policyNFT = await PolicyNFT.deploy(deployer.address, deployer.address);
+  await policyNFT.waitForDeployment();
+
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
-  const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target);
+  const poolRegistry = await PoolRegistry.deploy(
+    deployer.address,
+    riskManager.target,
+    underwriterManager.target
+  );
   await poolRegistry.waitForDeployment();
 
-  const LossDistributor = await ethers.getContractFactory("LossDistributor");
-  const lossDistributor = await LossDistributor.deploy(riskManager.target);
-  await lossDistributor.waitForDeployment();
+  const CapitalPool = await ethers.getContractFactory("CapitalPool");
+  const capitalPool = await CapitalPool.deploy(deployer.address, WETH_ADDRESS);
+  await capitalPool.waitForDeployment();
 
-  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
-  const rewardDistributor = await RewardDistributor.deploy(riskManager.target);
-  await rewardDistributor.waitForDeployment();
+  const LossDistributor = await ethers.getContractFactory("LossDistributor");
+  const lossDistributor = await LossDistributor.deploy(
+    riskManager.target,
+    underwriterManager.target,
+    capitalPool.target
+  );
+  await lossDistributor.waitForDeployment();
 
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
   await policyNFT.setPolicyManagerAddress(policyManager.target);
+
+  const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+  const rewardDistributor = await RewardDistributor.deploy(
+    poolRegistry.target,
+    policyManager.target,
+    capitalPool.target,
+    underwriterManager.target
+  );
+  await rewardDistributor.waitForDeployment();
+
 
   const CatShare = await ethers.getContractFactory("CatShare");
   const catShare = await CatShare.deploy();
@@ -74,9 +92,8 @@ async function main() {
   await transferTx.wait();
   await catPool.initialize();
 
-  const CapitalPool = await ethers.getContractFactory("CapitalPool");
-  const capitalPool = await CapitalPool.deploy(deployer.address, WETH_ADDRESS);
-  await capitalPool.waitForDeployment();
+  await capitalPool.setRiskManagerAddress(riskManager.target);
+  await capitalPool.setUnderwriterManagerAddress(underwriterManager.target);
 
   // Wire permissions and addresses
   await catPool.setRiskManagerAddress(riskManager.target);
@@ -116,8 +133,8 @@ async function main() {
   );
 
   // Use configurator for initial setup
-  await protocolConfigurator.setPoolRegistryRiskManager(riskManager.target);
-  await protocolConfigurator.setCapitalPoolRiskManager(riskManager.target);
+  await protocolConfigurator.setRiskManager(poolRegistry.target, riskManager.target);
+  await protocolConfigurator.setRiskManager(capitalPool.target, riskManager.target);
 
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   // 1. Aave v3
