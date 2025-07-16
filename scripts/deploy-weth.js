@@ -33,7 +33,8 @@ async function main() {
 
   /*──────────────────────────── Core contracts ───────────────────────────*/
   const PolicyNFT = await ethers.getContractFactory("PolicyNFT");
-  const policyNFT = await PolicyNFT.deploy(deployer.address);
+  // Deploy with deployer as a temporary PolicyManager; updated after
+  const policyNFT = await PolicyNFT.deploy(deployer.address, deployer.address);
   await policyNFT.waitForDeployment();
 
   const RiskManager = await ethers.getContractFactory("RiskManager");
@@ -59,7 +60,7 @@ async function main() {
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
   const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
   await policyManager.waitForDeployment();
-  await policyNFT.setRiskManagerAddress(policyManager.target);
+  await policyNFT.setPolicyManagerAddress(policyManager.target);
 
   const CatShare = await ethers.getContractFactory("CatShare");
   const catShare = await CatShare.deploy();
