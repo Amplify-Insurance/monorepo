@@ -325,9 +325,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   }
 
   // Calculate total yield and value
-  const totalValue = underwritingPositions.reduce((sum, position) => sum + position.nativeValue, 0)
   const weightedYield = underwritingPositions.reduce((sum, position) => sum + position.yield * position.nativeValue, 0)
-  const averageYield = totalValue > 0 ? weightedYield / totalValue : 0
 
   const totalDeposited = (details || []).reduce((sum, d) => {
     const dec = pools.find((p) => p.deployment === d.deployment)?.underlyingAssetDecimals ?? 6
@@ -345,6 +343,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const totalUnderwrittenUsd = underwritingPositions.reduce((sum, p) => sum + p.usdValue, 0)
   const baseAdapter = adapters.find((a) => a.id === Number(details?.[0]?.yieldChoice))
   const baseYieldApr = baseAdapter?.apr || 0
+  const averageYield = totalDeposited > 0 ? weightedYield / totalDeposited : 0
   const totalApr = baseYieldApr + averageYield
 
   const renderTables = (positions, title) => {
