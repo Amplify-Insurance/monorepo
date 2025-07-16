@@ -55,8 +55,12 @@ async function main() {
   const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target, underwriterManager.target);
   await poolRegistry.waitForDeployment();
 
+  const CapitalPool = await ethers.getContractFactory("CapitalPool");
+  const capitalPool = await CapitalPool.deploy(deployer.address, USDC_ADDRESS);
+  await capitalPool.waitForDeployment();
+
   const LossDistributor = await ethers.getContractFactory("LossDistributor");
-  const lossDistributor = await LossDistributor.deploy(riskManager.target);
+  const lossDistributor = await LossDistributor.deploy(riskManager.target, underwriterManager.target, capitalPool.target);
   await lossDistributor.waitForDeployment();
 
   const PolicyManager = await ethers.getContractFactory("PolicyManager");
@@ -64,10 +68,9 @@ async function main() {
   await policyManager.waitForDeployment();
   await policyNFT.setPolicyManagerAddress(policyManager.target);
   await policyNFT.setRiskManagerAddress(riskManager.target);
-
   
   const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
-  const rewardDistributor = await RewardDistributor.deploy(riskManager.target, policyManager.target);
+  const rewardDistributor = await RewardDistributor.deploy(poolRegistry.target, policyManager.target, capitalPool.target, underwriterManager.target );
   await rewardDistributor.waitForDeployment();
 
   
@@ -82,10 +85,6 @@ async function main() {
   const transferTx = await catShare.transferOwnership(catPool.target);
   await transferTx.wait();
   await catPool.initialize();
-
-  const CapitalPool = await ethers.getContractFactory("CapitalPool");
-  const capitalPool = await CapitalPool.deploy(deployer.address, USDC_ADDRESS);
-  await capitalPool.waitForDeployment();
 
   await capitalPool.setRiskManagerAddress(riskManager.target);
   await capitalPool.setUnderwriterManagerAddress(underwriterManager.target);
