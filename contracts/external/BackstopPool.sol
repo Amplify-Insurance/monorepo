@@ -104,19 +104,19 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
 
     /* ───────────────────── Admin Functions ───────────────────── */
 
-    function setRiskManagerAddress(address newRiskManagerAddress) external onlyOwner {
+    function setRiskManager(address newRiskManagerAddress) external onlyOwner {
         require(newRiskManagerAddress != address(0), "CIP: Address cannot be zero");
         riskManagerAddress = newRiskManagerAddress;
         emit RiskManagerAddressSet(newRiskManagerAddress);
     }
 
-    function setCapitalPoolAddress(address newCapitalPoolAddress) external onlyOwner {
+    function setCapitalPool(address newCapitalPoolAddress) external onlyOwner {
         require(newCapitalPoolAddress != address(0), "CIP: Address cannot be zero");
         capitalPoolAddress = newCapitalPoolAddress;
         emit CapitalPoolAddressSet(newCapitalPoolAddress);
     }
 
-    function setPolicyManagerAddress(address newPolicyManagerAddress) external onlyOwner {
+    function setPolicyManager(address newPolicyManagerAddress) external onlyOwner {
         require(newPolicyManagerAddress != address(0), "CIP: Address cannot be zero");
         policyManagerAddress = newPolicyManagerAddress;
         emit PolicyManagerAddressSet(newPolicyManagerAddress);

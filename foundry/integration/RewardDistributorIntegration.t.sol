@@ -88,9 +88,9 @@ contract RewardDistributorIntegrationTest is Test {
         capitalPool.setRewardDistributor(address(rewardDistributor));
 
         // Link BackstopPool (cat) to its dependencies
-        catPool.setRiskManagerAddress(address(riskManager));
-        catPool.setPolicyManagerAddress(address(policyManager));
-        catPool.setCapitalPoolAddress(address(capitalPool));
+        catPool.setRiskManager(address(riskManager));
+        catPool.setPolicyManager(address(policyManager));
+        catPool.setCapitalPool(address(capitalPool));
         catPool.setRewardDistributor(address(rewardDistributor));
         riskManager.setCommittee(committee);
 

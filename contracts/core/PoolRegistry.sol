@@ -68,13 +68,13 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         underwriterManager = underwriterManagerAddress;
     }
 
-    function setRiskManagerAddress(address newRiskManager) external onlyOwner {
+    function setRiskManager(address newRiskManager) external onlyOwner {
         require(newRiskManager != address(0), "PR: Zero address");
         riskManager = newRiskManager;
         emit RiskManagerAddressSet(newRiskManager);
     }
 
-    function setUnderwriterManagerAddress(address newUnderwriterManager) external onlyOwner {
+    function setUnderwriterManager(address newUnderwriterManager) external onlyOwner {
         require(newUnderwriterManager != address(0), "PR: Zero address");
         underwriterManager = newUnderwriterManager;
         emit UnderwriterManagerAddressSet(newUnderwriterManager);

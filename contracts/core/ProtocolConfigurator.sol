@@ -101,11 +101,11 @@ contract RiskAdmin is Ownable {
 
 
     function setRiskManager(address target, address newRiskManager) external onlyOwner initialized {
-        ICapitalPoolAdmin(target).setRiskManagerAddress(newRiskManager);
+        ICapitalPoolAdmin(target).setRiskManager(newRiskManager);
     }
 
     function setUnderwriterManager(address target, address newUnderwriterManager) external onlyOwner initialized {
-        ICapitalPoolAdmin(target).setUnderwriterManagerAddress(newUnderwriterManager);
+        ICapitalPoolAdmin(target).setUnderwriterManager(newUnderwriterManager);
     }
 
     function setCapitalPoolNoticePeriod(uint256 newPeriod) external onlyOwner initialized {

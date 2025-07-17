@@ -71,10 +71,10 @@ contract RiskManagerIntegration is Test {
 
         um = new UnderwriterManager(owner);
 
-        policyNFT.setPolicyManagerAddress(address(policyManager));
-        catPool.setPolicyManagerAddress(address(policyManager));
-        catPool.setCapitalPoolAddress(address(capitalPool));
-        catPool.setRiskManagerAddress(address(rm));
+        policyNFT.setPolicyManager(address(policyManager));
+        catPool.setPolicyManager(address(policyManager));
+        catPool.setCapitalPool(address(capitalPool));
+        catPool.setRiskManager(address(rm));
         catPool.setRewardDistributor(address(rewardDistributor));
         policyManager.setAddresses(address(registry), address(capitalPool), address(catPool), address(rewardDistributor), address(rm));
 

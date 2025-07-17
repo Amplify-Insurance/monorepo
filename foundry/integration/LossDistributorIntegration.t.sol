@@ -74,9 +74,9 @@ contract LossDistributorIntegrationTest is Test {
         adapter.setDepositor(address(capitalPool));
         catShare.transferOwnership(address(catPool));
         catPool.initialize();
-        catPool.setRiskManagerAddress(address(riskManager));
-        catPool.setCapitalPoolAddress(address(capitalPool));
-        catPool.setPolicyManagerAddress(address(policyManager));
+        catPool.setRiskManager(address(riskManager));
+        catPool.setCapitalPool(address(capitalPool));
+        catPool.setPolicyManager(address(policyManager));
         
         policyManager.setAddresses(
             address(poolRegistry), address(capitalPool), address(catPool),

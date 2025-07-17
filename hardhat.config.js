@@ -30,6 +30,12 @@ module.exports = {
             chainId: 8453,
             accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         },
+
+        fuse: {
+            url: process.env.FUSE_RPC_URL || "https://rpc.fuse.io",
+            chainId: 122,
+            accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+        },
         // localhost: { // Example: For a local node like Ganache
         //   url: "http://127.0.0.1:8545",
         // },

@@ -71,9 +71,9 @@ contract PolicyNFTIntegrationTest is Test {
         capital.setRiskManager(address(rm));
         capital.setBaseYieldAdapter(YieldPlatform(3), address(yieldAdapter));
         yieldAdapter.setDepositor(address(capital));
-        cat.setRiskManagerAddress(address(rm));
-        cat.setCapitalPoolAddress(address(capital));
-        cat.setPolicyManagerAddress(address(pm));
+        cat.setRiskManager(address(rm));
+        cat.setCapitalPool(address(capital));
+        cat.setPolicyManager(address(pm));
         cat.setRewardDistributor(address(rewards));
 
         um.setAddresses(address(capital), address(registry), address(cat), address(lossDist), address(rewards), address(rm));

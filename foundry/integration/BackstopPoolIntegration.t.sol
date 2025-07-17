@@ -71,9 +71,9 @@ contract BackstopPoolIntegration is Test {
         um.setAddresses(address(capitalPool), address(registry), address(catPool), address(lossDist), address(rewardDist), address(rm));
         rm.setAddresses(address(capitalPool), address(registry), address(pm), address(catPool), address(lossDist), address(rewardDist), address(um));
         capitalPool.setRiskManager(address(rm));
-        catPool.setRiskManagerAddress(address(capitalPool));
-        catPool.setCapitalPoolAddress(address(capitalPool));
-        catPool.setPolicyManagerAddress(address(pm));
+        catPool.setRiskManager(address(capitalPool));
+        catPool.setCapitalPool(address(capitalPool));
+        catPool.setPolicyManager(address(pm));
         usdc.mint(owner, 2_000e6);
         usdc.approve(address(catPool), type(uint256).max);
         catPool.depositLiquidity(1_000e6);
@@ -128,9 +128,9 @@ contract BackstopPoolIntegration is Test {
         um.setAddresses(address(capitalPool), address(registry), address(catPool), address(lossDist), address(rewardDist), address(rm));
         rm.setAddresses(address(capitalPool), address(registry), address(pm), address(catPool), address(lossDist), address(rewardDist), address(um));
         capitalPool.setRiskManager(address(rm));
-        catPool.setPolicyManagerAddress(address(pm));
-        catPool.setRiskManagerAddress(address(capitalPool));
-        catPool.setCapitalPoolAddress(address(capitalPool));
+        catPool.setPolicyManager(address(pm));
+        catPool.setRiskManager(address(capitalPool));
+        catPool.setCapitalPool(address(capitalPool));
         catPool.setRewardDistributor(address(rewardDist));
 
         IPoolRegistry.RateModel memory model = IPoolRegistry.RateModel({base: 1000, slope1: 0, slope2: 0, kink: 10000});

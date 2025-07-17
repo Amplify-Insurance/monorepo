@@ -78,9 +78,9 @@ contract BackstopPoolComprehensiveTest is Test {
         vm.startPrank(owner);
         pool.initialize();
         adapter.setDepositor(address(pool));
-        pool.setRiskManagerAddress(riskManager);
-        pool.setCapitalPoolAddress(capitalPool);
-        pool.setPolicyManagerAddress(policyManager);
+        pool.setRiskManager(riskManager);
+        pool.setCapitalPool(capitalPool);
+        pool.setPolicyManager(policyManager);
         pool.setRewardDistributor(address(distributor));
         vm.stopPrank();
 
@@ -258,7 +258,7 @@ contract BackstopPoolComprehensiveTest is Test {
     function testRevert_adminSetters_ifZeroAddress() public {
         vm.expectRevert("CIP: Address cannot be zero");
         vm.prank(owner);
-        pool.setRiskManagerAddress(address(0));
+        pool.setRiskManager(address(0));
 
         vm.expectRevert("CIP: Address cannot be zero");
         vm.prank(owner);

@@ -45,13 +45,13 @@ contract PolicyNFT is ERC721URIStorage, Ownable, IPolicyNFT {
         policyManagerContract = _initialPolicyManager;
     }
 
-    function setPolicyManagerAddress(address newPolicyManagerAddress) external onlyOwner {
+    function setPolicyManager(address newPolicyManagerAddress) external onlyOwner {
         require(newPolicyManagerAddress != address(0), "PolicyNFT: Address cannot be zero");
         policyManagerContract = newPolicyManagerAddress;
         emit PolicyManagerAddressSet(newPolicyManagerAddress);
     }
 
-    function setRiskManagerAddress(address newRiskManagerAddress) external onlyOwner {
+    function setRiskManager(address newRiskManagerAddress) external onlyOwner {
         require(newRiskManagerAddress != address(0), "PolicyNFT: Address cannot be zero");
         riskManagerContract = newRiskManagerAddress;
         emit RiskManagerAddressSet(newRiskManagerAddress);

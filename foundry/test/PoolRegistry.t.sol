@@ -117,7 +117,7 @@ contract PoolRegistryFuzz is Test {
     function testFuzz_setRiskManagerAddress(address newRM) public {
         vm.assume(newRM != address(0));
         // FIX: This function is onlyOwner. No prank needed.
-        registry.setRiskManagerAddress(newRM);
+        registry.setRiskManager(newRM);
         assertEq(registry.riskManager(), newRM);
     }
 
@@ -191,7 +191,7 @@ contract PoolRegistryFuzz is Test {
     function testRevert_setRiskManagerAddressZero() public {
         // FIX: Correct function name
         vm.expectRevert("PR: Zero address");
-        registry.setRiskManagerAddress(address(0));
+        registry.setRiskManager(address(0));
     }
 
     function test_removeAdapter_swapAndPop() public {

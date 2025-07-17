@@ -14,32 +14,20 @@ const fs = require("fs");
 const path = require("path");
 
 // ────────────────────────────────────────────────────────────────────────────
-// Asset addresses (Base mainnet)
+// Asset addresses (Using Base Sepolia for example)
 // ────────────────────────────────────────────────────────────────────────────
-const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC
-// ───────────────────────────  Yield platform contracts  ────────────────────
-// 1. Aave v3
-const AAVE_POOL_ADDRESS   = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5";
-const AAVE_AUSDC_ADDRESS  = "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB";
+const USDC_ADDRESS = "0xc6Bc407706B7140EE8Eef2f86F9504651b63e7f9"; // Base Sepolia USDC
+const DAI_ADDRESS = "0x2502F488D481Df4F5054330C71b95d93D41625C2";  // Base Sepolia DAI
+const USDT_ADDRESS = "0x3695Dd1D1D43B794C0B13eb8be8419Eb3ac22bf7";  // Base Sepolia DAI
+const USDM_ADDRESS = "0x4447863cddABbF2c3dAC826f042e03c91927A196";  // Base Sepolia DAI
 
-// 2. Compound v3 (Comet)
-const COMPOUND_COMET_USDC = "0xb125E6687d4313864e53df431d5425969c15Eb2F";
-
-
-const MOONWELL_MUSDC = "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22";
-const EULER_EUSDC = "0x0A1a3b5f2041F33522C4efc754a7D096f880eE16";
-const USD_PLUS = "0xb79dd08ea68a908a97220c76d19a6aa9cbde4376"
-const DAI = "0x50c5725949a6f0c72e6c4a641f24049a917db0cb"
-
-// NEW: Helper function to wait for a transaction to be mined
- async function waitForTx(txOrPromise, message) {
-     console.log(`Waiting for transaction: ${message}...`);
-     // Resolve the promise to get the TransactionResponse
-     const tx = await txOrPromise;
-     // Now we can wait for it to be mined
-     await tx.wait();      // TransactionResponse.wait() → Promise<TransactionReceipt> :contentReference[oaicite:0]{index=0}
-     console.log("...Done.");
-   }
+// Helper function to wait for a transaction to be mined
+async function waitForTx(txPromise, message) {
+  console.log(`Waiting for transaction: ${message}...`);
+  const tx = await txPromise;
+  await tx.wait();
+  console.log("...Done.");
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 async function main() {
@@ -108,6 +96,8 @@ async function main() {
 
   await waitForTx(capitalPool.setRiskManager(riskManager.target), "Set RiskManager on CapitalPool");
   await waitForTx(capitalPool.setUnderwriterManager(underwriterManager.target), "Set UnderwriterManager on CapitalPool");
+  await waitForTx(capitalPool.setLossDistributor(lossDistributor.target), "Set LossDistributor on CapitalPool");
+  await waitForTx(capitalPool.setRewardDistributor(rewardDistributor.target), "Set RewardDistributor on CapitalPool");
 
   await waitForTx(catPool.setRiskManager(riskManager.target), "Set RiskManager on BackstopPool");
   await waitForTx(catPool.setCapitalPool(capitalPool.target), "Set CapitalPool on BackstopPool");
@@ -145,23 +135,25 @@ async function main() {
     poolRegistry.target,
     capitalPool.target,
     policyManager.target,
-    underwriterManager.target,
-    riskManager.target // FIX: Added missing riskManager address
+    underwriterManager.target
   ), "Initialize RiskAdmin");
 
-  /*─────────────────────────── Yield adapters ────────────────────────────*/
-  console.log("\nDeploying yield adapters...");
-  const AaveAdapter = await ethers.getContractFactory("AaveV3Adapter");
-  const aaveAdapter = await AaveAdapter.deploy(USDC_ADDRESS, AAVE_POOL_ADDRESS, AAVE_AUSDC_ADDRESS, deployer.address);
+  /*─────────────────────────── Yield adapters (MOCKS) ────────────────────────────*/
+  console.log("\nDeploying MOCK yield adapters for testnet...");
+  
+  // FIX: Deploy MockAaveV3Adapter with its correct constructor arguments
+  const AaveAdapter = await ethers.getContractFactory("MockAaveV3Adapter");
+  const aaveAdapter = await AaveAdapter.deploy(USDC_ADDRESS, deployer.address);
   await aaveAdapter.waitForDeployment();
-  console.log("AaveAdapter deployed to:", aaveAdapter.target);
-  await waitForTx(aaveAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on AaveAdapter");
+  console.log("MockAaveV3Adapter deployed to:", aaveAdapter.target);
+  await waitForTx(aaveAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on MockAaveV3Adapter");
 
-  const CompoundAdapter = await ethers.getContractFactory("CompoundV3Adapter");
-  const compoundAdapter = await CompoundAdapter.deploy(COMPOUND_COMET_USDC, deployer.address);
+  // FIX: Deploy MockCompoundV3Adapter with its correct constructor arguments
+  const CompoundAdapter = await ethers.getContractFactory("MockCompoundV3Adapter");
+  const compoundAdapter = await CompoundAdapter.deploy(USDC_ADDRESS, deployer.address);
   await compoundAdapter.waitForDeployment();
-  console.log("CompoundAdapter deployed to:", compoundAdapter.target);
-  await waitForTx(compoundAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on CompoundAdapter");
+  console.log("MockCompoundV3Adapter deployed to:", compoundAdapter.target);
+  await waitForTx(compoundAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on MockCompoundV3Adapter");
 
   /*──────────────── Transfer ownership and configure via RiskAdmin ──────*/
   console.log("\nTransferring ownership to RiskAdmin and configuring...");
@@ -185,12 +177,11 @@ async function main() {
   console.log("\nAdding initial risk pools...");
   const defaultRateModel = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
 
-  await waitForTx(protocolConfigurator.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 500), "Add Aave risk pool");
-  await waitForTx(protocolConfigurator.addProtocolRiskPool(COMPOUND_COMET_USDC, defaultRateModel, 500), "Add Compound risk pool");
-  await waitForTx(protocolConfigurator.addProtocolRiskPool(MOONWELL_MUSDC, defaultRateModel, 500), "Add Moonwell risk pool");
-  await waitForTx(protocolConfigurator.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500), "Add Euler risk pool");
-  await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250), "Add DAI risk pool");
-  await waitForTx(protocolConfigurator.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250), "Add USD+ risk pool");
+  // For a testnet, we can just use the underlying asset addresses as placeholders for the covered assets
+  await waitForTx(protocolConfigurator.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 500), "Add USDC risk pool");
+  await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI_ADDRESS, defaultRateModel, 250), "Add DAI risk pool");
+  await waitForTx(protocolConfigurator.addProtocolRiskPool(USDM_ADDRESS, defaultRateModel, 250), "Add DAI risk pool");
+  await waitForTx(protocolConfigurator.addProtocolRiskPool(USDT_ADDRESS, defaultRateModel, 250), "Add DAI risk pool");
 
   /*──────────────────────────────── Output ──────────────────────────────*/
   const addresses = {
@@ -204,8 +195,8 @@ async function main() {
     RiskManager:       riskManager.target,
     ProtocolConfigurator: protocolConfigurator.target,
     UnderwriterManager: underwriterManager.target,
-    "Aave Adapter":    aaveAdapter.target,
-    "Compound Adapter": compoundAdapter.target,
+    "Mock Aave Adapter":    aaveAdapter.target,
+    "Mock Compound Adapter": compoundAdapter.target,
   };
 
   console.table(addresses);
