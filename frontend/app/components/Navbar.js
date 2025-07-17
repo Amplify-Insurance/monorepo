@@ -8,6 +8,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit"
 import ThemeToggle from "./ThemeToggle"
 import CurrencyToggle from "./CurrencyToggle"
 import MobileNav from "./MobileNav"
+import NetworkSelector from "./NetworkSelector"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -84,12 +85,14 @@ export default function Navbar() {
             >
               Transactions
             </Link>
+            <NetworkSelector />
             <ThemeToggle />
             <ConnectButton />
           </div>
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center space-x-2">
+            <NetworkSelector />
             <ThemeToggle />
             <button
               onClick={() => setIsOpen(!isOpen)}
