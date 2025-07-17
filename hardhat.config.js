@@ -31,6 +31,12 @@ module.exports = {
             accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         },
 
+        base_sepolia: {
+            url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
+            chainId: 84532,
+            accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+        },
+
         fuse: {
             url: process.env.FUSE_RPC_URL || "https://rpc.fuse.io",
             chainId: 122,
