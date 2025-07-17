@@ -1,7 +1,7 @@
 // app/config.js
 import { http } from 'wagmi';
-// 1. Import getDefaultConfig
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { CHAINS, CHAIN_MAP } from './config/chains';
 
 // 2. Get WalletConnect Project ID from environment variables
 const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
@@ -15,42 +15,21 @@ if (!projectId) {
   // For RainbowKit defaults to work best, a projectId is needed.
 }
 
-// 3. Define the Base mainnet chain
-const baseMainnet = {
-  id: 8453,
-  name: 'Base',
-  network: 'base-mainnet',
-  nativeCurrency: {
-    name: 'Ether',
-    symbol: 'ETH',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: [
-        // Use env variable in prod, fall back to public RPC in dev
-        process.env.NEXT_PUBLIC_RPC_URL || 'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe',
-      ],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: 'BaseScan',
-      url: 'https://basescan.org',
-    },
-  },
-  testnet: false,
-};
+let defaultChainId = 8453;
+if (typeof window !== 'undefined') {
+  const stored = window.localStorage.getItem('chainId');
+  if (stored) defaultChainId = parseInt(stored, 10);
+}
 
-// 4. Use getDefaultConfig to create wagmi/RainbowKit config
 export const config = getDefaultConfig({
   appName: 'LayerCover',
   projectId: projectId || 'DEFAULT_PROJECT_ID_IF_MISSING',
-  chains: [baseMainnet],
+  chains: CHAINS,
   transports: {
-    [baseMainnet.id]: http(
-      process.env.NEXT_PUBLIC_RPC_URL || 'https://base-mainnet.g.alchemy.com/v2/1aCtyoTdLMNn0TDAz_2hqBKwJhiKBzIe',
-    ),
+    [CHAIN_MAP[8453].id]: http(CHAIN_MAP[8453].rpcUrls.default.http[0]),
+    [CHAIN_MAP[84532].id]: http(CHAIN_MAP[84532].rpcUrls.default.http[0]),
   },
   ssr: true,
 });
+
+export { defaultChainId };

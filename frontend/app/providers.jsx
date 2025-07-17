@@ -3,8 +3,9 @@
 
 import React from 'react';
 import { WagmiProvider } from 'wagmi';
-import { config } from './config'; // Uses the updated config
+import { config } from './config';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NetworkProvider } from '../hooks/useNetwork';
 
 // 1. Import RainbowKitProvider and styles
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
@@ -22,12 +23,14 @@ export function Providers({ children }) {
    const [queryClient] = React.useState(() => new QueryClient());
 
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        {/* 2. Wrap with RainbowKitProvider */}
-        <RainbowKitProvider>{children}</RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <NetworkProvider>
+      <WagmiProvider config={config}>
+        <QueryClientProvider client={queryClient}>
+          {/* 2. Wrap with RainbowKitProvider */}
+          <RainbowKitProvider>{children}</RainbowKitProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </NetworkProvider>
   );
 }
 
