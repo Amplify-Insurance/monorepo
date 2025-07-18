@@ -29,13 +29,21 @@ export default function ClaimsPage() {
   const [claimInfoOpen, setClaimInfoOpen] = useState(false)
   const [claimModalOpen, setClaimModalOpen] = useState(false)
 
+  const toBigInt = (value) => {
+    if (typeof value === "bigint") return value
+    if (typeof value === "string" || typeof value === "number") return BigInt(value)
+    if (value && typeof value === "object") {
+      if ("hex" in value) return BigInt(value.hex)
+      if (typeof value.toString === "function") return BigInt(value.toString())
+    }
+    return 0n
+  }
+
 
   const coverages = policies
   .map((p) => {
-    // 1. Create a real BigNumber from the object, then get the number
-    const poolIdAsNumber = ethers.BigNumber.from(p.poolId).toNumber();
-    
-    // 2. Find the pool using the correct number
+    const poolIdAsNumber = Number(toBigInt(p.poolId))
+
     const pool = pools.find(
       (pl) => Number(pl.id) === poolIdAsNumber
     );
@@ -44,24 +52,20 @@ export default function ClaimsPage() {
 
     console.log(pool, "this is pool")
 
-    // 3. Do the same for all other BigNumber-like objects
     const coverageAmount = Number(
-      ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
+      ethers.utils.formatUnits(toBigInt(p.coverage), pool.underlyingAssetDecimals)
     );
 
-    const activationHex = p.activation?.hex || p.start?.hex || "0x0";
-    const expiryHex = p.lastPaidUntil?.hex || "0x0";
-
-    const activationTs = parseInt(activationHex, 16);
-    let expiryTs = parseInt(expiryHex, 16);
+    const activationTs = Number(toBigInt(p.activation ?? p.start ?? 0n))
+    let expiryTs = Number(toBigInt(p.lastPaidUntil ?? 0n))
     if (!expiryTs) {
       const deposit = Number(
         ethers.utils.formatUnits(
-          p.premiumDeposit?.hex || "0",
+          toBigInt(p.premiumDeposit ?? 0n),
           pool.underlyingAssetDecimals
         )
       );
-      const lastDrainTs = parseInt(p.lastDrainTime?.hex || "0x0", 16);
+      const lastDrainTs = Number(toBigInt(p.lastDrainTime ?? 0n));
       const rate = Number(pool.premiumRateBps || 0) / 100;
       const perSecond =
         rate > 0 ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0;
@@ -78,7 +82,7 @@ export default function ClaimsPage() {
       coverageAmount,
       premium: Number(pool.premiumRateBps || 0) / 100,
       claimFeeBps: Number(pool.claimFeeBps || 0),
-      startDate: new Date(activationTs * 1000).toISOString(),
+      startDate: activationTs ? new Date(activationTs * 1000).toISOString() : null,
       endDate: expiryTs ? new Date(expiryTs * 1000).toISOString() : null,
       isActive: Date.now() / 1000 >= activationTs,
       protocolTokenDecimals: Number(pool.protocolTokenDecimals ?? 18),
@@ -199,8 +203,8 @@ export default function ClaimsPage() {
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {coverage.isActive
-                              ? `Expires: ${new Date(coverage.endDate).toLocaleDateString()}`
-                              : `Activates: ${new Date(coverage.startDate).toLocaleDateString()}`}
+                              ? `Expires: ${coverage.endDate ? new Date(coverage.endDate).toLocaleDateString() : "-"}`
+                              : `Activates: ${coverage.startDate ? new Date(coverage.startDate).toLocaleDateString() : "-"}`}
                           </div>
                         </div>
                       </div>
@@ -240,7 +244,7 @@ export default function ClaimsPage() {
                             {coverage.protocol} {coverage.poolName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Activates: {new Date(coverage.startDate).toLocaleDateString()}
+                            Activates: {coverage.startDate ? new Date(coverage.startDate).toLocaleDateString() : "-"}
                           </div>
                         </div>
                       </div>
@@ -321,7 +325,7 @@ export default function ClaimsPage() {
                               {selectedCoverage.protocol} {selectedCoverage.poolName}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Coverage Period: {new Date(selectedCoverage.startDate).toLocaleDateString()} -{" "}
+                              Coverage Period: {selectedCoverage.startDate ? new Date(selectedCoverage.startDate).toLocaleDateString() : "-"} -{" "}
                               {selectedCoverage.endDate ? new Date(selectedCoverage.endDate).toLocaleDateString() : "N/A"}
                             </div>
                           </div>
