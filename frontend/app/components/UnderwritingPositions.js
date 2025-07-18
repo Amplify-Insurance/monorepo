@@ -207,7 +207,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
     try {
       const dep = getDeployment(position.deployment)
       const cp = await getCapitalPoolWithSigner(dep.capitalPool, dep.name)
-      const tx = await cp.executeWithdrawal()
+      const tx = await cp.executeWithdrawal(0)
       await tx.wait()
 
       setWithdrawalRequests((prev) => {
@@ -964,6 +964,20 @@ export default function UnderwritingPositions({ displayCurrency }) {
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Increase Position
+          </button>
+
+          {/* New: Withdraw button shown when a withdrawal request is ready */}
+          <button
+            onClick={() => {
+              const readyPosition = underwritingPositions.find((p) => p.status === "withdrawal ready")
+              if (readyPosition) {
+                handleExecuteWithdrawal(readyPosition)
+              }
+            }}
+            disabled={!underwritingPositions.some((p) => p.status === "withdrawal ready") || isExecuting}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isExecuting ? "Withdrawing..." : "Withdraw"}
           </button>
           <button
             onClick={() => {
