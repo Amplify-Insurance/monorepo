@@ -10,8 +10,7 @@ import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
 import { getTokenName, getTokenLogo, getProtocolName} from "../config/tokenNameMap"
 import { ethers } from "ethers"
-import { getRiskManagerWithSigner } from "../../lib/riskManager"
-import { getERC20WithSigner } from "../../lib/erc20"
+import ClaimModal from "../components/ClaimModal"
 import {
   Sheet,
   SheetTrigger,
@@ -26,9 +25,9 @@ export default function ClaimsPage() {
   const { pools } = usePools()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCoverage, setSelectedCoverage] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [claimInfoOpen, setClaimInfoOpen] = useState(false)
+  const [claimModalOpen, setClaimModalOpen] = useState(false)
 
 
   const coverages = policies
@@ -109,67 +108,6 @@ export default function ClaimsPage() {
       coverage.pool.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const handleSubmitClaim = async (e) => {
-    e.preventDefault()
-    if (!selectedCoverage) return
-    setIsSubmitting(true)
-    try {
-      const rm = await getRiskManagerWithSigner()
-      const tokenContract = await getERC20WithSigner(selectedCoverage.pool)
-      const signerAddress = await tokenContract.signer.getAddress()
-      const coverageBn = ethers.utils.parseUnits(
-        selectedCoverage.coverageAmount.toString(),
-        selectedCoverage.underlyingAssetDecimals,
-      )
-      let protocolCoverageBn = coverageBn
-      if (
-        selectedCoverage.protocolTokenDecimals >
-        selectedCoverage.underlyingAssetDecimals
-      ) {
-        protocolCoverageBn = coverageBn.mul(
-          ethers.BigNumber.from(10).pow(
-            selectedCoverage.protocolTokenDecimals -
-              selectedCoverage.underlyingAssetDecimals,
-          ),
-        )
-      } else if (
-        selectedCoverage.protocolTokenDecimals <
-        selectedCoverage.underlyingAssetDecimals
-      ) {
-        protocolCoverageBn = coverageBn.div(
-          ethers.BigNumber.from(10).pow(
-            selectedCoverage.underlyingAssetDecimals -
-              selectedCoverage.protocolTokenDecimals,
-          ),
-        )
-      }
-
-      const allowance = await tokenContract.allowance(
-        signerAddress,
-        rm.address,
-      )
-      if (allowance.lt(protocolCoverageBn)) {
-        const approveTx = await tokenContract.approve(
-          rm.address,
-          protocolCoverageBn,
-        )
-        await approveTx.wait()
-      }
-
-      // processClaim(policyId, claimAmount)
-      const tx = await rm.processClaim(
-        selectedCoverage.id,
-        protocolCoverageBn,
-      )
-      await tx.wait()
-      setShowConfirmation(true)
-      setSelectedCoverage(null)
-    } catch (err) {
-      console.error("Failed to submit claim", err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   if (!isConnected) {
     return (
@@ -365,8 +303,7 @@ export default function ClaimsPage() {
                     </div>
                   </div>
 
-                  <form onSubmit={handleSubmitClaim}>
-                    <div className="mb-6">
+                  <>
                       <h3 className="text-base font-medium text-gray-900 dark:text-white mb-2">Selected Coverage</h3>
                       <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                         <div className="flex items-center mb-3">
@@ -416,21 +353,29 @@ export default function ClaimsPage() {
                         Cancel
                       </button>
                       <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className={`px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white ${isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                          }`}
+                        type="button"
+                        onClick={() => setClaimModalOpen(true)}
+                        className="px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                       >
-                        {isSubmitting ? "Submitting..." : "Submit Claim"}
+                        Submit Claim
                       </button>
                     </div>
-                  </form>
+                  </>
                 </>
               )}
             </div>
           </div>
         </div>
       )}
+      <ClaimModal
+        isOpen={claimModalOpen}
+        onClose={() => setClaimModalOpen(false)}
+        coverage={selectedCoverage}
+        onSubmitted={() => {
+          setShowConfirmation(true)
+          setSelectedCoverage(null)
+        }}
+      />
     </div>
   )
 }
