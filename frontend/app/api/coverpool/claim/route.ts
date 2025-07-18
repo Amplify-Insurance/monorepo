@@ -4,10 +4,10 @@ import deployments from '../../../config/deployments';
 
 export async function POST(req: Request) {
   try {
-    const { policyId, deployment: depName } = await req.json();
+    const { policyId, claimAmount, deployment: depName } = await req.json();
     const dep = deployments.find((d) => d.name === depName) ?? deployments[0];
     const rm = getRiskManagerWriter(dep.riskManager, dep.name);
-    const tx = await rm.processClaim(policyId);
+    const tx = await rm.processClaim(policyId, claimAmount);
     await tx.wait();
     return NextResponse.json({ txHash: tx.hash });
   } catch (err: any) {
