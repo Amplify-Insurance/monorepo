@@ -156,7 +156,11 @@ export default function ClaimsPage() {
         await approveTx.wait()
       }
 
-      const tx = await rm.processClaim(selectedCoverage.id)
+      // processClaim(policyId, claimAmount)
+      const tx = await rm.processClaim(
+        selectedCoverage.id,
+        protocolCoverageBn,
+      )
       await tx.wait()
       setShowConfirmation(true)
       setSelectedCoverage(null)
@@ -325,7 +329,7 @@ export default function ClaimsPage() {
                       <SheetTitle>Make a Claim</SheetTitle>
                     </SheetHeader>
                     <div className="mt-4 text-sm">
-                      Filing a claim calls <code>processClaim(policyId)</code> on the RiskManager. After review, you receive your coverage minus the claim fee.
+                      Filing a claim calls <code>processClaim(policyId, claimAmount)</code> on the RiskManager. After review, you receive your coverage minus the claim fee.
                     </div>
                   </SheetContent>
                 </Sheet>
