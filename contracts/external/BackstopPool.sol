@@ -29,6 +29,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
     address public riskManagerAddress;
     address public capitalPoolAddress;
     address public policyManagerAddress;
+    address public underwriterManagerAddress;
     IRewardDistributor public rewardDistributor;
 
     bool private _initialized;
@@ -58,6 +59,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
     event ProtocolAssetRewardsClaimed(address indexed user, address indexed token, uint256 amount);
     event RiskManagerAddressSet(address indexed newRiskManagerAddress);
     event CapitalPoolAddressSet(address indexed newCapitalPoolAddress);
+    event UnderwriterManagerAddressSet(address indexed newUnderwriterManagerAddress);
     event PolicyManagerAddressSet(address indexed newPolicyManagerAddress);
     event RewardDistributorSet(address indexed newRewardDistributor);
 
@@ -102,6 +104,21 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         _;
     }
 
+    modifier onlyCapitalPool() {
+        require(msg.sender == capitalPoolAddress, "CIP: Caller is not the CapitalPool");
+        _;
+    }
+
+    modifier onlyUnderwriterManager() {
+        require(msg.sender == underwriterManagerAddress, "CIP: Caller is not the UnderwriterManager");
+        _;
+    }
+
+    modifier onlyApproved() {
+        require(msg.sender == underwriterManagerAddress || msg.sender == riskManagerAddress || msg.sender == capitalPoolAddress, "CIP: Caller is not the approved");
+        _;
+    }
+
     /* ───────────────────── Admin Functions ───────────────────── */
 
     function setRiskManager(address newRiskManagerAddress) external onlyOwner {
@@ -114,6 +131,12 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         require(newCapitalPoolAddress != address(0), "CIP: Address cannot be zero");
         capitalPoolAddress = newCapitalPoolAddress;
         emit CapitalPoolAddressSet(newCapitalPoolAddress);
+    }
+
+    function setUnderwriterManager(address newUnderwriterManagerAddress) external onlyOwner {
+        require(newUnderwriterManagerAddress != address(0), "CIP: Address cannot be zero");
+        underwriterManagerAddress = newUnderwriterManagerAddress;
+        emit UnderwriterManagerAddressSet(newUnderwriterManagerAddress);
     }
 
     function setPolicyManager(address newPolicyManagerAddress) external onlyOwner {
@@ -215,7 +238,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         emit UsdcPremiumReceived(amount);
     }
 
-    function drawFund(uint256 amountToDraw) external override onlyRiskManager nonReentrant {
+    function drawFund(uint256 amountToDraw) external override onlyApproved nonReentrant {
         require(amountToDraw > 0, "CIP: Draw amount must be positive");
         require(capitalPoolAddress != address(0), "CIP: CapitalPool address not set");
         require(amountToDraw <= liquidUsdc(), "CIP: Draw amount exceeds Cat Pool's liquid USDC");
@@ -269,7 +292,7 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
         emit ProtocolAssetRewardsClaimed(msg.sender, protocolAsset, claimableAmount);
     }
 
-    function claimProtocolAssetRewardsFor(address user, address protocolAsset) external override onlyRiskManager nonReentrant {
+    function claimProtocolAssetRewardsFor(address user, address protocolAsset) external override onlyApproved nonReentrant {
         require(address(rewardDistributor) != address(0), "CIP: Reward distributor not set");
         uint256 userShares = catShareToken.balanceOf(user);
 
