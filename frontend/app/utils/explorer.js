@@ -13,8 +13,13 @@ export const notifyTx = async (tx, name, addTx) => {
   const { update, dismiss } = toast({
     title: `${name} Submitted`,
     description: (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
-        View on block explorer
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline break-all"
+      >
+        {url}
       </a>
     ),
   })
@@ -24,8 +29,13 @@ export const notifyTx = async (tx, name, addTx) => {
     update({
       title: `${name} Confirmed`,
       description: (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
-          View on block explorer
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline break-all"
+        >
+          {url}
         </a>
       ),
     })
