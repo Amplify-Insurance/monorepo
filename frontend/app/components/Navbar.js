@@ -79,13 +79,13 @@ export default function Navbar() {
           {/* Desktop Controls */}
           <div className="hidden md:flex items-center space-x-4">
             {/* <CurrencyToggle /> */}
-            <Link
+            {/* <Link
               href="/transactions"
               className="px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50"
             >
               Transactions
-            </Link>
-            <NetworkSelector />
+            </Link> */}
+            {/* <NetworkSelector /> */}
             <ThemeToggle />
             <ConnectButton />
           </div>

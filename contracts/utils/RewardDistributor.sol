@@ -26,6 +26,7 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
     address public capitalPool;
     address public underwriterManager;
     address public catPool;
+    address public riskManager;
 
     // --- Events ---
     event PoolRegistrySet(address indexed newPoolRegistry);
@@ -33,7 +34,8 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
     event CapitalPoolSet(address indexed newCapitalPool);
     event UnderwriterManagerSet(address indexed newUnderwriterManager);
     event CatPoolSet(address indexed newCatPool);
-    
+    event RiskManagerSet(address indexed newCatPool);
+
     // --- Accounting Structs ---
     struct RewardTracker {
         uint256 accumulatedRewardsPerShare;
@@ -51,7 +53,7 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
 
     /* ───────────────────────── Modifiers & Errors ──────────────────────── */
     modifier onlyDistributors() {
-        require(msg.sender == policyManager || msg.sender == capitalPool, "RD: Not an authorized distributor");
+        require(msg.sender == policyManager || msg.sender == capitalPool ||  msg.sender == riskManager  ||  msg.sender == catPool , "RD: Not an authorized distributor");
         _;
     }
     
@@ -78,7 +80,9 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
         address _poolRegistry,
         address _policyManager,
         address _capitalPool,
-        address _underwriterManager
+        address _underwriterManager,
+        address _riskManager
+
     ) Ownable(msg.sender) {
         if (_poolRegistry == address(0) || _policyManager == address(0) || _capitalPool == address(0) || _underwriterManager == address(0)) {
             revert ZeroAddress();
@@ -87,6 +91,8 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
         policyManager = _policyManager;
         capitalPool = _capitalPool;
         underwriterManager = _underwriterManager;
+        riskManager = _riskManager;
+
     }
 
     function setPoolRegistry(address newPoolRegistry) external onlyOwner {
@@ -105,6 +111,12 @@ contract RewardDistributor is IRewardDistributor, Ownable, ReentrancyGuard {
         if (newCapitalPool == address(0)) revert ZeroAddress();
         capitalPool = newCapitalPool;
         emit CapitalPoolSet(newCapitalPool);
+    }
+
+    function setRiskManager(address newRiskManager) external onlyOwner {
+        if (newRiskManager == address(0)) revert ZeroAddress();
+        riskManager = newRiskManager;
+        emit RiskManagerSet(newRiskManager);
     }
 
     function setUnderwriterManager(address newUnderwriterManager) external onlyOwner {

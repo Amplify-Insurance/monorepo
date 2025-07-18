@@ -58,25 +58,25 @@ const TOKEN_NAME_MAPS = {
     "0x4200000000000000000000000000000000000006": 'WETH',
   },
   84532: {
-    "0xc6bc407706b7140ee8eef2f86f9504651b63e7f9": 'USDC',
-    "0x3695dd1d1d43b794c0b13eb8be8419eb3ac22bf7": 'USDT',
-    "0x4447863cddabbf2c3dac826f042e03c91927a196": 'USDM',
-    "0x2502f488d481df4f5054330c71b95d93d41625c2": 'DAI',
+    "0xdb17b0db251013464c6f9e2477ba79bce5d8dce3": 'USDC',
+    "0x474C479BeC727D24F833365Db2A929Bd55ACC7eA": 'USDT',
+    "0x8815459FFDEC8FA33F9d1E37d4b5852fB269cDD8": 'USDM',
+    "0xdD758aD67Dc25914b17DA6602a190E266a0b0772": 'DAI',
   },
 };
 
 const TOKEN_LOGO_MAPS = {
   8453: {
-    "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": '/images/tokens/usdc.png',
+    "0xdb17b0db251013464c6f9e2477ba79bce5d8dce3": '/images/tokens/usdc.png',
     "0x50c5725949a6f0c72e6c4a641f24049a917db0cb": '/images/stablecoins/usd_plus.svg',
     "0xb79dd08ea68a908a97220c76d19a6aa9cbde4376": '/images/stablecoins/dai.svg',
     "0x4200000000000000000000000000000000000006": '/images/tokens/eth.png',
   },
   84532: {
-    "0xc6bc407706b7140ee8eef2f86f9504651b63e7f9": '/images/stablecoins/usdc.png',
-    "0x2502f488d481df4f5054330c71b95d93d41625c2": '/images/stablecoins/dai.svg',
-    "0x3695dd1d1d43b794c0b13eb8be8419eb3ac22bf7": '/images/stablecoins/usdt.png',
-    "0x4447863cddabbf2c3dac826f042e03c91927a196": '/images/stablecoins/usdm.png',
+    "0xdb17b0db251013464c6f9e2477ba79bce5d8dce3": '/images/stablecoins/usdc.png',
+    "0xdD758aD67Dc25914b17DA6602a190E266a0b0772": '/images/stablecoins/dai.svg',
+    "0x474C479BeC727D24F833365Db2A929Bd55ACC7eA": '/images/stablecoins/usdt.png',
+    "0x8815459FFDEC8FA33F9d1E37d4b5852fB269cDD8": '/images/stablecoins/usdm.png',
   },
 };
 

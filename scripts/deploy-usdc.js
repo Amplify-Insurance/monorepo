@@ -29,10 +29,10 @@ const NETWORK_CONFIG = {
     useMocks: false,
   },
   base_sepolia: {
-    USDC_ADDRESS: "0xc6Bc407706B7140EE8Eef2f86F9504651b63e7f9",
-    DAI: "0x2502F488D481Df4F5054330C71b95d93D41625C2",
-    USDT_ADDRESS: "0x3695Dd1D1D43B794C0B13eb8be8419Eb3ac22bf7",
-    USDM_ADDRESS: "0x4447863cddABbF2c3dAC826f042e03c91927A196",
+    USDC_ADDRESS: "0xDB17B0Db251013464C6f9E2477ba79bCe5d8DCE3",
+    DAI: "0xdD758aD67Dc25914b17DA6602a190E266a0b0772",
+    USDT_ADDRESS: "0x474C479BeC727D24F833365Db2A929Bd55ACC7eA",
+    USDM_ADDRESS: "0x8815459FFDEC8FA33F9d1E37d4b5852fB269cDD8",
     useMocks: true,
   },
 };
@@ -109,7 +109,7 @@ async function main() {
   console.log("PolicyManager deployed to:", policyManager.target);
   
   const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
-  const rewardDistributor = await RewardDistributor.deploy(poolRegistry.target, policyManager.target, capitalPool.target, underwriterManager.target );
+  const rewardDistributor = await RewardDistributor.deploy(poolRegistry.target, policyManager.target, capitalPool.target, underwriterManager.target, riskManager.target );
   await rewardDistributor.waitForDeployment();
   console.log("RewardDistributor deployed to:", rewardDistributor.target);
   
@@ -171,7 +171,6 @@ async function main() {
     capitalPool.target,
     policyManager.target,
     underwriterManager.target,
-    riskManager.target // FIX: Added missing riskManager address
   ), "Initialize RiskAdmin");
 
   /*─────────────────────────── Yield adapters ────────────────────────────*/
@@ -182,7 +181,7 @@ async function main() {
     : [USDC_ADDRESS, AAVE_POOL_ADDRESS, AAVE_AUSDC_ADDRESS, deployer.address];
   const aaveAdapter = await AaveAdapter.deploy(...aaveArgs);
   await aaveAdapter.waitForDeployment();
-  console.log(`${useMocks ? "MockAaveV3Adapter" : "AaveAdapter"} deployed to:", aaveAdapter.target);
+
   await waitForTx(aaveAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on AaveAdapter");
 
   const CompoundAdapter = await ethers.getContractFactory(useMocks ? "MockCompoundV3Adapter" : "CompoundV3Adapter");
@@ -191,7 +190,8 @@ async function main() {
     : [COMPOUND_COMET_USDC, deployer.address];
   const compoundAdapter = await CompoundAdapter.deploy(...compoundArgs);
   await compoundAdapter.waitForDeployment();
-  console.log(`${useMocks ? "MockCompoundV3Adapter" : "CompoundAdapter"} deployed to:", compoundAdapter.target);
+
+  
   await waitForTx(compoundAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on CompoundAdapter");
 
   /*──────────────── Transfer ownership and configure via RiskAdmin ──────*/

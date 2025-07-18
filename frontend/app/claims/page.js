@@ -8,7 +8,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatCurrency } from "../utils/formatting"
 import useUserPolicies from "../../hooks/useUserPolicies"
 import usePools from "../../hooks/usePools"
-import { getTokenName, getTokenLogo, getProtocolName} from "../config/tokenNameMap"
+import { getTokenName, getTokenLogo, getProtocolName } from "../config/tokenNameMap"
 import { ethers } from "ethers"
 import ClaimModal from "../components/ClaimModal"
 import {
@@ -31,63 +31,63 @@ export default function ClaimsPage() {
 
 
   const coverages = policies
-  .map((p) => {
-    // 1. Create a real BigNumber from the object, then get the number
-    const poolIdAsNumber = ethers.BigNumber.from(p.poolId).toNumber();
-    
-    // 2. Find the pool using the correct number
-    const pool = pools.find(
-      (pl) => Number(pl.id) === poolIdAsNumber
-    );
+    .map((p) => {
+      // 1. Create a real BigNumber from the object, then get the number
+      const poolIdAsNumber = ethers.BigNumber.from(p.poolId).toNumber();
 
-    if (!pool) return null;
-
-    console.log(pool, "this is pool")
-
-    // 3. Do the same for all other BigNumber-like objects
-    const coverageAmount = Number(
-      ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
-    );
-
-    const activationHex = p.activation?.hex || p.start?.hex || "0x0";
-    const expiryHex = p.lastPaidUntil?.hex || "0x0";
-
-    const activationTs = parseInt(activationHex, 16);
-    let expiryTs = parseInt(expiryHex, 16);
-    if (!expiryTs) {
-      const deposit = Number(
-        ethers.utils.formatUnits(
-          p.premiumDeposit?.hex || "0",
-          pool.underlyingAssetDecimals
-        )
+      // 2. Find the pool using the correct number
+      const pool = pools.find(
+        (pl) => Number(pl.id) === poolIdAsNumber
       );
-      const lastDrainTs = parseInt(p.lastDrainTime?.hex || "0x0", 16);
-      const rate = Number(pool.premiumRateBps || 0) / 100;
-      const perSecond =
-        rate > 0 ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0;
-      if (perSecond > 0) {
-        expiryTs = Math.floor(lastDrainTs + deposit / perSecond);
+
+      if (!pool) return null;
+
+      console.log(pool, "this is pool")
+
+      // 3. Do the same for all other BigNumber-like objects
+      const coverageAmount = Number(
+        ethers.utils.formatUnits(p.coverage, pool.underlyingAssetDecimals)
+      );
+
+      const activationHex = p.activation?.hex || p.start?.hex || "0x0";
+      const expiryHex = p.lastPaidUntil?.hex || "0x0";
+
+      const activationTs = parseInt(activationHex, 16);
+      let expiryTs = parseInt(expiryHex, 16);
+      if (!expiryTs) {
+        const deposit = Number(
+          ethers.utils.formatUnits(
+            p.premiumDeposit?.hex || "0",
+            pool.underlyingAssetDecimals
+          )
+        );
+        const lastDrainTs = parseInt(p.lastDrainTime?.hex || "0x0", 16);
+        const rate = Number(pool.premiumRateBps || 0) / 100;
+        const perSecond =
+          rate > 0 ? (coverageAmount * (rate / 100)) / (365 * 24 * 60 * 60) : 0;
+        if (perSecond > 0) {
+          expiryTs = Math.floor(lastDrainTs + deposit / perSecond);
+        }
       }
-    }
 
-    return {
-      id: typeof p.id === 'object' ? ethers.BigNumber.from(p.id).toNumber() : p.id,
-      protocol: getProtocolName(pool.id),
-      pool: pool.protocolTokenToCover,
-      poolName: getTokenName(pool.protocolTokenToCover),
-      coverageAmount,
-      premium: Number(pool.premiumRateBps || 0) / 100,
-      claimFeeBps: Number(pool.claimFeeBps || 0),
-      startDate: new Date(activationTs * 1000).toISOString(),
-      endDate: expiryTs ? new Date(expiryTs * 1000).toISOString() : null,
-      isActive: Date.now() / 1000 >= activationTs,
-      protocolTokenDecimals: Number(pool.protocolTokenDecimals ?? 18),
-      underlyingAssetDecimals: Number(pool.underlyingAssetDecimals ?? 18),
-      deployment: pool.deployment,
-    };
+      return {
+        id: typeof p.id === 'object' ? ethers.BigNumber.from(p.id).toNumber() : p.id,
+        protocol: getProtocolName(pool.id),
+        pool: pool.protocolTokenToCover,
+        poolName: getTokenName(pool.protocolTokenToCover),
+        coverageAmount,
+        premium: Number(pool.premiumRateBps || 0) / 100,
+        claimFeeBps: Number(pool.claimFeeBps || 0),
+        startDate: new Date(activationTs * 1000).toISOString(),
+        endDate: expiryTs ? new Date(expiryTs * 1000).toISOString() : null,
+        isActive: Date.now() / 1000 >= activationTs,
+        protocolTokenDecimals: Number(pool.protocolTokenDecimals ?? 18),
+        underlyingAssetDecimals: Number(pool.underlyingAssetDecimals ?? 18),
+        deployment: pool.deployment,
+      };
 
-  })
-  .filter(Boolean);
+    })
+    .filter(Boolean);
 
 
   const activeCoverages = coverages.filter((c) => c.isActive)
@@ -130,7 +130,7 @@ export default function ClaimsPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-800 mb-4">
             <svg
               className="h-6 w-6 text-green-600 dark:text-green-400"
-              xmlns="http://www.w3.org/2000/svg"
+              xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -172,7 +172,9 @@ export default function ClaimsPage() {
 
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {filteredCoverages.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">No active coverages found</div>
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    No active coverages found
+                  </div>
                 ) : (
                   filteredCoverages.map((coverage) => (
                     <div
@@ -198,9 +200,11 @@ export default function ClaimsPage() {
                             {coverage.protocol} {coverage.poolName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {coverage.isActive
+                            {coverage.isActive && coverage.endDate
                               ? `Expires: ${new Date(coverage.endDate).toLocaleDateString()}`
-                              : `Activates: ${new Date(coverage.startDate).toLocaleDateString()}`}
+                              : `Activates: ${new Date(
+                                coverage.startDate,
+                              ).toLocaleDateString()}`}
                           </div>
                         </div>
                       </div>
@@ -218,7 +222,9 @@ export default function ClaimsPage() {
 
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {filteredPendingCoverages.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">No pending coverages found</div>
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    No pending coverages found
+                  </div>
                 ) : (
                   filteredPendingCoverages.map((coverage) => (
                     <div
@@ -255,19 +261,24 @@ export default function ClaimsPage() {
           </div>
 
           <div className="md:col-span-2">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-              <div className="flex items-center mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-6">
+              <div className="flex items-center">
                 <h2 className="text-lg font-semibold">Make a Claim</h2>
                 <Sheet open={claimInfoOpen} onOpenChange={setClaimInfoOpen}>
                   <SheetTrigger className="ml-2 text-gray-500 hover:text-gray-700">
                     <HelpCircle className="w-4 h-4" />
                   </SheetTrigger>
-                  <SheetContent side="right" className="w-1/3 sm:max-w-none text-black dark:text-white">
+                  <SheetContent
+                    side="right"
+                    className="w-full md:w-1/3 sm:max-w-md text-black dark:text-white"
+                  >
                     <SheetHeader>
                       <SheetTitle>Make a Claim</SheetTitle>
                     </SheetHeader>
                     <div className="mt-4 text-sm">
-                      Filing a claim calls <code>processClaim(policyId, claimAmount)</code> on the RiskManager. After review, you receive your coverage minus the claim fee.
+                      Filing a claim calls{" "}
+                      <code>processClaim(policyId, claimAmount)</code> on the RiskManager.
+                      After review, you receive your coverage minus the claim fee.
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -278,14 +289,16 @@ export default function ClaimsPage() {
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
                     <Info className="h-6 w-6 text-gray-500 dark:text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">Select a Coverage</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                    Select a Coverage
+                  </h3>
                   <p className="text-gray-500 dark:text-gray-400">
                     Please select an active coverage from the list to make a claim.
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <div className="flex">
                       <div className="flex-shrink-0">
                         <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
@@ -296,71 +309,82 @@ export default function ClaimsPage() {
                         </h3>
                         <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
                           <p>
-                            {`Making a claim will incur a ${selectedCoverage.claimFeeBps / 100}% fee on the claim value. This fee is non-refundable.`}
+                            {`Making a claim will incur a ${selectedCoverage.claimFeeBps / 100
+                              }% fee on the claim value. This fee is non-refundable.`}
                           </p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <>
-                      <h3 className="text-base font-medium text-gray-900 dark:text-white mb-2">Selected Coverage</h3>
-                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                        <div className="flex items-center mb-3">
-                          <div className="flex-shrink-0 h-10 w-10 mr-3">
-                            <Image
-                              src={getTokenLogo(selectedCoverage.pool)}
-                              alt={selectedCoverage.protocol}
-                              width={40}
-                              height={40}
-                              className="rounded-full"
-                            />
+                  <div>
+                    <h3 className="text-base font-medium text-gray-900 dark:text-white mb-2">
+                      Selected Coverage
+                    </h3>
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <div className="flex-shrink-0 h-10 w-10 mr-3">
+                          <Image
+                            src={getTokenLogo(selectedCoverage.pool)}
+                            alt={selectedCoverage.protocol}
+                            width={40}
+                            height={40}
+                            className="rounded-full"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-lg font-medium text-gray-900 dark:text-white">
+                            {selectedCoverage.protocol} {selectedCoverage.poolName}
                           </div>
-                          <div>
-                            <div className="text-lg font-medium text-gray-900 dark:text-white">
-                              {selectedCoverage.protocol} {selectedCoverage.poolName}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Coverage Period: {new Date(selectedCoverage.startDate).toLocaleDateString()} -{" "}
-                              {selectedCoverage.endDate ? new Date(selectedCoverage.endDate).toLocaleDateString() : "N/A"}
-                            </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Coverage Period:{" "}
+                            {new Date(selectedCoverage.startDate).toLocaleDateString()} -{" "}
+                            {selectedCoverage.endDate
+                              ? new Date(selectedCoverage.endDate).toLocaleDateString()
+                              : "N/A"}
                           </div>
                         </div>
+                      </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">Coverage Amount</div>
-                            <div className="text-lg font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(selectedCoverage.coverageAmount)}
-                            </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Coverage Amount
                           </div>
-                          <div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{`Claim Fee (${selectedCoverage.claimFeeBps / 100}%)`}</div>
-                            <div className="text-lg font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(selectedCoverage.coverageAmount * (selectedCoverage.claimFeeBps / 10000))}
-                            </div>
+                          <div className="text-lg font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(selectedCoverage.coverageAmount)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{`Claim Fee (${selectedCoverage.claimFeeBps / 100
+                            }%)`}</div>
+                          <div className="text-lg font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(
+                              selectedCoverage.coverageAmount *
+                              (selectedCoverage.claimFeeBps / 10000),
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        className="mr-3 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        onClick={() => setSelectedCoverage(null)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setClaimModalOpen(true)}
-                        className="px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                      >
-                        Submit Claim
-                      </button>
-                    </div>
-                  </>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      className="mr-3 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      onClick={() => setSelectedCoverage(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClaimModalOpen(true)}
+                      className="px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      Submit Claim
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -374,6 +398,7 @@ export default function ClaimsPage() {
         onSubmitted={() => {
           setShowConfirmation(true)
           setSelectedCoverage(null)
+          setClaimModalOpen(false)
         }}
       />
     </div>
