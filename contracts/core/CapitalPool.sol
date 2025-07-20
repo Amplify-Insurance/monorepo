@@ -66,29 +66,33 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
 
     /* ───────────────────────── Modifiers & Errors ──────────────────────── */
     modifier onlyRiskManager() {
+        // This require statement can be updated to use the custom error
+        // e.g., if (msg.sender != riskManager) revert NotRiskManager(msg.sender);
         require(msg.sender == riskManager, "CP: Caller is not the RiskManager");
         _;
     }
 
     modifier onlyLossDistributor() {
+        // This require statement can be updated to use the custom error
+        // e.g., if (msg.sender != lossDistributor) revert NotLossDistributor(msg.sender);
         require(msg.sender == lossDistributor, "CP: Caller is not the LossDistributor");
         _;
     }
     
     error ZeroAddress();
-    error InvalidAmount();
-    error NoSharesToMint();
-    error NotRiskManager();
-    error InconsistentState();
+    error InvalidAmount(uint256 amount);
+    error NoSharesToMint(uint256 amountDeposited);
+    error NotRiskManager(address caller);
+    error InconsistentState(string reason);
     error NoWithdrawalRequest();
-    error NoticePeriodActive();
-    error InsufficientShares();
-    error AdapterNotConfigured();
-    error NoActiveDeposit();
-    error PayoutExceedsPoolLPCapital();
-    error InvalidRequestIndex();
-    error NotLossDistributor();
-    error MismatchedArrayLengths();
+    error NoticePeriodActive(uint256 unlockTimestamp, uint256 blockTimestamp);
+    error InsufficientShares(uint256 requested, uint256 available);
+    error AdapterNotConfigured(uint8 platform); // enums are represented as uint8
+    error NoActiveDeposit(address user);
+    error PayoutExceedsPoolLPCapital(uint256 payoutAmount, uint256 availableCapital);
+    error InvalidRequestIndex(uint256 index, uint256 length);
+    error NotLossDistributor(address caller);
+    error MismatchedArrayLengths(uint256 lengthA, uint256 lengthB);
 
     /* ───────────────────────── Events ──────────────────────────── */
     event RiskManagerSet(address indexed newRiskManager);
@@ -174,7 +178,7 @@ function deposit(uint256 _amount, YieldPlatform _yieldChoice) external override 
 
     // 2. Calculate how many shares to mint for the deposit
     uint256 sharesToMint = _calculateSharesToMint(_amount);
-    if (sharesToMint == 0) revert NoSharesToMint();
+    if (sharesToMint == 0) revert NoSharesToMint(_amount);
 
     // 3. Perform the token transfer and deposit into the yield adapter
     _performDepositInteraction(chosenAdapter, _amount);
@@ -198,12 +202,12 @@ function _validateDeposit(
     uint256 _amount,
     YieldPlatform _yieldChoice
 ) internal view returns (IYieldAdapter) {
-    if (_amount == 0) revert InvalidAmount();
-    if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured();
+    if (_amount == 0) revert InvalidAmount(_amount);
+    if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured(uint8(_yieldChoice));
 
     UnderwriterAccount storage account = underwriterAccounts[msg.sender];
     IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
-    if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured();
+    if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured(uint8(_yieldChoice));
 
     // Prevent users from changing their chosen yield strategy without first withdrawing.
     if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
@@ -257,10 +261,10 @@ function _updateStateOnDeposit(
 }
 
     function requestWithdrawal(uint256 _sharesToBurn) external nonReentrant {
-        if (_sharesToBurn == 0) revert InvalidAmount();
+        if (_sharesToBurn == 0) revert InvalidAmount(_sharesToBurn);
         UnderwriterAccount storage account = underwriterAccounts[msg.sender];
         uint256 newTotalPending = account.totalPendingWithdrawalShares + _sharesToBurn;
-        if (newTotalPending > account.masterShares) revert InsufficientShares();
+        if (newTotalPending > account.masterShares) revert InsufficientShares(_sharesToBurn, account.masterShares - account.totalPendingWithdrawalShares);
         account.totalPendingWithdrawalShares = newTotalPending;
         uint256 valueToWithdraw = sharesToValue(_sharesToBurn);
         if (address(underwriterManager) != address(0)) {
@@ -277,7 +281,7 @@ function _updateStateOnDeposit(
 
     function cancelWithdrawalRequest(uint256 _requestIndex) external nonReentrant {
         WithdrawalRequest[] storage requests = withdrawalRequests[msg.sender];
-        if (_requestIndex >= requests.length) revert InvalidRequestIndex();
+        if (_requestIndex >= requests.length) revert InvalidRequestIndex(_requestIndex, requests.length);
         uint256 sharesToCancel = requests[_requestIndex].shares;
         uint256 valueCancelled = sharesToValue(sharesToCancel);
         if (address(underwriterManager) != address(0)) {
@@ -320,13 +324,13 @@ function _validateWithdrawalRequest(
     uint256 requestIndex
 ) internal view returns (UnderwriterAccount storage, uint256) {
     WithdrawalRequest[] storage requests = withdrawalRequests[user];
-    if (requestIndex >= requests.length) revert InvalidRequestIndex();
+    if (requestIndex >= requests.length) revert InvalidRequestIndex(requestIndex, requests.length);
 
     WithdrawalRequest memory requestToExecute = requests[requestIndex];
-    if (block.timestamp < requestToExecute.unlockTimestamp) revert NoticePeriodActive();
+    if (block.timestamp < requestToExecute.unlockTimestamp) revert NoticePeriodActive(requestToExecute.unlockTimestamp, block.timestamp);
     
     UnderwriterAccount storage account = underwriterAccounts[user];
-    if (requestToExecute.shares > account.masterShares) revert InconsistentState();
+    if (requestToExecute.shares > account.masterShares) revert InconsistentState("Pending withdrawal shares exceed total shares.");
 
     return (account, requestToExecute.shares);
 }
@@ -423,7 +427,7 @@ function _updateStateAfterWithdrawal(
     function executePayout(PayoutData calldata _payoutData) external override nonReentrant onlyRiskManager {
         uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
         if (totalPayoutAmount == 0) return;
-        if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital();
+        if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital(totalPayoutAmount, _payoutData.totalCapitalFromPoolLPs);
 
         _gatherFundsForPayout(_payoutData);
 
@@ -463,8 +467,8 @@ function _updateStateAfterWithdrawal(
         uint256[] calldata sharesToBurn,
         uint256 totalLossAmount
     ) external nonReentrant onlyLossDistributor {
-        if (underwriters.length != sharesToBurn.length) revert MismatchedArrayLengths();
-        if (totalLossAmount == 0) revert InvalidAmount();
+        if (underwriters.length != sharesToBurn.length) revert MismatchedArrayLengths(underwriters.length, sharesToBurn.length);
+        if (totalLossAmount == 0) revert InvalidAmount(totalLossAmount);
 
         for (uint i = 0; i < underwriters.length; i++) {
             address underwriter = underwriters[i];
@@ -472,7 +476,7 @@ function _updateStateAfterWithdrawal(
             if (burnAmount == 0) continue;
 
             UnderwriterAccount storage account = underwriterAccounts[underwriter];
-            if (account.masterShares < burnAmount) revert InsufficientShares();
+            if (account.masterShares < burnAmount) revert InsufficientShares(burnAmount, account.masterShares);
 
             account.masterShares -= burnAmount;
             

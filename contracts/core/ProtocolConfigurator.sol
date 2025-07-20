@@ -11,6 +11,7 @@ import {IUnderwriterManagerAdmin} from "../interfaces/IUnderwriterManagerAdmin.s
 import {IPolicyManagerAdmin} from "../interfaces/IPolicyManagerAdmin.sol";
 import {IRiskManagerAdmin} from "../interfaces/IRiskManagerAdmin.sol";
 
+
 /**
  * @title RiskAdmin
  * @author Gemini
@@ -106,6 +107,14 @@ contract RiskAdmin is Ownable {
 
     function setUnderwriterManager(address target, address newUnderwriterManager) external onlyOwner initialized {
         ICapitalPoolAdmin(target).setUnderwriterManager(newUnderwriterManager);
+    }
+
+    function setLossDistributor(address target, address newLossDistributor) external onlyOwner initialized {
+        ICapitalPoolAdmin(target).setLossDistributor(newLossDistributor);
+    }
+
+    function setRewardDistributor(address target, address newRewardDistributor) external onlyOwner initialized {
+        ICapitalPoolAdmin(target).setRewardDistributor(newRewardDistributor);
     }
 
     function setCapitalPoolNoticePeriod(uint256 newPeriod) external onlyOwner initialized {

@@ -208,6 +208,9 @@ async function main() {
   await waitForTx(protocolConfigurator.setRiskManager(poolRegistry.target, riskManager.target), "Set RiskManager on PoolRegistry via Admin");
   await waitForTx(protocolConfigurator.setRiskManager(capitalPool.target, riskManager.target), "Set RiskManager on CapitalPool via Admin");
   
+  await waitForTx(protocolConfigurator.setRewardDistributor(capitalPool.target, rewardDistributor.target), "Set rewardDistributor on CapitalPool via Admin");
+  await waitForTx(protocolConfigurator.setLossDistributor(capitalPool.target, lossDistributor.target), "Set lossDistributor on CapitalPool via Admin");
+
   // 1=AAVE, 2=COMPOUND
   await waitForTx(protocolConfigurator.setCapitalPoolBaseYieldAdapter(1, aaveAdapter.target), "Set Aave adapter via Admin");
   await waitForTx(protocolConfigurator.setCapitalPoolBaseYieldAdapter(2, compoundAdapter.target), "Set Compound adapter via Admin");

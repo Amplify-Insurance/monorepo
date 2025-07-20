@@ -13,4 +13,6 @@ interface ICapitalPoolAdmin {
     function setUnderwriterManager(address _underwriterManager) external;
     function setUnderwriterNoticePeriod(uint256 _newPeriod) external;
     function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external;
+    function setLossDistributor(address _lossDistributor) external;
+    function setRewardDistributor(address _rewardDistributor) external;
 }
