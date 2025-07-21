@@ -136,6 +136,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /* ───────────────── Hooks & State Updaters ───────────────── */
 
+    function settleLossesForUser(address user) external {
+    if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+    _realizeLossesForAllPools(user);
+}
+
+
     function onCapitalDeposited(address underwriter, uint256 amount) external nonReentrant {
         if (msg.sender != address(capitalPool)) revert NotCapitalPool();
         underwriterTotalPledge[underwriter] += amount;
@@ -157,7 +163,8 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         nonReentrant
     {
         if (msg.sender != address(capitalPool)) revert NotCapitalPool();
-        _realizeLossesForAllPools(underwriter);
+        // _realizeLossesForAllPools(underwriter); // <-- REMOVE THIS LINE
+
         uint256 pledgeAfterLosses = underwriterTotalPledge[underwriter];
         uint256 amountToSubtract = Math.min(pledgeAfterLosses, principalComponentRemoved);
         underwriterTotalPledge[underwriter] -= amountToSubtract;

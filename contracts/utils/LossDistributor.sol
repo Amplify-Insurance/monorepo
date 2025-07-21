@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IUnderwriterManager.sol";
 import "../interfaces/ICapitalPool.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+
 
 /**
  * @title LossDistributor
@@ -109,27 +111,40 @@ contract LossDistributor is ILossDistributor, Ownable {
      * shares in the CapitalPool, and updating their debt.
      * @dev Called by the UnderwriterManager before an action like a withdrawal.
      */
-    function realizeLosses(address user, uint256 poolId) external override onlyUnderwriterManager {
+function realizeLosses(address user, uint256 poolId) external override onlyUnderwriterManager {
         uint256 userPledge = underwriterManager.underwriterPoolPledge(user, poolId);
         if (userPledge == 0) return;
 
         uint256 pendingLossValue = getPendingLosses(user, poolId, userPledge);
-        
+
         if (pendingLossValue > 0) {
-            // Convert the value of the loss into the number of shares to burn
+            // Convert the value of the loss into a theoretical number of shares to burn
             uint256 sharesToBurn = capitalPool.valueToShares(pendingLossValue);
 
-            // Command the CapitalPool to burn the shares
-            address[] memory underwriters = new address[](1);
-            underwriters[0] = user;
-            uint256[] memory burnAmounts = new uint256[](1);
-            burnAmounts[0] = sharesToBurn;
-            capitalPool.burnSharesForLoss(underwriters, burnAmounts, pendingLossValue);
+            // --- START FIX ---
 
-            // Update the user's debt to the new total
-            LossTracker storage tracker = poolLossTrackers[poolId];
-            UserLossState storage userState = userLossStates[user][poolId];
-            userState.lossDebt = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
+            // Get the user's actual, current share balance from the CapitalPool
+            (,, uint256 userMasterShares,) = capitalPool.getUnderwriterAccount(user);
+
+            // Clamp the burn amount to not exceed the user's balance
+            uint256 clampedSharesToBurn = Math.min(sharesToBurn, userMasterShares);
+
+            // --- END FIX ---
+
+            if (clampedSharesToBurn > 0) {
+                // Command the CapitalPool to burn the clamped number of shares
+                address[] memory underwriters = new address[](1);
+                underwriters[0] = user;
+                uint256[] memory burnAmounts = new uint256[](1);
+                burnAmounts[0] = clampedSharesToBurn; // Use the safe, clamped value
+
+                capitalPool.burnSharesForLoss(underwriters, burnAmounts, pendingLossValue);
+
+                // Update the user's debt to reflect the total loss incurred
+                LossTracker storage tracker = poolLossTrackers[poolId];
+                UserLossState storage userState = userLossStates[user][poolId];
+                userState.lossDebt = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
+            }
         }
     }
 

@@ -294,30 +294,45 @@ function _updateStateOnDeposit(
     }
 
 
-    function executeWithdrawal(uint256 _requestIndex) external nonReentrant {
-        // 1. Validate the withdrawal request and get the necessary data
-        (
-            UnderwriterAccount storage account,
-            uint256 sharesToBurn
-        ) = _validateWithdrawalRequest(msg.sender, _requestIndex);
+function executeWithdrawal(uint256 _requestIndex) external nonReentrant {
+    // 1. Validate the withdrawal request to get the originally requested shares
+    (
+        UnderwriterAccount storage account,
+        uint256 requestedSharesToBurn
+    ) = _validateWithdrawalRequest(msg.sender, _requestIndex);
 
-        // 2. Calculate values and burn shares before any external calls
-        uint256 amountToReceive = sharesToValue(sharesToBurn);
-        uint256 principalComponentRemoved = _burnSharesAndRemoveRequest(msg.sender, _requestIndex, sharesToBurn);
-
-        // 3. Perform the external call to the yield adapter
-        uint256 assetsActuallyWithdrawn = _performAdapterWithdrawal(account, amountToReceive);
-
-        // 4. Update all internal state and notify other contracts
-        _updateStateAfterWithdrawal(msg.sender, account, principalComponentRemoved, assetsActuallyWithdrawn);
-
-        // 5. Transfer the final assets to the user
-        if (assetsActuallyWithdrawn > 0) {
-            underlyingAsset.safeTransfer(msg.sender, assetsActuallyWithdrawn);
-        }
-        
-        emit WithdrawalExecuted(msg.sender, assetsActuallyWithdrawn, sharesToBurn, _requestIndex);
+    // --- FIX: SETTLE LOSSES FIRST ---
+    // 2. Settle any outstanding losses for the user. This may reduce their share balance.
+    if (address(underwriterManager) != address(0)) {
+        underwriterManager.settleLossesForUser(msg.sender);
     }
+    
+    // 3. Re-check available shares and adjust the amount to burn if necessary
+    uint256 sharesAvailableAfterLosses = account.masterShares;
+    uint256 finalSharesToBurn = Math.min(requestedSharesToBurn, sharesAvailableAfterLosses);
+
+    // If all shares were lost, there's nothing to withdraw.
+    if (finalSharesToBurn == 0) {
+        // Clean up the stale withdrawal request
+        WithdrawalRequest[] storage requests = withdrawalRequests[msg.sender];
+        requests[_requestIndex] = requests[requests.length - 1];
+        requests.pop();
+        emit WithdrawalExecuted(msg.sender, 0, 0, _requestIndex); // Emit event with zero values
+        return;
+    }
+
+    // 4. Proceed with the withdrawal using the adjusted share amount
+    uint256 amountToReceive = sharesToValue(finalSharesToBurn);
+    uint256 principalComponentRemoved = _burnSharesAndRemoveRequest(msg.sender, _requestIndex, finalSharesToBurn);
+    uint256 assetsActuallyWithdrawn = _performAdapterWithdrawal(account, amountToReceive);
+    _updateStateAfterWithdrawal(msg.sender, account, principalComponentRemoved, assetsActuallyWithdrawn);
+
+    if (assetsActuallyWithdrawn > 0) {
+        underlyingAsset.safeTransfer(msg.sender, assetsActuallyWithdrawn);
+    }
+    
+    emit WithdrawalExecuted(msg.sender, assetsActuallyWithdrawn, finalSharesToBurn, _requestIndex);
+}
 
 function _validateWithdrawalRequest(
     address user,
@@ -526,24 +541,43 @@ function _updateStateAfterWithdrawal(
         );
     }
 
-    function _handleWithdrawalAttempt(
-        IYieldAdapter adapter,
-        uint256 amountToWithdraw,
-        IBackstopPool catPool
-    ) internal {
-        try adapter.withdraw(amountToWithdraw, address(this)) {
-            // Success
-        } catch {
-            emit AdapterCallFailed(address(adapter), "withdraw", "withdraw failed");
-            uint256 sent = 0;
-            try IYieldAdapterEmergency(address(adapter)).emergencyTransfer(address(this), amountToWithdraw) returns (uint256 v) {
-                sent = v;
-            } catch { /* Emergency transfer is not supported or failed. */ }
-            if (sent == 0) {
-                catPool.drawFund(amountToWithdraw);
-            }
+
+function _handleWithdrawalAttempt(
+    IYieldAdapter adapter,
+    uint256 amountToWithdraw,
+    IBackstopPool catPool
+) internal {
+    uint256 actuallyWithdrawn = 0;
+    try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256 withdrawn) {
+        // Success case for normal withdrawal
+        actuallyWithdrawn = withdrawn;
+    } catch {
+        // Failure case, try emergency measures
+        emit AdapterCallFailed(address(adapter), "withdraw", "withdraw failed");
+        uint256 sent = 0;
+        try IYieldAdapterEmergency(address(adapter)).emergencyTransfer(address(this), amountToWithdraw) returns (uint256 v) {
+            sent = v;
+        } catch { /* Emergency transfer is not supported or failed. */ }
+
+        if (sent > 0) {
+            // Success case for emergency withdrawal
+            actuallyWithdrawn = sent;
+        } else {
+            // Final fallback: draw funds from the backstop pool
+            catPool.drawFund(amountToWithdraw);
         }
     }
+    
+    // --- FIX ---
+    // Update the principal tracking if funds were successfully withdrawn from the adapter
+    if (actuallyWithdrawn > 0) {
+        uint256 currentPrincipal = principalInAdapter[address(adapter)];
+        // Prevent underflow, though in a consistent state this shouldn't happen
+        principalInAdapter[address(adapter)] = (currentPrincipal > actuallyWithdrawn) ? currentPrincipal - actuallyWithdrawn : 0;
+    }
+}
+
+
     function getWithdrawalRequestCount(address _underwriter) external view returns (uint256) {
         return withdrawalRequests[_underwriter].length;
     }
