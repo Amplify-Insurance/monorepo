@@ -107,92 +107,44 @@ contract LossDistributor is ILossDistributor, Ownable {
     }
 
     /**
-     * @notice Realizes a user's pending losses by calculating what they owe, burning their
-     * shares in the CapitalPool, and updating their debt.
-     * @dev Called by the UnderwriterManager before an action like a withdrawal.
+     * @notice Realizes a user's total aggregated losses from multiple pools at once.
+     * @dev This function is called by the UnderwriterManager after it has summed up
+     * the pending losses from all of a user's leveraged positions.
      */
-function realizeLosses(address user, uint256 poolId) external override onlyUnderwriterManager {
-        uint256 userPledge = underwriterManager.underwriterPoolPledge(user, poolId);
-        if (userPledge == 0) return;
+    function realizeAggregateLoss(
+        address user,
+        uint256 totalLossValue,
+        uint256[] calldata poolIds
+    ) external override onlyUnderwriterManager {
+        if (totalLossValue == 0) return;
 
-        uint256 pendingLossValue = getPendingLosses(user, poolId, userPledge);
+        // 1. Convert the single, total loss value into a number of shares to burn.
+        uint256 sharesToBurn = capitalPool.valueToShares(totalLossValue);
 
-        if (pendingLossValue > 0) {
-            // Convert the value of the loss into a theoretical number of shares to burn
-            uint256 sharesToBurn = capitalPool.valueToShares(pendingLossValue);
-
-            // --- START FIX ---
-
-            // Get the user's actual, current share balance from the CapitalPool
+        if (sharesToBurn > 0) {
+            // Get the user's actual, current share balance to ensure we don't burn more than they have.
             (,, uint256 userMasterShares,) = capitalPool.getUnderwriterAccount(user);
-
-            // Clamp the burn amount to not exceed the user's balance
             uint256 clampedSharesToBurn = Math.min(sharesToBurn, userMasterShares);
 
-            // --- END FIX ---
-
             if (clampedSharesToBurn > 0) {
-                // Command the CapitalPool to burn the clamped number of shares
-                address[] memory underwriters = new address[](1);
-                underwriters[0] = user;
-                uint256[] memory burnAmounts = new uint256[](1);
-                burnAmounts[0] = clampedSharesToBurn; // Use the safe, clamped value
+                // 2. Perform the SINGLE, simplified burn operation on the CapitalPool.
+                capitalPool.burnSharesForLoss(user, clampedSharesToBurn);
+            }
+        }
 
-                capitalPool.burnSharesForLoss(underwriters, burnAmounts, pendingLossValue);
-
-                // Update the user's debt to reflect the total loss incurred
-                LossTracker storage tracker = poolLossTrackers[poolId];
-                UserLossState storage userState = userLossStates[user][poolId];
+        // 3. Loop through the user's covered pools to update their loss debt,
+        //    ensuring their accounting is fully settled.
+        for (uint i = 0; i < poolIds.length; i++) {
+            uint256 poolId = poolIds[i];
+            LossTracker storage tracker = poolLossTrackers[poolId];
+            UserLossState storage userState = userLossStates[user][poolId];
+            uint256 userPledge = underwriterManager.underwriterPoolPledge(user, poolId);
+            
+            if (userPledge > 0) {
                 userState.lossDebt = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
             }
         }
     }
-
-
-
-    /**
- * @notice Realizes a user's total aggregated losses from multiple pools at once.
- * @dev This function is called by the UnderwriterManager after it has summed up
- * the pending losses from all of a user's leveraged positions.
- */
-function realizeAggregateLoss(
-    address user,
-    uint256 totalLossValue,
-    uint256[] calldata poolIds
-) external override onlyUnderwriterManager {
-    // 1. Convert the single, total loss value into shares.
-    uint256 sharesToBurn = capitalPool.valueToShares(totalLossValue);
-
-    if (sharesToBurn > 0) {
-        // Optional safety clamp (good practice, but logic should prevent issues)
-        (,, uint256 userMasterShares,) = capitalPool.getUnderwriterAccount(user);
-        uint256 clampedSharesToBurn = Math.min(sharesToBurn, userMasterShares);
-
-        if (clampedSharesToBurn > 0) {
-            address[] memory underwriters = new address[](1);
-            underwriters[0] = user;
-            uint256[] memory burnAmounts = new uint256[](1);
-            burnAmounts[0] = clampedSharesToBurn;
-
-            // 2. Perform the SINGLE burn operation.
-            capitalPool.burnSharesForLoss(underwriters, burnAmounts, totalLossValue);
-        }
-    }
-
-    // 3. Loop here to update the user's loss debt for each pool,
-    //    ensuring their accounting is settled.
-    for (uint i = 0; i < poolIds.length; i++) {
-        uint256 poolId = poolIds[i];
-        LossTracker storage tracker = poolLossTrackers[poolId];
-        UserLossState storage userState = userLossStates[user][poolId];
-        uint256 userPledge = underwriterManager.underwriterPoolPledge(user, poolId);
-        
-        // Settle the debt fully for this pool.
-        if (userPledge > 0) {
-            userState.lossDebt = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
-        }
-    }
-}
 
     /* ───────────────────────── View Functions ──────────────────────── */
     

@@ -28,11 +28,9 @@ interface ICapitalPool {
     function sharesToValue(uint256 shares) external view returns (uint256);
     function valueToShares(uint256 value) external view returns (uint256);
     function executePayout(PayoutData calldata payoutData) external;
-
     function burnSharesForLoss(
-        address[] calldata underwriters,
-        uint256[] calldata sharesToBurn,
-        uint256 totalLossAmount
+        address underwriter,
+        uint256 burnAmount
     ) external;
 }
 

@@ -10,4 +10,6 @@ interface IUnderwriterManager {
     function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external;
     function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) external;
     function settleLossesForUser(address user) external;
+    function onLossRealized(address underwriter, uint256 valueLost) external;
+
 }

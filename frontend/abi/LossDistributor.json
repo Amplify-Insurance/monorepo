@@ -228,11 +228,16 @@
         },
         {
           "internalType": "uint256",
-          "name": "poolId",
+          "name": "totalLossValue",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "poolIds",
+          "type": "uint256[]"
         }
       ],
-      "name": "realizeLosses",
+      "name": "realizeAggregateLoss",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

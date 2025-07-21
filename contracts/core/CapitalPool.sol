@@ -40,7 +40,6 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     address[] public activeYieldAdapterAddresses;
     mapping(address => bool) public isAdapterActive;
 
-    // NEW: Links a yield adapter to a specific reward pool ID in the RewardDistributor
     mapping(address => uint256) public yieldAdapterRewardPoolId;
 
     struct UnderwriterAccount {
@@ -66,15 +65,11 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
 
     /* ───────────────────────── Modifiers & Errors ──────────────────────── */
     modifier onlyRiskManager() {
-        // This require statement can be updated to use the custom error
-        // e.g., if (msg.sender != riskManager) revert NotRiskManager(msg.sender);
         require(msg.sender == riskManager, "CP: Caller is not the RiskManager");
         _;
     }
 
     modifier onlyLossDistributor() {
-        // This require statement can be updated to use the custom error
-        // e.g., if (msg.sender != lossDistributor) revert NotLossDistributor(msg.sender);
         require(msg.sender == lossDistributor, "CP: Caller is not the LossDistributor");
         _;
     }
@@ -87,7 +82,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     error NoWithdrawalRequest();
     error NoticePeriodActive(uint256 unlockTimestamp, uint256 blockTimestamp);
     error InsufficientShares(uint256 requested, uint256 available);
-    error AdapterNotConfigured(uint8 platform); // enums are represented as uint8
+    error AdapterNotConfigured(uint8 platform);
     error NoActiveDeposit(address user);
     error PayoutExceedsPoolLPCapital(uint256 payoutAmount, uint256 availableCapital);
     error InvalidRequestIndex(uint256 index, uint256 length);
@@ -100,12 +95,12 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     event RewardDistributorSet(address indexed newRewardDistributor);
     event UnderwriterManagerSet(address indexed newUnderwriterManager);
     event BaseYieldAdapterSet(YieldPlatform indexed platform, address indexed adapterAddress);
-    event YieldAdapterRewardPoolSet(address indexed adapter, uint256 indexed rewardPoolId); // NEW
+    event YieldAdapterRewardPoolSet(address indexed adapter, uint256 indexed rewardPoolId);
     event Deposit(address indexed user, uint256 amount, uint256 sharesMinted, YieldPlatform yieldChoice);
     event WithdrawalRequested(address indexed user, uint256 sharesToBurn, uint256 timestamp, uint256 requestIndex);
     event WithdrawalExecuted(address indexed user, uint256 assetsReceived, uint256 sharesBurned, uint256 requestIndex);
     event WithdrawalRequestCancelled(address indexed user, uint256 sharesCancelled, uint256 requestIndex);
-    event SharesBurntForLoss(address indexed underwriter, uint256 sharesBurnt);
+    event SharesBurntForLoss(address indexed underwriter, uint256 sharesBurnt, uint256 valueLost);
     event YieldHarvested(address indexed adapter, uint256 yieldAmount, uint256 rewardPoolId);
     event UnderwriterNoticePeriodSet(uint256 newPeriod);
     event AdapterCallFailed(address indexed adapterAddress, string functionCalled, string reason);
@@ -164,7 +159,6 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         emit BaseYieldAdapterSet(_platform, _adapterAddress);
     }
     
-    // NEW: Admin function to link an adapter to its reward pool
     function setYieldAdapterRewardPool(address adapterAddress, uint256 rewardPoolId) external onlyOwner {
         require(isAdapterActive[adapterAddress], "CP: Adapter must be active");
         yieldAdapterRewardPoolId[adapterAddress] = rewardPoolId;
@@ -172,93 +166,66 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     }
 
     /* ───────────────── Underwriter Deposit & Withdrawal ────────────────── */
-function deposit(uint256 _amount, YieldPlatform _yieldChoice) external override nonReentrant {
-    // 1. Validate the deposit and get the chosen adapter
-    IYieldAdapter chosenAdapter = _validateDeposit(_amount, _yieldChoice);
-
-    // 2. Calculate how many shares to mint for the deposit
-    uint256 sharesToMint = _calculateSharesToMint(_amount);
-    if (sharesToMint == 0) revert NoSharesToMint(_amount);
-
-    // 3. Perform the token transfer and deposit into the yield adapter
-    _performDepositInteraction(chosenAdapter, _amount);
-
-    // 4. Update all internal state variables
-    UnderwriterAccount storage account = underwriterAccounts[msg.sender];
-    _updateStateOnDeposit(account, _amount, sharesToMint, _yieldChoice, chosenAdapter);
-    
-    // 5. Call hooks for other protocol contracts
-    if (address(underwriterManager) != address(0)) {
-        underwriterManager.onCapitalDeposited(msg.sender, _amount);
+    function deposit(uint256 _amount, YieldPlatform _yieldChoice) external override nonReentrant {
+        IYieldAdapter chosenAdapter = _validateDeposit(_amount, _yieldChoice);
+        uint256 sharesToMint = _calculateSharesToMint(_amount);
+        if (sharesToMint == 0) revert NoSharesToMint(_amount);
+        _performDepositInteraction(chosenAdapter, _amount);
+        UnderwriterAccount storage account = underwriterAccounts[msg.sender];
+        _updateStateOnDeposit(account, _amount, sharesToMint, _yieldChoice, chosenAdapter);
+        if (address(underwriterManager) != address(0)) {
+            underwriterManager.onCapitalDeposited(msg.sender, _amount);
+        }
+        emit Deposit(msg.sender, _amount, sharesToMint, _yieldChoice);
     }
-    
-    emit Deposit(msg.sender, _amount, sharesToMint, _yieldChoice);
-}
 
-/**
- * @dev Validates the deposit parameters and returns the chosen yield adapter.
- */
-function _validateDeposit(
-    uint256 _amount,
-    YieldPlatform _yieldChoice
-) internal view returns (IYieldAdapter) {
-    if (_amount == 0) revert InvalidAmount(_amount);
-    if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured(uint8(_yieldChoice));
-
-    UnderwriterAccount storage account = underwriterAccounts[msg.sender];
-    IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
-    if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured(uint8(_yieldChoice));
-
-    // Prevent users from changing their chosen yield strategy without first withdrawing.
-    if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
-        revert("CP: Cannot change yield platform; withdraw first.");
+    function _validateDeposit(
+        uint256 _amount,
+        YieldPlatform _yieldChoice
+    ) internal view returns (IYieldAdapter) {
+        if (_amount == 0) revert InvalidAmount(_amount);
+        if (_yieldChoice == YieldPlatform.NONE) revert AdapterNotConfigured(uint8(_yieldChoice));
+        UnderwriterAccount storage account = underwriterAccounts[msg.sender];
+        IYieldAdapter chosenAdapter = baseYieldAdapters[_yieldChoice];
+        if (address(chosenAdapter) == address(0)) revert AdapterNotConfigured(uint8(_yieldChoice));
+        if (account.masterShares > 0 && account.yieldChoice != _yieldChoice) {
+            revert("CP: Cannot change yield platform; withdraw first.");
+        }
+        return chosenAdapter;
     }
-    return chosenAdapter;
-}
 
-/**
- * @dev Calculates the number of shares to mint based on the current share price.
- */
-function _calculateSharesToMint(uint256 _amount) internal view returns (uint256) {
-    uint256 effectiveShares = totalMasterSharesSystem - INITIAL_SHARES_LOCKED;
-    if (totalSystemValue == 0 || effectiveShares == 0) {
-        return _amount; // Initial deposit sets the price at 1:1
-    } else {
-        return Math.mulDiv(_amount, effectiveShares, totalSystemValue);
+    function _calculateSharesToMint(uint256 _amount) internal view returns (uint256) {
+        uint256 effectiveShares = totalMasterSharesSystem - INITIAL_SHARES_LOCKED;
+        if (totalSystemValue == 0 || effectiveShares == 0) {
+            return _amount;
+        } else {
+            return Math.mulDiv(_amount, effectiveShares, totalSystemValue);
+        }
     }
-}
 
-/**
- * @dev Handles the external calls for transferring tokens and depositing to the adapter.
- */
-function _performDepositInteraction(IYieldAdapter _adapter, uint256 _amount) internal {
-    underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
-    underlyingAsset.forceApprove(address(_adapter), _amount);
-    _adapter.deposit(_amount);
-}
-
-/**
- * @dev Updates all necessary state variables after a successful deposit.
- */
-function _updateStateOnDeposit(
-    UnderwriterAccount storage account,
-    uint256 _amount,
-    uint256 _sharesToMint,
-    YieldPlatform _yieldChoice,
-    IYieldAdapter _adapter
-) internal {
-    // If this is the user's first deposit, set their yield choice.
-    if (account.masterShares == 0) {
-        account.yieldChoice = _yieldChoice;
-        account.yieldAdapter = _adapter;
+    function _performDepositInteraction(IYieldAdapter _adapter, uint256 _amount) internal {
+        underlyingAsset.safeTransferFrom(msg.sender, address(this), _amount);
+        underlyingAsset.forceApprove(address(_adapter), _amount);
+        _adapter.deposit(_amount);
     }
-    
-    account.totalDepositedAssetPrincipal += _amount;
-    account.masterShares += _sharesToMint;
-    totalMasterSharesSystem += _sharesToMint;
-    totalSystemValue += _amount;
-    principalInAdapter[address(_adapter)] += _amount;
-}
+
+    function _updateStateOnDeposit(
+        UnderwriterAccount storage account,
+        uint256 _amount,
+        uint256 _sharesToMint,
+        YieldPlatform _yieldChoice,
+        IYieldAdapter _adapter
+    ) internal {
+        if (account.masterShares == 0) {
+            account.yieldChoice = _yieldChoice;
+            account.yieldAdapter = _adapter;
+        }
+        account.totalDepositedAssetPrincipal += _amount;
+        account.masterShares += _sharesToMint;
+        totalMasterSharesSystem += _sharesToMint;
+        totalSystemValue += _amount;
+        principalInAdapter[address(_adapter)] += _amount;
+    }
 
     function requestWithdrawal(uint256 _sharesToBurn) external nonReentrant {
         if (_sharesToBurn == 0) revert InvalidAmount(_sharesToBurn);
@@ -293,96 +260,79 @@ function _updateStateOnDeposit(
         emit WithdrawalRequestCancelled(msg.sender, sharesToCancel, _requestIndex);
     }
 
+    function executeWithdrawal(uint256 _requestIndex) external nonReentrant {
+        uint256 requestedSharesToBurn = _validateWithdrawalRequestAndGetShares(_requestIndex);
 
-function executeWithdrawal(uint256 _requestIndex) external nonReentrant {
-    // 1. Validate the withdrawal request to get the originally requested shares
-    (
-        UnderwriterAccount storage account,
-        uint256 requestedSharesToBurn
-    ) = _validateWithdrawalRequest(msg.sender, _requestIndex);
+        if (address(underwriterManager) != address(0)) {
+            underwriterManager.settleLossesForUser(msg.sender);
+        }
+        
+        UnderwriterAccount storage account = underwriterAccounts[msg.sender];
+        uint256 sharesAvailableAfterLosses = account.masterShares;
+        uint256 finalSharesToBurn = Math.min(requestedSharesToBurn, sharesAvailableAfterLosses);
 
-    // --- FIX: SETTLE LOSSES FIRST ---
-    // 2. Settle any outstanding losses for the user. This may reduce their share balance.
-    if (address(underwriterManager) != address(0)) {
-        underwriterManager.settleLossesForUser(msg.sender);
+        if (finalSharesToBurn == 0) {
+            WithdrawalRequest[] storage requests = withdrawalRequests[msg.sender];
+            if (_requestIndex < requests.length) {
+                requests[_requestIndex] = requests[requests.length - 1];
+                requests.pop();
+            }
+            emit WithdrawalExecuted(msg.sender, 0, 0, _requestIndex);
+            return;
+        }
+
+        uint256 amountToReceive = sharesToValue(finalSharesToBurn);
+        uint256 principalComponentRemoved = _burnSharesAndRemoveRequest(msg.sender, _requestIndex, finalSharesToBurn);
+        uint256 assetsActuallyWithdrawn = _performAdapterWithdrawal(account, amountToReceive);
+        _updateStateAfterWithdrawal(msg.sender, account, principalComponentRemoved, assetsActuallyWithdrawn);
+
+        if (assetsActuallyWithdrawn > 0) {
+            underlyingAsset.safeTransfer(msg.sender, assetsActuallyWithdrawn);
+        }
+        emit WithdrawalExecuted(msg.sender, assetsActuallyWithdrawn, finalSharesToBurn, _requestIndex);
     }
-    
-    // 3. Re-check available shares and adjust the amount to burn if necessary
-    uint256 sharesAvailableAfterLosses = account.masterShares;
-    uint256 finalSharesToBurn = Math.min(requestedSharesToBurn, sharesAvailableAfterLosses);
 
-    // If all shares were lost, there's nothing to withdraw.
-    if (finalSharesToBurn == 0) {
-        // Clean up the stale withdrawal request
+    function _validateWithdrawalRequestAndGetShares(
+        uint256 requestIndex
+    ) internal view returns (uint256) {
         WithdrawalRequest[] storage requests = withdrawalRequests[msg.sender];
-        requests[_requestIndex] = requests[requests.length - 1];
-        requests.pop();
-        emit WithdrawalExecuted(msg.sender, 0, 0, _requestIndex); // Emit event with zero values
-        return;
+        if (requestIndex >= requests.length) revert InvalidRequestIndex(requestIndex, requests.length);
+        WithdrawalRequest memory requestToExecute = requests[requestIndex];
+        if (block.timestamp < requestToExecute.unlockTimestamp) revert NoticePeriodActive(requestToExecute.unlockTimestamp, block.timestamp);
+        UnderwriterAccount storage account = underwriterAccounts[msg.sender];
+        if (requestToExecute.shares > account.masterShares) revert InconsistentState("Pending withdrawal shares exceed total shares.");
+        return requestToExecute.shares;
     }
 
-    // 4. Proceed with the withdrawal using the adjusted share amount
-    uint256 amountToReceive = sharesToValue(finalSharesToBurn);
-    uint256 principalComponentRemoved = _burnSharesAndRemoveRequest(msg.sender, _requestIndex, finalSharesToBurn);
-    uint256 assetsActuallyWithdrawn = _performAdapterWithdrawal(account, amountToReceive);
-    _updateStateAfterWithdrawal(msg.sender, account, principalComponentRemoved, assetsActuallyWithdrawn);
-
-    if (assetsActuallyWithdrawn > 0) {
-        underlyingAsset.safeTransfer(msg.sender, assetsActuallyWithdrawn);
-    }
-    
-    emit WithdrawalExecuted(msg.sender, assetsActuallyWithdrawn, finalSharesToBurn, _requestIndex);
-}
-
-function _validateWithdrawalRequest(
-    address user,
-    uint256 requestIndex
-) internal view returns (UnderwriterAccount storage, uint256) {
-    WithdrawalRequest[] storage requests = withdrawalRequests[user];
-    if (requestIndex >= requests.length) revert InvalidRequestIndex(requestIndex, requests.length);
-
-    WithdrawalRequest memory requestToExecute = requests[requestIndex];
-    if (block.timestamp < requestToExecute.unlockTimestamp) revert NoticePeriodActive(requestToExecute.unlockTimestamp, block.timestamp);
-    
-    UnderwriterAccount storage account = underwriterAccounts[user];
-    if (requestToExecute.shares > account.masterShares) revert InconsistentState("Pending withdrawal shares exceed total shares.");
-
-    return (account, requestToExecute.shares);
-}
-
-function _performAdapterWithdrawal(
-    UnderwriterAccount storage account,
-    uint256 amountToReceive
-) internal returns (uint256 assetsWithdrawn) {
-    if (amountToReceive > 0) {
-        assetsWithdrawn = account.yieldAdapter.withdraw(amountToReceive, address(this));
-    }
-}
-
-function _updateStateAfterWithdrawal(
-    address user,
-    UnderwriterAccount storage account,
-    uint256 principalComponentRemoved,
-    uint256 assetsActuallyWithdrawn
-) internal {
-    if (totalSystemValue >= principalComponentRemoved) {
-        totalSystemValue -= principalComponentRemoved;
-    } else {
-        totalSystemValue = 0;
+    function _performAdapterWithdrawal(
+        UnderwriterAccount storage account,
+        uint256 amountToReceive
+    ) internal returns (uint256 assetsWithdrawn) {
+        if (amountToReceive > 0) {
+            assetsWithdrawn = account.yieldAdapter.withdraw(amountToReceive, address(this));
+        }
     }
 
-    principalInAdapter[address(account.yieldAdapter)] -= assetsActuallyWithdrawn;
-    
-    bool isFullWithdrawal = (account.masterShares == 0);
-    
-    if (address(underwriterManager) != address(0)) {
-        underwriterManager.onCapitalWithdrawn(user, principalComponentRemoved, isFullWithdrawal);
+    function _updateStateAfterWithdrawal(
+        address user,
+        UnderwriterAccount storage account,
+        uint256 principalComponentRemoved,
+        uint256 assetsActuallyWithdrawn
+    ) internal {
+        if (totalSystemValue >= principalComponentRemoved) {
+            totalSystemValue -= principalComponentRemoved;
+        } else {
+            totalSystemValue = 0;
+        }
+        principalInAdapter[address(account.yieldAdapter)] -= assetsActuallyWithdrawn;
+        bool isFullWithdrawal = (account.masterShares == 0);
+        if (address(underwriterManager) != address(0)) {
+            underwriterManager.onCapitalWithdrawn(user, principalComponentRemoved, isFullWithdrawal);
+        }
+        if (isFullWithdrawal) {
+            delete underwriterAccounts[user];
+        }
     }
-
-    if (isFullWithdrawal) {
-        delete underwriterAccounts[user];
-    }
-}
 
     function _burnSharesAndRemoveRequest(
         address _underwriter,
@@ -390,23 +340,26 @@ function _updateStateAfterWithdrawal(
         uint256 _sharesToBurn
     ) internal returns (uint256) {
         UnderwriterAccount storage account = underwriterAccounts[_underwriter];
-        uint256 oldMasterShares = account.masterShares;
-        uint256 principalComponentRemoved = 0;
-        if (oldMasterShares > 0) {
-             principalComponentRemoved = (account.totalDepositedAssetPrincipal * _sharesToBurn) / oldMasterShares;
+        uint256 principalComponentRemoved = sharesToValue(_sharesToBurn);
+
+        if (account.totalDepositedAssetPrincipal >= principalComponentRemoved) {
+            account.totalDepositedAssetPrincipal -= principalComponentRemoved;
+        } else {
+            account.totalDepositedAssetPrincipal = 0;
         }
-        account.totalDepositedAssetPrincipal -= principalComponentRemoved;
+
         account.masterShares -= _sharesToBurn;
         account.totalPendingWithdrawalShares -= _sharesToBurn;
         totalMasterSharesSystem -= _sharesToBurn;
+
         WithdrawalRequest[] storage requests = withdrawalRequests[_underwriter];
         requests[_requestIndex] = requests[requests.length - 1];
         requests.pop();
+
         return principalComponentRemoved;
     }
 
     /* ───────────────────── Yield & Reward Functions ─────────────────── */
-
     function harvestAndDistributeYield(address adapterAddress) external nonReentrant {
         require(isAdapterActive[adapterAddress], "CP: Adapter not active");
         IYieldAdapter adapter = IYieldAdapter(adapterAddress);
@@ -419,35 +372,29 @@ function _updateStateAfterWithdrawal(
         if (currentValue > principal) {
             uint256 yieldAmount = currentValue - principal;
             uint256 withdrawnYield = adapter.withdraw(yieldAmount, address(this));
-            
             if (withdrawnYield > 0 && address(rewardDistributor) != address(0)) {
-                // --- FIX: ISOLATED YIELD LOGIC ---
-                // 1. Look up the specific reward pool ID for this adapter.
                 uint256 rewardPoolId = yieldAdapterRewardPoolId[adapterAddress];
                 require(rewardPoolId != 0, "CP: Reward pool for adapter not set");
-
-                // 2. Distribute yield based on the capital in THIS adapter, not the whole system.
                 uint256 principalInThisAdapter = principalInAdapter[adapterAddress];
-                
                 underlyingAsset.safeTransfer(address(rewardDistributor), withdrawnYield);
                 rewardDistributor.distribute(rewardPoolId, address(underlyingAsset), withdrawnYield, principalInThisAdapter);
-                
                 emit YieldHarvested(adapterAddress, withdrawnYield, rewardPoolId);
             }
         }
     }
 
     /* ───────────────────── Trusted Functions ─────────────────── */
-    
     function executePayout(PayoutData calldata _payoutData) external override nonReentrant onlyRiskManager {
         uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
         if (totalPayoutAmount == 0) return;
         if (totalPayoutAmount > _payoutData.totalCapitalFromPoolLPs) revert PayoutExceedsPoolLPCapital(totalPayoutAmount, _payoutData.totalCapitalFromPoolLPs);
-
+        
         _gatherFundsForPayout(_payoutData);
-
         require(underlyingAsset.balanceOf(address(this)) >= totalPayoutAmount, "CP: Payout failed, insufficient funds gathered");
 
+        // --- FIX #1 ---
+        // The total system value MUST be reduced to reflect the assets that have left the system.
+        // This keeps the share price calculation accurate.
         if (totalSystemValue >= totalPayoutAmount) {
             totalSystemValue -= totalPayoutAmount;
         } else {
@@ -466,7 +413,6 @@ function _updateStateAfterWithdrawal(
         if (_payoutData.totalCapitalFromPoolLPs > 0) {
             IBackstopPool catPool = IRiskManagerWithBackstop(riskManager).catPool();
             uint256 totalPayoutAmount = _payoutData.claimantAmount + _payoutData.feeAmount;
-
             for (uint i = 0; i < _payoutData.adapters.length; i++) {
                 uint256 adapterCapitalShare = _payoutData.capitalPerAdapter[i];
                 if (adapterCapitalShare == 0) continue;
@@ -476,44 +422,50 @@ function _updateStateAfterWithdrawal(
             }
         }
     }
-
-    function burnSharesForLoss(
-        address[] calldata underwriters,
-        uint256[] calldata sharesToBurn,
-        uint256 totalLossAmount
+function burnSharesForLoss(
+        address underwriter,
+        uint256 burnAmount
     ) external nonReentrant onlyLossDistributor {
-        if (underwriters.length != sharesToBurn.length) revert MismatchedArrayLengths(underwriters.length, sharesToBurn.length);
-        if (totalLossAmount == 0) revert InvalidAmount(totalLossAmount);
+        if (burnAmount == 0) return;
 
-        for (uint i = 0; i < underwriters.length; i++) {
-            address underwriter = underwriters[i];
-            uint256 burnAmount = sharesToBurn[i];
-            if (burnAmount == 0) continue;
-
-            UnderwriterAccount storage account = underwriterAccounts[underwriter];
-            if (account.masterShares < burnAmount) revert InsufficientShares(burnAmount, account.masterShares);
-
-            account.masterShares -= burnAmount;
-            
-            uint256 principalLoss = Math.min(burnAmount, account.totalDepositedAssetPrincipal);
-            account.totalDepositedAssetPrincipal -= principalLoss;
-
-            bool wipedOut = (account.masterShares == 0);
-            if (wipedOut) {
-                delete underwriterAccounts[underwriter];
-                delete withdrawalRequests[underwriter];
-            }
-            emit SharesBurntForLoss(underwriter, burnAmount);
+        UnderwriterAccount storage account = underwriterAccounts[underwriter];
+        if (account.masterShares < burnAmount) {
+            revert InsufficientShares(burnAmount, account.masterShares);
         }
 
-        // Reduce total shares and value by the same amount to keep the share price stable
-        uint256 sharesEquivalentOfLoss = valueToShares(totalLossAmount);
-        totalMasterSharesSystem -= sharesEquivalentOfLoss;
-        if (totalSystemValue >= totalLossAmount) {
-            totalSystemValue -= totalLossAmount;
+        // --- FINAL FIX ---
+        // Calculate the proportion of principal to remove BEFORE burning shares.
+        // This prevents rounding errors and keeps the book value (principal) and
+        // market value (shares) perfectly synchronized.
+        uint256 principalBefore = account.totalDepositedAssetPrincipal;
+        uint256 sharesBefore = account.masterShares;
+        
+        uint256 valueToDeduct = Math.mulDiv(principalBefore, burnAmount, sharesBefore);
+
+        account.masterShares -= burnAmount;
+        totalMasterSharesSystem -= burnAmount;
+
+        if (principalBefore >= valueToDeduct) {
+            account.totalDepositedAssetPrincipal = principalBefore - valueToDeduct;
         } else {
-            totalSystemValue = 0;
+            account.totalDepositedAssetPrincipal = 0;
         }
+
+        bool wipedOut = (account.masterShares == 0);
+        if (wipedOut) {
+            // If shares are wiped out, ensure principal is also zeroed out.
+            account.totalDepositedAssetPrincipal = 0;
+            delete underwriterAccounts[underwriter];
+            delete withdrawalRequests[underwriter];
+        }
+
+        if (address(underwriterManager) != address(0)) {
+            // Use the originally calculated value for external reporting.
+            uint256 originalValueLost = sharesToValue(burnAmount);
+            underwriterManager.onLossRealized(underwriter, originalValueLost);
+        }
+
+        emit SharesBurntForLoss(underwriter, burnAmount, valueToDeduct);
     }
 
     /* ───────────────────────── View Functions ──────────────────────── */
@@ -541,42 +493,33 @@ function _updateStateAfterWithdrawal(
         );
     }
 
+    function _handleWithdrawalAttempt(
+        IYieldAdapter adapter,
+        uint256 amountToWithdraw,
+        IBackstopPool catPool
+    ) internal {
+        uint256 actuallyWithdrawn = 0;
+        try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256 withdrawn) {
+            actuallyWithdrawn = withdrawn;
+        } catch {
+            emit AdapterCallFailed(address(adapter), "withdraw", "withdraw failed");
+            uint256 sent = 0;
+            try IYieldAdapterEmergency(address(adapter)).emergencyTransfer(address(this), amountToWithdraw) returns (uint256 v) {
+                sent = v;
+            } catch { /* Emergency transfer is not supported or failed. */ }
 
-function _handleWithdrawalAttempt(
-    IYieldAdapter adapter,
-    uint256 amountToWithdraw,
-    IBackstopPool catPool
-) internal {
-    uint256 actuallyWithdrawn = 0;
-    try adapter.withdraw(amountToWithdraw, address(this)) returns (uint256 withdrawn) {
-        // Success case for normal withdrawal
-        actuallyWithdrawn = withdrawn;
-    } catch {
-        // Failure case, try emergency measures
-        emit AdapterCallFailed(address(adapter), "withdraw", "withdraw failed");
-        uint256 sent = 0;
-        try IYieldAdapterEmergency(address(adapter)).emergencyTransfer(address(this), amountToWithdraw) returns (uint256 v) {
-            sent = v;
-        } catch { /* Emergency transfer is not supported or failed. */ }
-
-        if (sent > 0) {
-            // Success case for emergency withdrawal
-            actuallyWithdrawn = sent;
-        } else {
-            // Final fallback: draw funds from the backstop pool
-            catPool.drawFund(amountToWithdraw);
+            if (sent > 0) {
+                actuallyWithdrawn = sent;
+            } else {
+                catPool.drawFund(amountToWithdraw);
+            }
+        }
+        
+        if (actuallyWithdrawn > 0) {
+            uint256 currentPrincipal = principalInAdapter[address(adapter)];
+            principalInAdapter[address(adapter)] = (currentPrincipal > actuallyWithdrawn) ? currentPrincipal - actuallyWithdrawn : 0;
         }
     }
-    
-    // --- FIX ---
-    // Update the principal tracking if funds were successfully withdrawn from the adapter
-    if (actuallyWithdrawn > 0) {
-        uint256 currentPrincipal = principalInAdapter[address(adapter)];
-        // Prevent underflow, though in a consistent state this shouldn't happen
-        principalInAdapter[address(adapter)] = (currentPrincipal > actuallyWithdrawn) ? currentPrincipal - actuallyWithdrawn : 0;
-    }
-}
-
 
     function getWithdrawalRequestCount(address _underwriter) external view returns (uint256) {
         return withdrawalRequests[_underwriter].length;
@@ -584,7 +527,9 @@ function _handleWithdrawalAttempt(
 
     function sharesToValue(uint256 _shares) public view override returns (uint256) {
         if (totalMasterSharesSystem <= INITIAL_SHARES_LOCKED) return 0;
-        return Math.mulDiv(_shares, totalSystemValue, totalMasterSharesSystem - INITIAL_SHARES_LOCKED);
+        uint256 effectiveShares = totalMasterSharesSystem - INITIAL_SHARES_LOCKED;
+        if (effectiveShares == 0) return 0;
+        return Math.mulDiv(_shares, totalSystemValue, effectiveShares);
     }
 
     function valueToShares(uint256 _value) public view override returns (uint256) {

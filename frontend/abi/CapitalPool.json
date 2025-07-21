@@ -20,42 +20,137 @@
       "type": "constructor"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "platform",
+          "type": "uint8"
+        }
+      ],
       "name": "AdapterNotConfigured",
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "target",
+          "type": "address"
+        }
+      ],
+      "name": "AddressEmptyCode",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "AddressInsufficientBalance",
+      "type": "error"
+    },
+    {
       "inputs": [],
+      "name": "FailedInnerCall",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
       "name": "InconsistentState",
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requested",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "available",
+          "type": "uint256"
+        }
+      ],
       "name": "InsufficientShares",
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
       "name": "InvalidAmount",
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "length",
+          "type": "uint256"
+        }
+      ],
       "name": "InvalidRequestIndex",
       "type": "error"
     },
     {
       "inputs": [],
+      "name": "MathOverflowedMulDiv",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "lengthA",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lengthB",
+          "type": "uint256"
+        }
+      ],
       "name": "MismatchedArrayLengths",
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
       "name": "NoActiveDeposit",
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "amountDeposited",
+          "type": "uint256"
+        }
+      ],
       "name": "NoSharesToMint",
       "type": "error"
     },
@@ -65,17 +160,40 @@
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        }
+      ],
       "name": "NotLossDistributor",
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        }
+      ],
       "name": "NotRiskManager",
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "unlockTimestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "blockTimestamp",
+          "type": "uint256"
+        }
+      ],
       "name": "NoticePeriodActive",
       "type": "error"
     },
@@ -102,7 +220,18 @@
       "type": "error"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "payoutAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "availableCapital",
+          "type": "uint256"
+        }
+      ],
       "name": "PayoutExceedsPoolLPCapital",
       "type": "error"
     },
@@ -273,6 +402,12 @@
           "indexed": false,
           "internalType": "uint256",
           "name": "sharesBurnt",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "valueLost",
           "type": "uint256"
         }
       ],
@@ -490,18 +625,13 @@
     {
       "inputs": [
         {
-          "internalType": "address[]",
-          "name": "underwriters",
-          "type": "address[]"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "sharesToBurn",
-          "type": "uint256[]"
+          "internalType": "address",
+          "name": "underwriter",
+          "type": "address"
         },
         {
           "internalType": "uint256",
-          "name": "totalLossAmount",
+          "name": "burnAmount",
           "type": "uint256"
         }
       ],

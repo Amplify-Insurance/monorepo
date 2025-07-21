@@ -33,6 +33,33 @@
       "inputs": [
         {
           "internalType": "address",
+          "name": "target",
+          "type": "address"
+        }
+      ],
+      "name": "AddressEmptyCode",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "AddressInsufficientBalance",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FailedInnerCall",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "owner",
           "type": "address"
         }
@@ -281,6 +308,19 @@
         }
       ],
       "name": "RiskManagerAddressSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newUnderwriterManagerAddress",
+          "type": "address"
+        }
+      ],
+      "name": "UnderwriterManagerAddressSet",
       "type": "event"
     },
     {
@@ -650,7 +690,7 @@
           "type": "address"
         }
       ],
-      "name": "setCapitalPoolAddress",
+      "name": "setCapitalPool",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -663,7 +703,7 @@
           "type": "address"
         }
       ],
-      "name": "setPolicyManagerAddress",
+      "name": "setPolicyManager",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -689,7 +729,20 @@
           "type": "address"
         }
       ],
-      "name": "setRiskManagerAddress",
+      "name": "setRiskManager",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newUnderwriterManagerAddress",
+          "type": "address"
+        }
+      ],
+      "name": "setUnderwriterManager",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -705,6 +758,19 @@
       "name": "transferOwnership",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "underwriterManagerAddress",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {

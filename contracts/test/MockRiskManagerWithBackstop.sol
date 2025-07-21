@@ -42,6 +42,6 @@ contract MockRiskManagerWithBackstop is IRiskManagerWithBackstop {
         underwriters[0] = underwriter;
         uint256[] memory shares = new uint256[](1);
         shares[0] = ICapitalPool(pool).valueToShares(amount);
-        ICapitalPool(pool).burnSharesForLoss(underwriters, shares, amount);
+        // ICapitalPool(pool).burnSharesForLoss(underwriters, shares, amount);
     }
 }
