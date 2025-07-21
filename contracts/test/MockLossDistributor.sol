@@ -57,4 +57,8 @@ contract MockLossDistributor is ILossDistributor {
         userPledge;
         return pending[user][poolId];
     }
+
+    function realizeAggregateLoss(address user, uint256 totalLossValue, uint256[] calldata poolIds) external override {
+        pending[user][totalLossValue] = 0;
+    }
 }

@@ -317,8 +317,23 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
      */
     function _realizeLossesForAllPools(address _user) internal {
         uint256[] memory allocations = underwriterAllocations[_user];
+        if (allocations.length == 0) return;
+
+        uint256 totalPendingLossValue = 0;
+
+        // 1. Aggregate the total loss value from all of the user's pools.
         for (uint256 i = 0; i < allocations.length; i++) {
-            lossDistributor.realizeLosses(_user, allocations[i]);
+            uint256 poolId = allocations[i];
+            uint256 userPledge = underwriterPoolPledge[_user][poolId];
+            if (userPledge > 0) {
+                totalPendingLossValue += lossDistributor.getPendingLosses(_user, poolId, userPledge);
+            }
+        }
+
+        if (totalPendingLossValue > 0) {
+            // 2. Make a single call to a new function in the LossDistributor
+            //    to realize the aggregated loss.
+            lossDistributor.realizeAggregateLoss(_user, totalPendingLossValue, allocations);
         }
     }
 

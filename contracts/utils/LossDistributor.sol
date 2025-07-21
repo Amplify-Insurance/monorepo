@@ -148,6 +148,52 @@ function realizeLosses(address user, uint256 poolId) external override onlyUnder
         }
     }
 
+
+
+    /**
+ * @notice Realizes a user's total aggregated losses from multiple pools at once.
+ * @dev This function is called by the UnderwriterManager after it has summed up
+ * the pending losses from all of a user's leveraged positions.
+ */
+function realizeAggregateLoss(
+    address user,
+    uint256 totalLossValue,
+    uint256[] calldata poolIds
+) external override onlyUnderwriterManager {
+    // 1. Convert the single, total loss value into shares.
+    uint256 sharesToBurn = capitalPool.valueToShares(totalLossValue);
+
+    if (sharesToBurn > 0) {
+        // Optional safety clamp (good practice, but logic should prevent issues)
+        (,, uint256 userMasterShares,) = capitalPool.getUnderwriterAccount(user);
+        uint256 clampedSharesToBurn = Math.min(sharesToBurn, userMasterShares);
+
+        if (clampedSharesToBurn > 0) {
+            address[] memory underwriters = new address[](1);
+            underwriters[0] = user;
+            uint256[] memory burnAmounts = new uint256[](1);
+            burnAmounts[0] = clampedSharesToBurn;
+
+            // 2. Perform the SINGLE burn operation.
+            capitalPool.burnSharesForLoss(underwriters, burnAmounts, totalLossValue);
+        }
+    }
+
+    // 3. Loop here to update the user's loss debt for each pool,
+    //    ensuring their accounting is settled.
+    for (uint i = 0; i < poolIds.length; i++) {
+        uint256 poolId = poolIds[i];
+        LossTracker storage tracker = poolLossTrackers[poolId];
+        UserLossState storage userState = userLossStates[user][poolId];
+        uint256 userPledge = underwriterManager.underwriterPoolPledge(user, poolId);
+        
+        // Settle the debt fully for this pool.
+        if (userPledge > 0) {
+            userState.lossDebt = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
+        }
+    }
+}
+
     /* ───────────────────────── View Functions ──────────────────────── */
     
     /**

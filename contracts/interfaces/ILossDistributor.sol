@@ -5,4 +5,9 @@ interface ILossDistributor {
     function distributeLoss(uint256 poolId, uint256 lossAmount, uint256 totalPledgeInPool) external;
     function realizeLosses(address user, uint256 poolId) external;
     function getPendingLosses(address user, uint256 poolId, uint256 userPledge) external view returns (uint256);
+    function realizeAggregateLoss(
+    address user,
+    uint256 totalLossValue,
+    uint256[] calldata poolIds
+) external;
 }
