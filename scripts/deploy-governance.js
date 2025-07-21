@@ -26,6 +26,15 @@ const QUORUM_BPS = 4000;                      // 40%
 // const PROPOSER_FEE_SHARE_BPS = 1000;          // 10%
 const SLASH_BPS = 500;                        // 5%
 
+// Helper to verify a contract on Etherscan
+async function verifyContract(address, args) {
+  try {
+    await hre.run("verify:verify", { address, constructorArguments: args });
+  } catch (err) {
+    console.log(`Verification failed for ${address}: ${err.message}`);
+  }
+}
+
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying governance contracts with:", deployer.address);
@@ -98,6 +107,18 @@ async function main() {
   Object.assign(entry, addresses);
   fs.writeFileSync(rootPath, JSON.stringify(root, null, 2));
   console.log(`Updated ${rootPath}`);
+
+  // Verify contracts on Etherscan
+  await verifyContract(govToken.target, ["Governance Token", "GOV", 18]);
+  await verifyContract(staking.target, [govToken.target, deployer.address]);
+  await verifyContract(committee.target, [
+    RISK_MANAGER_ADDRESS,
+    staking.target,
+    VOTING_PERIOD,
+    CHALLENGE_PERIOD,
+    QUORUM_BPS,
+    SLASH_BPS,
+  ]);
 }
 
 main().catch((err) => {

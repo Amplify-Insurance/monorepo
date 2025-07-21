@@ -57,14 +57,23 @@ const {
 } = cfg;
 
 // NEW: Helper function to wait for a transaction to be mined
- async function waitForTx(txOrPromise, message) {
+async function waitForTx(txOrPromise, message) {
      console.log(`Waiting for transaction: ${message}...`);
      // Resolve the promise to get the TransactionResponse
      const tx = await txOrPromise;
      // Now we can wait for it to be mined
      await tx.wait();      // TransactionResponse.wait() → Promise<TransactionReceipt> :contentReference[oaicite:0]{index=0}
-     console.log("...Done.");
-   }
+    console.log("...Done.");
+  }
+
+// Helper to verify a contract on Etherscan
+async function verifyContract(address, args) {
+  try {
+    await hre.run("verify:verify", { address, constructorArguments: args });
+  } catch (err) {
+    console.log(`Verification failed for ${address}: ${err.message}`);
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 async function main() {
@@ -273,6 +282,27 @@ async function main() {
   Object.assign(entry, addresses);
   fs.writeFileSync(rootPath, JSON.stringify(root, null, 2));
   console.log(`Updated ${rootPath}`);
+
+  // Verify contracts on Etherscan
+  const verifications = [
+    { address: riskManager.target, args: [deployer.address] },
+    { address: underwriterManager.target, args: [deployer.address] },
+    { address: policyNFT.target, args: [deployer.address, deployer.address] },
+    { address: poolRegistry.target, args: [deployer.address, riskManager.target, underwriterManager.target] },
+    { address: capitalPool.target, args: [deployer.address, USDC_ADDRESS] },
+    { address: lossDistributor.target, args: [riskManager.target, underwriterManager.target, capitalPool.target] },
+    { address: policyManager.target, args: [policyNFT.target, deployer.address] },
+    { address: rewardDistributor.target, args: [poolRegistry.target, policyManager.target, capitalPool.target, underwriterManager.target, riskManager.target] },
+    { address: catShare.target, args: [] },
+    { address: catPool.target, args: [USDC_ADDRESS, catShare.target, ethers.ZeroAddress, deployer.address] },
+    { address: protocolConfigurator.target, args: [deployer.address] },
+    { address: aaveAdapter.target, args: aaveArgs },
+    { address: compoundAdapter.target, args: compoundArgs },
+  ];
+
+  for (const v of verifications) {
+    await verifyContract(v.address, v.args);
+  }
 }
 
 main().catch((err) => {
