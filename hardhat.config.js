@@ -52,7 +52,7 @@ module.exports = {
     },
     etherscan: {
         // Your API key for Etherscan used for contract verification
-        apiKey: process.env.ETHERSCAN_API_KEY || "",
+        apiKey: process.env.ETHERSCAN_API_KEY || "G4EESDAW23EQNARC9NTBEQM545HHMCNPG6",
     },
     paths: {
         sources: "./contracts",

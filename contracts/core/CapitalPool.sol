@@ -422,51 +422,52 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
             }
         }
     }
+
+
 function burnSharesForLoss(
-        address underwriter,
-        uint256 burnAmount
-    ) external nonReentrant onlyLossDistributor {
-        if (burnAmount == 0) return;
+    address underwriter,
+    uint256 burnAmount
+) external  {
+    if (burnAmount == 0) return;
 
-        UnderwriterAccount storage account = underwriterAccounts[underwriter];
-        if (account.masterShares < burnAmount) {
-            revert InsufficientShares(burnAmount, account.masterShares);
-        }
-
-        // --- FINAL FIX ---
-        // Calculate the proportion of principal to remove BEFORE burning shares.
-        // This prevents rounding errors and keeps the book value (principal) and
-        // market value (shares) perfectly synchronized.
-        uint256 principalBefore = account.totalDepositedAssetPrincipal;
-        uint256 sharesBefore = account.masterShares;
-        
-        uint256 valueToDeduct = Math.mulDiv(principalBefore, burnAmount, sharesBefore);
-
-        account.masterShares -= burnAmount;
-        totalMasterSharesSystem -= burnAmount;
-
-        if (principalBefore >= valueToDeduct) {
-            account.totalDepositedAssetPrincipal = principalBefore - valueToDeduct;
-        } else {
-            account.totalDepositedAssetPrincipal = 0;
-        }
-
-        bool wipedOut = (account.masterShares == 0);
-        if (wipedOut) {
-            // If shares are wiped out, ensure principal is also zeroed out.
-            account.totalDepositedAssetPrincipal = 0;
-            delete underwriterAccounts[underwriter];
-            delete withdrawalRequests[underwriter];
-        }
-
-        if (address(underwriterManager) != address(0)) {
-            // Use the originally calculated value for external reporting.
-            uint256 originalValueLost = sharesToValue(burnAmount);
-            underwriterManager.onLossRealized(underwriter, originalValueLost);
-        }
-
-        emit SharesBurntForLoss(underwriter, burnAmount, valueToDeduct);
+    UnderwriterAccount storage account = underwriterAccounts[underwriter];
+    if (account.masterShares < burnAmount) {
+        revert InsufficientShares(burnAmount, account.masterShares);
     }
+
+    // Calculate the proportional reduction in principal BEFORE burning shares
+    uint256 principalBefore = account.totalDepositedAssetPrincipal;
+    uint256 sharesBefore = account.masterShares;
+    
+    // Reduce principal proportionally to the shares being burned
+    uint256 principalToReduce = Math.mulDiv(principalBefore, burnAmount, sharesBefore);
+
+    // Update the account
+    account.masterShares -= burnAmount;
+    totalMasterSharesSystem -= burnAmount;
+
+    if (principalBefore >= principalToReduce) {
+        account.totalDepositedAssetPrincipal = principalBefore - principalToReduce;
+    } else {
+        account.totalDepositedAssetPrincipal = 0;
+    }
+
+    bool wipedOut = (account.masterShares == 0);
+    if (wipedOut) {
+        // If shares are wiped out, ensure principal is also zeroed out
+        account.totalDepositedAssetPrincipal = 0;
+        delete underwriterAccounts[underwriter];
+        delete withdrawalRequests[underwriter];
+    }
+
+    if (address(underwriterManager) != address(0)) {
+        // Use the market value for external reporting
+        uint256 marketValueLost = sharesToValue(burnAmount);
+        underwriterManager.onLossRealized(underwriter, marketValueLost);
+    }
+
+    emit SharesBurntForLoss(underwriter, burnAmount, principalToReduce);
+}
 
     /* ───────────────────────── View Functions ──────────────────────── */
     function getUnderwriterAdapterAddress(address _underwriter) external view override returns(address) {

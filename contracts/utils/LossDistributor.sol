@@ -119,7 +119,7 @@ contract LossDistributor is ILossDistributor, Ownable {
         if (totalLossValue == 0) return;
 
         // 1. Convert the single, total loss value into a number of shares to burn.
-        uint256 sharesToBurn = capitalPool.valueToShares(totalLossValue);
+        uint256 sharesToBurn = totalLossValue; // capitalPool.valueToShares(totalLossValue);
 
         if (sharesToBurn > 0) {
             // Get the user's actual, current share balance to ensure we don't burn more than they have.
