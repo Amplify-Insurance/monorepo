@@ -17,15 +17,15 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 /**
  * @title UnderwriterManager
  * @author Gemini
- * @notice Manages the lifecycle of underwriter capital. This contract handles capital
- * allocation, deallocation, reward claims, and state tracking related to underwriters.
- * It serves as the primary interaction point for liquidity providers.
+ * @notice Manages the allocation (pledging) of capital to risk pools.
+ * @dev This version has been refactored to read total capital values directly from the
+ * CapitalPool contract, which acts as the single source of truth for capital holdings.
+ * This prevents data desynchronization while maintaining separation of concerns.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /* ───────────────────────── State Variables ───────────────────────── */
-
+    /* ───────────────────────── State: Interfaces ───────────────────────── */
     ICapitalPool public capitalPool;
     IPoolRegistry public poolRegistry;
     IBackstopPool public catPool;
@@ -33,28 +33,36 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     IRewardDistributor public rewardDistributor;
     address public riskManager;
 
-    mapping(address => uint256) public underwriterTotalPledge;
+    /* ────────────────── State: Underwriter-Specific ────────────────── */
+    // NOTE: `underwriterTotalPledge` has been removed to prevent data duplication.
+    // The user's total capital is now read directly from the CapitalPool.
     mapping(address => mapping(uint256 => uint256)) public underwriterPoolPledge;
-    mapping(uint256 => address[]) public poolSpecificUnderwriters;
     mapping(address => uint256[]) public underwriterAllocations;
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
-
-    // Index tracking for efficient array removal
-    mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
     mapping(address => mapping(uint256 => uint256)) public underwriterAllocationIndex;
+    mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
 
+    /* ───────────────── State: Pool & Adapter Aggregates ──────────────── */
+    mapping(uint256 => uint256) public totalCapitalPledgedToPool;
+    mapping(uint256 => uint256) public capitalPendingWithdrawal;
+    mapping(uint256 => mapping(address => uint256)) public capitalPerAdapter;
+    mapping(uint256 => address[]) public poolActiveAdapters;
+    mapping(uint256 => mapping(address => uint256)) public poolAdapterIndex;
+    mapping(uint256 => mapping(address => bool)) public isAdapterInPool;
+    mapping(uint256 => address[]) public poolSpecificUnderwriters;
+    mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
+
+    /* ───────────────────────── Constants & Config ──────────────────────── */
     uint256 public constant ABSOLUTE_MAX_ALLOCATIONS = 50;
     uint256 public maxAllocationsPerUnderwriter = 5;
     uint256 public deallocationNoticePeriod;
 
-    mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
-
     /* ───────────────────────── Events & Errors ───────────────────────── */
-
     event AddressesSet(address capital, address registry, address cat, address loss, address rewards, address riskMgr);
-    event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount);
-    event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 timestamp);
-    event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId);
+    event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount, address adapter);
+    event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 amount, uint256 timestamp);
+    event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount, address adapter);
+    event LossRecorded(address indexed underwriter, uint256 indexed poolId, uint256 lossAmount);
     event DeallocationNoticePeriodSet(uint256 newPeriod);
     event MaxAllocationsPerUnderwriterSet(uint256 newMax);
 
@@ -71,8 +79,18 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     error NoticePeriodActive();
     error InsufficientFreeCapital();
 
-    /* ───────────────────── Constructor & Setup ───────────────────── */
+    /* ───────────────────── Modifiers ───────────────────── */
+    modifier onlyCapitalPool() {
+        require(msg.sender == address(capitalPool), "UM: Not CapitalPool");
+        _;
+    }
 
+    modifier onlyRiskManager() {
+        require(msg.sender == riskManager, "UM: Not RiskManager");
+        _;
+    }
+
+    /* ───────────────────── Constructor & Setup ───────────────────── */
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
     function setAddresses(
@@ -110,326 +128,275 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     /* ──────────────── Underwriter Capital Management ──────────────── */
 
     function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
-        (uint256 totalPledge, address adapter) = _prepareAllocateCapital(poolIds);
+        // _prepareAllocateCapital now reads directly from CapitalPool
+        (uint256 totalCapitalToPledge, address adapter) = _prepareAllocateCapital(poolIds);
+        
+        // This logic assumes 100% of capital is pledged to each listed pool.
         for (uint256 i = 0; i < poolIds.length; i++) {
-            _executeAllocation(poolIds[i], totalPledge, adapter);
+            _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
         }
     }
 
     function requestDeallocateFromPool(uint256 poolId) external nonReentrant {
         _checkDeallocationRequest(msg.sender, poolId);
-        deallocationRequestTimestamp[msg.sender][poolId] = block.timestamp;
         uint256 pledgeAmount = underwriterPoolPledge[msg.sender][poolId];
-        poolRegistry.updateCapitalPendingWithdrawal(poolId, pledgeAmount, true);
-        emit DeallocationRequested(msg.sender, poolId, block.timestamp);
+        deallocationRequestTimestamp[msg.sender][poolId] = block.timestamp;
+        capitalPendingWithdrawal[poolId] += pledgeAmount;
+        emit DeallocationRequested(msg.sender, poolId, pledgeAmount, block.timestamp);
     }
 
     function deallocateFromPool(uint256 poolId) external nonReentrant {
         _validateDeallocationRequest(msg.sender, poolId);
-        delete deallocationRequestTimestamp[msg.sender][poolId];
-        _realizeLossesForAllPools(msg.sender);
-        _executeDeallocation(msg.sender, poolId);
-    }
+        address underwriter = msg.sender;
+        uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
+        address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
 
+        delete deallocationRequestTimestamp[underwriter][poolId];
+        _realizeLossesForAllPools(underwriter);
+
+        totalCapitalPledgedToPool[poolId] -= pledgeAmount;
+        capitalPendingWithdrawal[poolId] -= pledgeAmount;
+        capitalPerAdapter[poolId][adapter] -= pledgeAmount;
+
+        if (capitalPerAdapter[poolId][adapter] == 0) {
+            _removeAdapterFromPool(poolId, adapter);
+        }
+
+        _removeUnderwriterFromPool(underwriter, poolId);
+
+        emit CapitalDeallocated(underwriter, poolId, pledgeAmount, adapter);
+    }
 
     /* ───────────────── Hooks & State Updaters ───────────────── */
+    
+    function recordLossAgainstPledge(address underwriter, uint256 poolId, uint256 lossAmount) external onlyRiskManager {
+        if (lossAmount == 0) return;
 
-    function settleLossesForUser(address user) external {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
-        _realizeLossesForAllPools(user);
+        uint256 pledgeInPool = underwriterPoolPledge[underwriter][poolId];
+        address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
+        require(adapter != address(0), "User has no yield adapter");
+
+        uint256 poolLoss = Math.min(pledgeInPool, lossAmount);
+
+        // Reduce the specific pool pledge and its aggregate accounting.
+        // There is no `underwriterTotalPledge` to update anymore.
+        underwriterPoolPledge[underwriter][poolId] -= poolLoss;
+        totalCapitalPledgedToPool[poolId] -= poolLoss;
+        capitalPerAdapter[poolId][adapter] -= poolLoss;
+
+        if (capitalPerAdapter[poolId][adapter] == 0) {
+            _removeAdapterFromPool(poolId, adapter);
+        }
+        
+        if (underwriterPoolPledge[underwriter][poolId] == 0) {
+            _removeUnderwriterFromPool(underwriter, poolId);
+        }
+
+        emit LossRecorded(underwriter, poolId, poolLoss);
     }
 
-    function onCapitalDeposited(address underwriter, uint256 amount) external nonReentrant {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+    function onCapitalDeposited(address underwriter, uint256 amount) external onlyCapitalPool nonReentrant {
+        // Realize any pending losses before potential pledge adjustments.
         _realizeLossesForAllPools(underwriter);
-        underwriterTotalPledge[underwriter] += amount;
-        _updateAllPoolPledgesOnDeposit(underwriter);
-    }
-
-    function onWithdrawalRequested(address underwriter, uint256 principalComponent) external nonReentrant {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
-        _updateAllPoolsOnWithdrawalAction(underwriter, principalComponent, true);
-    }
-
-    function onWithdrawalCancelled(address underwriter, uint256 principalComponent) external nonReentrant {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
-        _updateAllPoolsOnWithdrawalAction(underwriter, principalComponent, false);
-    }
-
-    function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal)
-        external
-        nonReentrant
-    {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
         
-        uint256 pledgeBefore = underwriterTotalPledge[underwriter];
-        if (pledgeBefore == 0) return;
+        // `underwriterTotalPledge` is no longer tracked here.
+        // Optional logic could be added to proportionally increase existing pledges based
+        // on the new total capital, which would be read from CapitalPool.
+    }
 
-        uint256 amountToSubtract = Math.min(pledgeBefore, principalComponentRemoved);
-        
-        if (amountToSubtract > 0) {
-            underwriterTotalPledge[underwriter] -= amountToSubtract;
+    function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) external onlyCapitalPool nonReentrant {
+        // Get the state of capital *after* the withdrawal from the source of truth.
+        (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
 
-            // --- FINAL FIX: Reduce per-pool pledges proportionally ---
-            // This ensures the per-pool pledges remain synchronized with the total pledge.
-            uint256[] memory allocations = underwriterAllocations[underwriter];
+        // Reconstruct the state of capital *before* the withdrawal to do proportional math.
+        uint256 principalBefore = principalAfter + principalComponentRemoved;
+        if (principalBefore == 0) return;
+
+        uint256[] memory allocations = underwriterAllocations[underwriter];
+        if (allocations.length > 0) {
+            address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
+            require(adapter != address(0), "User has no yield adapter");
+
             for (uint256 i = 0; i < allocations.length; i++) {
                 uint256 poolId = allocations[i];
-                uint256 currentPoolPledge = underwriterPoolPledge[underwriter][poolId];
-                uint256 proportionalReduction = Math.mulDiv(currentPoolPledge, amountToSubtract, pledgeBefore);
-                
-                if (currentPoolPledge > proportionalReduction) {
-                    underwriterPoolPledge[underwriter][poolId] -= proportionalReduction;
-                } else {
-                    underwriterPoolPledge[underwriter][poolId] = 0;
+                uint256 poolPledgeBefore = underwriterPoolPledge[underwriter][poolId];
+                if (poolPledgeBefore > 0) {
+                    // Proportionally reduce the pledge for this pool based on the % of capital withdrawn.
+                    uint256 reduction = Math.mulDiv(poolPledgeBefore, principalComponentRemoved, principalBefore);
+                    underwriterPoolPledge[underwriter][poolId] -= reduction;
+                    totalCapitalPledgedToPool[poolId] -= reduction;
+                    capitalPerAdapter[poolId][adapter] -= reduction;
                 }
             }
         }
         
-        _processWithdrawalForAllPools(underwriter, principalComponentRemoved, isFullWithdrawal);
-        
         if (isFullWithdrawal) {
-            delete underwriterAllocations[underwriter];
+            _handleFullWithdrawalCleanup(underwriter);
         }
     }
 
-    function onLossRealized(address underwriter, uint256 valueLost) external {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+    function onLossRealized(address, uint256) external onlyCapitalPool {
+        // This function is intentionally left blank for pledge updates.
+        // The `recordLossAgainstPledge` function is the primary entry point for recording losses against pledges.
+    }
 
-        uint256 pledgeBefore = underwriterTotalPledge[underwriter];
-        if (pledgeBefore == 0) return;
+    /* ───────────────── View Functions ───────────────── */
 
-        uint256 amountToSubtract = Math.min(pledgeBefore, valueLost);
-        underwriterTotalPledge[underwriter] -= amountToSubtract;
-
-        uint256[] memory allocations = underwriterAllocations[underwriter];
-        for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-            uint256 currentPoolPledge = underwriterPoolPledge[underwriter][poolId];
-            
-            uint256 proportionalLoss = Math.mulDiv(currentPoolPledge, amountToSubtract, pledgeBefore);
-            
-            if (currentPoolPledge > proportionalLoss) {
-                underwriterPoolPledge[underwriter][poolId] -= proportionalLoss;
-            } else {
-                underwriterPoolPledge[underwriter][poolId] = 0;
-            }
+    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256) {
+        address[] memory adapters = poolActiveAdapters[poolId];
+        uint256[] memory capital = new uint256[](adapters.length);
+        for(uint i = 0; i < adapters.length; i++){
+            capital[i] = capitalPerAdapter[poolId][adapters[i]];
         }
-    }
-
-    /* ───────────────── Rewards Claiming ───────────────── */
-
-    function claimPremiumRewards(uint256 poolId) external nonReentrant {
-        uint256 pledge = underwriterPoolPledge[msg.sender][poolId];
-        if (pledge == 0) revert NotAllocated();
-        (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(poolId);
-        rewardDistributor.claim(
-            msg.sender,
-            poolId,
-            address(protocolToken),
-            pledge
-        );
-    }
-
-    function claimDistressedAssets(uint256 poolId) external nonReentrant {
-        if (!isAllocatedToPool[msg.sender][poolId]) revert NotAllocated();
-        (IERC20 protocolToken,,,,,,) = poolRegistry.getPoolData(poolId);
-        if (address(protocolToken) != address(0)) {
-            catPool.claimProtocolAssetRewardsFor(msg.sender, address(protocolToken));
-        }
-    }
-
-    /* ───────────────── External Functions for Other Contracts ───────────────── */
-
-    function realizeLossesForAllPools(address user) external {
-        if (msg.sender != riskManager) revert NotRiskManager();
-        _realizeLossesForAllPools(user);
+        return (adapters, capital, totalCapitalPledgedToPool[poolId]);
     }
 
     function getPoolUnderwriters(uint256 poolId) external view returns (address[] memory) {
         return poolSpecificUnderwriters[poolId];
     }
+    
+    function getUnderwriterAllocations(address user) external view returns (uint256[] memory) {
+        return underwriterAllocations[user];
+    }
 
-    /* ───────────────── Internal & Private Functions ───────────────── */
+    /* ───────────────── Internal & Helper Functions ───────────────── */
 
     function _executeAllocation(uint256 poolId, uint256 totalPledge, address adapter) internal {
         underwriterPoolPledge[msg.sender][poolId] = totalPledge;
         isAllocatedToPool[msg.sender][poolId] = true;
         underwriterAllocationIndex[msg.sender][poolId] = underwriterAllocations[msg.sender].length;
         underwriterAllocations[msg.sender].push(poolId);
+        
         underwriterIndexInPoolArray[poolId][msg.sender] = poolSpecificUnderwriters[poolId].length;
         poolSpecificUnderwriters[poolId].push(msg.sender);
-        poolRegistry.updateCapitalAllocation(poolId, adapter, totalPledge, true);
-        emit CapitalAllocated(msg.sender, poolId, totalPledge);
+
+        totalCapitalPledgedToPool[poolId] += totalPledge;
+        capitalPerAdapter[poolId][adapter] += totalPledge;
+        _addAdapterToPool(poolId, adapter);
+
+        emit CapitalAllocated(msg.sender, poolId, totalPledge, adapter);
     }
 
-    function _executeDeallocation(address underwriter, uint256 poolId) internal {
+    function _addAdapterToPool(uint256 poolId, address adapterAddress) internal {
+        if (!isAdapterInPool[poolId][adapterAddress]) {
+            isAdapterInPool[poolId][adapterAddress] = true;
+            poolAdapterIndex[poolId][adapterAddress] = poolActiveAdapters[poolId].length;
+            poolActiveAdapters[poolId].push(adapterAddress);
+        }
+    }
+
+    function _removeAdapterFromPool(uint256 poolId, address adapterAddress) internal {
+        if (!isAdapterInPool[poolId][adapterAddress]) return;
+        
+        uint256 indexToRemove = poolAdapterIndex[poolId][adapterAddress];
+        address[] storage adapters = poolActiveAdapters[poolId];
+        address lastAdapter = adapters[adapters.length - 1];
+        
+        adapters[indexToRemove] = lastAdapter;
+        poolAdapterIndex[poolId][lastAdapter] = indexToRemove;
+        
+        adapters.pop();
+        delete isAdapterInPool[poolId][adapterAddress];
+        delete poolAdapterIndex[poolId][adapterAddress];
+    }
+
+    function _removeUnderwriterFromPool(address underwriter, uint256 poolId) internal {
+        // Remove from underwriter's allocation list
+        uint256[] storage allocs = underwriterAllocations[underwriter];
+        uint256 indexToRemove = underwriterAllocationIndex[underwriter][poolId];
+        uint256 lastElementPoolId = allocs[allocs.length - 1];
+        allocs[indexToRemove] = lastElementPoolId;
+        underwriterAllocationIndex[underwriter][lastElementPoolId] = indexToRemove;
+        allocs.pop();
+
+        // Remove from pool's underwriter list
+        uint256 indexInPool = underwriterIndexInPoolArray[poolId][underwriter];
+        address[] storage underwriters = poolSpecificUnderwriters[poolId];
+        address lastUnderwriter = underwriters[underwriters.length - 1];
+        underwriters[indexInPool] = lastUnderwriter;
+        underwriterIndexInPoolArray[poolId][lastUnderwriter] = indexInPool;
+        underwriters.pop();
+
+        delete underwriterIndexInPoolArray[poolId][underwriter];
+        delete underwriterAllocationIndex[underwriter][poolId];
+        delete underwriterPoolPledge[underwriter][poolId];
+        delete isAllocatedToPool[underwriter][poolId];
+    }
+
+    function _handleFullWithdrawalCleanup(address underwriter) internal {
+        address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
+        uint256[] memory allocations = underwriterAllocations[underwriter];
+        for (uint i=0; i < allocations.length; i++) {
+            uint256 poolId = allocations[i];
+            uint256 pledge = underwriterPoolPledge[underwriter][poolId];
+            if (pledge > 0) {
+                totalCapitalPledgedToPool[poolId] -= pledge;
+                capitalPerAdapter[poolId][adapter] -= pledge;
+            }
+            _removeUnderwriterFromPool(underwriter, poolId);
+        }
+        delete underwriterAllocations[underwriter];
+    }
+
+    function _prepareAllocateCapital(uint256[] calldata poolIds) internal view returns (uint256, address) {
+        // **MODIFIED**: Read total capital directly from CapitalPool instead of a local variable.
+        (uint256 totalDepositedPrincipal, , , ) = capitalPool.getUnderwriterAccount(msg.sender);
+        if (totalDepositedPrincipal == 0) revert NoCapitalToAllocate();
+        
+        uint256 len = poolIds.length;
+        if (len == 0 || len + underwriterAllocations[msg.sender].length > maxAllocationsPerUnderwriter) {
+            revert ExceedsMaxAllocations();
+        }
+        
+        address adapter = capitalPool.getUnderwriterAdapterAddress(msg.sender);
+        require(adapter != address(0), "User has no yield adapter");
+        
+        uint256 poolCount = poolRegistry.getPoolCount();
+        for (uint256 i = 0; i < len; i++) {
+            uint256 pid = poolIds[i];
+            if (pid >= poolCount) revert InvalidPoolId();
+            if (isAllocatedToPool[msg.sender][pid]) revert AlreadyAllocated();
+        }
+        
+        // Return the true total capital to be pledged.
+        return (totalDepositedPrincipal, adapter);
+    }
+
+    function _checkDeallocationRequest(address underwriter, uint256 poolId) internal view {
+        if (poolId >= poolRegistry.getPoolCount()) revert InvalidPoolId();
+        if (!isAllocatedToPool[underwriter][poolId]) revert NotAllocated();
+        if (deallocationRequestTimestamp[underwriter][poolId] != 0) revert DeallocationRequestPending();
+        
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
-        address userAdapterAddress = capitalPool.getUnderwriterAdapterAddress(underwriter);
-        require(userAdapterAddress != address(0), "User has no yield adapter");
+        (, uint256 totalSold, , , ) = poolRegistry.getPoolStaticData(poolId);
+        uint256 currentPledged = totalCapitalPledgedToPool[poolId];
+        uint256 pendingW = capitalPendingWithdrawal[poolId];
         
-        _removeUnderwriterFromPool(underwriter, poolId);
-        
-        poolRegistry.updateCapitalAllocation(poolId, userAdapterAddress, pledgeAmount, false);
-        poolRegistry.updateCapitalPendingWithdrawal(poolId, pledgeAmount, false);
-        emit CapitalDeallocated(underwriter, poolId);
+        uint256 freeCapital = currentPledged > totalSold + pendingW ? currentPledged - totalSold - pendingW : 0;
+        if (pledgeAmount > freeCapital) revert InsufficientFreeCapital();
+    }
+
+    function _realizeLossesForAllPools(address user) internal {
+        uint256[] memory allocations = underwriterAllocations[user];
+        if (allocations.length == 0) return;
+
+        uint256 totalPendingLossValue = 0;
+        for (uint256 i = 0; i < allocations.length; i++) {
+            uint256 poolId = allocations[i];
+            uint256 userPledge = underwriterPoolPledge[user][poolId];
+            if (userPledge > 0) {
+                totalPendingLossValue += lossDistributor.getPendingLosses(user, poolId, userPledge);
+            }
+        }
+
+        if (totalPendingLossValue > 0) {
+            lossDistributor.realizeAggregateLoss(user, totalPendingLossValue, allocations);
+        }
     }
 
     function _validateDeallocationRequest(address underwriter, uint256 poolId) internal view {
         uint256 requestTime = deallocationRequestTimestamp[underwriter][poolId];
         if (requestTime == 0) revert NoDeallocationRequest();
         if (block.timestamp < requestTime + deallocationNoticePeriod) revert NoticePeriodActive();
-    }
-
-    function _updateAllPoolPledgesOnDeposit(address underwriter) internal {
-        uint256[] memory pools = underwriterAllocations[underwriter];
-        if (pools.length == 0) return;
-        
-        uint256 newTotalPledge = underwriterTotalPledge[underwriter];
-
-        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(pools);
-        for (uint256 i = 0; i < pools.length; i++) {
-            underwriterPoolPledge[underwriter][pools[i]] = newTotalPledge;
-            address protocolToken = address(allPoolData[i].protocolTokenToCover);
-            rewardDistributor.updateUserState(
-                underwriter, pools[i], protocolToken, newTotalPledge
-            );
-        }
-    }
-
-    function _updateAllPoolsOnWithdrawalAction(address underwriter, uint256 principalComponent, bool isRequest) internal {
-        uint256[] memory allocations = underwriterAllocations[underwriter];
-        if (allocations.length == 0) return;
-        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
-        for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-            if (isRequest || (principalComponent > 0 && allPoolData[i].capitalPendingWithdrawal >= principalComponent)) {
-                poolRegistry.updateCapitalPendingWithdrawal(poolId, principalComponent, isRequest);
-            }
-            address protocolToken = address(allPoolData[i].protocolTokenToCover);
-            rewardDistributor.updateUserState(
-                underwriter, poolId, protocolToken, underwriterPoolPledge[underwriter][poolId]
-            );
-        }
-    }
-
-    function _processWithdrawalForAllPools(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) internal {
-        uint256[] memory allocations = underwriterAllocations[underwriter];
-        if (allocations.length == 0) return;
-        IPoolRegistry.PoolInfo[] memory allPoolData = poolRegistry.getMultiplePoolData(allocations);
-        for (uint256 i = 0; i < allocations.length; i++) {
-            _processWithdrawalForPool(
-                underwriter,
-                allocations[i],
-                principalComponentRemoved,
-                isFullWithdrawal,
-                allPoolData[i].capitalPendingWithdrawal,
-                address(allPoolData[i].protocolTokenToCover)
-            );
-        }
-    }
-
-    function claimYieldRewards() external nonReentrant {
-        address adapterAddress = capitalPool.getUnderwriterAdapterAddress(msg.sender);
-        require(adapterAddress != address(0), "No yield adapter chosen");
-        uint256 rewardPoolId = capitalPool.yieldAdapterRewardPoolId(adapterAddress);
-        require(rewardPoolId != 0, "Reward pool for adapter not set");
-        (,,uint256 userShares,) = capitalPool.getUnderwriterAccount(msg.sender);
-        rewardDistributor.claim(msg.sender, rewardPoolId, address(capitalPool.underlyingAsset()), userShares);
-    }
-
-    function _realizeLossesForAllPools(address _user) internal {
-        uint256[] memory allocations = underwriterAllocations[_user];
-        if (allocations.length == 0) return;
-
-        uint256 totalPendingLossValue = 0;
-        for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-            uint256 userPledge = underwriterPoolPledge[_user][poolId];
-            if (userPledge > 0) {
-                totalPendingLossValue += lossDistributor.getPendingLosses(_user, poolId, userPledge);
-            }
-        }
-
-        if (totalPendingLossValue > 0) {
-            lossDistributor.realizeAggregateLoss(_user, totalPendingLossValue, allocations);
-        }
-    }
-
-    function _processWithdrawalForPool(
-        address underwriter,
-        uint256 poolId,
-        uint256 principalComponentRemoved,
-        bool isFullWithdrawal,
-        uint256 pendingWithdrawal,
-        address protocolToken
-    ) internal {
-        uint256 reduction = Math.min(principalComponentRemoved, pendingWithdrawal);
-        if (reduction > 0) {
-            poolRegistry.updateCapitalPendingWithdrawal(poolId, reduction, false);
-        }
-        
-        uint256 newPoolPledge = underwriterPoolPledge[underwriter][poolId];
-
-        rewardDistributor.updateUserState(underwriter, poolId, protocolToken, newPoolPledge);
-        if (isFullWithdrawal || newPoolPledge == 0) {
-            _removeUnderwriterFromPool(underwriter, poolId);
-        }
-    }
-
-    function _removeUnderwriterFromPool(address _underwriter, uint256 _poolId) internal {
-        isAllocatedToPool[_underwriter][_poolId] = false;
-        uint256[] storage allocs = underwriterAllocations[_underwriter];
-        uint256 indexToRemove = underwriterAllocationIndex[_underwriter][_poolId];
-        uint256 lastElementPoolId = allocs[allocs.length - 1];
-        allocs[indexToRemove] = lastElementPoolId;
-        underwriterAllocationIndex[_underwriter][lastElementPoolId] = indexToRemove;
-        allocs.pop();
-        uint256 index = underwriterIndexInPoolArray[_poolId][_underwriter];
-        address[] storage underwriters = poolSpecificUnderwriters[_poolId];
-        address last = underwriters[underwriters.length - 1];
-        underwriters[index] = last;
-        underwriterIndexInPoolArray[_poolId][last] = index;
-        underwriters.pop();
-        delete underwriterIndexInPoolArray[_poolId][_underwriter];
-        delete underwriterAllocationIndex[_underwriter][_poolId];
-        delete underwriterPoolPledge[_underwriter][_poolId];
-    }
-
-    function _prepareAllocateCapital(uint256[] calldata _poolIds)
-        internal
-        view
-        returns (uint256 totalPledge, address adapter)
-    {
-        totalPledge = underwriterTotalPledge[msg.sender];
-        if (totalPledge == 0) revert NoCapitalToAllocate();
-        uint256 len = _poolIds.length;
-        if (len == 0 || len + underwriterAllocations[msg.sender].length > maxAllocationsPerUnderwriter) {
-            revert ExceedsMaxAllocations();
-        }
-        adapter = capitalPool.getUnderwriterAdapterAddress(msg.sender);
-        require(adapter != address(0), "User has no yield adapter");
-        uint256 poolCount = poolRegistry.getPoolCount();
-        for (uint256 i = 0; i < len; i++) {
-            uint256 pid = _poolIds[i];
-            if (pid >= poolCount) revert InvalidPoolId();
-            if (isAllocatedToPool[msg.sender][pid]) revert AlreadyAllocated();
-        }
-    }
-
-    function _checkDeallocationRequest(address _underwriter, uint256 _poolId) internal view {
-        if (_poolId >= poolRegistry.getPoolCount()) revert InvalidPoolId();
-        if (!isAllocatedToPool[_underwriter][_poolId]) revert NotAllocated();
-        if (deallocationRequestTimestamp[_underwriter][_poolId] != 0) revert DeallocationRequestPending();
-        
-        uint256 pledgeAmount = underwriterPoolPledge[_underwriter][_poolId];
-        (,uint256 totalPledged, uint256 totalSold, uint256 pendingWithdrawal,,,) = poolRegistry.getPoolData(_poolId);
-        uint256 freeCapital =
-            totalPledged > totalSold + pendingWithdrawal ? totalPledged - totalSold - pendingWithdrawal : 0;
-        if (pledgeAmount > freeCapital) revert InsufficientFreeCapital();
-    }
-
-    function getUnderwriterAllocations(address user) external view returns (uint256[] memory) {
-        return underwriterAllocations[user];
     }
 }

@@ -14,12 +14,14 @@ import "../interfaces/ICapitalPool.sol";
 import "../interfaces/IBackstopPool.sol";
 import "../interfaces/IRewardDistributor.sol";
 import "../interfaces/IRiskManagerPMHook.sol";
+// --- NEW INTERFACE ---
+import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
+
 
 /**
  * @title PolicyManager
  * @author Gemini
- * @notice Handles policy lifecycle with a batched linked-list for pending increases,
- * tracking a storage sum to avoid under-counting and prevent DoS.
+ * @notice Handles policy lifecycle. Updated to fetch capital data from UnderwriterManager.
  */
 contract PolicyManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -37,6 +39,8 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     IPolicyNFT public immutable policyNFT;
     IRewardDistributor public rewardDistributor;
     IRiskManagerPMHook public riskManager;
+    // --- NEW STATE VARIABLE ---
+    IUnderwriterManager public underwriterManager;
     uint256 public catPremiumBps = 2_000; // 20%
 
     // --- Pending increases as a linked list ---
@@ -65,12 +69,12 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     error TooManyPendingIncreases();
 
     /* ───────────────────────── Events ──────────────────────────── */
-    event AddressesSet(address indexed registry, address indexed capital, address indexed rewards, address rm);
+    event AddressesSet(address indexed registry, address indexed capital, address indexed rewards, address rm, address um);
     event CatPremiumShareSet(uint256 newBps);
     event CatPoolSet(address indexed newCatPool);
     event CoverCooldownPeriodSet(uint256 newPeriod);
     event CoverIncreaseRequested(uint256 indexed policyId, uint256 additionalCoverage, uint256 activationTimestamp);
-    event PremiumAdded(uint256 indexed policyId, uint256 amount); // NEW: Event for adding premium
+    event PremiumAdded(uint256 indexed policyId, uint256 amount);
 
     /* ───────────────────────── Constructor ───────────────────────── */
     constructor(address _policyNFT, address _initialOwner) Ownable(_initialOwner) {
@@ -84,10 +88,11 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         address capital,
         address cat,
         address rewards,
-        address rm
+        address rm,
+        address um // <-- NEW
     ) external onlyOwner {
         if (registry == address(0) || capital == address(0) || cat == address(0) ||
-            rewards == address(0) || rm == address(0)) {
+            rewards == address(0) || rm == address(0) || um == address(0)) { // <-- NEW
             revert AddressesNotSet();
         }
         poolRegistry = IPoolRegistry(registry);
@@ -95,7 +100,8 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         catPool = IBackstopPool(cat);
         rewardDistributor = IRewardDistributor(rewards);
         riskManager = IRiskManagerPMHook(rm);
-        emit AddressesSet(registry, capital, rewards, rm);
+        underwriterManager = IUnderwriterManager(um); // <-- NEW
+        emit AddressesSet(registry, capital, rewards, rm, um);
     }
 
     function setCatPool(address catPoolAddress) external onlyOwner {
@@ -142,11 +148,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         riskManager.updateCoverageSold(poolId, coverageAmount, true);
     }
 
-    /**
-     * @notice NEW: Allows a policyholder to add more funds to their premium deposit, extending the coverage duration.
-     * @param policyId The ID of the policy to top up.
-     * @param amount The amount of premium to add.
-     */
     function addPremium(uint256 policyId, uint256 amount) external nonReentrant {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
         if (amount == 0) revert InvalidAmount();
@@ -159,10 +160,8 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         IPolicyNFT.Policy memory pol = policyNFT.getPolicy(policyId);
         if (pol.coverage == 0) revert PolicyAlreadyTerminated();
 
-        // Transfer funds from user
         capitalPool.underlyingAsset().safeTransferFrom(msg.sender, address(this), amount);
 
-        // Update the policy's deposit balance. The lastDrainTime is updated by _settleAndDrainPremium.
         uint128 newDeposit = pol.premiumDeposit + uint128(amount);
         policyNFT.updatePremiumAccount(policyId, newDeposit, pol.lastDrainTime);
 
@@ -258,8 +257,11 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     function _validateIncreaseCover(uint256 policyId, uint256 additionalCoverage, IPolicyNFT.Policy memory pol) internal view {
-        ( , uint256 pledged, uint256 sold, uint256 pendingW, bool paused, , ) = poolRegistry.getPoolData(pol.poolId);
+        ( , uint256 sold, bool paused, , ) = poolRegistry.getPoolStaticData(pol.poolId);
         if (paused) revert PoolPaused();
+
+        (,,uint256 pledged) = underwriterManager.getPoolPayoutData(pol.poolId);
+        uint256 pendingW = underwriterManager.capitalPendingWithdrawal(pol.poolId);
 
         uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
         uint256 totalPending = pendingCoverageSum[policyId];
@@ -277,8 +279,11 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         view
         returns (uint256 activationTimestamp)
     {
-        ( , uint256 pledged, uint256 sold, uint256 pendingW, bool paused, , ) = poolRegistry.getPoolData(poolId);
+        ( , uint256 sold, bool paused, , ) = poolRegistry.getPoolStaticData(poolId);
         if (paused) revert PoolPaused();
+
+        (,,uint256 pledged) = underwriterManager.getPoolPayoutData(poolId);
+        uint256 pendingW = underwriterManager.capitalPendingWithdrawal(poolId);
 
         uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
         if (sold + coverageAmount > availableCapital) revert InsufficientCapacity();
@@ -317,7 +322,10 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     function _calculatePremiumCost(IPolicyNFT.Policy memory pol) internal view returns (uint256 cost, uint256 rateBps) {
-        ( , uint256 pledged, uint256 sold, uint256 pendingW, , , ) = poolRegistry.getPoolData(pol.poolId);
+        ( , uint256 sold, , , ) = poolRegistry.getPoolStaticData(pol.poolId);
+        (,,uint256 pledged) = underwriterManager.getPoolPayoutData(pol.poolId);
+        uint256 pendingW = underwriterManager.capitalPendingWithdrawal(pol.poolId);
+        
         uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
         rateBps = _getCurrentRateBps(pol.poolId, sold, availableCapital);
 
@@ -338,7 +346,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         }
 
         if (poolInc > 0) {
-            ( , uint256 pledged, , , , , ) = poolRegistry.getPoolData(poolId);
+            (,,uint256 pledged) = underwriterManager.getPoolPayoutData(poolId);
             if (pledged > 0) {
                 IERC20 asset = capitalPool.underlyingAsset();
                 asset.safeTransfer(address(rewardDistributor), poolInc);
@@ -425,7 +433,10 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         if (pol.coverage == 0) return false;
         if (block.timestamp <= pol.lastDrainTime) return pol.premiumDeposit > 0;
 
-        ( , uint256 pledged, uint256 sold, uint256 pendingW, , , ) = poolRegistry.getPoolData(pol.poolId);
+        ( , uint256 sold, , , ) = poolRegistry.getPoolStaticData(pol.poolId);
+        (,,uint256 pledged) = underwriterManager.getPoolPayoutData(pol.poolId);
+        uint256 pendingW = underwriterManager.capitalPendingWithdrawal(pol.poolId);
+
         uint256 availableCapital = pendingW >= pledged ? 0 : pledged - pendingW;
         uint256 rateBps = _getCurrentRateBps(pol.poolId, sold, availableCapital);
         

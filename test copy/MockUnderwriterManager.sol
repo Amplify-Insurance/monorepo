@@ -75,16 +75,4 @@ contract MockUnderwriterManager is IUnderwriterManager {
         // This function can be empty for the test to pass.
         onWithdrawalCancelledCallCount++;
     }
-
-    function settleLossesForUser(address user) external override {
-        // This function can be empty for the test to pass.
-        // Its existence is what matters.
-        last_realizeLossesForAllPools_user = user;
-    }
-
-        function onLossRealized(address underwriter, uint256 valueLost) external override {
-        // This function can be empty for the test to pass.
-        // Its existence is what matters.
-        last_realizeLossesForAllPools_user = underwriter;
-    }
 }

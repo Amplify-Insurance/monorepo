@@ -149,7 +149,7 @@ async function main() {
   await waitForTx(catPool.setRewardDistributor(rewardDistributor.target), "Set RewardDistributor on BackstopPool");
   await waitForTx(rewardDistributor.setCatPool(catPool.target), "Set BackstopPool on RewardDistributor");
 
-  await waitForTx(policyManager.setAddresses(poolRegistry.target, capitalPool.target, catPool.target, rewardDistributor.target, riskManager.target), "Set addresses on PolicyManager");
+  await waitForTx(policyManager.setAddresses(poolRegistry.target, capitalPool.target, catPool.target, rewardDistributor.target, riskManager.target,underwriterManager.target), "Set addresses on PolicyManager");
   await waitForTx(riskManager.setAddresses(
     capitalPool.target,
     poolRegistry.target,

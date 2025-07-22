@@ -427,7 +427,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
 function burnSharesForLoss(
     address underwriter,
     uint256 burnAmount
-) external  {
+) external onlyLossDistributor  {
     if (burnAmount == 0) return;
 
     UnderwriterAccount storage account = underwriterAccounts[underwriter];

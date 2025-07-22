@@ -34,7 +34,10 @@ contract LossDistributor is ILossDistributor, Ownable {
     struct UserLossState {
         // The total loss the user has already realized and "paid" for.
         uint256 lossDebt;
+        uint256 accumulatedLossPerPledgeAtLastUpdate;
+
     }
+
 
     // --- State Variables ---
     mapping(uint256 => LossTracker) public poolLossTrackers;
@@ -168,4 +171,51 @@ contract LossDistributor is ILossDistributor, Ownable {
         
         return totalLossIncurred - userState.lossDebt;
     }
+
+    // In LossDistributor.sol
+
+/**
+ * @notice Snapshots the current pool loss state for a user.
+ * @dev Called by UnderwriterManager when a user's pledge is changed.
+ * This sets a new baseline for calculating prospective losses.
+ */
+function recordPledgeUpdate(
+    address user,
+    uint256 poolId
+) external override onlyUnderwriterManager {
+    userLossStates[user][poolId].accumulatedLossPerPledgeAtLastUpdate = poolLossTrackers[poolId].accumulatedLossPerPledge;
+}
+
+
+    // In LossDistributor.sol
+
+/**
+ * @notice Calculates only the new losses a user is exposed to since their last pledge update.
+ * @dev This provides an intuitive view of losses, ignoring historical losses
+ * that occurred before the user's capital was pledged.
+ * @return The amount of new, unrealized loss affecting the user.
+ */
+function getProspectiveLosses(
+    address user,
+    uint256 poolId,
+    uint256 userPledge
+) public view returns (uint256) {
+    LossTracker storage tracker = poolLossTrackers[poolId];
+    UserLossState storage userState = userLossStates[user][poolId];
+
+    uint256 currentLossPerPledge = tracker.accumulatedLossPerPledge;
+    uint256 lossPerPledgeAtUpdate = userState.accumulatedLossPerPledgeAtLastUpdate;
+
+    // If the pool's current loss ratio is less than or equal to the user's snapshot,
+    // it means no new losses have occurred that affect them.
+    if (currentLossPerPledge <= lossPerPledgeAtUpdate) {
+        return 0;
+    }
+
+    // Calculate the increase in loss-per-pledge since the user's last update.
+    uint256 deltaLossPerPledge = currentLossPerPledge - lossPerPledgeAtUpdate;
+
+    // The prospective loss is their current pledge multiplied by the new loss ratio.
+    return (userPledge * deltaLossPerPledge) / PRECISION_FACTOR;
+}
 }

@@ -39,14 +39,13 @@ contract MockLossDistributor is ILossDistributor {
         emit LossDistributed(poolId, lossAmount, totalPledgeInPool);
     }
 
-
-    function getPendingLosses(address user, uint256 poolId, uint256 userPledge) external view override returns (uint256) {
-        // `userPledge` is unused in this mock but kept for interface compatibility
-        userPledge;
-        return pending[user][poolId];
+    function realizeLosses(address user, uint256 poolId, uint256) external override returns (uint256) {
+        uint256 amount = pending[user][poolId];
+        pending[user][poolId] = 0;
+        return amount;
     }
 
-    function realizeAggregateLoss(address user, uint256 totalLossValue, uint256[] calldata poolIds) external override {
-        pending[user][totalLossValue] = 0;
+    function getPendingLosses(address user, uint256 poolId, uint256) external view override returns (uint256) {
+        return pending[user][poolId];
     }
 }

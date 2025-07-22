@@ -19,8 +19,9 @@ import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
 
 /**
  * @title RiskManager
- * @notice Orchestrates claim processing and liquidations for the protocol.
- * @dev UPDATED: Now supports partial claims on policies.
+ * @author Gemini
+ * @notice Orchestrates claim processing and liquidations. Refactored to work with the
+ * UnderwriterManager as the single source of truth for capital pledges.
  */
 contract RiskManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -37,7 +38,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     address public policyManager;
     address public committee;
 
-    uint256 public constant CLAIM_FEE_BPS = 500; // 5%
     uint256 public constant BPS = 10_000;
 
     // --- Structs ---
@@ -50,8 +50,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256 poolClaimFeeBps;
         address[] adapters;
         uint256[] capitalPerAdapter;
-        uint256 totalCoverageSold;
-        bool isCoverPool;
     }
 
     // --- Events ---
@@ -67,7 +65,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     );
     event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
-    event ClaimProcessed(uint256 indexed policyId, uint256 amountClaimed, bool isFullClaim); // NEW
+    event ClaimProcessed(uint256 indexed policyId, uint256 amountClaimed, bool isFullClaim);
 
     // --- Errors ---
 
@@ -76,7 +74,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     error ZeroAddressNotAllowed();
     error OnlyPolicyOwner();
     error PolicyNotActive();
-    error InvalidClaimAmount(); // NEW
+    error InvalidClaimAmount();
 
     // --- Constructor ---
 
@@ -121,16 +119,12 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
         _checkInsolvency(_underwriter);
+        // The RiskManager orchestrates the liquidation by calling the UnderwriterManager,
+        // which is responsible for calculating and realizing the losses.
         underwriterManager.realizeLossesForAllPools(_underwriter);
         emit UnderwriterLiquidated(msg.sender, _underwriter);
     }
 
-    /**
-     * @notice Process a partial or full claim against a policy.
-     * @dev UPDATED: Now takes a `claimAmount` to support partial claims.
-     * @param policyId The ID of the policy being claimed against.
-     * @param claimAmount The amount of the loss to claim. Must be > 0 and <= remaining coverage.
-     */
     function processClaim(uint256 policyId, uint256 claimAmount) external nonReentrant {
         address claimant = policyNFT.ownerOf(policyId);
         if (msg.sender != claimant) revert OnlyPolicyOwner();
@@ -139,26 +133,24 @@ contract RiskManager is Ownable, ReentrancyGuard {
         if (block.timestamp < policy.activation) revert PolicyNotActive();
         if (claimAmount == 0 || claimAmount > policy.coverage) revert InvalidClaimAmount();
 
-        ClaimData memory data = _prepareClaimData(policyId, policy, claimant);
+        ClaimData memory data = _prepareClaimData(policy, claimant);
 
-        // NOTE: The premium payment logic is based on the original contract's pattern.
-        // It assumes the claimant pays a premium proportional to the claim amount.
         _distributePremium(data, claimAmount);
         
-        uint256 lossBorneByPool = _distributeLosses(data, claimAmount);
-        _executePayout(data, claimAmount);
-        _updatePoolState(data, lossBorneByPool, claimAmount);
+        uint256 lossBorneByPool = _distributeLossesAndRecord(data, claimAmount);
+        
+        _executePayout(data, claimAmount, lossBorneByPool);
 
         bool isFullClaim = (claimAmount == policy.coverage);
         
         if (isFullClaim) {
-            // If the full remaining coverage is claimed, burn the policy NFT.
             policyNFT.burn(policyId);
         } else {
-            // For a partial claim, reduce the policy's coverage amount.
-            // NOTE: This requires a new function on the IPolicyNFT interface.
             policyNFT.reduceCoverage(policyId, claimAmount);
         }
+        
+        poolRegistry.updateCoverageSold(policy.poolId, claimAmount, false);
+
 
         emit ClaimProcessed(policyId, claimAmount, isFullClaim);
     }
@@ -186,10 +178,24 @@ contract RiskManager is Ownable, ReentrancyGuard {
         );
     }
 
-    function _distributeLosses(ClaimData memory _data, uint256 _claimAmount) internal returns (uint256) {
-        lossDistributor.distributeLoss(_data.policy.poolId, _claimAmount, _data.totalCapitalPledged);
-
+    /**
+     * @notice Distributes losses by updating the aggregate loss metric in the LossDistributor.
+     * @dev This function is now highly scalable (O(1) complexity regarding underwriters) as it
+     * no longer loops through all underwriters. Individual loss accounting is handled
+     * by the "pull" part of the pattern when an underwriter interacts with the system.
+     */
+    function _distributeLossesAndRecord(ClaimData memory _data, uint256 _claimAmount) internal returns (uint256) {
         uint256 lossBorneByPool = Math.min(_claimAmount, _data.totalCapitalPledged);
+
+        if (lossBorneByPool > 0) {
+            // Step 1: Update the aggregate loss metric in LossDistributor. This is an O(1) operation.
+            lossDistributor.distributeLoss(
+                _data.policy.poolId,
+                lossBorneByPool,
+                _data.totalCapitalPledged
+            );
+        }
+        
         uint256 shortfall = _claimAmount > lossBorneByPool ? _claimAmount - lossBorneByPool : 0;
         if (shortfall > 0) {
             catPool.drawFund(shortfall);
@@ -197,7 +203,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         return lossBorneByPool;
     }
 
-    function _executePayout(ClaimData memory _data, uint256 _claimAmount) internal {
+    function _executePayout(ClaimData memory _data, uint256 _claimAmount, uint256 _lossBorneByPool) internal {
         uint256 claimFee = (_claimAmount * _data.poolClaimFeeBps) / BPS;
         uint256 payoutAmount = _claimAmount > claimFee ? _claimAmount - claimFee : 0;
 
@@ -208,50 +214,30 @@ contract RiskManager is Ownable, ReentrancyGuard {
             feeAmount: claimFee,
             adapters: _data.adapters,
             capitalPerAdapter: _data.capitalPerAdapter,
-            totalCapitalFromPoolLPs: _data.totalCapitalPledged
+            totalCapitalFromPoolLPs: _lossBorneByPool
         });
         capitalPool.executePayout(payoutData);
     }
 
-    function _updatePoolState(ClaimData memory _data, uint256 lossBorneByPool, uint256 _claimAmount) internal {
-        if (lossBorneByPool > 0 && _data.totalCapitalPledged > 0) {
-            for (uint256 i = 0; i < _data.adapters.length; i++) {
-                uint256 adapterLoss = Math.mulDiv(
-                    lossBorneByPool,
-                    _data.capitalPerAdapter[i],
-                    _data.totalCapitalPledged
-                );
-                if (adapterLoss > 0) {
-                    poolRegistry.updateCapitalAllocation(_data.policy.poolId, _data.adapters[i], adapterLoss, false);
-                }
-            }
-        }
-        if (_data.isCoverPool) {
-            uint256 reduction = Math.min(_claimAmount, _data.totalCoverageSold);
-            if (reduction > 0) {
-                poolRegistry.updateCoverageSold(_data.policy.poolId, reduction, false);
-            }
-        }
-    }
-
     function _prepareClaimData(
-        uint256, // _policyId - no longer needed here but kept for signature consistency
         IPolicyNFT.Policy memory _policy,
         address _claimant
     ) internal view returns (ClaimData memory data) {
         data.policy = _policy;
         data.claimant = _claimant;
+        
+        // Fetch dynamic capital data from the single source of truth: UnderwriterManager
         (data.adapters, data.capitalPerAdapter, data.totalCapitalPledged) =
-            poolRegistry.getPoolPayoutData(data.policy.poolId);
+            underwriterManager.getPoolPayoutData(data.policy.poolId);
+        
+        // Fetch static pool configuration from the PoolRegistry
         (
             data.protocolToken,
-            ,
-            data.totalCoverageSold,
-            ,
-            data.isCoverPool,
-            ,
+            , // totalCoverageSold is not needed in this struct
+            , // isPaused is not needed here
+            , // feeRecipient is not needed here
             data.poolClaimFeeBps
-        ) = poolRegistry.getPoolData(data.policy.poolId);
+        ) = poolRegistry.getPoolStaticData(data.policy.poolId);
     }
 
     function _checkInsolvency(address _underwriter) internal view {

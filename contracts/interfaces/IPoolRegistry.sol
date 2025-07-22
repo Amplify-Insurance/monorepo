@@ -23,27 +23,18 @@ interface IPoolRegistry {
 
     enum ProtocolRiskIdentifier { NONE, PROTOCOL_A, PROTOCOL_B, LIDO_STETH, ROCKET_RETH }
 
-    function getPoolData(uint256 poolId) external view returns (
-        IERC20 protocolTokenToCover,
-        uint256 totalCapitalPledgedToPool,
-        uint256 totalCoverageSold,
-        uint256 capitalPendingWithdrawal,
-        bool isPaused,
-        address feeRecipient,
-        uint256 claimFeeBps
-    );
-
     function isYieldRewardPool(uint256 poolId) external view returns (bool);
     function getPoolRateModel(uint256 poolId) external view returns (RateModel memory);
-    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
-    function getPoolActiveAdapters(uint256 poolId) external view returns (address[] memory);
-    function getCapitalPerAdapter(uint256 poolId, address adapter) external view returns (uint256);
     function addProtocolRiskPool(address, RateModel calldata, uint256) external returns (uint256);
-    function updateCapitalAllocation(uint256 poolId, address adapterAddress, uint256 pledgeAmount, bool isAllocation) external;
-    function updateCapitalPendingWithdrawal(uint256 poolId, uint256 amount, bool isRequest) external;
     function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external;
     function getPoolCount() external view returns (uint256);
     function setPauseState(uint256 poolId, bool isPaused) external;
     function setFeeRecipient(uint256 poolId, address recipient) external;
-    function getMultiplePoolData(uint256[] calldata poolIds) external view returns (PoolInfo[] memory);
-}
+    function getPoolStaticData(uint256 poolId) external view returns (
+        IERC20 protocolTokenToCover,
+        uint256 totalCoverageSold,
+        bool isPaused,
+        address feeRecipient,
+        uint256 claimFeeBps
+    );
+    }

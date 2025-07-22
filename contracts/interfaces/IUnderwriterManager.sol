@@ -11,5 +11,9 @@ interface IUnderwriterManager {
     function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) external;
     function settleLossesForUser(address user) external;
     function onLossRealized(address underwriter, uint256 valueLost) external;
+    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256);
+    function capitalPendingWithdrawal(uint256 poolId) external view returns (uint256);
+    function getPoolUnderwriters(uint256 poolId) external view returns (address[] memory);
+    function recordLossAgainstPledge(address underwriter, uint256 poolId, uint256 lossAmount) external;
 
 }
