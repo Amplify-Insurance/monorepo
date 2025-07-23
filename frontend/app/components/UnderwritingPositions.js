@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, Fragment, useMemo } from "react"
-import { TrendingUp, ChevronDown, ChevronUp, Download } from "lucide-react"
+import { TrendingUp, ChevronDown, ChevronUp, Download, Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
@@ -13,6 +13,7 @@ import usePools from "../../hooks/usePools"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { ethers } from "ethers"
 import { getCapitalPoolWithSigner, getUnderlyingAssetDecimals } from "../../lib/capitalPool"
+import { getUnderwriterManagerWithSigner } from "../../lib/underwriterManager"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { getDeployment } from "../config/deployments"
 
@@ -30,6 +31,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [isExecuting, setIsExecuting] = useState(false)
   const [isRequesting, setIsRequesting] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [isDeallocating, setIsDeallocating] = useState(false)
   const [expandedRows, setExpandedRows] = useState([])
   const toggleRow = (id) => {
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -66,6 +68,12 @@ export default function UnderwritingPositions({ displayCurrency }) {
         const positionId = `${d.deployment}-${pid}`
         const withdrawalRequest = withdrawalRequests[positionId]
         const tokenPriceUsd = pool.tokenPriceUsd ?? 1
+        const deallocTs = d.deallocationRequests?.[pid] ?? "0"
+        const deallocationReadyDate =
+          Number(deallocTs) > 0
+            ? (Number(deallocTs) + Number(d.deallocationNoticePeriod || 0)) * 1000
+            : 0
+        const canDeallocate = deallocationReadyDate > 0 && Date.now() >= deallocationReadyDate
         const base = {
           deployment: d.deployment,
           protocol,
@@ -79,6 +87,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
           withdrawalRequestShares: d.totalPendingWithdrawalShares,
           shares: d.masterShares,
           yieldChoice: d.yieldChoice,
+          deallocationReadyDate,
+          canDeallocate,
         }
 
         if (
@@ -212,6 +222,20 @@ export default function UnderwritingPositions({ displayCurrency }) {
       console.error("Failed to cancel withdrawal", err)
     } finally {
       setIsCancelling(false)
+    }
+  }
+
+  const handleDeallocate = async (position) => {
+    setIsDeallocating(true)
+    try {
+      const dep = getDeployment(position.deployment)
+      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
+      const tx = await rm.deallocateFromPool(position.poolId)
+      await tx.wait()
+    } catch (err) {
+      console.error("Failed to deallocate from pool", err)
+    } finally {
+      setIsDeallocating(false)
     }
   }
 
@@ -590,7 +614,18 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                                     d="M6 18L18 6M6 6l12 12"
                                                   />
                                                 </svg>
-                                                {isCancelling ? "Cancelling..." : "Cancel Withdrawal"}
+                                              {isCancelling ? "Cancelling..." : "Cancel Withdrawal"}
+                                              </button>
+                                            )}
+
+                                            {position.canDeallocate && (
+                                              <button
+                                                className="group flex items-center justify-center gap-3 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                onClick={() => handleDeallocate(position)}
+                                                disabled={isDeallocating}
+                                              >
+                                                <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                {isDeallocating ? "Deallocating..." : "Deallocate"}
                                               </button>
                                             )}
                                           </div>
