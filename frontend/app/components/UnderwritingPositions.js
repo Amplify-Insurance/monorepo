@@ -12,7 +12,6 @@ import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 import usePools from "../../hooks/usePools"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { ethers } from "ethers"
-import { getUnderwriterManagerWithSigner } from "../../lib/underwriterManager"
 import { getCapitalPoolWithSigner, getUnderlyingAssetDecimals } from "../../lib/capitalPool"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { getDeployment } from "../config/deployments"
@@ -28,10 +27,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
     return 0n
   }
   const NOTICE_PERIOD = 600 // seconds
-  const [isClaiming, setIsClaiming] = useState(false)
-  const [isClaimingAll, setIsClaimingAll] = useState(false)
-  const [isClaimingDistressed, setIsClaimingDistressed] = useState(false)
-  const [isClaimingAllDistressed, setIsClaimingAllDistressed] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
   const [isRequesting, setIsRequesting] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -44,7 +39,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState(null)
   const [withdrawalRequests, setWithdrawalRequests] = useState({}) // Mock withdrawal requests
-  const [rewardsMap, setRewardsMap] = useState({})
   const { address } = useAccount()
   const { details } = useUnderwriterDetails(address)
   const { pools } = usePools()
@@ -134,33 +128,12 @@ export default function UnderwritingPositions({ displayCurrency }) {
     return positions
   }, [details, pools, withdrawalRequests])
 
-  useEffect(() => {
-    async function loadRewards() {
-      if (!address) return
-      const map = {}
-      for (const pos of underwritingPositions) {
-        try {
-          const res = await fetch(`/api/underwriters/${address}/rewards/${pos.poolId}?deployment=${pos.deployment}`)
-          if (res.ok) {
-            const data = await res.json()
-            const item = (data.rewards || []).find((r) => r.deployment === pos.deployment)
-            map[pos.id] = item ? item.pending : "0"
-          }
-        } catch (err) {
-          console.error("Failed to load pending rewards", err)
-        }
-      }
-      setRewardsMap(map)
-    }
-    loadRewards()
-  }, [address, underwritingPositions])
 
   const protocolPositions = underwritingPositions.filter((p) => p.type === "protocol")
   const stablecoinPositions = underwritingPositions.filter((p) => p.type === "stablecoin")
 
   const showPendingLoss = underwritingPositions.some((p) => p.pendingLoss > 0)
 
-  const hasDistressedAssets = underwritingPositions.some((p) => p.pendingLoss > 0)
 
   const handleIncreasePosition = (position) => {
     setSelectedPosition(position)
@@ -242,87 +215,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
     }
   }
 
-  const handleClaimRewards = async (position) => {
-    setIsClaiming(true)
-    try {
-      const dep = getDeployment(position.deployment)
-      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
-      if (typeof rm.claimPremiumRewards === "function") {
-        await (await rm.claimPremiumRewards([position.poolId])).wait()
-      }
-      if (typeof rm.claimDistressedAssets === "function") {
-        await (await rm.claimDistressedAssets([position.poolId])).wait()
-      }
-    } catch (err) {
-      console.error("Failed to claim rewards", err)
-    } finally {
-      setIsClaiming(false)
-    }
-  }
-
-  const handleClaimAllRewards = async () => {
-    if (underwritingPositions.length === 0) return
-    setIsClaimingAll(true)
-    try {
-      const grouped = underwritingPositions.reduce((acc, p) => {
-        ;(acc[p.deployment] = acc[p.deployment] || []).push(p.poolId)
-        return acc
-      }, {})
-      for (const [depName, ids] of Object.entries(grouped)) {
-        const dep = getDeployment(depName)
-        const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
-        if (typeof rm.claimPremiumRewards === "function") {
-          await (await rm.claimPremiumRewards(ids)).wait()
-        }
-        if (typeof rm.claimDistressedAssets === "function") {
-          await (await rm.claimDistressedAssets(ids)).wait()
-        }
-      }
-    } catch (err) {
-      console.error("Failed to claim all rewards", err)
-    } finally {
-      setIsClaimingAll(false)
-    }
-  }
-
-  const handleClaimDistressed = async (position) => {
-    setIsClaimingDistressed(true)
-    try {
-      const dep = getDeployment(position.deployment)
-      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
-      if (typeof rm.claimDistressedAssets === "function") {
-        await (await rm.claimDistressedAssets([position.poolId])).wait()
-      }
-    } catch (err) {
-      console.error("Failed to claim distressed assets", err)
-    } finally {
-      setIsClaimingDistressed(false)
-    }
-  }
-
-  const handleClaimAllDistressed = async () => {
-    if (underwritingPositions.length === 0) return
-    setIsClaimingAllDistressed(true)
-    try {
-      const grouped = underwritingPositions.reduce((acc, p) => {
-        if (p.pendingLoss > 0) {
-          ;(acc[p.deployment] = acc[p.deployment] || []).push(p.poolId)
-        }
-        return acc
-      }, {})
-      for (const [depName, ids] of Object.entries(grouped)) {
-        const dep = getDeployment(depName)
-        const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
-        if (typeof rm.claimDistressedAssets === "function") {
-          await (await rm.claimDistressedAssets(ids)).wait()
-        }
-      }
-    } catch (err) {
-      console.error("Failed to claim all distressed assets", err)
-    } finally {
-      setIsClaimingAllDistressed(false)
-    }
-  }
 
   // Calculate total yield and value
   const weightedYield = underwritingPositions.reduce((sum, position) => sum + position.yield * position.nativeValue, 0)
@@ -600,14 +492,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                             Position Metrics
                                           </h4>
                                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800/30">
-                                              <div className="text-emerald-700 dark:text-emerald-400 text-sm font-medium">
-                                                Pending Rewards
-                                              </div>
-                                              <div className="text-emerald-900 dark:text-emerald-300 text-lg font-bold">
-                                                {(Number(rewardsMap[position.id] || 0) / 1e18).toFixed(4)}
-                                              </div>
-                                            </div>
                                             <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800/30">
                                               <div className="text-blue-700 dark:text-blue-400 text-sm font-medium">
                                                 Yield APY
@@ -675,26 +559,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                             Quick Actions
                                           </h4>
                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <button
-                                              className="group flex items-center justify-center gap-3 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                              onClick={() => handleClaimRewards(position)}
-                                              disabled={isClaiming}
-                                            >
-                                              <svg
-                                                className="w-5 h-5 group-hover:scale-110 transition-transform"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                                                />
-                                              </svg>
-                                              {isClaiming ? "Claiming..." : "Claim Rewards"}
-                                            </button>
 
                                             {position.status === "withdrawal ready" && (
                                               <button
@@ -773,28 +637,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                               View Pool Details
                                             </Link>
 
-                                            {position.pendingLoss > 0 && (
-                                              <button
-                                                className="group w-full flex items-center gap-3 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50"
-                                                onClick={() => handleClaimDistressed(position)}
-                                                disabled={isClaimingDistressed}
-                                              >
-                                                <svg
-                                                  className="w-5 h-5 group-hover:scale-110 transition-transform"
-                                                  fill="none"
-                                                  stroke="currentColor"
-                                                  viewBox="0 0 24 24"
-                                                >
-                                                  <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                                                  />
-                                                </svg>
-                                                {isClaimingDistressed ? "Claiming..." : "Claim Distressed"}
-                                              </button>
-                                            )}
                                           </div>
                                         </div>
 
@@ -934,17 +776,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
         {renderTables(protocolPositions, "Protocol Cover")}
         {stablecoinPositions.some((p) => p.status === "active") &&
           renderTables(stablecoinPositions, "Stablecoin Cover")}
-        {hasDistressedAssets && (
-          <div className="mt-4 flex justify-end">
-            <button
-              onClick={handleClaimAllDistressed}
-              disabled={isClaimingAllDistressed}
-              className="mr-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md"
-            >
-              {isClaimingAllDistressed ? "Claiming..." : "Claim All Distressed"}
-            </button>
-          </div>
-        )}
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             onClick={() => setShowAllocModal(true)}
@@ -991,13 +822,6 @@ export default function UnderwritingPositions({ displayCurrency }) {
             className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Request Withdrawal
-          </button>
-          <button
-            onClick={handleClaimAllRewards}
-            disabled={isClaimingAll}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
-          >
-            {isClaimingAll ? "Claiming..." : "Claim All Rewards"}
           </button>
         </div>
 
