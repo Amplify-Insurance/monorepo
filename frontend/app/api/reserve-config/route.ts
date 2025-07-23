@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
     const calls = [
       { target: dep.policyManager, callData: pm.interface.encodeFunctionData('coverCooldownPeriod') },
-      { target: dep.poolRegistry, callData: pr.interface.encodeFunctionData('getPoolData', [0]) },
+      { target: dep.poolRegistry, callData: pr.interface.encodeFunctionData('getPoolStaticData', [0]) },
       { target: dep.capitalPool, callData: cp.interface.encodeFunctionData('underwriterNoticePeriod') },
     ]
 
@@ -29,9 +29,9 @@ export async function GET(req: Request) {
       ? pm.interface.decodeFunctionResult('coverCooldownPeriod', res[0].returnData)[0]
       : 0n
     const poolData = res[1].success
-      ? pr.interface.decodeFunctionResult('getPoolData', res[1].returnData)
+      ? pr.interface.decodeFunctionResult('getPoolStaticData', res[1].returnData)
       : null
-    const claimFee = poolData ? (poolData.claimFeeBps ?? poolData[6]) : 0n
+    const claimFee = poolData ? (poolData.claimFeeBps ?? poolData[4]) : 0n
     const notice = res[2].success
       ? cp.interface.decodeFunctionResult('underwriterNoticePeriod', res[2].returnData)[0]
       : 0n

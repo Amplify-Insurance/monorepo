@@ -28,7 +28,6 @@ export async function GET(
         const baseCalls = [
           { target: dep.capitalPool, callData: cp.interface.encodeFunctionData('getUnderwriterAccount', [addr]) },
           { target: dep.poolRegistry, callData: pr.interface.encodeFunctionData('getPoolCount') },
-          { target: dep.underwriterManager, callData: rm.interface.encodeFunctionData('underwriterTotalPledge', [addr]) },
         ]
         const baseResults = await multicall.tryAggregate(false, baseCalls)
 
@@ -62,16 +61,11 @@ export async function GET(
         }
         if (!baseResults[1].success) {
           while (true) {
-            try { await pr.getPoolData(poolCount); poolCount++ } catch { break }
+            try { await pr.getPoolStaticData(poolCount); poolCount++ } catch { break }
           }
         }
 
-        let pledge = 0n
-        if (baseResults[2].success) {
-          try {
-            pledge = rm.interface.decodeFunctionResult('underwriterTotalPledge', baseResults[2].returnData)[0]
-          } catch {}
-        }
+        const pledge = account[0]
 
         const allocCalls: { target: string; callData: string }[] = []
         for (let i = 0; i < Number(poolCount); i++) {

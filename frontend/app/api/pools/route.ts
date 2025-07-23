@@ -13,7 +13,7 @@ export async function GET() {
     } catch {
       while (true) {
         console.log('getPoolCount: null');
-        try { await poolRegistry.getPoolData(count); count++; } catch { break; }
+        try { await poolRegistry.getPoolStaticData(count); count++; } catch { break; }
       }
     }
     return NextResponse.json({ count: Number(count) });

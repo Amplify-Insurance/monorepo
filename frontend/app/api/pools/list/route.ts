@@ -8,6 +8,7 @@ import {
   getUnderlyingAssetAddress,
   getUnderlyingAssetDecimals,
 } from "../../../../lib/capitalPool";
+import { getUnderwriterManager } from "../../../../lib/underwriterManager";
 import bnToString from "../../../../lib/bnToString";
 import { ethers } from "ethers";
 import deployments from "../../../config/deployments";
@@ -76,6 +77,7 @@ export async function GET() {
     const poolRegistry = getPoolRegistry(dep.poolRegistry, dep.name);
     const policyManager = getPolicyManager(dep.policyManager, dep.name);
     const priceOracle = getPriceOracle(dep.priceOracle, dep.name);
+    const underwriterManager = getUnderwriterManager(dep.underwriterManager, dep.name);
     try {
       /* 1️⃣ How many pools exist? */
       let count = 0n;
@@ -85,7 +87,7 @@ export async function GET() {
         // Fallback: iterate until call‑revert when the length function is absent.
         while (true) {
           try {
-            await poolRegistry.getPoolData(count);
+            await poolRegistry.getPoolStaticData(count);
             count++;
           } catch {
             break;
@@ -123,9 +125,10 @@ export async function GET() {
       for (let i = 0; i < Number(count); i++) {
         poolCalls.push({
           target: dep.poolRegistry,
-          callData: poolRegistry.interface.encodeFunctionData("getPoolData", [
-            i,
-          ]),
+          callData: poolRegistry.interface.encodeFunctionData(
+            "getPoolStaticData",
+            [i]
+          ),
         });
         poolCalls.push({
           target: dep.poolRegistry,
@@ -134,33 +137,56 @@ export async function GET() {
             [i]
           ),
         });
+        poolCalls.push({
+          target: dep.underwriterManager,
+          callData: underwriterManager.interface.encodeFunctionData(
+            "totalCapitalPledgedToPool",
+            [i]
+          ),
+        });
+        poolCalls.push({
+          target: dep.underwriterManager,
+          callData: underwriterManager.interface.encodeFunctionData(
+            "capitalPendingWithdrawal",
+            [i]
+          ),
+        });
       }
 
       const poolResults = await multicall.tryAggregate(true, poolCalls);
 
       for (let i = 0; i < Number(count); i++) {
-        const dataRes = poolResults[2 * i];
-        const rateRes = poolResults[2 * i + 1];
+        const dataRes = poolResults[4 * i];
+        const rateRes = poolResults[4 * i + 1];
+        const totalRes = poolResults[4 * i + 2];
+        const pendingRes = poolResults[4 * i + 3];
         if (!dataRes.success || !rateRes.success) continue;
         try {
-        const dataDec = poolRegistry.interface.decodeFunctionResult(
-            "getPoolData",
-            dataRes.returnData
+          const dataDec = poolRegistry.interface.decodeFunctionResult(
+            "getPoolStaticData",
+            dataRes.returnData,
           );
           const rateDec = poolRegistry.interface.decodeFunctionResult(
             "getPoolRateModel",
-            rateRes.returnData
+            rateRes.returnData,
           );
+          const [totalDec] = underwriterManager.interface.decodeFunctionResult(
+            "totalCapitalPledgedToPool",
+            totalRes.returnData,
+          );
+          const [pendingDec] = underwriterManager.interface.decodeFunctionResult(
+            "capitalPendingWithdrawal",
+            pendingRes.returnData,
+          );
+
           const rawInfo = {
             protocolTokenToCover: dataDec.protocolTokenToCover ?? dataDec[0],
-            totalCapitalPledgedToPool:
-              dataDec.totalCapitalPledgedToPool ?? dataDec[1],
-            totalCoverageSold: dataDec.totalCoverageSold ?? dataDec[2],
-            capitalPendingWithdrawal:
-              dataDec.capitalPendingWithdrawal ?? dataDec[3],
-            isPaused: dataDec.isPaused ?? dataDec[4],
-            feeRecipient: dataDec.feeRecipient ?? dataDec[5],
-            claimFeeBps: dataDec.claimFeeBps ?? dataDec[6],
+            totalCoverageSold: dataDec.totalCoverageSold ?? dataDec[1],
+            isPaused: dataDec.isPaused ?? dataDec[2],
+            feeRecipient: dataDec.feeRecipient ?? dataDec[3],
+            claimFeeBps: dataDec.claimFeeBps ?? dataDec[4],
+            totalCapitalPledgedToPool: totalDec,
+            capitalPendingWithdrawal: pendingDec,
             rateModel: rateDec[0],
           };
           const info = bnToString(rawInfo);
