@@ -18,10 +18,10 @@ export default function useReserveConfig(deployment, poolId = 0) {
         const pm = getPolicyManager(dep.policyManager, dep.name)
         const [cooldown, poolData, notice] = await Promise.all([
           pm.coverCooldownPeriod(),
-          pr.getPoolData(poolId),
+          pr.getPoolStaticData(poolId),
           cp.underwriterNoticePeriod(),
         ])
-        const claimFee = poolData.claimFeeBps ?? poolData[6]
+        const claimFee = poolData.claimFeeBps ?? poolData[4]
         setConfig({
           coverCooldownPeriod: Number(cooldown.toString()),
           claimFeeBps: Number(claimFee.toString()),

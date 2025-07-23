@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 // import your provider and contract instances
 import { getPoolRegistry } from '../../../../lib/poolRegistry';
+import { getUnderwriterManager } from '../../../../lib/underwriterManager';
 import deployments from '../../../config/deployments';
 
 export async function GET(
@@ -16,16 +17,20 @@ export async function GET(
 
   for (const dep of deployments) {
     const poolRegistry = getPoolRegistry(dep.poolRegistry, dep.name);
+    const rm = getUnderwriterManager(dep.underwriterManager, dep.name);
     try {
-      const data = await poolRegistry.getPoolData(idNum);
+      const data = await poolRegistry.getPoolStaticData(idNum);
       const rate = await poolRegistry.getPoolRateModel(idNum);
+      const total = await rm.totalCapitalPledgedToPool(idNum);
+      const pending = await rm.capitalPendingWithdrawal(idNum);
       const poolInfo = {
         protocolTokenToCover: data[0],
-        totalCapitalPledgedToPool: data[1],
-        totalCoverageSold: data[2],
-        capitalPendingWithdrawal: data[3],
-        isPaused: data[4],
-        feeRecipient: data[5],
+        totalCoverageSold: data[1],
+        isPaused: data[2],
+        feeRecipient: data[3],
+        claimFeeBps: data[4],
+        totalCapitalPledgedToPool: total.toString(),
+        capitalPendingWithdrawal: pending.toString(),
         rateModel: rate,
       };
       return NextResponse.json({ id: idNum, deployment: dep.name, poolInfo });
