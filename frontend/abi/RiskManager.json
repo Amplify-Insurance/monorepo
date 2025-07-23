@@ -2,7 +2,7 @@
   "_format": "hh-sol-artifact-1",
   "contractName": "RiskManager",
   "sourceName": "contracts/core/RiskManager.sol",
-  "abi": [
+  "abi":[
     {
       "inputs": [
         {
@@ -13,6 +13,33 @@
       ],
       "stateMutability": "nonpayable",
       "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "target",
+          "type": "address"
+        }
+      ],
+      "name": "AddressEmptyCode",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "AddressInsufficientBalance",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FailedInnerCall",
+      "type": "error"
     },
     {
       "inputs": [],

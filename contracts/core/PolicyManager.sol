@@ -22,6 +22,7 @@ import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
  * @title PolicyManager
  * @author Gemini
  * @notice Handles policy lifecycle. Updated to fetch capital data from UnderwriterManager.
+ * @dev CORRECTED: Added clearIncreasesAndGetPendingAmount to be called by RiskManager during claims.
  */
 contract PolicyManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -67,6 +68,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     error PolicyNotActive();
     error AddressesNotSet();
     error TooManyPendingIncreases();
+    error NotRiskManager(); // NEW
 
     /* ───────────────────────── Events ──────────────────────────── */
     event AddressesSet(address indexed registry, address indexed capital, address indexed rewards, address rm, address um);
@@ -81,6 +83,12 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         policyNFT = IPolicyNFT(_policyNFT);
     }
 
+    /* ───────────────────── Modifiers ───────────────────── */
+    modifier onlyRiskManager() {
+        require(msg.sender == address(riskManager), "PM: Caller is not the RiskManager");
+        _;
+    }
+
     /* ───────────────────── Admin Functions ───────────────────── */
 
     function setAddresses(
@@ -89,10 +97,10 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         address cat,
         address rewards,
         address rm,
-        address um // <-- NEW
+        address um
     ) external onlyOwner {
         if (registry == address(0) || capital == address(0) || cat == address(0) ||
-            rewards == address(0) || rm == address(0) || um == address(0)) { // <-- NEW
+            rewards == address(0) || rm == address(0) || um == address(0)) {
             revert AddressesNotSet();
         }
         poolRegistry = IPoolRegistry(registry);
@@ -100,7 +108,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         catPool = IBackstopPool(cat);
         rewardDistributor = IRewardDistributor(rewards);
         riskManager = IRiskManagerPMHook(rm);
-        underwriterManager = IUnderwriterManager(um); // <-- NEW
+        underwriterManager = IUnderwriterManager(um);
         emit AddressesSet(registry, capital, rewards, rm, um);
     }
 
@@ -145,7 +153,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
             uint128(activationTimestamp)
         );
 
-        poolRegistry.updateCoverageSold(poolId, coverageAmount, true);
+        riskManager.updateCoverageSold(poolId, coverageAmount, true);
     }
 
     function addPremium(uint256 policyId, uint256 amount) external nonReentrant {
@@ -191,7 +199,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         pendingIncreaseListHead[policyId] = nodeId;
         pendingCoverageSum[policyId] += additionalCoverage;
 
-        poolRegistry.updateCoverageSold(pol.poolId, additionalCoverage, true);
+        riskManager.updateCoverageSold(pol.poolId, additionalCoverage, true);
 
         emit CoverIncreaseRequested(policyId, additionalCoverage, activateAt);
     }
@@ -225,18 +233,34 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         _terminatePolicy(policyId, pol);
     }
 
+    /* ───────────────── Trusted Functions ───────────────── */
+
+    /**
+     * @notice Called by the RiskManager during claim processing to clear any pending increases.
+     * @dev This is a crucial step to prevent orphaned liability on the books when a policy is terminated.
+     * @param policyId The ID of the policy whose pending increases should be cleared.
+     * @return totalCancelled The total amount of coverage from the pending increases that were cancelled.
+     */
+    function clearIncreasesAndGetPendingAmount(uint256 policyId)
+        external
+        onlyRiskManager
+        returns (uint256 totalCancelled)
+    {
+        return _clearAllPendingIncreases(policyId);
+    }
+
+    /* ───────────────── Internal Helpers ────────────────────────── */
+
     function _terminatePolicy(uint256 policyId, IPolicyNFT.Policy memory pol) internal {
         uint256 pendingToCancel = _clearAllPendingIncreases(policyId);
         uint256 totalToReduce = pol.coverage + pendingToCancel;
 
         if (totalToReduce > 0) {
-            poolRegistry.updateCoverageSold(pol.poolId, totalToReduce, false);
+            riskManager.updateCoverageSold(pol.poolId, totalToReduce, false);
         }
 
         policyNFT.burn(policyId);
     }
-
-    /* ───────────────── Internal Helpers ────────────────────────── */
 
     function _clearAllPendingIncreases(uint256 policyId) internal returns (uint256 totalCancelled) {
         totalCancelled = pendingCoverageSum[policyId];
@@ -342,6 +366,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         if (catAmt > 0) {
             IERC20 asset = capitalPool.underlyingAsset();
             asset.safeTransfer(address(catPool), catAmt);
+            // This assumes the BackstopPool has been corrected to not pull funds again.
             catPool.receiveUsdcPremium(catAmt);
         }
 

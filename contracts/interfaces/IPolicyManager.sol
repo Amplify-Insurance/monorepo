@@ -5,4 +5,5 @@ import "./IPolicyNFT.sol";
 
 interface IPolicyManager {
     function policyNFT() external view returns (IPolicyNFT);
+    function clearIncreasesAndGetPendingAmount(uint256 policyId) external returns (uint256 totalCancelled);
 }
