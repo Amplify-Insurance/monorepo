@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Plus, Info } from "lucide-react"
+import { Plus, Info, Coins } from "lucide-react"
 import Image from "next/image"
 import Modal from "./Modal"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
@@ -15,11 +15,12 @@ export default function IncreasePositionModal({ isOpen, onClose, position, displ
   const { address } = useAccount()
   const [amount, setAmount] = useState("")
   const [walletBalance, setWalletBalance] = useState(0)
+  const [assetName, setAssetName] = useState("")
+  const [assetLogo, setAssetLogo] = useState("/placeholder.svg")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [txHash, setTxHash] = useState("")
   const [error, setError] = useState("")
 
-  const tokenName = position ? getTokenName(position.pool) : ""
   const tokenPrice = 1 // Mock price - replace with actual price hook
 
   useEffect(() => {
@@ -35,6 +36,8 @@ export default function IncreasePositionModal({ isOpen, onClose, position, displ
         const bal = await tokenContract.balanceOf(address)
         const human = Number(ethers.utils.formatUnits(bal, dec))
         setWalletBalance(human)
+        setAssetName(getTokenName(assetAddr))
+        setAssetLogo(getTokenLogo(assetAddr))
       } catch (err) {
         console.error("Failed to fetch wallet balance", err)
         setError("Could not fetch wallet balance.")
@@ -100,16 +103,10 @@ export default function IncreasePositionModal({ isOpen, onClose, position, displ
         {/* Current Position Info */}
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
           <div className="flex items-center space-x-3 mb-3">
-            <Image
-              src={getTokenLogo(position.pool) || "/placeholder.svg"}
-              alt={tokenName}
-              width={32}
-              height={32}
-              className="rounded-full"
-            />
+            <Coins className="w-8 h-8 text-blue-600 dark:text-blue-400" />
             <div>
-              <h4 className="font-medium text-blue-900 dark:text-blue-100">{position.protocol}</h4>
-              <p className="text-sm text-blue-600 dark:text-blue-400">{tokenName} Pool</p>
+              <h4 className="font-medium text-blue-900 dark:text-blue-100">All Pools</h4>
+              <p className="text-sm text-blue-600 dark:text-blue-400">{assetName}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -154,14 +151,14 @@ export default function IncreasePositionModal({ isOpen, onClose, position, displ
               <div className="flex items-center ml-2">
                 <div className="h-6 w-6 mr-2">
                   <Image
-                    src={getTokenLogo(position.pool) || "/placeholder.svg"}
-                    alt={tokenName}
+                    src={assetLogo}
+                    alt={assetName}
                     width={24}
                     height={24}
                     className="rounded-full"
                   />
                 </div>
-                <span className="text-base font-medium text-gray-900 dark:text-white">{tokenName}</span>
+                <span className="text-base font-medium text-gray-900 dark:text-white">{assetName}</span>
               </div>
             </div>
             <div className="flex justify-between items-center px-3 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
