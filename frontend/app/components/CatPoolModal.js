@@ -297,12 +297,12 @@ export default function CatPoolModal({
           )}
         </div>
 
-        {/* Action Button */}
-        {isDeposit && needsApproval ? (
+        {/* Action Buttons */}
+        {isDeposit && needsApproval && (
           <button
             onClick={handleApprove}
             disabled={isApproving || !amount || Number.parseFloat(amount) <= 0}
-            className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="w-full py-4 mb-3 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             {isApproving ? (
               <div className="flex items-center justify-center space-x-2">
@@ -313,22 +313,26 @@ export default function CatPoolModal({
               `Approve ${symbol}`
             )}
           </button>
-        ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !amount || Number.parseFloat(amount) <= 0}
-            className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
-          >
-            {isSubmitting ? (
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Processing...</span>
-              </div>
-            ) : (
-              `${isDeposit ? "Deposit" : "Withdraw"} ${symbol}`
-            )}
-          </button>
         )}
+        <button
+          onClick={handleSubmit}
+          disabled={
+            isSubmitting ||
+            !amount ||
+            Number.parseFloat(amount) <= 0 ||
+            (isDeposit && needsApproval)
+          }
+          className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+        >
+          {isSubmitting ? (
+            <div className="flex items-center justify-center space-x-2">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Processing...</span>
+            </div>
+          ) : (
+            `${isDeposit ? "Deposit" : "Withdraw"} ${symbol}`
+          )}
+        </button>
         {txHash && (
           <p className="text-xs text-center mt-2">
             Transaction submitted.{' '}
