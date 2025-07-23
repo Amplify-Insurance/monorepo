@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: { params: { address: string
       const pr = getPoolRegistry(dep.poolRegistry, dep.name)
       try {
         const pool = await pr.getPoolData(id)
-        const pledge = await rm.underwriterTotalPledge(addr)
+        const pledge = await rm.underwriterPoolPledge(addr, id)
         const pending = await rd.pendingRewards(addr, id, pool.protocolTokenToCover, pledge)
         results.push({ deployment: dep.name, rewardToken: pool.protocolTokenToCover, pending: pending.toString() })
       } catch {}
