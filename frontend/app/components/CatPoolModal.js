@@ -36,7 +36,7 @@ export default function CatPoolModal({
     minimumFractionDigits: 2,
   })
 
-  const [tokenAddr, setTokenAddr] = useState(token || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") // default USDC
+  const [tokenAddr, setTokenAddr] = useState(token || "0xDB17B0Db251013464C6f9E2477ba79bCe5d8DCE3") // default USDC
 
   const handleAmountChange = (e) => {
     const value = e.target.value

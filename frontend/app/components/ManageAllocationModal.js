@@ -116,7 +116,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
         for (const id of toDeallocate) {
           const pledge = await rm.underwriterPoolPledge(signerAddr, id)
           if (pledge > 0) {
-            const reqTx = await rm.requestDeallocateFromPool(id, pledge)
+            const reqTx = await rm.requestDeallocateFromPool(id)
             setTxHash(reqTx.hash)
             await reqTx.wait()
 
