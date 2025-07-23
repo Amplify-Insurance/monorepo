@@ -90,7 +90,7 @@ export async function GET(
         for (const id of allocatedPoolIds) {
           lossCalls.push({
             target: dep.lossDistributor,
-            callData: ld.interface.encodeFunctionData('getPendingLosses', [addr, BigInt(id), pledge]),
+            callData: ld.interface.encodeFunctionData('getProspectiveLosses', [addr, BigInt(id), pledge]),
           })
         }
 
@@ -100,7 +100,7 @@ export async function GET(
         for (let i = 0; i < lossResults.length; i++) {
           if (!lossResults[i].success) continue
           try {
-            const [loss] = ld.interface.decodeFunctionResult('getPendingLosses', lossResults[i].returnData)
+            const [loss] = ld.interface.decodeFunctionResult('getProspectiveLosses', lossResults[i].returnData)
             pendingLosses[allocatedPoolIds[i]] = loss.toString()
           } catch {}
         }

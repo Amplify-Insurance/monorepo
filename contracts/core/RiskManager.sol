@@ -155,10 +155,10 @@ contract RiskManager is Ownable, ReentrancyGuard {
         emit ClaimProcessed(policyId, claimAmount, isFullClaim);
     }
 
-    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external {
-        if (msg.sender != policyManager) revert NotPolicyManager();
-        poolRegistry.updateCoverageSold(poolId, amount, isSale);
-    }
+    // function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external {
+    //     if (msg.sender != policyManager) revert NotPolicyManager();
+    //     poolRegistry.updateCoverageSold(poolId, amount, isSale);
+    // }
 
     // --- Internal Functions ---
 

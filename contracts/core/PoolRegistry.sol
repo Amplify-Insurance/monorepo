@@ -65,6 +65,11 @@ contract PoolRegistry is IPoolRegistry, Ownable {
         _;
     }
 
+
+    modifier onlyApproved() {
+        require(msg.sender == policyManager || msg.sender == riskManager , "PR: Not Approved");
+        _;
+    }
     // --- Constructor ---
 
     constructor(address initialOwner, address riskManagerAddress, address policyManagerAddress) Ownable(initialOwner) {
@@ -140,7 +145,7 @@ contract PoolRegistry is IPoolRegistry, Ownable {
      * @notice Updates the total amount of coverage sold for a given pool.
      * @dev This function is now restricted to the PolicyManager, which is responsible for selling policies.
      */
-    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external onlyPolicyManager {
+    function updateCoverageSold(uint256 poolId, uint256 amount, bool isSale) external onlyApproved {
         require(poolId < protocolRiskPools.length, "PR: Invalid poolId");
         PoolData storage pool = protocolRiskPools[poolId];
         if (isSale) {

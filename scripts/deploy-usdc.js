@@ -97,8 +97,13 @@ async function main() {
   await policyNFT.waitForDeployment();
   console.log("PolicyNFT deployed to:", policyNFT.target);
 
+  const PolicyManager = await ethers.getContractFactory("PolicyManager");
+  const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
+  await policyManager.waitForDeployment();
+  console.log("PolicyManager deployed to:", policyManager.target);
+
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
-  const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target, underwriterManager.target);
+  const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target, policyManager.target);
   await poolRegistry.waitForDeployment();
   console.log("PoolRegistry deployed to:", poolRegistry.target);
 
@@ -112,10 +117,6 @@ async function main() {
   await lossDistributor.waitForDeployment();
   console.log("LossDistributor deployed to:", lossDistributor.target);
 
-  const PolicyManager = await ethers.getContractFactory("PolicyManager");
-  const policyManager = await PolicyManager.deploy(policyNFT.target, deployer.address);
-  await policyManager.waitForDeployment();
-  console.log("PolicyManager deployed to:", policyManager.target);
   
   const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
   const rewardDistributor = await RewardDistributor.deploy(poolRegistry.target, policyManager.target, capitalPool.target, underwriterManager.target, riskManager.target );

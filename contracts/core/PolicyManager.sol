@@ -145,7 +145,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
             uint128(activationTimestamp)
         );
 
-        riskManager.updateCoverageSold(poolId, coverageAmount, true);
+        poolRegistry.updateCoverageSold(poolId, coverageAmount, true);
     }
 
     function addPremium(uint256 policyId, uint256 amount) external nonReentrant {
@@ -191,7 +191,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         pendingIncreaseListHead[policyId] = nodeId;
         pendingCoverageSum[policyId] += additionalCoverage;
 
-        riskManager.updateCoverageSold(pol.poolId, additionalCoverage, true);
+        poolRegistry.updateCoverageSold(pol.poolId, additionalCoverage, true);
 
         emit CoverIncreaseRequested(policyId, additionalCoverage, activateAt);
     }
@@ -230,7 +230,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         uint256 totalToReduce = pol.coverage + pendingToCancel;
 
         if (totalToReduce > 0) {
-            riskManager.updateCoverageSold(pol.poolId, totalToReduce, false);
+            poolRegistry.updateCoverageSold(pol.poolId, totalToReduce, false);
         }
 
         policyNFT.burn(policyId);

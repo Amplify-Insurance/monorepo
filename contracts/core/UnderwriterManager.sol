@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.20;
 
+// OpenZeppelin Imports
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-// --- Interfaces ---
+// --- Interface Imports ---
 import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
 import {ICapitalPool} from "../interfaces/ICapitalPool.sol";
 import {IBackstopPool} from "../interfaces/IBackstopPool.sol";
@@ -34,13 +35,16 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     address public riskManager;
 
     /* ────────────────── State: Underwriter-Specific ────────────────── */
-    // NOTE: `underwriterTotalPledge` has been removed to prevent data duplication.
-    // The user's total capital is now read directly from the CapitalPool.
     mapping(address => mapping(uint256 => uint256)) public underwriterPoolPledge;
     mapping(address => uint256[]) public underwriterAllocations;
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
     mapping(address => mapping(uint256 => uint256)) public underwriterAllocationIndex;
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
+    
+    // --- NEW ---
+    // Tracks the value of capital that an underwriter has requested to withdraw
+    // but has not yet executed. This capital is considered encumbered.
+    mapping(address => uint256) public underwriterPendingWithdrawalValue;
 
     /* ───────────────── State: Pool & Adapter Aggregates ──────────────── */
     mapping(uint256 => uint256) public totalCapitalPledgedToPool;
@@ -128,12 +132,10 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     /* ──────────────── Underwriter Capital Management ──────────────── */
 
     function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
-        // _prepareAllocateCapital now reads directly from CapitalPool
-        (uint256 totalCapitalToPledge, address adapter) = _prepareAllocateCapital(poolIds);
+        (uint256 availableCapitalToPledge, address adapter) = _prepareAllocateCapital(poolIds);
         
-        // This logic assumes 100% of capital is pledged to each listed pool.
         for (uint256 i = 0; i < poolIds.length; i++) {
-            _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
+            _executeAllocation(poolIds[i], availableCapitalToPledge, adapter);
         }
     }
 
@@ -169,75 +171,69 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /* ───────────────── Hooks & State Updaters ───────────────── */
     
-    function recordLossAgainstPledge(address underwriter, uint256 poolId, uint256 lossAmount) external onlyRiskManager {
-        if (lossAmount == 0) return;
+    function onWithdrawalRequested(address underwriter, uint256 valueToWithdraw) external onlyCapitalPool {
+        underwriterPendingWithdrawalValue[underwriter] += valueToWithdraw;
+    }
 
-        uint256 pledgeInPool = underwriterPoolPledge[underwriter][poolId];
-        address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
-        require(adapter != address(0), "User has no yield adapter");
-
-        uint256 poolLoss = Math.min(pledgeInPool, lossAmount);
-
-        // Reduce the specific pool pledge and its aggregate accounting.
-        // There is no `underwriterTotalPledge` to update anymore.
-        underwriterPoolPledge[underwriter][poolId] -= poolLoss;
-        totalCapitalPledgedToPool[poolId] -= poolLoss;
-        capitalPerAdapter[poolId][adapter] -= poolLoss;
-
-        if (capitalPerAdapter[poolId][adapter] == 0) {
-            _removeAdapterFromPool(poolId, adapter);
+    function onWithdrawalCancelled(address underwriter, uint256 valueCancelled) external onlyCapitalPool {
+        uint256 pending = underwriterPendingWithdrawalValue[underwriter];
+        if (pending >= valueCancelled) {
+            underwriterPendingWithdrawalValue[underwriter] = pending - valueCancelled;
+        } else {
+            underwriterPendingWithdrawalValue[underwriter] = 0;
         }
-        
-        if (underwriterPoolPledge[underwriter][poolId] == 0) {
-            _removeUnderwriterFromPool(underwriter, poolId);
-        }
+    }
 
-        emit LossRecorded(underwriter, poolId, poolLoss);
+    /**
+     * @notice Settles all pending losses for a specific underwriter.
+     * @dev Called by the CapitalPool before a withdrawal is executed to ensure
+     * the user's capital is reduced by any incurred losses first.
+     * @param user The address of the underwriter to settle losses for.
+     */
+    function settleLossesForUser(address user) external onlyCapitalPool {
+        _realizeLossesForAllPools(user);
     }
 
     function onCapitalDeposited(address underwriter, uint256 amount) external onlyCapitalPool nonReentrant {
-        // Realize any pending losses before potential pledge adjustments.
         _realizeLossesForAllPools(underwriter);
-        
-        // `underwriterTotalPledge` is no longer tracked here.
-        // Optional logic could be added to proportionally increase existing pledges based
-        // on the new total capital, which would be read from CapitalPool.
+        // Optional: Logic to auto-increase pledges can be added here.
     }
 
     function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) external onlyCapitalPool nonReentrant {
-        // Get the state of capital *after* the withdrawal from the source of truth.
-        (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
-
-        // Reconstruct the state of capital *before* the withdrawal to do proportional math.
-        uint256 principalBefore = principalAfter + principalComponentRemoved;
-        if (principalBefore == 0) return;
-
-        uint256[] memory allocations = underwriterAllocations[underwriter];
-        if (allocations.length > 0) {
-            address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
-            require(adapter != address(0), "User has no yield adapter");
-
-            for (uint256 i = 0; i < allocations.length; i++) {
-                uint256 poolId = allocations[i];
-                uint256 poolPledgeBefore = underwriterPoolPledge[underwriter][poolId];
-                if (poolPledgeBefore > 0) {
-                    // Proportionally reduce the pledge for this pool based on the % of capital withdrawn.
-                    uint256 reduction = Math.mulDiv(poolPledgeBefore, principalComponentRemoved, principalBefore);
-                    underwriterPoolPledge[underwriter][poolId] -= reduction;
-                    totalCapitalPledgedToPool[poolId] -= reduction;
-                    capitalPerAdapter[poolId][adapter] -= reduction;
-                }
-            }
+        // Decrease the pending withdrawal value now that the withdrawal has been executed.
+        uint256 pending = underwriterPendingWithdrawalValue[underwriter];
+        if (pending >= principalComponentRemoved) {
+            underwriterPendingWithdrawalValue[underwriter] = pending - principalComponentRemoved;
+        } else {
+            underwriterPendingWithdrawalValue[underwriter] = 0;
         }
+
+        // Proportionally reduce all pledges to reflect the capital removal.
+        _proportionallyReduceAllPledges(underwriter, principalComponentRemoved);
         
         if (isFullWithdrawal) {
             _handleFullWithdrawalCleanup(underwriter);
         }
     }
 
-    function onLossRealized(address, uint256) external onlyCapitalPool {
-        // This function is intentionally left blank for pledge updates.
-        // The `recordLossAgainstPledge` function is the primary entry point for recording losses against pledges.
+    /**
+     * @notice Hook called by CapitalPool after an underwriter's shares are burned for a loss.
+     * @dev Reduces all of the underwriter's pledges proportionally to the capital lost.
+     * Also handles cleanup if the loss wipes out the underwriter's entire stake.
+     * @param underwriter The address of the underwriter who incurred the loss.
+     * @param marketValueLost The value of the capital lost, equivalent to burned shares.
+     */
+    function onLossRealized(address underwriter, uint256 marketValueLost) external onlyCapitalPool {
+        // 1. Proportionally reduce all pledges based on the value lost.
+        _proportionallyReduceAllPledges(underwriter, marketValueLost);
+
+        // 2. Check if the user's stake was completely wiped out.
+        (, , uint256 sharesAfter, ) = capitalPool.getUnderwriterAccount(underwriter);
+
+        // 3. If so, run the same cleanup logic as a full withdrawal.
+        if (sharesAfter == 0) {
+            _handleFullWithdrawalCleanup(underwriter);
+        }
     }
 
     /* ───────────────── View Functions ───────────────── */
@@ -260,6 +256,29 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     /* ───────────────── Internal & Helper Functions ───────────────── */
+
+    function _proportionallyReduceAllPledges(address underwriter, uint256 reductionAmount) internal {
+        (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
+        uint256 principalBefore = principalAfter + reductionAmount;
+        if (principalBefore == 0) return;
+
+        uint256[] memory allocations = underwriterAllocations[underwriter];
+        if (allocations.length > 0) {
+            address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
+            if (adapter == address(0)) return;
+
+            for (uint256 i = 0; i < allocations.length; i++) {
+                uint256 poolId = allocations[i];
+                uint256 poolPledgeBefore = underwriterPoolPledge[underwriter][poolId];
+                if (poolPledgeBefore > 0) {
+                    uint256 reduction = Math.mulDiv(poolPledgeBefore, reductionAmount, principalBefore);
+                    underwriterPoolPledge[underwriter][poolId] -= reduction;
+                    totalCapitalPledgedToPool[poolId] -= reduction;
+                    capitalPerAdapter[poolId][adapter] -= reduction;
+                }
+            }
+        }
+    }
 
     function _executeAllocation(uint256 poolId, uint256 totalPledge, address adapter) internal {
         underwriterPoolPledge[msg.sender][poolId] = totalPledge;
@@ -301,7 +320,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     function _removeUnderwriterFromPool(address underwriter, uint256 poolId) internal {
-        // Remove from underwriter's allocation list
         uint256[] storage allocs = underwriterAllocations[underwriter];
         uint256 indexToRemove = underwriterAllocationIndex[underwriter][poolId];
         uint256 lastElementPoolId = allocs[allocs.length - 1];
@@ -309,7 +327,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         underwriterAllocationIndex[underwriter][lastElementPoolId] = indexToRemove;
         allocs.pop();
 
-        // Remove from pool's underwriter list
         uint256 indexInPool = underwriterIndexInPoolArray[poolId][underwriter];
         address[] storage underwriters = poolSpecificUnderwriters[poolId];
         address lastUnderwriter = underwriters[underwriters.length - 1];
@@ -339,9 +356,13 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     function _prepareAllocateCapital(uint256[] calldata poolIds) internal view returns (uint256, address) {
-        // **MODIFIED**: Read total capital directly from CapitalPool instead of a local variable.
         (uint256 totalDepositedPrincipal, , , ) = capitalPool.getUnderwriterAccount(msg.sender);
-        if (totalDepositedPrincipal == 0) revert NoCapitalToAllocate();
+        
+        // Subtract the value of pending (encumbered) withdrawals to get the true available capital.
+        uint256 pendingValue = underwriterPendingWithdrawalValue[msg.sender];
+        uint256 availablePrincipal = totalDepositedPrincipal > pendingValue ? totalDepositedPrincipal - pendingValue : 0;
+
+        if (availablePrincipal == 0) revert NoCapitalToAllocate();
         
         uint256 len = poolIds.length;
         if (len == 0 || len + underwriterAllocations[msg.sender].length > maxAllocationsPerUnderwriter) {
@@ -358,8 +379,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             if (isAllocatedToPool[msg.sender][pid]) revert AlreadyAllocated();
         }
         
-        // Return the true total capital to be pledged.
-        return (totalDepositedPrincipal, adapter);
+        return (availablePrincipal, adapter);
     }
 
     function _checkDeallocationRequest(address underwriter, uint256 poolId) internal view {
