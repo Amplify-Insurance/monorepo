@@ -233,7 +233,8 @@ contract BackstopPool is Ownable, ReentrancyGuard, IBackstopPool {
 
     function receiveUsdcPremium(uint256 amount) external override onlyPolicyManager {
         require(amount > 0, "CIP: Premium amount must be positive");
-        usdc.safeTransferFrom(msg.sender, address(this), amount);
+        // The PolicyManager has already transferred the funds.
+        // This function just needs to account for the new balance.
         idleUSDC += amount;
         emit UsdcPremiumReceived(amount);
     }
