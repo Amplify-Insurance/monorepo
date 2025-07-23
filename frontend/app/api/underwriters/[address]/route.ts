@@ -36,9 +36,10 @@ export async function GET(
           : [0n, 0n, 0n, 0n]
 
         // Fetch notice period and withdrawal request data directly
-        const [noticePeriod, requestCount] = await Promise.all([
+        const [noticePeriod, requestCount, deallocationPeriod] = await Promise.all([
           cp.underwriterNoticePeriod(),
           cp.getWithdrawalRequestCount(addr),
+          rm.deallocationNoticePeriod(),
         ])
 
         let withdrawalRequestTimestamp = 0n
@@ -105,6 +106,27 @@ export async function GET(
           } catch {}
         }
 
+        const deallocCalls: { target: string; callData: string }[] = []
+        for (const id of allocatedPoolIds) {
+          deallocCalls.push({
+            target: dep.underwriterManager,
+            callData: rm.interface.encodeFunctionData('deallocationRequestTimestamp', [addr, BigInt(id)]),
+          })
+        }
+
+        const deallocResults = await multicall.tryAggregate(false, deallocCalls)
+
+        const deallocationRequests: Record<string, string> = {}
+        for (let i = 0; i < deallocResults.length; i++) {
+          if (!deallocResults[i].success) continue
+          try {
+            const [ts] = rm.interface.decodeFunctionResult('deallocationRequestTimestamp', deallocResults[i].returnData)
+            if (ts > 0n) {
+              deallocationRequests[allocatedPoolIds[i]] = ts.toString()
+            }
+          } catch {}
+        }
+
         details.push({
           deployment: dep.name,
           totalDepositedAssetPrincipal: account[0].toString(),
@@ -112,6 +134,8 @@ export async function GET(
           masterShares: account[2].toString(),
           withdrawalRequestTimestamp: withdrawalRequestTimestamp.toString(),
           withdrawalRequestShares: withdrawalRequestShares.toString(),
+          deallocationNoticePeriod: deallocationPeriod.toString(),
+          deallocationRequests,
           allocatedPoolIds,
           pendingLosses,
         })
