@@ -12,6 +12,9 @@ import SUPPORTED_TOKENS from "../config/supportedTokens"
 import useCatPoolUserInfo from "../../hooks/useCatPoolUserInfo"
 import useCatPoolStats from "../../hooks/useCatPoolStats"
 import useAnalytics from "../../hooks/useAnalytics"
+import deployments from "../config/deployments"
+import { getUsdcAddress } from "../../lib/catPool"
+import { getERC20WithSigner } from "../../lib/erc20"
 
 
 export default function CatPoolPage() {
@@ -23,6 +26,8 @@ export default function CatPoolPage() {
   const [modalMode, setModalMode] = useState("deposit")
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [needsApproval, setNeedsApproval] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
   const [poolStats, setPoolStats] = useState({
     totalLiquidity: 0,
     apr: 0,
@@ -39,6 +44,43 @@ export default function CatPoolPage() {
     setModalMode(mode)
     setIsModalOpen(true)
   }
+
+  const handleApprove = async () => {
+    setIsApproving(true)
+    try {
+      const usdcAddr = await getUsdcAddress()
+      const token = await getERC20WithSigner(usdcAddr)
+      const tx = await token.approve(
+        deployments[0]?.catInsurancePool,
+        ethers.constants.MaxUint256,
+      )
+      await tx.wait()
+      setNeedsApproval(false)
+    } catch (err) {
+      console.error('Approval failed', err)
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  useEffect(() => {
+    const checkAllowance = async () => {
+      if (!address) return setNeedsApproval(false)
+      try {
+        const usdcAddr = await getUsdcAddress()
+        const token = await getERC20WithSigner(usdcAddr)
+        const allowance = await token.allowance(
+          address,
+          deployments[0]?.catInsurancePool,
+        )
+        setNeedsApproval(allowance.eq(0))
+      } catch (err) {
+        console.error('Failed to check allowance', err)
+        setNeedsApproval(false)
+      }
+    }
+    checkAllowance()
+  }, [address])
 
   useEffect(() => {
     const totalLiquidity = Number(
@@ -196,9 +238,19 @@ export default function CatPoolPage() {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Actions</h3>
                 <div className="space-y-3">
+                  {needsApproval && (
+                    <button
+                      onClick={handleApprove}
+                      disabled={isApproving}
+                      className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md text-lg disabled:opacity-50"
+                    >
+                      {isApproving ? 'Approving...' : `Approve ${selectedToken.symbol}`}
+                    </button>
+                  )}
                   <button
                     onClick={() => openModal("deposit")}
-                    className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md text-lg"
+                    disabled={needsApproval}
+                    className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md text-lg disabled:opacity-50"
                   >
                     Deposit {selectedToken.symbol}
                   </button>
