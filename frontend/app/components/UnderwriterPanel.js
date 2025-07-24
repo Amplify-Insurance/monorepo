@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { Info, ChevronDown, Filter, HelpCircle } from "lucide-react"
+import Link from "next/link"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from "next/image"
 import { useAccount } from "wagmi"
@@ -82,6 +83,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const [yieldDropdownOpen, setYieldDropdownOpen] = useState(false)
   const [yieldInfoOpen, setYieldInfoOpen] = useState(false)
   const [selectionLimit, setSelectionLimit] = useState(0)
+  const [riskPoints, setRiskPoints] = useState({ used: 0, total: 0 })
 
   useEffect(() => {
     if (!selectedToken && tokens && tokens.length > 0) {
@@ -138,6 +140,22 @@ export default function UnderwriterPanel({ displayCurrency }) {
     }
     if (selectedDeployment) loadLimit()
   }, [selectedDeployment])
+
+  useEffect(() => {
+    async function loadRiskPoints() {
+      try {
+        if (!address) return
+        const dep = getDeployment(selectedDeployment)
+        const rm = getUnderwriterManager(dep.underwriterManager, dep.name)
+        const used = await rm.underwriterRiskPointsUsed(address)
+        const total = await rm.TOTAL_RISK_POINTS()
+        setRiskPoints({ used: Number(used.toString()), total: Number(total.toString()) })
+      } catch (err) {
+        console.error('Failed to load risk points', err)
+      }
+    }
+    if (isConnected && selectedDeployment) loadRiskPoints()
+  }, [address, isConnected, selectedDeployment])
 
 
   const markets = Object.values(
@@ -271,6 +289,53 @@ export default function UnderwriterPanel({ displayCurrency }) {
           </div>
         </div>
       </div>
+
+      {isConnected && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">Risk Points Usage</h3>
+              <div className="group relative">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                  Risk points limit how many protocols you can underwrite
+                </div>
+              </div>
+            </div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {riskPoints.used} / {riskPoints.total} points
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+              <div
+                className="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${riskPoints.total ? (riskPoints.used / riskPoints.total) * 100 : 0}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+              <span>0</span>
+              <span className="text-center">{riskPoints.total ? ((riskPoints.used / riskPoints.total) * 100).toFixed(1) : 0}% used</span>
+              <span>{riskPoints.total}</span>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-xs">
+            <span className="text-gray-600 dark:text-gray-300">
+              Remaining: {riskPoints.total - riskPoints.used} points
+            </span>
+            <Link
+              href="https://docs.example.com/risk-points"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium"
+            >
+              Learn more →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Token Selection Dropdown */}
       <div className="mb-6">
