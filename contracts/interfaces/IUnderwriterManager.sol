@@ -15,5 +15,6 @@ interface IUnderwriterManager {
     function capitalPendingWithdrawal(uint256 poolId) external view returns (uint256);
     function getPoolUnderwriters(uint256 poolId) external view returns (address[] memory);
     function recordLossAgainstPledge(address underwriter, uint256 poolId, uint256 lossAmount) external;
-
+    function setMaxAllocationsPerUnderwriter(uint256 _newMax) external;
+    function setDeallocationNoticePeriod(uint256 _newPeriod) external;
 }

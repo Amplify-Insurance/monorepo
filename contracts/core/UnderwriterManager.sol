@@ -17,9 +17,8 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 /**
  * @title UnderwriterManager
  * @author Gemini
- * @notice Manages the allocation (pledging) of capital to risk pools.
- * @dev CORRECTED: onCapitalDeposited now proportionally increases existing pledges
- * when an underwriter adds more capital.
+ * @notice Manages the allocation (pledging) of capital to risk pools using a risk-based points system.
+ * @dev CORRECTED: Implemented a risk points system to control underwriter leverage based on pool risk ratings.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -38,6 +37,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
     mapping(address => mapping(uint256 => uint256)) public underwriterAllocationIndex;
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
+    mapping(address => uint256) public underwriterRiskPointsUsed; // NEW
 
     /* ───────────────── State: Pool & Adapter Aggregates ──────────────── */
     mapping(uint256 => uint256) public totalCapitalPledgedToPool;
@@ -51,6 +51,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /* ───────────────────────── Constants & Config ──────────────────────── */
     uint256 public constant ABSOLUTE_MAX_ALLOCATIONS = 50;
+    uint256 public constant TOTAL_RISK_POINTS = 12; // NEW
     uint256 public maxAllocationsPerUnderwriter = 5;
     uint256 public deallocationNoticePeriod;
 
@@ -75,6 +76,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     error NoDeallocationRequest();
     error NoticePeriodActive();
     error InsufficientFreeCapital();
+    error InsufficientRiskPoints(uint256 current, uint256 required, uint256 total); // NEW
 
     /* ───────────────────── Modifiers ───────────────────── */
     modifier onlyCapitalPool() {
@@ -125,8 +127,10 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     /* ──────────────── Underwriter Capital Management ──────────────── */
 
     function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
-        (uint256 totalCapitalToPledge, address adapter) = _prepareAllocateCapital(poolIds);
+        (uint256 totalCapitalToPledge, address adapter, uint256 pointsToUse) = _prepareAllocateCapital(poolIds);
         
+        underwriterRiskPointsUsed[msg.sender] += pointsToUse;
+
         for (uint256 i = 0; i < poolIds.length; i++) {
             _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
         }
@@ -188,23 +192,13 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         emit LossRecorded(underwriter, poolId, poolLoss);
     }
 
-    /**
-     * @notice Hook called by CapitalPool after a deposit.
-     * @dev CORRECTED: This function now proportionally increases existing pledges based on the new
-     * total capital of the underwriter. This ensures that new deposits are automatically
-     * reflected in the available coverage capacity of the pools the underwriter has allocated to.
-     */
     function onCapitalDeposited(address underwriter, uint256 amount) external onlyCapitalPool nonReentrant {
         _realizeLossesForAllPools(underwriter);
 
         (uint256 principalAfter, , , ) = capitalPool.getUnderwriterAccount(underwriter);
         uint256 principalBefore = principalAfter > amount ? principalAfter - amount : 0;
         
-        if (principalBefore == 0) {
-            // This is a first-time deposit or the user had a zero balance.
-            // No existing pledges to update. The user must call allocateCapital separately.
-            return;
-        }
+        if (principalBefore == 0) return;
 
         uint256[] memory allocations = underwriterAllocations[underwriter];
         if (allocations.length > 0) {
@@ -280,6 +274,14 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     /* ───────────────── Internal & Helper Functions ───────────────── */
 
+    function _getPointsForRating(IPoolRegistry.RiskRating _rating) internal pure returns (uint256) {
+        if (_rating == IPoolRegistry.RiskRating.Low) return 1;
+        if (_rating == IPoolRegistry.RiskRating.Moderate) return 2;
+        if (_rating == IPoolRegistry.RiskRating.Elevated) return 3;
+        if (_rating == IPoolRegistry.RiskRating.Speculative) return 4;
+        return 0; // Should not happen with valid ratings
+    }
+
     function _executeAllocation(uint256 poolId, uint256 totalPledge, address adapter) internal {
         underwriterPoolPledge[msg.sender][poolId] = totalPledge;
         isAllocatedToPool[msg.sender][poolId] = true;
@@ -320,6 +322,16 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     function _removeUnderwriterFromPool(address underwriter, uint256 poolId) internal {
+        // Refund risk points before removing the allocation
+        IPoolRegistry.RiskRating rating = poolRegistry.getPoolRiskRating(poolId);
+        uint256 pointsToRefund = _getPointsForRating(rating);
+        if (underwriterRiskPointsUsed[underwriter] >= pointsToRefund) {
+            underwriterRiskPointsUsed[underwriter] -= pointsToRefund;
+        } else {
+            underwriterRiskPointsUsed[underwriter] = 0;
+        }
+
+        // Remove from underwriter's allocation list
         uint256[] storage allocs = underwriterAllocations[underwriter];
         uint256 indexToRemove = underwriterAllocationIndex[underwriter][poolId];
         uint256 lastElementPoolId = allocs[allocs.length - 1];
@@ -327,6 +339,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         underwriterAllocationIndex[underwriter][lastElementPoolId] = indexToRemove;
         allocs.pop();
 
+        // Remove from pool's underwriter list
         uint256 indexInPool = underwriterIndexInPoolArray[poolId][underwriter];
         address[] storage underwriters = poolSpecificUnderwriters[poolId];
         address lastUnderwriter = underwriters[underwriters.length - 1];
@@ -353,9 +366,10 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             _removeUnderwriterFromPool(underwriter, poolId);
         }
         delete underwriterAllocations[underwriter];
+        delete underwriterRiskPointsUsed[underwriter]; // Clean up state
     }
 
-    function _prepareAllocateCapital(uint256[] calldata poolIds) internal view returns (uint256, address) {
+    function _prepareAllocateCapital(uint256[] calldata poolIds) internal view returns (uint256, address, uint256) {
         (uint256 totalDepositedPrincipal, , , ) = capitalPool.getUnderwriterAccount(msg.sender);
         if (totalDepositedPrincipal == 0) revert NoCapitalToAllocate();
         
@@ -364,17 +378,27 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             revert ExceedsMaxAllocations();
         }
         
-        address adapter = capitalPool.getUnderwriterAdapterAddress(msg.sender);
-        require(adapter != address(0), "User has no yield adapter");
-        
+        uint256 currentPointsUsed = underwriterRiskPointsUsed[msg.sender];
+        uint256 additionalPointsRequired = 0;
         uint256 poolCount = poolRegistry.getPoolCount();
+
         for (uint256 i = 0; i < len; i++) {
             uint256 pid = poolIds[i];
             if (pid >= poolCount) revert InvalidPoolId();
             if (isAllocatedToPool[msg.sender][pid]) revert AlreadyAllocated();
+            
+            IPoolRegistry.RiskRating rating = poolRegistry.getPoolRiskRating(pid);
+            additionalPointsRequired += _getPointsForRating(rating);
+        }
+
+        if (currentPointsUsed + additionalPointsRequired > TOTAL_RISK_POINTS) {
+            revert InsufficientRiskPoints(currentPointsUsed, additionalPointsRequired, TOTAL_RISK_POINTS);
         }
         
-        return (totalDepositedPrincipal, adapter);
+        address adapter = capitalPool.getUnderwriterAdapterAddress(msg.sender);
+        require(adapter != address(0), "User has no yield adapter");
+        
+        return (totalDepositedPrincipal, adapter, additionalPointsRequired);
     }
 
     function _checkDeallocationRequest(address underwriter, uint256 poolId) internal view {
@@ -383,11 +407,17 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         if (deallocationRequestTimestamp[underwriter][poolId] != 0) revert DeallocationRequestPending();
         
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
-        (, uint256 totalSold, , , ) = poolRegistry.getPoolStaticData(poolId);
+
+        // Fetch all required static data in a single, efficient call.
+        (, uint256 totalSold, , , ,) = poolRegistry.getPoolStaticData(poolId);
+        
         uint256 currentPledged = totalCapitalPledgedToPool[poolId];
         uint256 pendingW = capitalPendingWithdrawal[poolId];
         
+        // Free capital is the portion of the pledged capital that is not backing sold coverage
+        // and is not already pending withdrawal.
         uint256 freeCapital = currentPledged > totalSold + pendingW ? currentPledged - totalSold - pendingW : 0;
+
         if (pledgeAmount > freeCapital) revert InsufficientFreeCapital();
     }
 

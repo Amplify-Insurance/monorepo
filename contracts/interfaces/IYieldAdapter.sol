@@ -29,4 +29,7 @@ interface IYieldAdapter {
      * specifically for the caller (e.g., CoverPool contract, which is msg.sender).
      */
     function getCurrentValueHeld() external view returns (uint256 currentValue);
+
+    function emergencyTransfer(address recipient, uint256 amount) external returns (uint256);
+
 }

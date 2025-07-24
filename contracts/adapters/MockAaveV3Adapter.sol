@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IYieldAdapter.sol";
-import "../interfaces/IYieldAdapterEmergency.sol";
 
 /**
  * @title MockAaveV3Adapter
@@ -16,7 +15,7 @@ import "../interfaces/IYieldAdapterEmergency.sol";
  * It does not interact with the actual Aave protocol. Instead, it tracks balances
  * internally and includes a helper function to simulate yield generation.
  */
-contract MockAaveV3Adapter is IYieldAdapter, IYieldAdapterEmergency, Ownable, ReentrancyGuard {
+contract MockAaveV3Adapter is IYieldAdapter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable underlyingToken;

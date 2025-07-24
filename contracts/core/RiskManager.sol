@@ -240,7 +240,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
             , 
             , 
             , 
-            data.poolClaimFeeBps
+            data.poolClaimFeeBps 
+            ,
         ) = poolRegistry.getPoolStaticData(data.policy.poolId);
     }
 

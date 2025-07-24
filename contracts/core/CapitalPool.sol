@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 // Interface Imports
 import "../interfaces/ICapitalPool.sol";
 import "../interfaces/IYieldAdapter.sol";
-import "../interfaces/IYieldAdapterEmergency.sol";
+import "../interfaces/IYieldAdapter.sol";
 import "../interfaces/IRewardDistributor.sol";
 import "../interfaces/IUnderwriterManager.sol";
 import "../interfaces/IRiskManagerWithBackstop.sol";
@@ -505,7 +505,7 @@ function burnSharesForLoss(
         } catch {
             emit AdapterCallFailed(address(adapter), "withdraw", "withdraw failed");
             uint256 sent = 0;
-            try IYieldAdapterEmergency(address(adapter)).emergencyTransfer(address(this), amountToWithdraw) returns (uint256 v) {
+            try IYieldAdapter(address(adapter)).emergencyTransfer(address(this), amountToWithdraw) returns (uint256 v) {
                 sent = v;
             } catch { /* Emergency transfer is not supported or failed. */ }
 

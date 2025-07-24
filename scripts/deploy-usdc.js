@@ -229,19 +229,28 @@ async function main() {
   console.log("\nAdding initial risk pools...");
   const defaultRateModel = { base: 200, slope1: 1000, slope2: 5000, kink: 7000 };
 
+  const RiskRating = {
+    Low: 1,
+    Moderate: 2,
+    Elevated: 3,
+    Speculative: 4,
+  };
+  
   if (useMocks) {
-    await waitForTx(protocolConfigurator.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 500), "Add USDC risk pool");
-    if (DAI) await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250), "Add DAI risk pool");
-    if (USDM_ADDRESS) await waitForTx(protocolConfigurator.addProtocolRiskPool(USDM_ADDRESS, defaultRateModel, 250), "Add USDM risk pool");
-    if (USDT_ADDRESS) await waitForTx(protocolConfigurator.addProtocolRiskPool(USDT_ADDRESS, defaultRateModel, 250), "Add USDT risk pool");
-  } else {
-    await waitForTx(protocolConfigurator.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 500), "Add Aave risk pool");
-    await waitForTx(protocolConfigurator.addProtocolRiskPool(COMPOUND_COMET_USDC, defaultRateModel, 500), "Add Compound risk pool");
-    await waitForTx(protocolConfigurator.addProtocolRiskPool(MOONWELL_MUSDC, defaultRateModel, 500), "Add Moonwell risk pool");
-    await waitForTx(protocolConfigurator.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500), "Add Euler risk pool");
-    await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250), "Add DAI risk pool");
-    await waitForTx(protocolConfigurator.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250), "Add USD+ risk pool");
-  }
+      // For mocks, we'll assign Low and Moderate risk
+      await waitForTx(protocolConfigurator.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 500, RiskRating.Low), "Add USDC risk pool");
+      if (DAI) await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250, RiskRating.Low), "Add DAI risk pool");
+      if (USDM_ADDRESS) await waitForTx(protocolConfigurator.addProtocolRiskPool(USDM_ADDRESS, defaultRateModel, 250, RiskRating.Elevated), "Add USDM risk pool");
+      if (USDT_ADDRESS) await waitForTx(protocolConfigurator.addProtocolRiskPool(USDT_ADDRESS, defaultRateModel, 250, RiskRating.Moderate), "Add USDT risk pool");
+    } else {
+      // For real assets, we can be more specific based on protocol reputation and asset type
+      await waitForTx(protocolConfigurator.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 500, RiskRating.Low), "Add Aave risk pool");
+      await waitForTx(protocolConfigurator.addProtocolRiskPool(COMPOUND_COMET_USDC, defaultRateModel, 500, RiskRating.Low), "Add Compound risk pool");
+      await waitForTx(protocolConfigurator.addProtocolRiskPool(MOONWELL_MUSDC, defaultRateModel, 500, RiskRating.Moderate), "Add Moonwell risk pool");
+      await waitForTx(protocolConfigurator.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500, RiskRating.Elevated), "Add Euler risk pool");
+      await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250, RiskRating.Low), "Add DAI risk pool");
+      await waitForTx(protocolConfigurator.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250, RiskRating.Elevated), "Add USD+ risk pool");
+    }
 
   /*──────────────────────────────── Output ──────────────────────────────*/
   const addresses = {

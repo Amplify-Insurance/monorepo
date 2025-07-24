@@ -236,7 +236,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     /* ───────────────── Trusted Functions ───────────────── */
 
     /**
-     * @notice Called by the RiskManager during claim processing to clear any pending increases.
+     * @notice Called by the RiskManager during claim processing to clear any pending increases. 5000000
      * @dev This is a crucial step to prevent orphaned liability on the books when a policy is terminated.
      * @param policyId The ID of the policy whose pending increases should be cleared.
      * @return totalCancelled The total amount of coverage from the pending increases that were cancelled.
@@ -281,7 +281,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     function _validateIncreaseCover(uint256 policyId, uint256 additionalCoverage, IPolicyNFT.Policy memory pol) internal view {
-        ( , uint256 sold, bool paused, , ) = poolRegistry.getPoolStaticData(pol.poolId);
+        ( , uint256 sold, bool paused, , ,) = poolRegistry.getPoolStaticData(pol.poolId);
         if (paused) revert PoolPaused();
 
         (,,uint256 pledged) = underwriterManager.getPoolPayoutData(pol.poolId);
@@ -303,7 +303,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         view
         returns (uint256 activationTimestamp)
     {
-        ( , uint256 sold, bool paused, , ) = poolRegistry.getPoolStaticData(poolId);
+        ( , uint256 sold, bool paused, , ,) = poolRegistry.getPoolStaticData(poolId);
         if (paused) revert PoolPaused();
 
         (,,uint256 pledged) = underwriterManager.getPoolPayoutData(poolId);
@@ -346,7 +346,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     function _calculatePremiumCost(IPolicyNFT.Policy memory pol) internal view returns (uint256 cost, uint256 rateBps) {
-        ( , uint256 sold, , , ) = poolRegistry.getPoolStaticData(pol.poolId);
+        ( , uint256 sold, , , ,) = poolRegistry.getPoolStaticData(pol.poolId);
         (,,uint256 pledged) = underwriterManager.getPoolPayoutData(pol.poolId);
         uint256 pendingW = underwriterManager.capitalPendingWithdrawal(pol.poolId);
         
@@ -458,7 +458,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         if (pol.coverage == 0) return false;
         if (block.timestamp <= pol.lastDrainTime) return pol.premiumDeposit > 0;
 
-        ( , uint256 sold, , , ) = poolRegistry.getPoolStaticData(pol.poolId);
+        ( , uint256 sold, , , ,) = poolRegistry.getPoolStaticData(pol.poolId);
         (,,uint256 pledged) = underwriterManager.getPoolPayoutData(pol.poolId);
         uint256 pendingW = underwriterManager.capitalPendingWithdrawal(pol.poolId);
 

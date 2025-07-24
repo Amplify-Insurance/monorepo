@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 // --- Interfaces ---
 import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
-import {IPoolRegistryAdmin} from "../interfaces/IPoolRegistryAdmin.sol";
-import {ICapitalPoolAdmin} from "../interfaces/ICapitalPoolAdmin.sol";
-import {IUnderwriterManagerAdmin} from "../interfaces/IUnderwriterManagerAdmin.sol";
-import {IPolicyManagerAdmin} from "../interfaces/IPolicyManagerAdmin.sol";
-import {IRiskManagerAdmin} from "../interfaces/IRiskManagerAdmin.sol";
+import {IPoolRegistry} from "../interfaces/IPoolRegistry.sol";
+import {ICapitalPool} from "../interfaces/ICapitalPool.sol";
+import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
+import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
+import {IRiskManager} from "../interfaces/IRiskManager.sol";
 
 
 /**
@@ -18,6 +18,7 @@ import {IRiskManagerAdmin} from "../interfaces/IRiskManagerAdmin.sol";
  * @notice Handles administrative and governance functions for the protocol.
  * This contract is intended to be controlled by a DAO or a multisig wallet.
  * Its purpose is to manage system-level parameters and critical safety features.
+ * @dev CORRECTED: Updated to support setting and managing risk ratings for pools.
  */
 contract RiskAdmin is Ownable {
     /* ───────────────────────── State Variables ───────────────────────── */
@@ -30,9 +31,10 @@ contract RiskAdmin is Ownable {
     /* ───────────────────────── Events ───────────────────────── */
     event Initialized(address registry, address capitalPool, address policyManager, address underwriterManager);
     event CommitteeSet(address indexed newCommittee);
-    event PoolAdded(uint256 indexed poolId, address indexed protocolToken);
+    event PoolAdded(uint256 indexed poolId, address indexed protocolToken, IPoolRegistry.RiskRating riskRating); // UPDATED
     event IncidentReported(uint256 indexed poolId, bool isPaused);
     event PoolFeeRecipientSet(uint256 indexed poolId, address indexed recipient);
+    event PoolRiskRatingSet(uint256 indexed poolId, IPoolRegistry.RiskRating newRating); // NEW
 
     /* ───────────────────────── Errors ───────────────────────── */
     error NotCommittee();
@@ -80,73 +82,89 @@ contract RiskAdmin is Ownable {
         if (_newCommittee == address(0)) revert ZeroAddressNotAllowed();
         committee = _newCommittee;
         // Synchronize the committee address with the external RiskManager contract
-        IRiskManagerAdmin(_riskManager).setCommittee(_newCommittee);
+        IRiskManager(_riskManager).setCommittee(_newCommittee);
         emit CommitteeSet(_newCommittee);
     }
 
     /* ───────────────────── Governance Functions ───────────────────── */
 
     /**
-     * @notice Adds a new risk pool to the protocol.
+     * @notice Adds a new risk pool to the protocol, including its risk rating.
      * @dev Can only be called by the owner (DAO/multisig).
      */
     function addProtocolRiskPool(
         address protocolTokenToCover,
         IPoolRegistry.RateModel calldata rateModel,
-        uint256 claimFeeBps
+        uint256 claimFeeBps,
+        IPoolRegistry.RiskRating riskRating // NEW
     ) external onlyOwner initialized returns (uint256) {
-        uint256 poolId = poolRegistry.addProtocolRiskPool(protocolTokenToCover, rateModel, claimFeeBps);
-        emit PoolAdded(poolId, protocolTokenToCover);
+        // The call to the registry now includes the risk rating
+        uint256 poolId = IPoolRegistry(address(poolRegistry)).addProtocolRiskPool(
+            protocolTokenToCover,
+            rateModel,
+            claimFeeBps,
+            riskRating
+        );
+        emit PoolAdded(poolId, protocolTokenToCover, riskRating); // UPDATED
         return poolId;
+    }
+
+    /**
+     * @notice Sets the risk rating for an existing pool.
+     * @dev Allows the admin to adjust risk profiles as projects evolve.
+     */
+    function setPoolRiskRating(uint256 poolId, IPoolRegistry.RiskRating newRating) external onlyOwner initialized {
+        IPoolRegistry(address(poolRegistry)).setPoolRiskRating(poolId, newRating);
+        emit PoolRiskRatingSet(poolId, newRating);
     }
 
 
     function setRiskManager(address target, address newRiskManager) external onlyOwner initialized {
-        ICapitalPoolAdmin(target).setRiskManager(newRiskManager);
+        ICapitalPool(target).setRiskManager(newRiskManager);
     }
 
     function setUnderwriterManager(address target, address newUnderwriterManager) external onlyOwner initialized {
-        ICapitalPoolAdmin(target).setUnderwriterManager(newUnderwriterManager);
+        ICapitalPool(target).setUnderwriterManager(newUnderwriterManager);
     }
 
     function setLossDistributor(address target, address newLossDistributor) external onlyOwner initialized {
-        ICapitalPoolAdmin(target).setLossDistributor(newLossDistributor);
+        ICapitalPool(target).setLossDistributor(newLossDistributor);
     }
 
     function setRewardDistributor(address target, address newRewardDistributor) external onlyOwner initialized {
-        ICapitalPoolAdmin(target).setRewardDistributor(newRewardDistributor);
+        ICapitalPool(target).setRewardDistributor(newRewardDistributor);
     }
 
     function setCapitalPoolNoticePeriod(uint256 newPeriod) external onlyOwner initialized {
-        ICapitalPoolAdmin(capitalPool).setUnderwriterNoticePeriod(newPeriod);
+        ICapitalPool(capitalPool).setUnderwriterNoticePeriod(newPeriod);
     }
 
-    function setCapitalPoolBaseYieldAdapter(ICapitalPoolAdmin.YieldPlatform platform, address adapter)
+    function setCapitalPoolBaseYieldAdapter(ICapitalPool.YieldPlatform platform, address adapter)
         external
         onlyOwner
         initialized
     {
-        ICapitalPoolAdmin(capitalPool).setBaseYieldAdapter(platform, adapter);
+        ICapitalPool(capitalPool).setBaseYieldAdapter(platform, adapter);
     }
 
     function setUnderwriterMaxAllocations(uint256 newMax) external onlyOwner initialized {
-        IUnderwriterManagerAdmin(underwriterManager).setMaxAllocationsPerUnderwriter(newMax);
+        IUnderwriterManager(underwriterManager).setMaxAllocationsPerUnderwriter(newMax);
     }
 
     function setUnderwriterDeallocationNotice(uint256 newPeriod) external onlyOwner initialized {
-        IUnderwriterManagerAdmin(underwriterManager).setDeallocationNoticePeriod(newPeriod);
+        IUnderwriterManager(underwriterManager).setDeallocationNoticePeriod(newPeriod);
     }
 
     function setPolicyCatPool(address catPoolAddress) external onlyOwner initialized {
-        IPolicyManagerAdmin(policyManager).setCatPool(catPoolAddress);
+        IPolicyManager(policyManager).setCatPool(catPoolAddress);
     }
 
     function setPolicyCatPremiumShare(uint256 newBps) external onlyOwner initialized {
-        IPolicyManagerAdmin(policyManager).setCatPremiumShareBps(newBps);
+        IPolicyManager(policyManager).setCatPremiumShareBps(newBps);
     }
 
     function setPolicyCoverCooldown(uint256 newPeriod) external onlyOwner initialized {
-        IPolicyManagerAdmin(policyManager).setCoverCooldownPeriod(newPeriod);
+        IPolicyManager(policyManager).setCoverCooldownPeriod(newPeriod);
     }
 
     /* ───────────────────── Committee Hooks ───────────────────── */

@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // NEW: The YieldPlatform enum is now defined in the public interface
 // so it can be used by any contract that imports it.
-enum YieldPlatform { NONE, AAVE, COMPOUND, OTHER_YIELD }
 
 interface ICapitalPool {
     struct PayoutData {
@@ -18,6 +17,14 @@ interface ICapitalPool {
         uint256 totalCapitalFromPoolLPs;
     }
     
+    enum YieldPlatform { NONE, AAVE, COMPOUND, OTHER_YIELD }
+
+    function setBaseYieldAdapter(YieldPlatform _platform, address _adapterAddress) external;
+    function setRiskManager(address _riskManager) external;
+    function setUnderwriterManager(address _underwriterManager) external;
+    function setUnderwriterNoticePeriod(uint256 _newPeriod) external;
+    function setLossDistributor(address _lossDistributor) external;
+    function setRewardDistributor(address _rewardDistributor) external;
 
     function yieldAdapterRewardPoolId(address) external view returns (uint256);
     function deposit(uint256 amount, YieldPlatform yieldChoice) external;
