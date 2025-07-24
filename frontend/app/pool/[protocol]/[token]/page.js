@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { utils as ethersUtils } from "ethers"
 import CoverageModal from "../../../components/CoverageModal"
 import usePools from "../../../../hooks/usePools"
 import useReserveConfig from "../../../../hooks/useReserveConfig"
@@ -127,17 +128,24 @@ export default function PoolDetailsPage() {
   // Derive numeric metrics from the raw pool info
   const processedPool = useMemo(() => {
     if (!pool) return null
-    const decimals = Number(pool.protocolTokenDecimals ?? 18)
+    const decimals = Number(
+      pool.underlyingAssetDecimals ?? pool.protocolTokenDecimals ?? 18,
+    )
     const pledged = BigInt(pool.totalCapitalPledgedToPool || 0)
     const sold = BigInt(pool.totalCoverageSold || 0)
     const tvl = Number((pledged / (10n ** BigInt(decimals))).toString())
     const utilization = pledged > 0n ? Number((sold * 10000n) / pledged) / 100 : 0
+    const available = pledged > sold ? pledged - sold : 0n
+    const capacity = Number(
+      ethersUtils.formatUnits(available, decimals),
+    )
     return {
       premium: Number(pool.premiumRateBps || 0) / 100,
       underwriterYield: Number(pool.underwriterYieldBps || 0) / 100,
       tvl,
       utilizationRate: utilization,
       rateModel: pool.rateModel,
+      capacity,
     }
   }, [pool])
 
@@ -539,7 +547,17 @@ export default function PoolDetailsPage() {
         <button className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors duration-150 ease-in-out text-sm sm:text-base flex items-center justify-center shadow-sm hover:shadow" onClick={()=>setPurchaseModalOpen(true)}>Purchase Coverage</button>
         <Link href="/markets?tab=underwrite" className="flex-1 py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-150 ease-in-out text-sm sm:text-base flex items-center justify-center shadow-sm hover:shadow">Provide Coverage</Link>
       </div>
-      <CoverageModal isOpen={purchaseModalOpen} onClose={()=>setPurchaseModalOpen(false)} type="purchase" protocol={market.name} token={token} premium={processedPool?.premium} yield={processedPool?.underwriterYield} deployment={pool?.deployment}/>
+      <CoverageModal
+        isOpen={purchaseModalOpen}
+        onClose={() => setPurchaseModalOpen(false)}
+        type="purchase"
+        protocol={market.name}
+        token={token}
+        premium={processedPool?.premium}
+        yield={processedPool?.underwriterYield}
+        capacity={processedPool?.capacity}
+        deployment={pool?.deployment}
+      />
     </div>
   )
 }
