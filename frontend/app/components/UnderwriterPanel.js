@@ -37,9 +37,9 @@ import {
 // Protocol categories
 const protocolCategories = [
   { id: "all", name: "All" },
-  { id: "lending", name: "Lending" },
-  { id: "exchange", name: "Exchanges" },
-  { id: "derivatives", name: "Derivatives" },
+  { id: "lst", name: "LSTs" },
+  // { id: "exchange", name: "Exchanges" },
+  // { id: "derivatives", name: "Derivatives" },
   { id: "stablecoin", name: "Stablecoins" },
 ]
 
@@ -498,13 +498,13 @@ export default function UnderwriterPanel({ displayCurrency }) {
       <div className="mb-6">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Available protocols for {selectedToken?.symbol || ''}
+            Available markets for {selectedToken?.symbol || ''}
           </h3>
-          {selectionLimit > 0 && (
+          {/* {selectionLimit > 0 && (
             <span className="ml-4 text-sm text-gray-500 dark:text-gray-400">
               Points remaining: {pointsRemaining}
             </span>
-          )}
+          )} */}
 
           <div className="relative">
             <button
