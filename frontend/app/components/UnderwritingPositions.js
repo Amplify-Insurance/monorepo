@@ -141,6 +141,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
 
   const protocolPositions = underwritingPositions.filter((p) => p.type === "protocol")
   const stablecoinPositions = underwritingPositions.filter((p) => p.type === "stablecoin")
+  const lstPositions = underwritingPositions.filter((p) => p.type === "lst")
 
   const showPendingLoss = underwritingPositions.some((p) => p.pendingLoss > 0)
 
@@ -282,13 +283,13 @@ export default function UnderwritingPositions({ displayCurrency }) {
                         scope="col"
                         className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
-                        {positions[0].type === "stablecoin" ? "Insured Token" : "Protocol"}
+                        {positions[0].type === "stablecoin" ? "Insured Token" : positions[0].type === "lst" ? "LST" : "Protocol"}
                       </th>
                       <th
                         scope="col"
                         className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
-                        {positions[0].type === "stablecoin" ? "Reserve Token" : "Pool"}
+                        {positions[0].type === "stablecoin" ? "Reserve Token" : positions[0].type === "lst" ? "Underlying" : "Pool"}
                       </th>
                       <th
                         scope="col"
@@ -811,6 +812,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
         {renderTables(protocolPositions, "Protocol Cover")}
         {stablecoinPositions.some((p) => p.status === "active") &&
           renderTables(stablecoinPositions, "Stablecoin Cover")}
+        {lstPositions.some((p) => p.status === "active") &&
+          renderTables(lstPositions, "LST Cover")}
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             onClick={() => setShowAllocModal(true)}

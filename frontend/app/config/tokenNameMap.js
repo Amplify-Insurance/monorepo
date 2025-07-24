@@ -16,6 +16,7 @@ export const PROTOCOL_NAME_MAP = {
   1: 'DAI',
   2: 'USDM',
   3: 'USDT',
+  4: 'LST Protocol',
 };
 
 export const PROTOCOL_DESCRIPTION_MAP = {
@@ -23,6 +24,7 @@ export const PROTOCOL_DESCRIPTION_MAP = {
   1: 'CDP Stablecoin',
   2: 'CDP Stablecoin',
   3: 'Stablecoin',
+  4: 'Liquid Staking Token',
 };
 
 export const PROTOCOL_LOGO_MAP = {
@@ -30,6 +32,7 @@ export const PROTOCOL_LOGO_MAP = {
   1: '/images/stablecoins/dai.svg',
   2: '/images/stablecoins/usdm.png',
   3: '/images/stablecoins/usdt.png',
+  4: '/placeholder-logo.png',
 };
 
 // Categorise protocols so the frontend can filter markets. The default value is
@@ -39,6 +42,7 @@ export const PROTOCOL_TYPE_MAP = {
   1: 'stablecoin',
   2: 'stablecoin',
   3: 'stablecoin',
+  4: 'lst', // example mapping for LST protocols
 };
 
 

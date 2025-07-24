@@ -18,7 +18,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const { address } = useAccount()
   const { details } = useUnderwriterDetails(address)
   const [selectedDeployment, setSelectedDeployment] = useState(deployment)
-  const [filter, setFilter] = useState("all") // "all", "protocols", "stablecoins"
+  const [filter, setFilter] = useState("all") // "all", "protocols", "stablecoins", "lsts"
 
   const YIELD_TO_PROTOCOL_MAP = {
     [YieldPlatform.AAVE]: 0,
@@ -40,6 +40,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
     const poolType = getProtocolType(pool.id)
     if (filter === "protocols") return poolType === "protocol"
     if (filter === "stablecoins") return poolType === "stablecoin"
+    if (filter === "lsts") return poolType === "lst"
     return true
   })
 
@@ -144,10 +145,11 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const getFilterCounts = () => {
     const protocolCount = allPoolsForDeployment.filter((p) => getProtocolType(p.id) === "protocol").length
     const stablecoinCount = allPoolsForDeployment.filter((p) => getProtocolType(p.id) === "stablecoin").length
-    return { protocolCount, stablecoinCount, totalCount: allPoolsForDeployment.length }
+    const lstCount = allPoolsForDeployment.filter((p) => getProtocolType(p.id) === "lst").length
+    return { protocolCount, stablecoinCount, lstCount, totalCount: allPoolsForDeployment.length }
   }
 
-  const { protocolCount, stablecoinCount, totalCount } = getFilterCounts()
+  const { protocolCount, stablecoinCount, lstCount, totalCount } = getFilterCounts()
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Manage Protocol Allocation">
@@ -200,6 +202,16 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
             }`}
           >
             Stablecoins ({stablecoinCount})
+          </button>
+          <button
+            onClick={() => setFilter("lsts")}
+            className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+              filter === "lsts"
+                ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            LSTs ({lstCount})
           </button>
         </div>
       </div>
@@ -309,10 +321,12 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
                         className={`px-2 py-0.5 text-xs rounded-full font-medium ${
                           poolType === "protocol"
                             ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-                            : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            : poolType === "stablecoin"
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
                         }`}
                       >
-                        {poolType === "protocol" ? "Protocol" : "Stablecoin"}
+                        {poolType === "protocol" ? "Protocol" : poolType === "stablecoin" ? "Stablecoin" : "LST"}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 mt-1">

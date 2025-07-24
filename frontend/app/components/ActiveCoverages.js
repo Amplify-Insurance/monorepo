@@ -166,6 +166,7 @@ export default function ActiveCoverages({ displayCurrency }) {
 
   const protocolCoverages = activeCoverages.filter((c) => c.type === "protocol")
   const stablecoinCoverages = activeCoverages.filter((c) => c.type === "stablecoin")
+  const lstCoverages = activeCoverages.filter((c) => c.type === "lst")
 
   const handleOpenModal = (coverage) => {
     setSelectedCoverage(coverage)
@@ -200,13 +201,13 @@ export default function ActiveCoverages({ displayCurrency }) {
               scope="col"
               className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
             >
-              {covers[0].type === "stablecoin" ? "Insured Token" : "Protocol"}
+              {covers[0].type === "stablecoin" ? "Insured Token" : covers[0].type === "lst" ? "LST" : "Protocol"}
             </th>
             <th
               scope="col"
               className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
             >
-              {covers[0].type === "stablecoin" ? "Reserve Token" : "Pool"}
+              {covers[0].type === "stablecoin" ? "Reserve Token" : covers[0].type === "lst" ? "Underlying" : "Pool"}
             </th>
             <th
               scope="col"
@@ -697,7 +698,9 @@ export default function ActiveCoverages({ displayCurrency }) {
                                     <p className="text-blue-800 dark:text-blue-400 text-xs leading-relaxed">
                                       {coverage.type === "stablecoin"
                                         ? `This coverage protects your ${coverage.poolName} assets against depegging events.`
-                                        : `This coverage protects your ${coverage.poolName} assets against smart contract risks and protocol failures.`}
+                                        : coverage.type === "lst"
+                                          ? `This coverage protects your ${coverage.poolName} holdings against slashing or custody risks.`
+                                          : `This coverage protects your ${coverage.poolName} assets against smart contract risks and protocol failures.`}
                                     </p>
                                   </div>
                                 </div>
@@ -729,6 +732,12 @@ export default function ActiveCoverages({ displayCurrency }) {
         <div>
           <h3 className="text-lg font-medium mb-2">Stablecoin Cover</h3>
           {renderTable(stablecoinCoverages)}
+        </div>
+      )}
+      {lstCoverages.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium mb-2">LST Cover</h3>
+          {renderTable(lstCoverages)}
         </div>
       )}
 
