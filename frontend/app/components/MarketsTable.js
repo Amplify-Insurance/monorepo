@@ -19,7 +19,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
-  const [typeFilter, setTypeFilter] = useState('all') // 'all', 'protocol', 'stablecoin'
+  const [typeFilter, setTypeFilter] = useState('all') // 'all', 'protocol', 'stablecoin', 'lst'
 
   const grouped = {}
   for (const pool of pools) {
@@ -127,12 +127,12 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
 
       {/* Market type filter */}
       <div className="mb-4 inline-flex rounded-md shadow-sm">
-        {['all', 'protocol', 'stablecoin'].map((type, idx) => (
+        {['all', 'protocol', 'stablecoin', 'lst'].map((type, idx, arr) => (
           <button
             key={type}
             type="button"
             className={`px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 focus:z-10 ${
-              idx === 0 ? 'rounded-l-md' : idx === 2 ? 'rounded-r-md -ml-px' : '-ml-px'
+              idx === 0 ? 'rounded-l-md' : idx === arr.length - 1 ? 'rounded-r-md -ml-px' : '-ml-px'
             } ${
               typeFilter === type
                 ? 'bg-blue-600 text-white'
@@ -140,7 +140,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
             }`}
             onClick={() => setTypeFilter(type)}
           >
-            {type === 'all' ? 'All' : type === 'protocol' ? 'Protocol' : 'Stablecoin'}
+            {type === 'all' ? 'All' : type === 'protocol' ? 'Protocol' : type === 'stablecoin' ? 'Stablecoin' : 'LSTs'}
           </button>
         ))}
       </div>
