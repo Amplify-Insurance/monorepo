@@ -20,10 +20,9 @@ import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
 /**
  * @title RiskManager
  * @author Gemini
- * @notice Orchestrates claim processing and liquidations. Refactored to work with the
- * UnderwriterManager as the single source of truth for capital pledges.
- * @dev CORRECTED: processClaim now clears pending increases from the PolicyManager
- * to ensure totalCoverageSold is accurately updated.
+ * @notice Orchestrates claim processing and liquidations.
+ * @dev CORRECTED: processClaim now correctly records the loss against underwriter pledges
+ * in the UnderwriterManager, ensuring available capacity is accurately calculated.
  */
 contract RiskManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -125,13 +124,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
         emit UnderwriterLiquidated(msg.sender, _underwriter);
     }
 
-    /**
-     * @notice Processes a claim, pays out the claimant, and updates system state.
-     * @dev CORRECTED: This function now includes a call to the PolicyManager to clear any
-     * pending coverage increases associated with the policy being claimed against. This ensures
-     * that the total coverage sold for the pool is reduced by both the claimed amount and any
-     * pending (but now cancelled) increases, preventing orphaned liability.
-     */
     function processClaim(uint256 policyId, uint256 claimAmount) external nonReentrant {
         address claimant = policyNFT.ownerOf(policyId);
         if (msg.sender != claimant) revert OnlyPolicyOwner();
@@ -142,15 +134,20 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
         ClaimData memory data = _prepareClaimData(policy, claimant);
 
-        // --- FIX: Clear pending increases and calculate total liability reduction ---
         uint256 pendingAmountCancelled = IPolicyManager(policyManager)
             .clearIncreasesAndGetPendingAmount(policyId);
         uint256 totalReduction = claimAmount + pendingAmountCancelled;
-        // --- End of FIX ---
 
         _distributePremium(data, claimAmount);
         
         uint256 lossBorneByPool = _distributeLossesAndRecord(data, claimAmount);
+        
+        // --- FIX: Notify UnderwriterManager of the loss to update pledges ---
+        address[] memory underwriters = underwriterManager.getPoolUnderwriters(policy.poolId);
+        for (uint i = 0; i < underwriters.length; i++) {
+            underwriterManager.recordLossAgainstPledge(underwriters[i], policy.poolId, claimAmount);
+        }
+        // --- End of FIX ---
         
         _executePayout(data, claimAmount, lossBorneByPool);
 
@@ -162,7 +159,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
             policyNFT.reduceCoverage(policyId, claimAmount);
         }
         
-        // Use the corrected totalReduction amount to update coverage sold
         poolRegistry.updateCoverageSold(policy.poolId, totalReduction, false);
 
         emit ClaimProcessed(policyId, claimAmount, isFullClaim);
@@ -235,14 +231,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
         (data.adapters, data.capitalPerAdapter, data.totalCapitalPledged) =
             underwriterManager.getPoolPayoutData(data.policy.poolId);
         
-        (
-            data.protocolToken,
-            , 
-            , 
-            , 
-            data.poolClaimFeeBps 
-            ,
-        ) = poolRegistry.getPoolStaticData(data.policy.poolId);
+        (data.protocolToken,,,,data.poolClaimFeeBps,) = poolRegistry.getPoolStaticData(data.policy.poolId);
     }
 
     function _checkInsolvency(address _underwriter) internal view {

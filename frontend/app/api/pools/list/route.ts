@@ -20,8 +20,8 @@ const BPS = 10_000n;
 
 /**
  * Recursively walk a value converting:
- *   • native `bigint` → `string`
- *   • ethers `BigNumber` → `string`
+ * • native `bigint` → `string`
+ * • ethers `BigNumber` → `string`
  * While doing so we strip the numeric index keys automatically added by the
  * ABI‑coder so the final JSON only contains the *named* Solidity struct fields.
  *
@@ -151,10 +151,10 @@ export async function GET() {
             [i]
           ),
         });
-        // Fetch risk rating for each pool
+        // --- FIX: Use the correct function name 'getPoolRiskRating' ---
         poolCalls.push({
           target: dep.poolRegistry,
-          callData: poolRegistry.interface.encodeFunctionData("riskRating", [i]),
+          callData: poolRegistry.interface.encodeFunctionData("getPoolRiskRating", [i]),
         });
       }
 
@@ -184,8 +184,9 @@ export async function GET() {
             "capitalPendingWithdrawal",
             pendingRes.returnData,
           );
+          // --- FIX: Use the correct function name 'getPoolRiskRating' to decode ---
           const [riskDec] = poolRegistry.interface.decodeFunctionResult(
-            "riskRating",
+            "getPoolRiskRating",
             riskRes.returnData,
           );
 

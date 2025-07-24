@@ -183,9 +183,34 @@
           "internalType": "uint256",
           "name": "claimFeeBps",
           "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum IPoolRegistry.RiskRating",
+          "name": "riskRating",
+          "type": "uint8"
         }
       ],
       "name": "PoolCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "poolId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum IPoolRegistry.RiskRating",
+          "name": "newRiskRating",
+          "type": "uint8"
+        }
+      ],
+      "name": "PoolRiskRatingUpdated",
       "type": "event"
     },
     {
@@ -258,6 +283,11 @@
           "internalType": "uint256",
           "name": "claimFeeBps",
           "type": "uint256"
+        },
+        {
+          "internalType": "enum IPoolRegistry.RiskRating",
+          "name": "riskRating",
+          "type": "uint8"
         }
       ],
       "name": "addProtocolRiskPool",
@@ -333,6 +363,25 @@
           "type": "uint256"
         }
       ],
+      "name": "getPoolRiskRating",
+      "outputs": [
+        {
+          "internalType": "enum IPoolRegistry.RiskRating",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "poolId",
+          "type": "uint256"
+        }
+      ],
       "name": "getPoolStaticData",
       "outputs": [
         {
@@ -359,6 +408,11 @@
           "internalType": "uint256",
           "name": "claimFeeBps",
           "type": "uint256"
+        },
+        {
+          "internalType": "enum IPoolRegistry.RiskRating",
+          "name": "riskRating",
+          "type": "uint8"
         }
       ],
       "stateMutability": "view",
@@ -481,6 +535,11 @@
           "type": "uint256"
         },
         {
+          "internalType": "enum IPoolRegistry.RiskRating",
+          "name": "riskRating",
+          "type": "uint8"
+        },
+        {
           "internalType": "uint256",
           "name": "totalCoverageSold",
           "type": "uint256"
@@ -581,7 +640,25 @@
           "type": "address"
         }
       ],
-      "name": "setPolicyManager",
+      "name": "setPolicyManagerAddress",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "poolId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum IPoolRegistry.RiskRating",
+          "name": "newRating",
+          "type": "uint8"
+        }
+      ],
+      "name": "setPoolRiskRating",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -594,7 +671,7 @@
           "type": "address"
         }
       ],
-      "name": "setRiskManager",
+      "name": "setRiskManagerAddress",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -633,25 +710,6 @@
       "name": "updateCoverageSold",
       "outputs": [],
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "poolId",
-          "type": "uint256"
-        }
-      ],
-      "name": "riskRating",
-      "outputs": [
-        {
-          "internalType": "uint8",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
       "type": "function"
     }
   ],
