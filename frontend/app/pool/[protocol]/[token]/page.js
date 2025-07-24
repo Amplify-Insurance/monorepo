@@ -217,7 +217,10 @@ export default function PoolDetailsPage() {
       ctx.fillStyle = text
       ctx.font = AXIS_LABEL_FONT
 
-      const maxRate = Math.max(...interestRateData.map((p) => p.rate)) * 1.1
+      const maxRate = Math.max(
+        ...interestRateData.map((p) => p.rate),
+        processedPool.premium ?? 0,
+      ) * 1.1
       const numY = 5
       for (let i = 0; i <= numY; i++) {
         const r = (i / numY) * maxRate
@@ -296,10 +299,7 @@ export default function PoolDetailsPage() {
       ctx.fillText(`Optimal ${optimal}%`, optX, padding.top - 5)
 
       const currentUtil = processedPool.utilizationRate
-      const base = rateParams.base
-      const s1 = rateParams.s1
-      const s2 = rateParams.s2
-      const currentRate = calculateRate(currentUtil, optimal, base, s1, s2)
+      const currentRate = processedPool.premium
       const { x: curX, y: curY } = map(currentUtil, currentRate)
       ctx.beginPath()
       ctx.lineWidth = 1
@@ -483,7 +483,7 @@ export default function PoolDetailsPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-center sm:text-left">
           <div><div className="text-xs text-gray-500 dark:text-gray-400">Current Utilization</div><div className="text-lg font-medium text-blue-600 dark:text-blue-400">{formatPercentage(processedPool?.utilizationRate ?? 0)}</div></div>
-          <div><div className="text-xs text-gray-500 dark:text-gray-400">Current Premium</div><div className="text-lg font-medium text-pink-600 dark:text-pink-400">{formatPercentage(calculateRate(processedPool?.utilizationRate ?? 0,rateParams.optimal,rateParams.base,rateParams.s1,rateParams.s2))}</div></div>
+          <div><div className="text-xs text-gray-500 dark:text-gray-400">Current Premium</div><div className="text-lg font-medium text-pink-600 dark:text-pink-400">{formatPercentage(processedPool?.premium ?? 0)}</div></div>
           <div><div className="text-xs text-gray-500 dark:text-gray-400">Optimal Utilization</div><div className="text-lg font-medium text-gray-700 dark:text-gray-300">{formatPercentage(rateParams.optimal)}</div></div>
           <div><div className="text-xs text-gray-500 dark:text-gray-400">Rate at Optimal</div><div className="text-lg font-medium text-gray-700 dark:text-gray-300">{formatPercentage(calculateRate(rateParams.optimal,rateParams.optimal,rateParams.base,rateParams.s1,rateParams.s2))}</div></div>
         </div>
