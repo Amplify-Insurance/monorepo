@@ -103,6 +103,8 @@ export default function ActiveCoverages({ displayCurrency }) {
         type: getProtocolType(pool.id),
         pool: pool.protocolTokenToCover,
         poolName: getTokenName(pool.protocolTokenToCover),
+        reserveToken: pool.underlyingAsset,
+        reserveTokenName: getTokenName(pool.underlyingAsset),
         premium: Number(pool.premiumRateBps || 0) / 100,
         capacity,
       }
@@ -269,14 +271,28 @@ export default function ActiveCoverages({ displayCurrency }) {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-6 w-6 mr-2">
                       <Image
-                        src={getTokenLogo(coverage.pool) || "/placeholder.svg"}
-                        alt={getProtocolName(coverage.poolName)}
+                        src={
+                          getTokenLogo(
+                            coverage.type === "protocol"
+                              ? coverage.pool
+                              : coverage.reserveToken,
+                          ) || "/placeholder.svg"
+                        }
+                        alt={
+                          coverage.type === "protocol"
+                            ? getProtocolName(coverage.poolName)
+                            : getTokenName(coverage.reserveToken)
+                        }
                         width={24}
                         height={24}
                         className="rounded-full"
                       />
                     </div>
-                    <div className="text-sm text-gray-900 dark:text-white">{coverage.poolName}</div>
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {coverage.type === "protocol"
+                        ? coverage.poolName
+                        : coverage.reserveTokenName}
+                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
