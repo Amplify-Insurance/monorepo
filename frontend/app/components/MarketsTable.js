@@ -2,7 +2,7 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import React, { useState, useEffect } from "react"
-import { ChevronDown, ChevronUp, ExternalLink, Info } from "lucide-react"
+import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useAccount } from "wagmi"
@@ -42,18 +42,6 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
   const [typeFilter, setTypeFilter] = useState("all") // 'all', 'protocol', 'stablecoin', 'lst'
-  const [userPoints, setUserPoints] = useState({ used: 0, total: 1000 }) // Mock user points data
-
-  // Fetch user points when address changes
-  useEffect(() => {
-    if (address && isConnected) {
-      // Mock API call to fetch user points
-      // In real implementation, this would be an actual API call
-      setUserPoints({ used: 350, total: 1000 })
-    } else {
-      setUserPoints({ used: 0, total: 1000 })
-    }
-  }, [address, isConnected])
 
   const grouped = {}
   for (const pool of pools) {
@@ -161,51 +149,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
         </div>
       )}
 
-      {/* User Points Usage Slider - only show when connected */}
-      {isConnected && (
-        <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-white">Points Usage</h3>
-              <div className="group relative">
-                <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                  Points are used to access premium features and discounts
-                </div>
-              </div>
-            </div>
-            <div className="text-sm font-medium text-gray-900 dark:text-white">
-              {userPoints.used} / {userPoints.total} points
-            </div>
-          </div>
 
-          <div className="relative">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-              <div
-                className="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${(userPoints.used / userPoints.total) * 100}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
-              <span>0</span>
-              <span className="text-center">{((userPoints.used / userPoints.total) * 100).toFixed(1)}% used</span>
-              <span>{userPoints.total}</span>
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-gray-600 dark:text-gray-300">
-              Remaining: {userPoints.total - userPoints.used} points
-            </span>
-            <Link
-              href="/points"
-              className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium"
-            >
-              Earn more points →
-            </Link>
-          </div>
-        </div>
-      )}
 
       {/* Market type filter */}
       <div className="mb-4 inline-flex rounded-md shadow-sm">
