@@ -1,54 +1,78 @@
 "use client"
 
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import React, { useState } from "react"
-import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
+import React, { useState, useEffect } from "react"
+import { ChevronDown, ChevronUp, ExternalLink, Info } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useAccount } from "wagmi"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
-import { utils as ethersUtils, BigNumber, ethers } from 'ethers';
-// import { formatUnits } from 'ethers';
-import { getTokenName, getTokenDescription, getTokenLogo, getProtocolName, getProtocolLogo, getProtocolDescription, getProtocolType } from "../config/tokenNameMap";
+import { utils as ethersUtils, BigNumber } from "ethers"
+import {
+  getTokenName,
+  getTokenLogo,
+  getProtocolName,
+  getProtocolLogo,
+  getProtocolDescription,
+  getProtocolType,
+} from "../config/tokenNameMap"
+
+// Risk rating conversion function
+const getRiskRatingText = (riskRating) => {
+  if (riskRating <= 25) return "Low"
+  if (riskRating <= 50) return "Moderate"
+  if (riskRating <= 75) return "Elevated"
+  return "Speculative"
+}
+
+// Risk rating color function
+const getRiskRatingColor = (riskRating) => {
+  if (riskRating <= 25) return "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20"
+  if (riskRating <= 50) return "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/20"
+  if (riskRating <= 75) return "text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20"
+  return "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20"
+}
 
 export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
-  const { isConnected } = useAccount()
+  const { isConnected, address } = useAccount()
   const [expandedMarkets, setExpandedMarkets] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
-  const [typeFilter, setTypeFilter] = useState('all') // 'all', 'protocol', 'stablecoin', 'lst'
+  const [typeFilter, setTypeFilter] = useState("all") // 'all', 'protocol', 'stablecoin', 'lst'
+  const [userPoints, setUserPoints] = useState({ used: 0, total: 1000 }) // Mock user points data
+
+  // Fetch user points when address changes
+  useEffect(() => {
+    if (address && isConnected) {
+      // Mock API call to fetch user points
+      // In real implementation, this would be an actual API call
+      setUserPoints({ used: 350, total: 1000 })
+    } else {
+      setUserPoints({ used: 0, total: 1000 })
+    }
+  }, [address, isConnected])
 
   const grouped = {}
   for (const pool of pools) {
     const name = getProtocolName(pool.id)
-    // const underlyingDec = Number(pool.underlyingAssetDecimals)
     const protoDec = Number(pool.protocolTokenDecimals ?? 18)
     const premium = Number(pool.premiumRateBps || 0) / 100
     const uwYield = Number(pool.underwriterYieldBps || 0) / 100
+    const riskRating = Number(pool.riskRating || 0) // Assuming this exists in pool data
 
-    const pledged = BigNumber.from(pool.totalCapitalPledgedToPool);
-    const sold = BigNumber.from(pool.totalCoverageSold);
+    const pledged = BigNumber.from(pool.totalCapitalPledgedToPool)
+    const sold = BigNumber.from(pool.totalCoverageSold)
 
-    const decimals =
-      pool.underlyingAssetDecimals ??
-      pool.protocolTokenDecimals ?? // this one **is** in the payload
-      18; // sensible default
+    const decimals = pool.underlyingAssetDecimals ?? pool.protocolTokenDecimals ?? 18
 
-    const coverageSold = Number(
-      ethersUtils.formatUnits(sold, decimals)
-    )
+    const coverageSold = Number(ethersUtils.formatUnits(sold, decimals))
 
-    const capacity = Number(
-      ethersUtils.formatUnits(pledged.sub(sold), decimals)
-    );
+    const capacity = Number(ethersUtils.formatUnits(pledged.sub(sold), decimals))
 
-
-    const tvlNative = Number(
-      ethersUtils.formatUnits(pool.totalCapitalPledgedToPool, decimals),
-    )
+    const tvlNative = Number(ethersUtils.formatUnits(pool.totalCapitalPledgedToPool, decimals))
 
     const entry = grouped[pool.id] || {
       id: pool.id,
@@ -57,6 +81,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
       tvl: 0,
       coverageSold: 0,
       tokenPriceUsd: pool.tokenPriceUsd ?? 0,
+      riskRating: riskRating,
       pools: [],
     }
     entry.tvl += tvlNative
@@ -70,6 +95,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
       tvl: Number(ethersUtils.formatUnits(pool.totalCoverageSold, protoDec)),
       price: pool.tokenPriceUsd ?? 0,
       capacity,
+      riskRating: riskRating,
     })
     grouped[pool.id] = entry
   }
@@ -78,9 +104,10 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     ...m,
     coverAvailable: m.tvl - m.coverageSold,
   }))
+
   const filteredMarkets = markets.filter((m) => {
     const type = getProtocolType(m.id)
-    if (typeFilter === 'all') return true
+    if (typeFilter === "all") return true
     return type === typeFilter
   })
 
@@ -134,22 +161,68 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
         </div>
       )}
 
+      {/* User Points Usage Slider - only show when connected */}
+      {isConnected && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">Points Usage</h3>
+              <div className="group relative">
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                  Points are used to access premium features and discounts
+                </div>
+              </div>
+            </div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {userPoints.used} / {userPoints.total} points
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+              <div
+                className="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${(userPoints.used / userPoints.total) * 100}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+              <span>0</span>
+              <span className="text-center">{((userPoints.used / userPoints.total) * 100).toFixed(1)}% used</span>
+              <span>{userPoints.total}</span>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-xs">
+            <span className="text-gray-600 dark:text-gray-300">
+              Remaining: {userPoints.total - userPoints.used} points
+            </span>
+            <Link
+              href="/points"
+              className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium"
+            >
+              Earn more points →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Market type filter */}
       <div className="mb-4 inline-flex rounded-md shadow-sm">
-        {['all', 'protocol', 'stablecoin', 'lst'].map((type, idx, arr) => (
+        {["all", "protocol", "stablecoin", "lst"].map((type, idx, arr) => (
           <button
             key={type}
             type="button"
             className={`px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 focus:z-10 ${
-              idx === 0 ? 'rounded-l-md' : idx === arr.length - 1 ? 'rounded-r-md -ml-px' : '-ml-px'
+              idx === 0 ? "rounded-l-md" : idx === arr.length - 1 ? "rounded-r-md -ml-px" : "-ml-px"
             } ${
               typeFilter === type
-                ? 'bg-blue-600 text-white'
-                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
+                ? "bg-blue-600 text-white"
+                : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
             }`}
             onClick={() => setTypeFilter(type)}
           >
-            {type === 'all' ? 'All' : type === 'protocol' ? 'Protocol' : type === 'stablecoin' ? 'Stablecoin' : 'LSTs'}
+            {type === "all" ? "All" : type === "protocol" ? "Protocol" : type === "stablecoin" ? "Stablecoin" : "LSTs"}
           </button>
         ))}
       </div>
@@ -180,6 +253,12 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                   </th>
                   <th
                     scope="col"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell"
+                  >
+                    Risk Rating
+                  </th>
+                  <th
+                    scope="col"
                     className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                   >
                     {mode === "purchase" ? "Premium APY" : "Yield APY"}
@@ -196,13 +275,12 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredMarkets.map((market) => (
                   <React.Fragment key={market.id}>
-
                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-750">
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-4">
                             <Image
-                              src={getProtocolLogo(market.id)}
+                              src={getProtocolLogo(market.id) || "/placeholder.svg"}
                               alt={market.name}
                               width={40}
                               height={40}
@@ -220,10 +298,8 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
                           {formatCurrency(
-                            displayCurrency === 'usd'
-                              ? market.tvl * market.tokenPriceUsd
-                              : market.tvl,
-                            'usd',
+                            displayCurrency === "usd" ? market.tvl * market.tokenPriceUsd : market.tvl,
+                            "usd",
                             displayCurrency,
                           )}
                         </div>
@@ -231,17 +307,23 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
                           {formatCurrency(
-                            displayCurrency === 'usd'
+                            displayCurrency === "usd"
                               ? market.coverAvailable * market.tokenPriceUsd
                               : market.coverAvailable,
-                            'usd',
+                            "usd",
                             displayCurrency,
                           )}
                         </div>
                       </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden lg:table-cell">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRiskRatingColor(market.riskRating)}`}
+                        >
+                          {getRiskRatingText(market.riskRating)}
+                        </span>
+                      </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {/* Display premium range instead of single value */}
                           {mode === "purchase" ? getPremiumRange(market) : getYieldRange(market)}
                         </div>
                       </td>
@@ -265,7 +347,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                     {/* Expanded pools section */}
                     {expandedMarkets.includes(market.id) && (
                       <tr>
-                        <td colSpan={5} className="px-3 sm:px-6 py-4">
+                        <td colSpan={6} className="px-3 sm:px-6 py-4">
                           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4">
                             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                               Available Pools
@@ -280,7 +362,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                     <div className="flex items-center">
                                       <div className="flex-shrink-0 h-6 w-6 mr-2">
                                         <Image
-                                          src={getTokenLogo(pool.token)}
+                                          src={getTokenLogo(pool.token) || "/placeholder.svg"}
                                           alt={pool.tokenName}
                                           width={24}
                                           height={24}
@@ -289,16 +371,20 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                                       </div>
                                       <span className="font-medium">{getTokenName(pool.token)}</span>
                                     </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      TVL:{' '}
-                                      {formatCurrency(
-                                        displayCurrency === 'usd'
-                                          ? pool.tvl * pool.price
-                                          : pool.tvl,
-                                        'usd',
-                                        displayCurrency,
-                                      )}
-                                    </div>
+                                    <span
+                                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRiskRatingColor(pool.riskRating)}`}
+                                    >
+                                      {getRiskRatingText(pool.riskRating)}
+                                    </span>
+                                  </div>
+
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                    TVL:{" "}
+                                    {formatCurrency(
+                                      displayCurrency === "usd" ? pool.tvl * pool.price : pool.tvl,
+                                      "usd",
+                                      displayCurrency,
+                                    )}
                                   </div>
 
                                   <div className="grid grid-cols-2 gap-2 mb-4">
