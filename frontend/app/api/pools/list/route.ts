@@ -151,15 +151,21 @@ export async function GET() {
             [i]
           ),
         });
+        // Fetch risk rating for each pool
+        poolCalls.push({
+          target: dep.poolRegistry,
+          callData: poolRegistry.interface.encodeFunctionData("riskRating", [i]),
+        });
       }
 
       const poolResults = await multicall.tryAggregate(true, poolCalls);
 
       for (let i = 0; i < Number(count); i++) {
-        const dataRes = poolResults[4 * i];
-        const rateRes = poolResults[4 * i + 1];
-        const totalRes = poolResults[4 * i + 2];
-        const pendingRes = poolResults[4 * i + 3];
+        const dataRes = poolResults[5 * i];
+        const rateRes = poolResults[5 * i + 1];
+        const totalRes = poolResults[5 * i + 2];
+        const pendingRes = poolResults[5 * i + 3];
+        const riskRes = poolResults[5 * i + 4];
         if (!dataRes.success || !rateRes.success) continue;
         try {
           const dataDec = poolRegistry.interface.decodeFunctionResult(
@@ -178,6 +184,10 @@ export async function GET() {
             "capitalPendingWithdrawal",
             pendingRes.returnData,
           );
+          const [riskDec] = poolRegistry.interface.decodeFunctionResult(
+            "riskRating",
+            riskRes.returnData,
+          );
 
           const rawInfo = {
             protocolTokenToCover: dataDec.protocolTokenToCover ?? dataDec[0],
@@ -188,6 +198,7 @@ export async function GET() {
             totalCapitalPledgedToPool: totalDec,
             capitalPendingWithdrawal: pendingDec,
             rateModel: rateDec[0],
+            riskRating: riskDec,
           };
           const info = bnToString(rawInfo);
           const rate = calcPremiumRateBps(info);

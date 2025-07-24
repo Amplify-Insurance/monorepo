@@ -22,6 +22,8 @@ import { YieldPlatform, getYieldPlatformInfo } from "../config/yieldPlatforms"
 import { ethers } from "ethers"
 import { getProtocolDescription } from "../config/tokenNameMap"
 import { getTokenLogo, getProtocolLogo, getProtocolName } from "../config/tokenNameMap"
+import { getUnderwriterManager } from "../../lib/underwriterManager"
+import { getDeployment } from "../config/deployments"
 import {
   Sheet,
   SheetTrigger,
@@ -79,6 +81,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const [selectedYield, setSelectedYield] = useState(null)
   const [yieldDropdownOpen, setYieldDropdownOpen] = useState(false)
   const [yieldInfoOpen, setYieldInfoOpen] = useState(false)
+  const [selectionLimit, setSelectionLimit] = useState(0)
 
   useEffect(() => {
     if (!selectedToken && tokens && tokens.length > 0) {
@@ -122,6 +125,20 @@ export default function UnderwriterPanel({ displayCurrency }) {
     setSelectedMarkets(Array.from(new Set(marketIds)))
   }, [details, selectedToken, pools])
 
+  useEffect(() => {
+    async function loadLimit() {
+      try {
+        const dep = getDeployment(selectedDeployment)
+        const rm = getUnderwriterManager(dep.underwriterManager, dep.name)
+        const lim = await rm.maxAllocationsPerUnderwriter()
+        setSelectionLimit(Number(lim.toString()))
+      } catch (err) {
+        console.error('Failed to load selection limit', err)
+      }
+    }
+    if (selectedDeployment) loadLimit()
+  }, [selectedDeployment])
+
 
   const markets = Object.values(
     pools.reduce((acc, pool) => {
@@ -143,6 +160,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
         coveredToken: pool.protocolTokenToCover,
         premium: Number(pool.premiumRateBps || 0) / 100,
         underwriterYield: Number(pool.underwriterYieldBps || 0) / 100,
+        riskRating: pool.riskRating ? Number(pool.riskRating) : null,
         tvl: Number(
           ethers.utils.formatUnits(
             pool.totalCoverageSold,
@@ -202,6 +220,9 @@ export default function UnderwriterPanel({ displayCurrency }) {
       if (prev.includes(marketId)) {
         return prev.filter((id) => id !== marketId)
       } else {
+        if (selectionLimit > 0 && prev.length >= selectionLimit) {
+          return prev
+        }
         return [...prev, marketId]
       }
     })
@@ -216,6 +237,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
   const selectedAdapter = adapters.find((a) => a.id === selectedYield)
   const baseYield = selectedAdapter?.apr || 0
   const totalYield = calculateTotalYield() + baseYield
+  const pointsRemaining = selectionLimit > 0 ? selectionLimit - selectedMarkets.length : 0
 
   if (!isConnected) {
     return (
@@ -412,6 +434,11 @@ export default function UnderwriterPanel({ displayCurrency }) {
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
             Available protocols for {selectedToken?.symbol || ''}
           </h3>
+          {selectionLimit > 0 && (
+            <span className="ml-4 text-sm text-gray-500 dark:text-gray-400">
+              Points remaining: {pointsRemaining}
+            </span>
+          )}
 
           <div className="relative">
             <button
@@ -513,6 +540,14 @@ export default function UnderwriterPanel({ displayCurrency }) {
                         )}
                       </span>
                     </div>
+                    {pool.riskRating !== null && (
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Risk Rating:</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {pool.riskRating}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -530,6 +565,11 @@ export default function UnderwriterPanel({ displayCurrency }) {
                 You've selected <span className="font-medium">{selectedMarkets.length}</span> protocol
                 {selectedMarkets.length !== 1 ? "s" : ""} to provide coverage for
               </p>
+              {selectionLimit > 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Points remaining: {pointsRemaining}
+                </p>
+              )}
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Total estimated yield:{" "}
                 <span className="font-medium text-green-600 dark:text-green-400">
