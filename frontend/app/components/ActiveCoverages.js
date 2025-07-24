@@ -95,17 +95,19 @@ export default function ActiveCoverages({ displayCurrency }) {
         return 0
       }
 
-      const baseCoverage = {
-        policyId: p.id,
-        deployment: p.deployment,
-        protocol,
-        protocolLogo,
-        type: getProtocolType(pool.id),
-        pool: pool.protocolTokenToCover,
-        poolName: getTokenName(pool.protocolTokenToCover),
-        premium: Number(pool.premiumRateBps || 0) / 100,
-        capacity,
-      }
+        const baseCoverage = {
+          policyId: p.id,
+          deployment: p.deployment,
+          protocol,
+          protocolLogo,
+          type: getProtocolType(pool.id),
+          pool: pool.protocolTokenToCover,
+          poolName: getTokenName(pool.protocolTokenToCover),
+          reserveToken: pool.underlyingAsset,
+          reserveTokenName: getTokenName(pool.underlyingAsset),
+          premium: Number(pool.premiumRateBps || 0) / 100,
+          capacity,
+        }
 
       const rows = []
 
@@ -269,14 +271,14 @@ export default function ActiveCoverages({ displayCurrency }) {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-6 w-6 mr-2">
                       <Image
-                        src={getTokenLogo(coverage.pool) || "/placeholder.svg"}
-                        alt={getProtocolName(coverage.poolName)}
+                        src={getTokenLogo(coverage.reserveToken) || "/placeholder.svg"}
+                        alt={coverage.reserveTokenName}
                         width={24}
                         height={24}
                         className="rounded-full"
                       />
                     </div>
-                    <div className="text-sm text-gray-900 dark:text-white">{coverage.poolName}</div>
+                    <div className="text-sm text-gray-900 dark:text-white">{coverage.reserveTokenName}</div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
