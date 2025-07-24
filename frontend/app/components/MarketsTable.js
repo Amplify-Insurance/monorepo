@@ -34,8 +34,12 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
 
     const decimals =
       pool.underlyingAssetDecimals ??
-      pool.protocolTokenDecimals ??   // this one **is** in the payload
-      18;                              // sensible default
+      pool.protocolTokenDecimals ?? // this one **is** in the payload
+      18; // sensible default
+
+    const coverageSold = Number(
+      ethersUtils.formatUnits(sold, decimals)
+    )
 
     const capacity = Number(
       ethersUtils.formatUnits(pledged.sub(sold), decimals)
@@ -51,10 +55,12 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
       name,
       description: `${getProtocolDescription(pool.id)}`,
       tvl: 0,
+      coverageSold: 0,
       tokenPriceUsd: pool.tokenPriceUsd ?? 0,
       pools: [],
     }
     entry.tvl += tvlNative
+    entry.coverageSold += coverageSold
     entry.pools.push({
       deployment: pool.deployment,
       token: pool.protocolTokenToCover,
@@ -68,7 +74,10 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     grouped[pool.id] = entry
   }
 
-  const markets = Object.values(grouped)
+  const markets = Object.values(grouped).map((m) => ({
+    ...m,
+    coverAvailable: m.tvl - m.coverageSold,
+  }))
   const filteredMarkets = markets.filter((m) => {
     const type = getProtocolType(m.id)
     if (typeFilter === 'all') return true
@@ -165,6 +174,12 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                   </th>
                   <th
                     scope="col"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                  >
+                    Cover Available
+                  </th>
+                  <th
+                    scope="col"
                     className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                   >
                     {mode === "purchase" ? "Premium APY" : "Yield APY"}
@@ -213,6 +228,17 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                           )}
                         </div>
                       </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {formatCurrency(
+                            displayCurrency === 'usd'
+                              ? market.coverAvailable * market.tokenPriceUsd
+                              : market.coverAvailable,
+                            'usd',
+                            displayCurrency,
+                          )}
+                        </div>
+                      </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
                           {/* Display premium range instead of single value */}
@@ -239,7 +265,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                     {/* Expanded pools section */}
                     {expandedMarkets.includes(market.id) && (
                       <tr>
-                        <td colSpan={4} className="px-3 sm:px-6 py-4">
+                        <td colSpan={5} className="px-3 sm:px-6 py-4">
                           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4">
                             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                               Available Pools
