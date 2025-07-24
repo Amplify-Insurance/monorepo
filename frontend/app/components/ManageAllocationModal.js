@@ -8,6 +8,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { formatPercentage } from "../utils/formatting"
+import { getRiskRatingText, getRiskRatingColor } from "../utils/riskRating"
 import { getUnderwriterManagerWithSigner, getUnderwriterManager } from "../../lib/underwriterManager"
 import { getDeployment } from "../config/deployments"
 import { YieldPlatform } from "../config/yieldPlatforms"
@@ -334,11 +335,12 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
                         {formatPercentage(yieldRate)} APY
                       </span>
                       {pool.riskRating !== null && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Risk Rating:{" "}
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {pool.riskRating}
-                          </span>
+                        <span
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${getRiskRatingColor(
+                            pool.riskRating,
+                          )}`}
+                        >
+                          {getRiskRatingText(pool.riskRating)}
                         </span>
                       )}
                     </div>

@@ -7,6 +7,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useAccount } from "wagmi"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
+import { getRiskRatingText, getRiskRatingColor } from "../utils/riskRating"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
 import { utils as ethersUtils, BigNumber } from "ethers"
@@ -19,21 +20,6 @@ import {
   getProtocolType,
 } from "../config/tokenNameMap"
 
-// Risk rating conversion function
-const getRiskRatingText = (riskRating) => {
-  if (riskRating <= 25) return "Low"
-  if (riskRating <= 50) return "Moderate"
-  if (riskRating <= 75) return "Elevated"
-  return "Speculative"
-}
-
-// Risk rating color function
-const getRiskRatingColor = (riskRating) => {
-  if (riskRating <= 25) return "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20"
-  if (riskRating <= 50) return "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/20"
-  if (riskRating <= 75) return "text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20"
-  return "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20"
-}
 
 export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const { isConnected, address } = useAccount()

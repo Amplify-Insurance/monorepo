@@ -9,6 +9,7 @@ import Image from "next/image"
 import { useAccount } from "wagmi"
 import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 import { formatCurrency, formatPercentage } from "../utils/formatting"
+import { getRiskRatingText, getRiskRatingColor } from "../utils/riskRating"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
 import {
@@ -608,8 +609,12 @@ export default function UnderwriterPanel({ displayCurrency }) {
                     {pool.riskRating !== null && (
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-sm text-gray-500 dark:text-gray-400">Risk Rating:</span>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {pool.riskRating}
+                        <span
+                          className={`text-sm font-medium px-2 py-0.5 rounded-full ${getRiskRatingColor(
+                            pool.riskRating,
+                          )}`}
+                        >
+                          {getRiskRatingText(pool.riskRating)}
                         </span>
                       </div>
                     )}
