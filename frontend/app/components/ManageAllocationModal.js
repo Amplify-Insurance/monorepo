@@ -333,6 +333,14 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
                       <span className="text-xs text-green-600 dark:text-green-400 font-medium">
                         {formatPercentage(yieldRate)} APY
                       </span>
+                      {pool.riskRating !== null && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Risk Rating:{" "}
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {pool.riskRating}
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
