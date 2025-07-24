@@ -80,6 +80,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
           type: getProtocolType(pool.id),
           pool: pool.protocolTokenToCover,
           poolName: getTokenName(pool.id),
+          reserveToken: pool.underlyingAsset,
+          reserveTokenName: getTokenName(pool.underlyingAsset),
           poolId: pid,
           pendingLoss,
           pendingLossUsd: pendingLoss * tokenPriceUsd,
@@ -349,14 +351,28 @@ export default function UnderwritingPositions({ displayCurrency }) {
                             <div className="flex items-center">
                               <div className="flex-shrink-0 h-6 w-6 mr-2">
                                 <Image
-                                  src={getTokenLogo(position.pool) || "/placeholder.svg"}
-                                  alt={getTokenName(position.pool)}
+                                  src={
+                                    getTokenLogo(
+                                      position.type === "protocol"
+                                        ? position.pool
+                                        : position.reserveToken,
+                                    ) || "/placeholder.svg"
+                                  }
+                                  alt={
+                                    position.type === "protocol"
+                                      ? getTokenName(position.pool)
+                                      : getTokenName(position.reserveToken)
+                                  }
                                   width={24}
                                   height={24}
                                   className="rounded-full"
                                 />
                               </div>
-                              <div className="text-sm text-gray-900 dark:text-white">{getTokenName(position.pool)}</div>
+                              <div className="text-sm text-gray-900 dark:text-white">
+                                {position.type === "protocol"
+                                  ? getTokenName(position.pool)
+                                  : position.reserveTokenName}
+                              </div>
                             </div>
                             <div className="mt-1 sm:hidden text-xs text-gray-500 dark:text-gray-400">
                               {displayCurrency === "native"
@@ -477,7 +493,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
                                         <div>
                                           <h3 className="text-lg font-semibold text-white">Position Management</h3>
                                           <p className="text-slate-300 text-sm">
-                                            {getProtocolName(position.poolId)} • {getTokenName(position.pool)}
+                                            {getProtocolName(position.poolId)} •{' '}
+                                            {position.type === "protocol"
+                                              ? getTokenName(position.pool)
+                                              : position.reserveTokenName}
                                           </p>
                                         </div>
                                       </div>
