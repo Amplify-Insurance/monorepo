@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import CatPool from '../abi/BackstopPool.json';
 import { getProvider, provider } from './provider';
+import { getERC20WithSigner } from './erc20';
 import deployments from '../app/config/deployments';
 
 const DEFAULT_ADDRESS = deployments[0]?.backstopPool as string;
@@ -72,6 +73,41 @@ export async function getCatShareDecimals(address: string = DEFAULT_ADDRESS, dep
     getProvider(deployment),
   );
   return await token.decimals();
+}
+
+/**
+ * Deposit USDC into the Catastrophe Pool. Automatically approves the
+ * BackstopPool contract if allowance is insufficient.
+ */
+export async function depositWithApproval(amount: ethers.BigNumberish) {
+  const cp = await getCatPoolWithSigner();
+  const usdcAddr = await getUsdcAddress();
+  const token = await getERC20WithSigner(usdcAddr);
+  const signerAddr = await token.signer.getAddress();
+  const allowance = await token.allowance(signerAddr, cp.address);
+  if (allowance.lt(amount)) {
+    const approveTx = await token.approve(cp.address, amount);
+    await approveTx.wait();
+  }
+  const tx = await cp.depositLiquidity(amount);
+  await tx.wait();
+  return tx;
+}
+
+/** Submit a withdrawal request for CatShare tokens. */
+export async function requestWithdrawal(shares: ethers.BigNumberish) {
+  const cp = await getCatPoolWithSigner();
+  const tx = await cp.requestWithdrawal(shares);
+  await tx.wait();
+  return tx;
+}
+
+/** Draw funds from the Cat Pool once the cooldown period has passed. */
+export async function drawFund(amount: ethers.BigNumberish) {
+  const cp = await getCatPoolWithSigner();
+  const tx = await cp.drawFund(amount);
+  await tx.wait();
+  return tx;
 }
 
 
