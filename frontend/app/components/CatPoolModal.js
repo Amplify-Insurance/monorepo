@@ -5,7 +5,13 @@ import Image from "next/image"
 import { Info, AlertTriangle, Clock, TrendingUp } from "lucide-react"
 import Modal from "./Modal"
 import { formatCurrency } from "../utils/formatting"
-import { getCatPoolWithSigner, getUsdcAddress, getUsdcDecimals, getCatShareAddress } from "../../lib/catPool"
+import {
+  getCatPoolWithSigner,
+  getUsdcAddress,
+  getUsdcDecimals,
+  getCatShareAddress,
+  depositWithApproval,
+} from "../../lib/catPool"
 import deployments from "../config/deployments"
 import { getERC20WithSigner, getTokenDecimals } from "../../lib/erc20"
 import { getTokenLogo } from "../config/tokenNameMap"
@@ -143,14 +149,13 @@ export default function CatPoolModal({
     if (!amount) return
     setIsSubmitting(true)
     try {
-      const cp = await getCatPoolWithSigner()
       if (isDeposit) {
         const dec = await getUsdcDecimals()
         const amountBn = ethers.utils.parseUnits(amount, dec)
-        const tx = await cp.depositLiquidity(amountBn)
+        const tx = await depositWithApproval(amountBn)
         setTxHash(tx.hash)
-        await tx.wait()
       } else {
+        const cp = await getCatPoolWithSigner()
         const dec = await getUsdcDecimals()
         const amountBn = ethers.utils.parseUnits(amount, dec)
         const shareAddr = await getCatShareAddress()

@@ -14,6 +14,7 @@ import {
   getUsdcAddress,
   getUsdcDecimals,
   getCatShareDecimals,
+  drawFund,
 } from "../../lib/catPool"
 import ClaimRewardsModal from "./ClaimRewardsModal"
 import RequestWithdrawalModal from "./RequestWithdrawalModal"
@@ -154,6 +155,24 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
       setPendingWithdrawal(null)
     } catch (error) {
       console.error('Failed to withdraw:', error)
+    }
+  }
+
+  const handleDrawFund = async () => {
+    if (!pendingWithdrawal) return
+    try {
+      const dec = await getUsdcDecimals()
+      const amountBn = ethers.utils.parseUnits(
+        Number(pendingWithdrawal.value).toFixed(dec),
+        dec,
+      )
+      const tx = await drawFund(amountBn)
+      setTxHash(tx.hash)
+      await refresh()
+      await refreshWithdrawal()
+      setPendingWithdrawal(null)
+    } catch (error) {
+      console.error('Failed to draw fund:', error)
     }
   }
 
@@ -435,12 +454,20 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end space-x-2">
                       {withdrawalReady && (
-                        <button
-                          onClick={handleExecuteWithdrawal}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 rounded-md transition-colors"
-                        >
-                          Withdraw
-                        </button>
+                        <>
+                          <button
+                            onClick={handleExecuteWithdrawal}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 rounded-md transition-colors"
+                          >
+                            Withdraw
+                          </button>
+                          <button
+                            onClick={handleDrawFund}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 rounded-md transition-colors"
+                          >
+                            Draw Fund
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
