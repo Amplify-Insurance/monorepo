@@ -2,7 +2,13 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import React, { useState, useEffect } from "react"
-import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useAccount } from "wagmi"
@@ -28,6 +34,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
   const [typeFilter, setTypeFilter] = useState("all") // 'all', 'protocol', 'stablecoin', 'lst'
+  const [sortConfig, setSortConfig] = useState({ key: "tvl", direction: "desc" })
 
   const grouped = {}
   for (const pool of pools) {
@@ -74,16 +81,48 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     grouped[pool.id] = entry
   }
 
-  const markets = Object.values(grouped).map((m) => ({
-    ...m,
-    coverAvailable: m.tvl - m.coverageSold,
-  }))
+  const markets = Object.values(grouped).map((m) => {
+    const premiums = m.pools.map((p) => p.premium)
+    const minPremium = premiums.length ? Math.min(...premiums) : 0
+    return {
+      ...m,
+      coverAvailable: m.tvl - m.coverageSold,
+      premium: minPremium,
+    }
+  })
 
   const filteredMarkets = markets.filter((m) => {
     const type = getProtocolType(m.id)
     if (typeFilter === "all") return true
     return type === typeFilter
   })
+
+  const sortedMarkets = [...filteredMarkets].sort((a, b) => {
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === "asc" ? -1 : 1
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === "asc" ? 1 : -1
+    }
+    return 0
+  })
+
+  const requestSort = (key) => {
+    let direction = "asc"
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc"
+    }
+    setSortConfig({ key, direction })
+  }
+
+  const getSortDirectionIcon = (key) => {
+    if (sortConfig.key !== key) return null
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="h-4 w-4" />
+    ) : (
+      <ArrowDown className="h-4 w-4" />
+    )
+  }
 
   const toggleMarket = (marketId) => {
     setExpandedMarkets((prev) => (prev.includes(marketId) ? prev.filter((id) => id !== marketId) : [...prev, marketId]))
@@ -171,27 +210,43 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                   </th>
                   <th
                     scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => requestSort("tvl")}
                   >
-                    TVL
+                    <div className="flex items-center">
+                      TVL
+                      {getSortDirectionIcon("tvl")}
+                    </div>
                   </th>
                   <th
                     scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => requestSort("coverAvailable")}
                   >
-                    Cover Available
+                    <div className="flex items-center">
+                      Cover Available
+                      {getSortDirectionIcon("coverAvailable")}
+                    </div>
                   </th>
                   <th
                     scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => requestSort("riskRating")}
                   >
-                    Risk Rating
+                    <div className="flex items-center">
+                      Risk Rating
+                      {getSortDirectionIcon("riskRating")}
+                    </div>
                   </th>
                   <th
                     scope="col"
-                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => requestSort("premium")}
                   >
-                    {mode === "purchase" ? "Premium APY" : "Yield APY"}
+                    <div className="flex items-center">
+                      {mode === "purchase" ? "Premium APY" : "Yield APY"}
+                      {getSortDirectionIcon("premium")}
+                    </div>
                   </th>
                   <th
                     scope="col"
@@ -203,7 +258,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
               </thead>
 
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredMarkets.map((market) => (
+                {sortedMarkets.map((market) => (
                   <React.Fragment key={market.id}>
                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-750">
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
