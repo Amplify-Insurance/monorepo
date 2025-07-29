@@ -2,47 +2,59 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/ILossDistributor.sol";
 import "../interfaces/IUnderwriterManager.sol";
 import "../interfaces/ICapitalPool.sol";
-import "../interfaces/IPoolRegistry.sol"; // + ADDED
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import "../interfaces/IPoolRegistry.sol";
 
 /**
  * @title LossDistributor
  * @author Gemini
- * @notice Manages the scalable accounting of losses for underwriters using the "pull-over-push" pattern.
- * @dev V2: Implements cross-pool loss distribution based on underwriter capital overlap.
+ * @notice Manages accounting for direct and contagion losses.
+ * @dev V3: Implements a hybrid model where contagion losses only affect underwriters 
+ * who are allocated to both the source and target pools.
  */
 contract LossDistributor is ILossDistributor, Ownable {
     // --- Dependencies ---
     address public riskManager;
     IUnderwriterManager public underwriterManager;
-    ICapitalPool        public capitalPool;
-    IPoolRegistry       public poolRegistry; // + ADDED
+    ICapitalPool public capitalPool;
+    IPoolRegistry public poolRegistry;
 
     // --- Events ---
     event RiskManagerSet(address indexed newRiskManager);
     event UnderwriterManagerSet(address indexed newUnderwriterManager);
     event CapitalPoolSet(address indexed newCapitalPool);
-    event PoolRegistrySet(address indexed newPoolRegistry); // + ADDED
+    event PoolRegistrySet(address indexed newPoolRegistry);
 
-    // --- Accounting Structs for the "Pull-over-Push" Pattern ---
+    // --- Accounting Structs ---
     struct LossTracker {
+        /// @notice Total accumulated shares-to-burn per unit of pledge for a pool.
         uint256 accumulatedSharesToBurnPerPledge;
     }
 
-    struct UserLossState {
+    struct UserDirectLossState {
+        /// @notice Crystallized share debt from previous pledge updates.
         uint256 historicalShareDebt;
-        uint256 accumulatedSharesToBurnPerPledgeAtLastUpdate;
+        /// @notice Snapshot of the pool's direct loss ratio at last pledge update.
+        uint256 directRatioSnapshot;
     }
 
     // --- State Variables ---
-    mapping(uint256 => LossTracker)                         public poolLossTrackers;
-    mapping(address => mapping(uint256 => UserLossState))   public userLossStates;
+    /// @notice Tracks direct losses for a given pool.
+    mapping(uint256 => LossTracker) public poolLossTrackers;
+    /// @notice Tracks contagion losses pushed from a source pool to a target pool.
+    mapping(uint256 => mapping(uint256 => LossTracker)) public contagionLossTrackers; // [targetPoolId][sourcePoolId]
+
+    /// @notice Tracks an underwriter's historical debt and snapshots for direct losses.
+    mapping(address => mapping(uint256 => UserDirectLossState)) public userLossStates;
+    /// @notice Tracks an underwriter's ratio snapshot for contagion losses.
+    mapping(address => mapping(uint256 => mapping(uint256 => uint256))) public userContagionRatioSnapshots; // [user][targetPoolId][sourcePoolId]
+
     uint256 public constant PRECISION_FACTOR = 1e18;
 
-    /* ───────────────────── Modifiers & Errors ───────────────────── */
+    // --- Modifiers & Errors ---
     modifier onlyRiskManager() {
         require(msg.sender == riskManager, "LD: Not RiskManager");
         _;
@@ -55,24 +67,24 @@ contract LossDistributor is ILossDistributor, Ownable {
 
     error ZeroAddress();
 
-    /* ─────────────────── Constructor & Configuration ─────────────────── */
+    // --- Constructor & Configuration ---
     constructor(
         address _riskManager,
         address _underwriterManager,
         address _capitalPool,
-        address _poolRegistry // + ADDED
+        address _poolRegistry
     ) Ownable(msg.sender) {
         if (
-            _riskManager         == address(0) ||
-            _underwriterManager  == address(0) ||
-            _capitalPool         == address(0) ||
-            _poolRegistry        == address(0) // + ADDED
+            _riskManager == address(0) ||
+            _underwriterManager == address(0) ||
+            _capitalPool == address(0) ||
+            _poolRegistry == address(0)
         ) revert ZeroAddress();
 
-        riskManager        = _riskManager;
+        riskManager = _riskManager;
         underwriterManager = IUnderwriterManager(_underwriterManager);
-        capitalPool        = ICapitalPool(_capitalPool);
-        poolRegistry       = IPoolRegistry(_poolRegistry); // + ADDED
+        capitalPool = ICapitalPool(_capitalPool);
+        poolRegistry = IPoolRegistry(_poolRegistry);
     }
 
     function setRiskManager(address newRiskManager) external onlyOwner {
@@ -93,92 +105,73 @@ contract LossDistributor is ILossDistributor, Ownable {
         emit CapitalPoolSet(newCapitalPool);
     }
 
-    // + ADDED
     function setPoolRegistry(address newPoolRegistry) external onlyOwner {
         if (newPoolRegistry == address(0)) revert ZeroAddress();
         poolRegistry = IPoolRegistry(newPoolRegistry);
         emit PoolRegistrySet(newPoolRegistry);
     }
 
-    /* ───────────────────────── Core Logic ───────────────────────── */
+    // --- Core Logic ---
 
-    /**
-     * @notice Records a loss against a claiming pool and distributes it across all
-     * correlated pools based on the capital overlap of their underwriters.
-     * @dev This is the "push" part of the pattern, now with cross-pool logic.
-     * @param claimPoolId The pool that suffered the initial loss.
-     * @param lossAmount Amount of underlying asset lost.
-     */
     function distributeLoss(
         uint256 claimPoolId,
         uint256 lossAmount
     ) external override onlyRiskManager {
         if (lossAmount == 0) return;
 
-        // Total capital in the claiming pool. This is the denominator for the loss ratio.
-        // We get it from the diagonal of the exposure matrix for consistency.
         uint256 totalCapitalInClaimPool = underwriterManager.overlapExposure(claimPoolId, claimPoolId);
         if (totalCapitalInClaimPool == 0) return;
 
-        uint256 poolCount = poolRegistry.getPoolCount();
+        // 1. Handle the Direct Loss on the Claiming Pool
+        uint256 sharesToBurnForDirectLoss = capitalPool.valueToShares(lossAmount);
+        if (sharesToBurnForDirectLoss > 0) {
+            poolLossTrackers[claimPoolId].accumulatedSharesToBurnPerPledge +=
+                (sharesToBurnForDirectLoss * PRECISION_FACTOR) / totalCapitalInClaimPool;
+        }
 
-        // For every other pool `P`, calculate its share of the loss from `C`.
+        // 2. Distribute Contagion Loss to other correlated pools
+        uint256 poolCount = poolRegistry.getPoolCount();
         for (uint256 p = 0; p < poolCount; p++) {
-            // How much capital in pool `p` is from underwriters who also backed `claimPoolId`?
+            if (p == claimPoolId) continue;
+
             uint256 overlap = underwriterManager.overlapExposure(claimPoolId, p);
             if (overlap == 0) continue;
 
-            // Loss allocated to pool `p` = Δ * (Overlap[C][P] / TotalCapital[C])
             uint256 lossForPoolP = Math.mulDiv(lossAmount, overlap, totalCapitalInClaimPool);
             if (lossForPoolP == 0) continue;
-
-            // Total capital in the affected pool `P`. This is the denominator for distributing the loss
-            // among the underwriters of pool `P`.
+            
             uint256 totalCapitalInPoolP = underwriterManager.overlapExposure(p, p);
             if (totalCapitalInPoolP == 0) continue;
 
-            // Convert the asset loss for pool `P` into CapitalPool shares to be burned.
-            uint256 sharesToBurn = capitalPool.valueToShares(lossForPoolP);
-            if (sharesToBurn == 0) continue;
-
-            // Update pool P's loss tracker. This increases the per-pledge debt for all of its underwriters.
-            poolLossTrackers[p].accumulatedSharesToBurnPerPledge +=
-                (sharesToBurn * PRECISION_FACTOR) / totalCapitalInPoolP;
+            uint256 sharesToBurnForContagion = capitalPool.valueToShares(lossForPoolP);
+            if (sharesToBurnForContagion > 0) {
+                // Store this loss in the dedicated contagion tracker
+                contagionLossTrackers[p][claimPoolId].accumulatedSharesToBurnPerPledge +=
+                    (sharesToBurnForContagion * PRECISION_FACTOR) / totalCapitalInPoolP;
+            }
         }
     }
     
-    /**
-     * @notice Snapshot a user's pending share debt before their pledge changes.
-     * @dev Called by UnderwriterManager *before* updating userPledge.
-     */
     function recordPledgeUpdate(address user, uint256 poolId)
         external
         override
         onlyUnderwriterManager
     {
-        LossTracker   storage tracker   = poolLossTrackers[poolId];
-        UserLossState storage userState = userLossStates[user][poolId];
-
-        uint256 currentPledge = underwriterManager.underwriterPoolPledge(user, poolId);
-
-        uint256 deltaRatio = tracker.accumulatedSharesToBurnPerPledge
-                           - userState.accumulatedSharesToBurnPerPledgeAtLastUpdate;
-
-        if (deltaRatio > 0 && currentPledge > 0) {
-            uint256 newDebt = (currentPledge * deltaRatio) / PRECISION_FACTOR;
-            userState.historicalShareDebt += newDebt;
+        uint256 pendingDebt = getPendingLosses(user, poolId, underwriterManager.underwriterPoolPledge(user, poolId));
+        
+        if (pendingDebt > 0) {
+            userLossStates[user][poolId].historicalShareDebt += pendingDebt;
         }
 
-        userState.accumulatedSharesToBurnPerPledgeAtLastUpdate =
-            tracker.accumulatedSharesToBurnPerPledge;
+        // Update snapshots to the current values
+        userLossStates[user][poolId].directRatioSnapshot = poolLossTrackers[poolId].accumulatedSharesToBurnPerPledge;
+        
+        uint256 poolCount = poolRegistry.getPoolCount();
+        for (uint256 i = 0; i < poolCount; i++) {
+            userContagionRatioSnapshots[user][poolId][i] = contagionLossTrackers[poolId][i].accumulatedSharesToBurnPerPledge;
+        }
     }
 
-    /**
-     * @notice Realize (burn) a user's aggregate pending share debt.
-     * @param user              The underwriter whose debt to settle.
-     * @param totalSharesToBurn Total shares owed across all pools.
-     * @param poolIds           The list of pools used to snapshot post‑burn state.
-     */
     function realizeAggregateLoss(
         address user,
         uint256 totalSharesToBurn,
@@ -193,32 +186,53 @@ contract LossDistributor is ILossDistributor, Ownable {
             capitalPool.burnSharesForLoss(user, burnable);
         }
 
+        // Reset user loss states for all their allocated pools
         for (uint256 i = 0; i < poolIds.length; i++) {
             uint256 pid = poolIds[i];
             userLossStates[user][pid].historicalShareDebt = 0;
-            userLossStates[user][pid]
-                .accumulatedSharesToBurnPerPledgeAtLastUpdate =
-                poolLossTrackers[pid].accumulatedSharesToBurnPerPledge;
+            userLossStates[user][pid].directRatioSnapshot = poolLossTrackers[pid].accumulatedSharesToBurnPerPledge;
+            
+            uint256 poolCount = poolRegistry.getPoolCount();
+            for (uint256 j = 0; j < poolCount; j++) {
+                userContagionRatioSnapshots[user][pid][j] = contagionLossTrackers[pid][j].accumulatedSharesToBurnPerPledge;
+            }
         }
     }
 
-    /* ───────────────────────── View Functions ───────────────────────── */
+    // --- View Functions ---
+
     function getPendingLosses(
         address user,
         uint256 poolId,
         uint256 userPledge
     ) public view override returns (uint256 pendingSharesToBurn) {
-        UserLossState storage us = userLossStates[user][poolId];
-        LossTracker   storage lt = poolLossTrackers[poolId];
+        if (userPledge == 0) return 0;
+        
+        UserDirectLossState storage uds = userLossStates[user][poolId];
+        pendingSharesToBurn = uds.historicalShareDebt;
 
-        uint256 deltaRatio = lt.accumulatedSharesToBurnPerPledge
-                           - us.accumulatedSharesToBurnPerPledgeAtLastUpdate;
-
-        uint256 liveDebt = 0;
-        if (deltaRatio > 0 && userPledge > 0) {
-            liveDebt = (userPledge * deltaRatio) / PRECISION_FACTOR;
+        // 1. Calculate debt from DIRECT losses on this pool.
+        LossTracker storage directTracker = poolLossTrackers[poolId];
+        uint256 directDelta = directTracker.accumulatedSharesToBurnPerPledge - uds.directRatioSnapshot;
+        if (directDelta > 0) {
+            pendingSharesToBurn += (userPledge * directDelta) / PRECISION_FACTOR;
         }
 
-        return us.historicalShareDebt + liveDebt;
+        // 2. Calculate debt from CONTAGION losses pushed from other pools.
+        uint256 poolCount = poolRegistry.getPoolCount();
+        for (uint256 sourcePoolId = 0; sourcePoolId < poolCount; sourcePoolId++) {
+            if (sourcePoolId == poolId) continue;
+            
+            // Only add contagion debt if the user was also underwriting the source pool.
+            if (underwriterManager.isAllocatedToPool(user, sourcePoolId)) {
+                LossTracker storage contagionTracker = contagionLossTrackers[poolId][sourcePoolId];
+                uint256 snapshot = userContagionRatioSnapshots[user][poolId][sourcePoolId];
+                uint256 contagionDelta = contagionTracker.accumulatedSharesToBurnPerPledge - snapshot;
+                
+                if (contagionDelta > 0) {
+                    pendingSharesToBurn += (userPledge * contagionDelta) / PRECISION_FACTOR;
+                }
+            }
+        }
     }
 }

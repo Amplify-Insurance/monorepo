@@ -18,5 +18,6 @@ interface IUnderwriterManager {
     function setMaxAllocationsPerUnderwriter(uint256 _newMax) external;
     function setDeallocationNoticePeriod(uint256 _newPeriod) external;
     function overlapExposure(uint256 claimPoolId, uint256 otherPoolId) external view returns (uint256 exposure);
+    function isAllocatedToPool(address underwriter, uint256 poolId) external view returns (bool);
 
 }
