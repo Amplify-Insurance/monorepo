@@ -13,27 +13,33 @@ export default function RequestWithdrawalModal({
   userValue = 0,
   maxWithdrawal = userBalance,
   displayCurrency = "USD",
+  tokenDecimals = 18,
 }) {
   const [withdrawalType, setWithdrawalType] = useState("partial")
   const [withdrawalAmount, setWithdrawalAmount] = useState("")
   const [withdrawalPercentage, setWithdrawalPercentage] = useState(25)
+  const displayDecimals = Math.min(tokenDecimals, 4)
 
   const handlePercentageClick = (percentage) => {
     setWithdrawalPercentage(percentage)
     const amount = (userBalance * percentage) / 100
     const capped = Math.min(amount, maxWithdrawal)
-    setWithdrawalAmount(capped.toFixed(4))
+    setWithdrawalAmount(capped.toFixed(tokenDecimals))
   }
 
   const handleAmountChange = (value) => {
-    const num = Math.min(Number.parseFloat(value), maxWithdrawal)
-    if (!isNaN(num)) {
-      setWithdrawalAmount(num.toString())
-      const percentage = (num / userBalance) * 100
-      setWithdrawalPercentage(Math.min(percentage, 100))
-    } else {
+    if (value === "") {
       setWithdrawalAmount("")
       setWithdrawalPercentage(0)
+      return
+    }
+    const regex = new RegExp(`^\\d*(\\.\\d{0,${tokenDecimals}})?$`)
+    if (!regex.test(value)) return
+    const num = Math.min(Number.parseFloat(value), maxWithdrawal)
+    if (!isNaN(num)) {
+      setWithdrawalAmount(value)
+      const percentage = (num / userBalance) * 100
+      setWithdrawalPercentage(Math.min(percentage, 100))
     }
   }
 
@@ -117,7 +123,7 @@ export default function RequestWithdrawalModal({
                   onChange={(e) => handleAmountChange(e.target.value)}
                   placeholder="0.00"
                   max={Math.min(userBalance, maxWithdrawal)}
-                  step="0.0001"
+                  step={Math.pow(10, -tokenDecimals)}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
@@ -131,10 +137,10 @@ export default function RequestWithdrawalModal({
                 </div>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Available: {userBalance.toFixed(4)} CATLP ({formatCurrency(userValue, "USD", displayCurrency)})
+                Available: {userBalance.toFixed(displayDecimals)} CATLP ({formatCurrency(userValue, "USD", displayCurrency)})
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Max withdrawable: {maxWithdrawal.toFixed(4)} CATLP ({formatCurrency((maxWithdrawal / userBalance) * userValue, "USD", displayCurrency)})
+                Max withdrawable: {maxWithdrawal.toFixed(displayDecimals)} CATLP ({formatCurrency((maxWithdrawal / userBalance) * userValue, "USD", displayCurrency)})
               </p>
             </div>
 
@@ -163,9 +169,9 @@ export default function RequestWithdrawalModal({
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600 dark:text-gray-400">Withdrawal Amount:</span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                {withdrawalType === "full" ? userBalance.toFixed(4) : withdrawalAmount || "0.00"} CATLP
-              </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {withdrawalType === "full" ? userBalance.toFixed(displayDecimals) : withdrawalAmount || "0.00"} CATLP
+                </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600 dark:text-gray-400">Estimated Value:</span>

@@ -110,5 +110,13 @@ export async function drawFund(amount: ethers.BigNumberish) {
   return tx;
 }
 
+/** Cancel a pending withdrawal request. */
+export async function cancelWithdrawal(requestIndex: number) {
+  const cp = await getCatPoolWithSigner();
+  const tx = await cp.cancelWithdrawalRequest(requestIndex);
+  await tx.wait();
+  return tx;
+}
+
 
 

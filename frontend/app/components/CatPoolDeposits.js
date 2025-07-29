@@ -176,6 +176,21 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
     }
   }
 
+  const handleCancelWithdrawal = async () => {
+    if (!pendingWithdrawal) return
+    try {
+      const cp = await getCatPoolWithSigner()
+      const tx = await cp.cancelWithdrawalRequest(0)
+      setTxHash(tx.hash)
+      await tx.wait()
+      await refresh()
+      await refreshWithdrawal()
+      setPendingWithdrawal(null)
+    } catch (error) {
+      console.error('Failed to cancel withdrawal:', error)
+    }
+  }
+
   if (!info || info.balance === "0") {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8">
@@ -453,7 +468,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end space-x-2">
-                      {withdrawalReady && (
+                      {withdrawalReady ? (
                         <>
                           <button
                             onClick={handleExecuteWithdrawal}
@@ -468,6 +483,13 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
                             Draw Fund
                           </button>
                         </>
+                      ) : (
+                        <button
+                          onClick={handleCancelWithdrawal}
+                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                        >
+                          Cancel Withdrawal
+                        </button>
                       )}
                     </div>
                   </td>
@@ -563,6 +585,7 @@ export default function CatPoolDeposits({ displayCurrency, refreshTrigger }) {
         userValue={value}
         maxWithdrawal={maxWithdrawableAmount}
         displayCurrency={displayCurrency}
+        tokenDecimals={shareDecimals}
       />
     </>
   )

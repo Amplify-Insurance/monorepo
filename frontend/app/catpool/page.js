@@ -9,6 +9,7 @@ import {
   Check,
 } from "lucide-react";
 import { ethers } from "ethers";
+import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import CatPoolModal from "../components/CatPoolModal";
 import CatPoolDeposits from "../components/CatPoolDeposits";
@@ -20,7 +21,7 @@ import useCatPoolStats from "../../hooks/useCatPoolStats";
 import useAnalytics from "../../hooks/useAnalytics";
 import useCatPoolWithdrawalRequest from "../../hooks/useCatPoolWithdrawalRequest";
 import deployments from "../config/deployments";
-import { getUsdcAddress } from "../../lib/catPool";
+import { getUsdcAddress, getCatPoolWithSigner } from "../../lib/catPool";
 import { getERC20WithSigner } from "../../lib/erc20";
 
 export default function CatPoolPage() {
@@ -45,6 +46,13 @@ export default function CatPoolPage() {
   const withdrawalReady =
     withdrawalRequest &&
     Date.now() / 1000 >= withdrawalRequest.timestamp + NOTICE_PERIOD;
+  const timeUntilReady =
+    withdrawalRequest && !withdrawalReady
+      ? formatDistanceToNow(
+          new Date((withdrawalRequest.timestamp + NOTICE_PERIOD) * 1000),
+          { addSuffix: true }
+        )
+      : null;
 
   const handleActionComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -300,13 +308,37 @@ export default function CatPoolPage() {
                     Deposit {selectedToken.symbol}
                   </button>
                   {info && info.balance !== "0" && (
-                    <button
-                      onClick={() => openModal("withdraw")}
-                      disabled={!withdrawalReady}
-                      className="w-full py-4 px-6 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-xl transition-all duration-200 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Withdraw {selectedToken.symbol}
-                    </button>
+                    <div className="space-y-2 w-full">
+                      <button
+                        onClick={() => openModal("withdraw")}
+                        disabled={!withdrawalReady}
+                        className="w-full py-4 px-6 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-xl transition-all duration-200 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Withdraw {selectedToken.symbol}
+                      </button>
+                      {withdrawalRequest && !withdrawalReady && (
+                        <>
+                          <p className="text-xs text-gray-500">
+                            Withdrawal available {timeUntilReady}
+                          </p>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const cp = await getCatPoolWithSigner();
+                                const tx = await cp.cancelWithdrawalRequest(0);
+                                await tx.wait();
+                                handleActionComplete();
+                              } catch (err) {
+                                console.error('Failed to cancel withdrawal', err);
+                              }
+                            }}
+                            className="w-full py-2 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl text-gray-900 dark:text-white transition-all"
+                          >
+                            Cancel Withdrawal
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
