@@ -9,6 +9,8 @@ import {
   getUnderlyingAssetDecimals,
 } from "../../../../lib/capitalPool";
 import { getUnderwriterManager } from "../../../../lib/underwriterManager";
+import { getCapitalPool } from "../../../../lib/capitalPool";
+import { getLossDistributor } from "../../../../lib/lossDistributor";
 import bnToString from "../../../../lib/bnToString";
 import { ethers } from "ethers";
 import deployments from "../../../config/deployments";
@@ -65,6 +67,36 @@ function calcPremiumRateBps(pool: any): bigint {
     return base + (slope1 * u) / BPS;
   }
   return base + (slope1 * kink) / BPS + (slope2 * (u - kink)) / BPS;
+}
+
+async function calcRiskAdjustedCapacity(dep: any, poolId: number, coverageSold: string) {
+  try {
+    const uwm = getUnderwriterManager(dep.underwriterManager, dep.name);
+    const cp = getCapitalPool(dep.capitalPool, dep.name);
+    const ld = getLossDistributor(dep.lossDistributor, dep.name);
+    const underwriters: string[] = await uwm.getPoolUnderwriters(poolId);
+    let totalNet = 0n;
+    for (const uw of underwriters) {
+      const [, , masterShares] = await cp.getUnderwriterAccount(uw);
+      const grossVal = BigInt((await cp.sharesToValue(masterShares)).toString());
+      const allocations: bigint[] = await uwm.getUnderwriterAllocations(uw);
+      let pendingShares = 0n;
+      for (const pid of allocations) {
+        const pledge = await uwm.underwriterPoolPledge(uw, pid);
+        const pending = await ld.getPendingLosses(uw, pid, pledge);
+        pendingShares += BigInt(pending.toString());
+      }
+      const pendingVal = pendingShares > 0n ? BigInt((await cp.sharesToValue(pendingShares)).toString()) : 0n;
+      const net = grossVal > pendingVal ? grossVal - pendingVal : 0n;
+      totalNet += net;
+    }
+    const sold = BigInt(coverageSold);
+    const capacity = totalNet > sold ? totalNet - sold : 0n;
+    return capacity.toString();
+  } catch (err) {
+    console.error('Failed to calc risk adjusted capacity', err);
+    return '0';
+  }
 }
 
 /**
@@ -261,10 +293,12 @@ export async function GET() {
       }
 
       for (const p of pools) {
+        const riskAdjustedCapacity = await calcRiskAdjustedCapacity(dep, p.id, p.totalCoverageSold);
         allPools.push({
           deployment: dep.name,
           underlyingAssetDecimals: underlyingDec,
           underlyingAsset,
+          riskAdjustedCapacity,
           ...p,
         });
       }

@@ -51,7 +51,11 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
 
     const coverageSold = Number(ethersUtils.formatUnits(sold, decimals))
 
-    const capacity = Number(ethersUtils.formatUnits(pledged.sub(sold), decimals))
+    const riskAdjusted = pool.riskAdjustedCapacity
+      ? BigNumber.from(pool.riskAdjustedCapacity)
+      : pledged.sub(sold)
+
+    const capacity = Number(ethersUtils.formatUnits(riskAdjusted, decimals))
 
     const tvlNative = Number(ethersUtils.formatUnits(pool.totalCapitalPledgedToPool, decimals))
 
@@ -84,9 +88,10 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const markets = Object.values(grouped).map((m) => {
     const premiums = m.pools.map((p) => p.premium)
     const minPremium = premiums.length ? Math.min(...premiums) : 0
+    const available = m.pools.reduce((acc, p) => acc + p.capacity, 0)
     return {
       ...m,
-      coverAvailable: m.tvl - m.coverageSold,
+      coverAvailable: available,
       premium: minPremium,
     }
   })
@@ -224,7 +229,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
                     onClick={() => requestSort("coverAvailable")}
                   >
                     <div className="flex items-center">
-                      Cover Available
+                      Cover Available (Risk-Adjusted)
                       {getSortDirectionIcon("coverAvailable")}
                     </div>
                   </th>

@@ -135,9 +135,11 @@ export default function PoolDetailsPage() {
     const sold = BigInt(pool.totalCoverageSold || 0)
     const tvl = Number((pledged / (10n ** BigInt(decimals))).toString())
     const utilization = pledged > 0n ? Number((sold * 10000n) / pledged) / 100 : 0
-    const available = pledged > sold ? pledged - sold : 0n
+    const riskAdjusted = pool.riskAdjustedCapacity
+      ? BigInt(pool.riskAdjustedCapacity)
+      : pledged > sold ? pledged - sold : 0n
     const capacity = Number(
-      ethersUtils.formatUnits(available, decimals),
+      ethersUtils.formatUnits(riskAdjusted, decimals),
     )
     return {
       premium: Number(pool.premiumRateBps || 0) / 100,
