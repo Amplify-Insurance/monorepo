@@ -1,4 +1,19 @@
-## Frontend
+# Frontend
+
+## Requirements
+
+- Node.js (>=18)
+- npm (>=9)
+- Network access to the npm registry
+
+Install dependencies with:
+
+```bash
+npm install
+```
+You can also run Hardhat commands via `scripts/hardhat.sh` which
+automatically installs dependencies if `node_modules` is missing.
+
 
 A minimal Next.js project lives under `frontend/` for interacting with the contracts.
 Install dependencies and run the development server with:
