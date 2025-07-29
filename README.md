@@ -15,48 +15,6 @@ Amplify Insurance is building a modular, open-source insurance marketplace where
 
 Underwriters deposit USDC → `CapitalPool` optionally stakes it in Aave, Compound, Euler, Moonwell or Morpho via plug-in adapters → yield flows back to the pool. When a policy-holder buys cover, `PolicyManager` pulls capital from the relevant risk pool, mints a `PolicyNFT` and streams premiums (block-by-block) back to underwriters. A small slice of every premium goes to the `BackstopPool` – a catastrophe back-stop fund issued as `CatShare` ERC-20 tokens. The README diagrams (“Underwriter Capital Flow” & “Distressed Capital Flow”) illustrate these paths in detail.
 
-## Directory Layout
-
-```
-contracts/               Solidity sources
-├─ core/                 Core contracts
-│  ├─ CapitalPool.sol       Underwriter vault and yield adapter hooks
-│  ├─ PoolRegistry.sol      Registry of risk pools and rate models
-│  ├─ PolicyManager.sol     User-facing policy lifecycle logic
-│  └─ RiskManager.sol       Coordinates allocation, claims and payouts
-├─ external/             Optional backstop modules
-│  └─ BackstopPool.sol  Secondary pool funded by premiums
-├─ governance/           DAO style governance
-│  ├─ Committee.sol
-│  └─ Staking.sol
-├─ utils/                Misc utilities
-│  ├─ ContractRegistry.sol
-│  ├─ DeploymentRegistry.sol
-│  ├─ MulticallReader.sol
-│  ├─ LossDistributor.sol
-│  └─ RewardDistributor.sol
-├─ adapters/             Yield strategy implementations
-│  ├─ AaveV3Adapter.sol
-│  ├─ CompoundV3Adapter.sol
-│  ├─ EulerAdapter.sol
-│  ├─ MoonwellAdapter.sol
-│  └─ MorhpoAdapter.sol
-├─ tokens/               ERC20/721 tokens used by the protocol
-│  ├─ CatShare.sol
-│  ├─ PolicyNFT.sol
-│  └─ OShare.sol
-├─ oracles/              Price feeds
-│  └─ PriceOracle.sol
-├─ interfaces/           Shared protocol interfaces
-└─ test/                 Mock contracts for unit tests
-
-frontend/                Next.js dApp for interacting with the contracts
-scripts/                 Deployment and helper scripts
-subgraphs/               The Graph subgraph definitions
-test/                    JavaScript test suite
-hardhat.config.js        Hardhat configuration
-package.json             Project dependencies and scripts
-```
 
 ## Requirements
 
@@ -72,68 +30,6 @@ npm install
 You can also run Hardhat commands via `scripts/hardhat.sh` which
 automatically installs dependencies if `node_modules` is missing.
 
-## Usage
-
-Compile contracts with:
-
-```bash
-npx hardhat compile
-```
-
-Run the test suite with:
-
-```bash
-npx hardhat test
-```
-
-Run Slither static analysis with:
-
-```bash
-npm run slither
-```
-
-Run Mythril security analysis with:
-
-```bash
-npm run test:mythril
-```
-
-Run Manticore symbolic execution with:
-
-```bash
-npm run test:manticore
-```
-
-Deploy the **PriceOracle** and register Chainlink feeds on Base with:
-
-```bash
-npx hardhat run scripts/deploy-oracle.js --network base
-```
-
-Then update `frontend/.env` using the printed `PriceOracle` and `MulticallReader`
-addresses so the frontend can display token prices and batch queries.
-
-The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.js` to add or customise networks. Running scripts on a remote network requires access to the configured RPC endpoint.
-
-## Contracts Overview
-
-- **CapitalPool** – Holds underwriter funds and interacts with yield adapters. Losses and withdrawals are accounted here.
-- **PolicyManager** – User entrypoint for purchasing cover. Mints and burns `PolicyNFT` tokens.
-- **RiskManager** – Coordinates pool allocations, claims processing and rewards through `LossDistributor` and `RewardDistributor`.
-- **PoolRegistry** – Stores pool parameters, rate models and active adapters for each risk pool.
-- **BackstopPool** – Collects a share of premiums and provides additional liquidity during large claims. Calling `setRewardDistributor` now configures the distributor's cat pool automatically so users can claim protocol asset rewards without extra setup.
-- **Governance (Committee & Staking)** – Simple on‑chain governance used for pausing pools and slashing misbehaving stakers.
-- **DeploymentRegistry** – Records the addresses of all protocol components for each deployment.
-
-## Running a Local Node
-
-To experiment with the contracts interactively you can start a local Hardhat node:
-
-```bash
-npx hardhat node
-```
-
-In a separate terminal deploy contracts and run scripts using the `--network localhost` option.
 
 ## Running a Local Subgraph
 
