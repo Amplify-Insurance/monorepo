@@ -16,22 +16,6 @@ Amplify Insurance is building a modular, open-source insurance marketplace where
 Underwriters deposit USDC → `CapitalPool` optionally stakes it in Aave, Compound, Euler, Moonwell or Morpho via plug-in adapters → yield flows back to the pool. When a policy-holder buys cover, `PolicyManager` pulls capital from the relevant risk pool, mints a `PolicyNFT` and streams premiums (block-by-block) back to underwriters. A small slice of every premium goes to the `BackstopPool` – a catastrophe back-stop fund issued as `CatShare` ERC-20 tokens. The README diagrams (“Underwriter Capital Flow” & “Distressed Capital Flow”) illustrate these paths in detail.
 
 
-## Requirements
-
-- Node.js (>=18)
-- npm (>=9)
-- Network access to the npm registry
-
-Install dependencies with:
-
-```bash
-npm install
-```
-You can also run Hardhat commands via `scripts/hardhat.sh` which
-automatically installs dependencies if `node_modules` is missing.
-
-
-
 ## Further Reading
 
 The unit tests under `test/` demonstrate common interactions such as underwriting deposits, premium payments and withdrawals.  Examine `test/RiskManager.test.js` for detailed examples of calling the contracts.
