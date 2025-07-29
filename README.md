@@ -31,27 +31,6 @@ You can also run Hardhat commands via `scripts/hardhat.sh` which
 automatically installs dependencies if `node_modules` is missing.
 
 
-## Running a Local Subgraph
-
-The frontend fetches historical data from a Graph Node. You can index the
-contracts locally by running the official Docker image:
-
-```bash
-docker run -p 8000:8000 -p 8020:8020 -p 8030:8030 -p 8040:8040 \
-  ghcr.io/graphprotocol/graph-node:latest
-```
-
-Deploy the subgraph:
-
-```bash
-cd subgraphs/insurance
-npm run deploy -- --node http://localhost:8020/ --ipfs http://localhost:5001 \
-  <SUBGRAPH_NAME>
-```
-
-Set `NEXT_PUBLIC_SUBGRAPH_URL` and `SUBGRAPH_URL` in `frontend/.env` to
-`http://localhost:8000/subgraphs/name/<SUBGRAPH_NAME>` so the UI queries the
-local index.
 
 ## Further Reading
 
