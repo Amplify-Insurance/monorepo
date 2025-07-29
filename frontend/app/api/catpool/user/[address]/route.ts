@@ -15,7 +15,13 @@ export async function GET(req: Request, { params }: { params: { address: string 
 
     const addr = params.address.toLowerCase()
     const catShareAddr = await cp.catShareToken()
-    const token = new ethers.Contract(catShareAddr, ERC20, getProvider(dep.name))
+    const token = new ethers.Contract(
+      catShareAddr,
+      // Ethers v6 does not automatically extract the ABI from Hardhat artifacts
+      // so we need to pass the `abi` array explicitly.
+      ERC20.abi,
+      getProvider(dep.name),
+    )
     const multicall = getMulticallReader(dep.multicallReader, dep.name)
 
     const calls = [

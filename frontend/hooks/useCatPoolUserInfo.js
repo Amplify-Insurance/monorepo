@@ -14,7 +14,8 @@ export default function useCatPoolUserInfo(address) {
       const cp = await getCatPoolWithSigner()
       const catShareAddr = await cp.catShareToken()
       const provider = new ethers.providers.Web3Provider(window.ethereum)
-      const token = new ethers.Contract(catShareAddr, ERC20, provider)
+      // Pass the ABI explicitly when using ethers v6
+      const token = new ethers.Contract(catShareAddr, ERC20.abi, provider)
       const [balance, totalSupply, liquid] = await Promise.all([
         token.balanceOf(address),
         token.totalSupply(),
