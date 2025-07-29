@@ -292,7 +292,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
         </div>
       </div>
 
-      {isConnected && (
+      {/* {isConnected && (
         <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -339,7 +339,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
             </Link>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Token Selection Dropdown */}
       <div className="mb-6">
