@@ -182,7 +182,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
         if (lossBorneByPool > 0) {
             lossDistributor.distributeLoss(
                 _data.policy.poolId,
-                lossBorneByPool
+                lossBorneByPool,
+                _data.totalCapitalPledged
             );
         }
         
@@ -235,7 +236,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
             totalPendingLosses += lossDistributor.getPendingLosses(_underwriter, pid, pledge);
         }
         uint256 pendingSharesToBurn = capitalPool.valueToShares(totalPendingLosses);
-        if (pendingSharesToBurn <= masterShares) revert UnderwriterNotInsolvent();
+        if (totalPendingLosses <= masterShares) revert UnderwriterNotInsolvent();    
     }
 
     function _scaleAmount(

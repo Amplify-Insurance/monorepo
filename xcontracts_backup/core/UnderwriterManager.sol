@@ -18,7 +18,7 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
  * @title UnderwriterManager
  * @author Gemini
  * @notice Manages the allocation (pledging) of capital to risk pools using a risk-based points system.
- * @dev V4: Added an overlap exposure matrix to enable cross-pool loss distribution.
+ * @dev V3: Removed redundant loss accounting pathways for a single, consistent model.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -48,14 +48,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => bool)) public isAdapterInPool;
     mapping(uint256 => address[]) public poolSpecificUnderwriters;
     mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
-
-    // --- NEW: State for Cross-Pool Risk ---
-    /**
-     * @notice overlapExposure[poolA][poolB] = sum of pledges to poolB from underwriters of poolA.
-     * @dev This matrix is the foundation for cross-pool loss distribution.
-     * The diagonal overlapExposure[P][P] is equivalent to totalCapitalPledgedToPool[P].
-     */
-    mapping(uint256 => mapping(uint256 => uint256)) public overlapExposure;
 
     // --- Constants & Config ---
     uint256 public constant ABSOLUTE_MAX_ALLOCATIONS = 50;
@@ -87,12 +79,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     // --- Modifiers ---
     modifier onlyCapitalPool() {
-        if (msg.sender != address(capitalPool)) revert NotCapitalPool();
+        require(msg.sender == address(capitalPool), "UM: Not CapitalPool");
         _;
     }
 
     modifier onlyRiskManager() {
-        if (msg.sender != riskManager) revert NotRiskManager();
+        require(msg.sender == riskManager, "UM: Not RiskManager");
         _;
     }
 
@@ -133,24 +125,20 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     // --- Underwriter Capital Management ---
     function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
-        // --- (1) Subtract old exposure contribution ---
-        _updateOverlapMatrix(msg.sender, -1);
-        
         (uint256 totalCapitalToPledge, address adapter, uint256 pointsToUse) = _prepareAllocateCapital(poolIds);
         
         underwriterRiskPointsUsed[msg.sender] += pointsToUse;
 
         for (uint256 i = 0; i < poolIds.length; i++) {
+            // Before allocating, snapshot any pending losses on other pools
             lossDistributor.recordPledgeUpdate(msg.sender, poolIds[i]);
             _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
         }
-
-        // --- (2) Add new exposure contribution ---
-        _updateOverlapMatrix(msg.sender, 1);
     }
 
     function requestDeallocateFromPool(uint256 poolId) external nonReentrant {
         _checkDeallocationRequest(msg.sender, poolId);
+        // Snapshot losses before creating the request
         lossDistributor.recordPledgeUpdate(msg.sender, poolId);
         uint256 pledgeAmount = underwriterPoolPledge[msg.sender][poolId];
         deallocationRequestTimestamp[msg.sender][poolId] = block.timestamp;
@@ -161,30 +149,21 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     function deallocateFromPool(uint256 poolId) external nonReentrant {
         _validateDeallocationRequest(msg.sender, poolId);
         address underwriter = msg.sender;
-        
-        // --- (1) Subtract old exposure contribution ---
-        _updateOverlapMatrix(underwriter, -1);
-
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
         address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
 
+        // Loss realization is handled by CapitalPool before withdrawal, not here.
         delete deallocationRequestTimestamp[underwriter][poolId];
 
         totalCapitalPledgedToPool[poolId] -= pledgeAmount;
         capitalPendingWithdrawal[poolId] -= pledgeAmount;
         capitalPerAdapter[poolId][adapter] -= pledgeAmount;
-        
-        // The diagonal exposure is the total pledge, so we must also reduce it here.
-        overlapExposure[poolId][poolId] -= pledgeAmount; 
 
         if (capitalPerAdapter[poolId][adapter] == 0) {
             _removeAdapterFromPool(poolId, adapter);
         }
 
         _removeUnderwriterFromPool(underwriter, poolId);
-        
-        // --- (2) Add new exposure contribution ---
-        _updateOverlapMatrix(underwriter, 1);
 
         emit CapitalDeallocated(underwriter, poolId, pledgeAmount, adapter);
     }
@@ -198,13 +177,10 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         
         if (principalBefore == 0) return;
 
-        // --- (1) Subtract old exposure contribution ---
-        _updateOverlapMatrix(underwriter, -1);
-
         uint256[] memory allocations = underwriterAllocations[underwriter];
         if (allocations.length > 0) {
             address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
-            if(adapter == address(0)) revert("UM: User has no yield adapter");
+            require(adapter != address(0), "UM: User has no yield adapter");
 
             for (uint256 i = 0; i < allocations.length; i++) {
                 uint256 poolId = allocations[i];
@@ -221,15 +197,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
                 }
             }
         }
-        
-        // --- (2) Add new exposure contribution ---
-        _updateOverlapMatrix(underwriter, 1);
     }
 
     function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) external onlyCapitalPool {
-        // --- (1) Subtract old exposure contribution ---
-        _updateOverlapMatrix(underwriter, -1);
-
         (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
         uint256 principalBefore = principalAfter + principalComponentRemoved;
         if (principalBefore == 0) return;
@@ -237,7 +207,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         uint256[] memory allocations = underwriterAllocations[underwriter];
         if (allocations.length > 0) {
             address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
-            if(adapter == address(0)) revert("User has no yield adapter");
+            require(adapter != address(0), "User has no yield adapter");
 
             for (uint256 i = 0; i < allocations.length; i++) {
                 uint256 poolId = allocations[i];
@@ -254,17 +224,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         if (isFullWithdrawal) {
             _handleFullWithdrawalCleanup(underwriter);
         }
-
-        // --- (2) Add new exposure contribution (unless fully withdrawn) ---
-        if (!isFullWithdrawal) {
-            _updateOverlapMatrix(underwriter, 1);
-        }
     }
 
     function onLossRealized(address underwriter, uint256 valueLost) external onlyCapitalPool {
-        // --- (1) Subtract old exposure contribution ---
-        _updateOverlapMatrix(underwriter, -1);
-
         (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
         uint256 principalBefore = principalAfter + valueLost;
         if (principalBefore == 0) return;
@@ -272,7 +234,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         uint256[] memory allocations = underwriterAllocations[underwriter];
         if (allocations.length > 0) {
             address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
-            if (adapter == address(0)) return; 
+            if (adapter == address(0)) return; // User might be fully wiped out.
 
             for (uint256 i = 0; i < allocations.length; i++) {
                 uint256 poolId = allocations[i];
@@ -285,11 +247,13 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
                 }
             }
         }
-        
-        // --- (2) Add new exposure contribution ---
-        _updateOverlapMatrix(underwriter, 1);
     }
     
+    /**
+     * @notice Realizes all pending losses for a user across all their allocated pools.
+     * @dev This is a critical function called before withdrawals or liquidations to ensure
+     * an underwriter's state is fully settled. Made external to be callable by other managers.
+     */
     function realizeLossesForAllPools(address user) public nonReentrant {
         uint256[] memory allocations = underwriterAllocations[user];
         if (allocations.length == 0) return;
@@ -325,50 +289,14 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     function getUnderwriterAllocations(address user) external view returns (uint256[] memory) {
         return underwriterAllocations[user];
     }
-    
+
     // --- Internal & Helper Functions ---
-
-    /**
-     * @dev Updates the overlap exposure matrix for a given underwriter.
-     * This function should be called with sign = -1 BEFORE a state change,
-     * and with sign = 1 AFTER the state change.
-     * Complexity: O(maxAllocationsPerUnderwriter^2)
-     * @param underwriter The user whose portfolio is changing.
-     * @param sign A multiplier (-1 for subtraction, 1 for addition).
-     */
-    function _updateOverlapMatrix(address underwriter, int256 sign) internal {
-        uint256[] memory allocations = underwriterAllocations[underwriter];
-        uint256 numAllocations = allocations.length;
-
-        if (numAllocations == 0) {
-            return;
-        }
-
-        for (uint256 i = 0; i < numAllocations; i++) {
-            uint256 poolA = allocations[i];
-            uint256 pledgeToA = underwriterPoolPledge[underwriter][poolA];
-            if (pledgeToA == 0) continue;
-
-            for (uint256 j = 0; j < numAllocations; j++) {
-                uint256 poolB = allocations[j];
-                uint256 pledgeToB = underwriterPoolPledge[underwriter][poolB];
-                if (pledgeToB == 0) continue;
-                
-                if (sign > 0) {
-                    overlapExposure[poolA][poolB] += pledgeToB;
-                } else {
-                    overlapExposure[poolA][poolB] -= pledgeToB;
-                }
-            }
-        }
-    }
-    
     function _getPointsForRating(IPoolRegistry.RiskRating _rating) internal pure returns (uint256) {
         if (_rating == IPoolRegistry.RiskRating.Low) return 1;
         if (_rating == IPoolRegistry.RiskRating.Moderate) return 2;
         if (_rating == IPoolRegistry.RiskRating.Elevated) return 3;
         if (_rating == IPoolRegistry.RiskRating.Speculative) return 4;
-        return 0; 
+        return 0; // Should not happen with valid ratings
     }
 
     function _executeAllocation(uint256 poolId, uint256 totalPledge, address adapter) internal {
@@ -448,7 +376,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             if (pledge > 0) {
                 totalCapitalPledgedToPool[poolId] -= pledge;
                 capitalPerAdapter[poolId][adapter] -= pledge;
-                overlapExposure[poolId][poolId] -= pledge;
             }
             _removeUnderwriterFromPool(underwriter, poolId);
         }
@@ -483,7 +410,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
         
         address adapter = capitalPool.getUnderwriterAdapterAddress(msg.sender);
-        if (adapter == address(0)) revert("User has no yield adapter");
+        require(adapter != address(0), "User has no yield adapter");
         
         return (totalDepositedPrincipal, adapter, additionalPointsRequired);
     }

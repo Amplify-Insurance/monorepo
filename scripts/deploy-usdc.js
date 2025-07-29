@@ -104,7 +104,7 @@ async function main() {
 
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
   const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target, policyManager.target);
-  await poolRegistry.waitForDeployment();
+  await poolRegistry.waitForDeployment(); 
   console.log("PoolRegistry deployed to:", poolRegistry.target);
 
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
@@ -113,7 +113,7 @@ async function main() {
   console.log("CapitalPool deployed to:", capitalPool.target);
 
   const LossDistributor = await ethers.getContractFactory("LossDistributor");
-  const lossDistributor = await LossDistributor.deploy(riskManager.target, underwriterManager.target, capitalPool.target);
+  const lossDistributor = await LossDistributor.deploy(riskManager.target, underwriterManager.target, capitalPool.target, poolRegistry.target);
   await lossDistributor.waitForDeployment();
   console.log("LossDistributor deployed to:", lossDistributor.target);
 
