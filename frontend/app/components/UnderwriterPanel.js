@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { Info, ChevronDown, Filter, HelpCircle } from "lucide-react"
+import { Slider } from "../../components/ui/slider"
 import Link from "next/link"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from "next/image"
@@ -309,12 +310,14 @@ export default function UnderwriterPanel({ displayCurrency }) {
           </div>
 
           <div className="relative">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-              <div
-                className="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${riskPoints.total ? (riskPoints.used / riskPoints.total) * 100 : 0}%` }}
-              ></div>
-            </div>
+            <Slider
+              value={[riskPoints.used]}
+              max={riskPoints.total}
+              min={0}
+              step={1}
+              disabled
+              className="w-full"
+            />
             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
               <span>0</span>
               <span className="text-center">{riskPoints.total ? ((riskPoints.used / riskPoints.total) * 100).toFixed(1) : 0}% used</span>
@@ -378,7 +381,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
                   className={`${token.symbol === selectedToken?.symbol
                     ? "text-white bg-blue-600"
                     : "text-gray-900 dark:text-gray-200"
-                    } cursor-default select-none relative py-2 pl-3 pr-9 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
+                    } group cursor-default select-none relative py-2 pl-3 pr-9 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700`}
                   onClick={() => {
                     setSelectedToken(token)
                     setTokenDropdownOpen(false)
@@ -396,8 +399,8 @@ export default function UnderwriterPanel({ displayCurrency }) {
                       />
                     </div>
                     <span
-                      className={`block truncate ${token.symbol === selectedToken?.symbol ? "font-medium" : "font-normal"
-                        }`}
+                      className={`block truncate ${token.symbol === selectedToken?.symbol ? "font-medium" : "font-normal"}
+                        group-hover:text-black`}
                     >
                       {token.symbol}
                     </span>
@@ -497,7 +500,16 @@ export default function UnderwriterPanel({ displayCurrency }) {
       {/* Category Filter */}
       <div className="mb-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
+            {selectedToken && (
+              <Image
+                src={getTokenLogo(selectedToken.address)}
+                alt={selectedToken.symbol}
+                width={24}
+                height={24}
+                className="mr-2 rounded-full"
+              />
+            )}
             Available markets for {selectedToken?.symbol || ''}
           </h3>
           {/* {selectionLimit > 0 && (
@@ -636,9 +648,15 @@ export default function UnderwriterPanel({ displayCurrency }) {
                 {selectedMarkets.length !== 1 ? "s" : ""} to provide coverage for
               </p>
               {selectionLimit > 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Points remaining: {pointsRemaining}
-                </p>
+                <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                  <span>Points remaining: {pointsRemaining}</span>
+                  <div className="relative group ml-1">
+                    <Info className="h-3 w-3 cursor-help" />
+                    <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">
+                      Points represent your underwriting capacity. Each selected protocol consumes 1 point. Unused points can be allocated to additional protocols.
+                    </div>
+                  </div>
+                </div>
               )}
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Total estimated yield:{" "}
