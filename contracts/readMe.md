@@ -63,10 +63,52 @@ npm install
 npx hardhat compile
 ```
 
-Run the unit tests:
+## Usage
+
+Run the test suite with:
 
 ```bash
 npx hardhat test
 ```
+
+Run Slither static analysis with:
+
+```bash
+npm run slither
+```
+
+Run Mythril security analysis with:
+
+```bash
+npm run test:mythril
+```
+
+Run Manticore symbolic execution with:
+
+```bash
+npm run test:manticore
+```
+
+Deploy the **PriceOracle** and register Chainlink feeds on Base with:
+
+```bash
+npx hardhat run scripts/deploy-oracle.js --network base
+```
+
+Then update `frontend/.env` using the printed `PriceOracle` and `MulticallReader`
+addresses so the frontend can display token prices and batch queries.
+
+The default network configuration uses Hardhat's in‑memory chain.  Modify `hardhat.config.js` to add or customise networks. Running scripts on a remote network requires access to the configured RPC endpoint.
+
+
+## Running a Local Node
+
+To experiment with the contracts interactively you can start a local Hardhat node:
+
+```bash
+npx hardhat node
+```
+
+In a separate terminal deploy contracts and run scripts using the `--network localhost` option.
 
 Static analysis helpers are available via `npm run slither`, `npm run test:mythril` and `npm run test:manticore`.
