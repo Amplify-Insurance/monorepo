@@ -366,7 +366,7 @@ export default function CoverageModal({
 
             {type === "provide" && selectedMarkets.length > 0 ? (
               <div>
-                <span className="text-sm text-gray-600 dark:text-gray-300 block mb-1">Selected Protocols:</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300 block mb-1">Selected Pools:</span>
                 <div className="max-h-32 overflow-y-auto">
                   {selectedMarkets.map((m, i) => (
                     <div key={i} className="flex justify-between items-center py-1 text-sm">

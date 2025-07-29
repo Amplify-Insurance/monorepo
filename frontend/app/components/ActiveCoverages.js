@@ -203,13 +203,13 @@ export default function ActiveCoverages({ displayCurrency }) {
               scope="col"
               className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
             >
-              {covers[0].type === "stablecoin" ? "Insured Token" : covers[0].type === "lst" ? "LST" : "Protocol"}
+              {covers[0].type === "stablecoin" ? "Covered Token" : covers[0].type === "lst" ? "LST" : "Protocol"}
             </th>
             <th
               scope="col"
               className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
             >
-              {covers[0].type === "stablecoin" ? "Reserve Token" : covers[0].type === "lst" ? "Underlying" : "Pool"}
+              {covers[0].type === "stablecoin" ? "Payout Token" : covers[0].type === "lst" ? "Underlying" : "Pool"}
             </th>
             <th
               scope="col"

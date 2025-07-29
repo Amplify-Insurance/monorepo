@@ -273,7 +273,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                         className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
                         {positions[0].type === "stablecoin"
-                          ? "Insured Token"
+                          ? "Covered Token"
                           : positions[0].type === "lst"
                             ? "LST"
                             : "Protocol"}
@@ -283,7 +283,7 @@ export default function UnderwritingPositions({ displayCurrency }) {
                         className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
                         {positions[0].type === "stablecoin"
-                          ? "Reserve Token"
+                          ? "Payout Token"
                           : positions[0].type === "lst"
                             ? "Underlying"
                             : "Pool"}

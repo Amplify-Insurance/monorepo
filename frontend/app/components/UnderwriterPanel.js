@@ -664,7 +664,7 @@ export default function UnderwriterPanel({ displayCurrency }) {
           onClose={() => setModalOpen(false)}
           type="provide"
           protocol={
-            selectedMarkets.length > 1 ? "Multiple Protocols" : markets.find((m) => m.id === selectedMarkets[0])?.name
+            selectedMarkets.length > 1 ? "Multiple Pools" : markets.find((m) => m.id === selectedMarkets[0])?.name
           }
           token={selectedToken?.address || ''}
           premium={0} // Not relevant for providing coverage

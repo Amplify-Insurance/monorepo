@@ -48,7 +48,7 @@ export default function UnderwritingWithdrawalModal({
   const waitingPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Request Withdrawal - ${position.protocol}`}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Request Withdrawal`}>
       <div className="space-y-6">
         {/* Position Info */}
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
@@ -201,7 +201,6 @@ export default function UnderwritingWithdrawalModal({
             <div className="text-sm text-amber-800 dark:text-amber-200">
               <p className="font-semibold mb-1">Important Notice</p>
               <ul className="space-y-1 text-xs">
-                <li>• Withdrawal requests cannot be modified once submitted</li>
                 <li>• You can cancel your request at any time during the 30-day period</li>
                 <li>• Your position will continue earning yield during the waiting period</li>
                 <li>• Partial withdrawals may affect your coverage allocation</li>

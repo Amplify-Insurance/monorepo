@@ -187,7 +187,6 @@ export default function RequestWithdrawalModal({
             <div className="text-sm text-amber-800 dark:text-amber-200">
               <p className="font-semibold mb-1">Important Notice</p>
               <ul className="space-y-1 text-xs">
-                <li>• Withdrawal requests cannot be modified once submitted</li>
                 <li>• You can cancel your request at any time during the 30-day period</li>
                 <li>• Your tokens will continue earning rewards during the waiting period</li>
               </ul>

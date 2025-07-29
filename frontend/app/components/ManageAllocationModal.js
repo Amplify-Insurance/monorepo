@@ -153,7 +153,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
   const { protocolCount, stablecoinCount, lstCount, totalCount } = getFilterCounts()
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Manage Protocol Allocation">
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Pool Allocations">
       {availableDeployments.length > 1 && (
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asset</label>
@@ -184,7 +184,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
           >
             All ({totalCount})
           </button>
-          <button
+          {/* <button
             onClick={() => setFilter("protocols")}
             className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
               filter === "protocols"
@@ -193,7 +193,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
             }`}
           >
             Protocols ({protocolCount})
-          </button>
+          </button> */}
           <button
             onClick={() => setFilter("stablecoins")}
             className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
@@ -264,7 +264,7 @@ export default function ManageAllocationModal({ isOpen, onClose, deployment }) {
             <div>
               <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">Withdrawal Notice</h4>
               <p className="text-sm text-amber-700 dark:text-amber-400">
-                Withdrawing cover from deselected protocols will require a <strong>30-day withdrawal period</strong>.
+                Withdrawing cover from deselected pools will require a <strong>30-day withdrawal period</strong>.
                 During this time, you will continue to earn yield on your position.
               </p>
               <button
