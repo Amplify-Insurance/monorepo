@@ -34,6 +34,7 @@ The ABIs for each contract live under `frontend/abi`, so only the addresses need
 to be provided. Several API routes under `app/api` demonstrate reading data from
 the contracts. Examples include:
 
+## Endpoints
 
 - `GET /api/pools` – number of pools
 - `GET /api/pools/list` – detailed info for all pools
