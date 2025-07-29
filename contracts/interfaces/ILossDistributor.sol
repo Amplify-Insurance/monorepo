@@ -10,12 +10,6 @@ interface ILossDistributor {
     uint256[] calldata poolIds
 ) external;
 
-    function getProspectiveLosses(
-        address user,
-        uint256 poolId,
-        uint256 userPledge
-    ) external view returns (uint256);
-
     function recordPledgeUpdate(
     address user,
     uint256 poolId

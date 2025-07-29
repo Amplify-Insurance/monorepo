@@ -18,12 +18,12 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
  * @title UnderwriterManager
  * @author Gemini
  * @notice Manages the allocation (pledging) of capital to risk pools using a risk-based points system.
- * @dev CORRECTED: Implemented a risk points system to control underwriter leverage based on pool risk ratings.
+ * @dev V3: Removed redundant loss accounting pathways for a single, consistent model.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /* ───────────────────────── State: Interfaces ───────────────────────── */
+    // --- State: Interfaces ---
     ICapitalPool public capitalPool;
     IPoolRegistry public poolRegistry;
     IBackstopPool public catPool;
@@ -31,15 +31,15 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     IRewardDistributor public rewardDistributor;
     address public riskManager;
 
-    /* ────────────────── State: Underwriter-Specific ────────────────── */
+    // --- State: Underwriter-Specific ---
     mapping(address => mapping(uint256 => uint256)) public underwriterPoolPledge;
     mapping(address => uint256[]) public underwriterAllocations;
     mapping(address => mapping(uint256 => bool)) public isAllocatedToPool;
     mapping(address => mapping(uint256 => uint256)) public underwriterAllocationIndex;
     mapping(address => mapping(uint256 => uint256)) public deallocationRequestTimestamp;
-    mapping(address => uint256) public underwriterRiskPointsUsed; // NEW
+    mapping(address => uint256) public underwriterRiskPointsUsed;
 
-    /* ───────────────── State: Pool & Adapter Aggregates ──────────────── */
+    // --- State: Pool & Adapter Aggregates ---
     mapping(uint256 => uint256) public totalCapitalPledgedToPool;
     mapping(uint256 => uint256) public capitalPendingWithdrawal;
     mapping(uint256 => mapping(address => uint256)) public capitalPerAdapter;
@@ -49,18 +49,17 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     mapping(uint256 => address[]) public poolSpecificUnderwriters;
     mapping(uint256 => mapping(address => uint256)) public underwriterIndexInPoolArray;
 
-    /* ───────────────────────── Constants & Config ──────────────────────── */
+    // --- Constants & Config ---
     uint256 public constant ABSOLUTE_MAX_ALLOCATIONS = 50;
-    uint256 public constant TOTAL_RISK_POINTS = 12; // NEW
+    uint256 public constant TOTAL_RISK_POINTS = 12;
     uint256 public maxAllocationsPerUnderwriter = 5;
     uint256 public deallocationNoticePeriod;
 
-    /* ───────────────────────── Events & Errors ───────────────────────── */
+    // --- Events & Errors ---
     event AddressesSet(address capital, address registry, address cat, address loss, address rewards, address riskMgr);
     event CapitalAllocated(address indexed underwriter, uint256 indexed poolId, uint256 amount, address adapter);
     event DeallocationRequested(address indexed underwriter, uint256 indexed poolId, uint256 amount, uint256 timestamp);
     event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount, address adapter);
-    event LossRecorded(address indexed underwriter, uint256 indexed poolId, uint256 lossAmount);
     event DeallocationNoticePeriodSet(uint256 newPeriod);
     event MaxAllocationsPerUnderwriterSet(uint256 newMax);
 
@@ -76,9 +75,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     error NoDeallocationRequest();
     error NoticePeriodActive();
     error InsufficientFreeCapital();
-    error InsufficientRiskPoints(uint256 current, uint256 required, uint256 total); // NEW
+    error InsufficientRiskPoints(uint256 current, uint256 required, uint256 total);
 
-    /* ───────────────────── Modifiers ───────────────────── */
+    // --- Modifiers ---
     modifier onlyCapitalPool() {
         require(msg.sender == address(capitalPool), "UM: Not CapitalPool");
         _;
@@ -89,7 +88,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         _;
     }
 
-    /* ───────────────────── Constructor & Setup ───────────────────── */
+    // --- Constructor & Setup ---
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
     function setAddresses(
@@ -124,20 +123,23 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         emit DeallocationNoticePeriodSet(_newPeriod);
     }
 
-    /* ──────────────── Underwriter Capital Management ──────────────── */
-
+    // --- Underwriter Capital Management ---
     function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
         (uint256 totalCapitalToPledge, address adapter, uint256 pointsToUse) = _prepareAllocateCapital(poolIds);
         
         underwriterRiskPointsUsed[msg.sender] += pointsToUse;
 
         for (uint256 i = 0; i < poolIds.length; i++) {
+            // Before allocating, snapshot any pending losses on other pools
+            lossDistributor.recordPledgeUpdate(msg.sender, poolIds[i]);
             _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
         }
     }
 
     function requestDeallocateFromPool(uint256 poolId) external nonReentrant {
         _checkDeallocationRequest(msg.sender, poolId);
+        // Snapshot losses before creating the request
+        lossDistributor.recordPledgeUpdate(msg.sender, poolId);
         uint256 pledgeAmount = underwriterPoolPledge[msg.sender][poolId];
         deallocationRequestTimestamp[msg.sender][poolId] = block.timestamp;
         capitalPendingWithdrawal[poolId] += pledgeAmount;
@@ -150,8 +152,8 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
         address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
 
+        // Loss realization is handled by CapitalPool before withdrawal, not here.
         delete deallocationRequestTimestamp[underwriter][poolId];
-        _realizeLossesForAllPools(underwriter);
 
         totalCapitalPledgedToPool[poolId] -= pledgeAmount;
         capitalPendingWithdrawal[poolId] -= pledgeAmount;
@@ -166,34 +168,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         emit CapitalDeallocated(underwriter, poolId, pledgeAmount, adapter);
     }
 
-    /* ───────────────── Hooks & State Updaters ───────────────── */
-    
-    function recordLossAgainstPledge(address underwriter, uint256 poolId, uint256 lossAmount) external onlyRiskManager {
-        if (lossAmount == 0) return;
-
-        uint256 pledgeInPool = underwriterPoolPledge[underwriter][poolId];
-        address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
-        require(adapter != address(0), "User has no yield adapter");
-
-        uint256 poolLoss = Math.min(pledgeInPool, lossAmount);
-
-        underwriterPoolPledge[underwriter][poolId] -= poolLoss;
-        totalCapitalPledgedToPool[poolId] -= poolLoss;
-        capitalPerAdapter[poolId][adapter] -= poolLoss;
-
-        if (capitalPerAdapter[poolId][adapter] == 0) {
-            _removeAdapterFromPool(poolId, adapter);
-        }
-        
-        if (underwriterPoolPledge[underwriter][poolId] == 0) {
-            _removeUnderwriterFromPool(underwriter, poolId);
-        }
-
-        emit LossRecorded(underwriter, poolId, poolLoss);
-    }
-
+    // --- Hooks & State Updaters ---
     function onCapitalDeposited(address underwriter, uint256 amount) external onlyCapitalPool nonReentrant {
-        _realizeLossesForAllPools(underwriter);
+        realizeLossesForAllPools(underwriter);
 
         (uint256 principalAfter, , , ) = capitalPool.getUnderwriterAccount(underwriter);
         uint256 principalBefore = principalAfter > amount ? principalAfter - amount : 0;
@@ -249,12 +226,53 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
     }
 
-    function onLossRealized(address, uint256) external onlyCapitalPool {
-        // Intentionally blank.
+    function onLossRealized(address underwriter, uint256 valueLost) external onlyCapitalPool nonReentrant {
+        (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
+        uint256 principalBefore = principalAfter + valueLost;
+        if (principalBefore == 0) return;
+
+        uint256[] memory allocations = underwriterAllocations[underwriter];
+        if (allocations.length > 0) {
+            address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
+            if (adapter == address(0)) return; // User might be fully wiped out.
+
+            for (uint256 i = 0; i < allocations.length; i++) {
+                uint256 poolId = allocations[i];
+                uint256 poolPledgeBefore = underwriterPoolPledge[underwriter][poolId];
+                if (poolPledgeBefore > 0) {
+                    uint256 reduction = Math.mulDiv(poolPledgeBefore, valueLost, principalBefore);
+                    underwriterPoolPledge[underwriter][poolId] -= reduction;
+                    totalCapitalPledgedToPool[poolId] -= reduction;
+                    capitalPerAdapter[poolId][adapter] -= reduction;
+                }
+            }
+        }
+    }
+    
+    /**
+     * @notice Realizes all pending losses for a user across all their allocated pools.
+     * @dev This is a critical function called before withdrawals or liquidations to ensure
+     * an underwriter's state is fully settled. Made external to be callable by other managers.
+     */
+    function realizeLossesForAllPools(address user) public nonReentrant {
+        uint256[] memory allocations = underwriterAllocations[user];
+        if (allocations.length == 0) return;
+
+        uint256 totalPendingSharesToBurn = 0;
+        for (uint256 i = 0; i < allocations.length; i++) {
+            uint256 poolId = allocations[i];
+            uint256 userPledge = underwriterPoolPledge[user][poolId];
+            if (userPledge > 0) {
+                totalPendingSharesToBurn += lossDistributor.getPendingLosses(user, poolId, userPledge);
+            }
+        }
+
+        if (totalPendingSharesToBurn > 0) {
+            lossDistributor.realizeAggregateLoss(user, totalPendingSharesToBurn, allocations);
+        }
     }
 
-    /* ───────────────── View Functions ───────────────── */
-
+    // --- View Functions ---
     function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256) {
         address[] memory adapters = poolActiveAdapters[poolId];
         uint256[] memory capital = new uint256[](adapters.length);
@@ -272,8 +290,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         return underwriterAllocations[user];
     }
 
-    /* ───────────────── Internal & Helper Functions ───────────────── */
-
+    // --- Internal & Helper Functions ---
     function _getPointsForRating(IPoolRegistry.RiskRating _rating) internal pure returns (uint256) {
         if (_rating == IPoolRegistry.RiskRating.Low) return 1;
         if (_rating == IPoolRegistry.RiskRating.Moderate) return 2;
@@ -322,7 +339,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     function _removeUnderwriterFromPool(address underwriter, uint256 poolId) internal {
-        // Refund risk points before removing the allocation
         IPoolRegistry.RiskRating rating = poolRegistry.getPoolRiskRating(poolId);
         uint256 pointsToRefund = _getPointsForRating(rating);
         if (underwriterRiskPointsUsed[underwriter] >= pointsToRefund) {
@@ -331,7 +347,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             underwriterRiskPointsUsed[underwriter] = 0;
         }
 
-        // Remove from underwriter's allocation list
         uint256[] storage allocs = underwriterAllocations[underwriter];
         uint256 indexToRemove = underwriterAllocationIndex[underwriter][poolId];
         uint256 lastElementPoolId = allocs[allocs.length - 1];
@@ -339,7 +354,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         underwriterAllocationIndex[underwriter][lastElementPoolId] = indexToRemove;
         allocs.pop();
 
-        // Remove from pool's underwriter list
         uint256 indexInPool = underwriterIndexInPoolArray[poolId][underwriter];
         address[] storage underwriters = poolSpecificUnderwriters[poolId];
         address lastUnderwriter = underwriters[underwriters.length - 1];
@@ -366,7 +380,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             _removeUnderwriterFromPool(underwriter, poolId);
         }
         delete underwriterAllocations[underwriter];
-        delete underwriterRiskPointsUsed[underwriter]; // Clean up state
+        delete underwriterRiskPointsUsed[underwriter];
     }
 
     function _prepareAllocateCapital(uint256[] calldata poolIds) internal view returns (uint256, address, uint256) {
@@ -407,36 +421,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         if (deallocationRequestTimestamp[underwriter][poolId] != 0) revert DeallocationRequestPending();
         
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
-
-        // Fetch all required static data in a single, efficient call.
         (, uint256 totalSold, , , ,) = poolRegistry.getPoolStaticData(poolId);
-        
         uint256 currentPledged = totalCapitalPledgedToPool[poolId];
         uint256 pendingW = capitalPendingWithdrawal[poolId];
-        
-        // Free capital is the portion of the pledged capital that is not backing sold coverage
-        // and is not already pending withdrawal.
         uint256 freeCapital = currentPledged > totalSold + pendingW ? currentPledged - totalSold - pendingW : 0;
 
         if (pledgeAmount > freeCapital) revert InsufficientFreeCapital();
-    }
-
-    function _realizeLossesForAllPools(address user) internal {
-        uint256[] memory allocations = underwriterAllocations[user];
-        if (allocations.length == 0) return;
-
-        uint256 totalPendingLossValue = 0;
-        for (uint256 i = 0; i < allocations.length; i++) {
-            uint256 poolId = allocations[i];
-            uint256 userPledge = underwriterPoolPledge[user][poolId];
-            if (userPledge > 0) {
-                totalPendingLossValue += lossDistributor.getPendingLosses(user, poolId, userPledge);
-            }
-        }
-
-        if (totalPendingLossValue > 0) {
-            lossDistributor.realizeAggregateLoss(user, totalPendingLossValue, allocations);
-        }
     }
 
     function _validateDeallocationRequest(address underwriter, uint256 poolId) internal view {

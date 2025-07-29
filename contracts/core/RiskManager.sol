@@ -21,14 +21,12 @@ import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
  * @title RiskManager
  * @author Gemini
  * @notice Orchestrates claim processing and liquidations.
- * @dev CORRECTED: processClaim now correctly records the loss against underwriter pledges
- * in the UnderwriterManager, ensuring available capacity is accurately calculated.
+ * @dev Relies on the LossDistributor and UnderwriterManager hooks for correct loss accounting.
  */
 contract RiskManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // --- State Variables ---
-
     ICapitalPool public capitalPool;
     IPoolRegistry public poolRegistry;
     IPolicyNFT public policyNFT;
@@ -42,7 +40,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     uint256 public constant BPS = 10_000;
 
     // --- Structs ---
-
     struct ClaimData {
         IPolicyNFT.Policy policy;
         address claimant;
@@ -54,7 +51,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     }
 
     // --- Events ---
-
     event AddressesSet(
         address capital,
         address registry,
@@ -69,7 +65,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     event ClaimProcessed(uint256 indexed policyId, uint256 amountClaimed, bool isFullClaim);
 
     // --- Errors ---
-
     error NotPolicyManager();
     error UnderwriterNotInsolvent();
     error ZeroAddressNotAllowed();
@@ -78,11 +73,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
     error InvalidClaimAmount();
 
     // --- Constructor ---
-
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
     // --- Owner Functions ---
-
     function setAddresses(
         address _capital,
         address _registry,
@@ -117,9 +110,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
     }
 
     // --- Public Functions ---
-
     function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
         _checkInsolvency(_underwriter);
+        // This function must be made external in UnderwriterManager
         underwriterManager.realizeLossesForAllPools(_underwriter);
         emit UnderwriterLiquidated(msg.sender, _underwriter);
     }
@@ -142,12 +135,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
         
         uint256 lossBorneByPool = _distributeLossesAndRecord(data, claimAmount);
         
-        // --- FIX: Notify UnderwriterManager of the loss to update pledges ---
-        address[] memory underwriters = underwriterManager.getPoolUnderwriters(policy.poolId);
-        for (uint i = 0; i < underwriters.length; i++) {
-            underwriterManager.recordLossAgainstPledge(underwriters[i], policy.poolId, claimAmount);
-        }
-        // --- End of FIX ---
+        // **FIXED**: The redundant and incorrect call to underwriterManager.recordLossAgainstPledge
+        // has been removed to prevent double-counting the loss. The system now correctly relies
+        // on the LossDistributor -> CapitalPool -> UnderwriterManager.onLossRealized pathway.
         
         _executePayout(data, claimAmount, lossBorneByPool);
 
@@ -170,7 +160,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     }
 
     // --- Internal Functions ---
-
     function _distributePremium(ClaimData memory _data, uint256 _claimAmount) internal {
         if (_claimAmount == 0 || address(_data.protocolToken) == address(0)) return;
 
@@ -246,7 +235,8 @@ contract RiskManager is Ownable, ReentrancyGuard {
             uint256 pledge = underwriterManager.underwriterPoolPledge(_underwriter, pid);
             totalPendingLosses += lossDistributor.getPendingLosses(_underwriter, pid, pledge);
         }
-        if (totalPendingLosses <= totalValue) revert UnderwriterNotInsolvent();
+        uint256 pendingSharesToBurn = capitalPool.valueToShares(totalPendingLosses);
+        if (totalPendingLosses <= masterShares) revert UnderwriterNotInsolvent();    
     }
 
     function _scaleAmount(

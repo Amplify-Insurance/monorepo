@@ -14,15 +14,14 @@ import "../interfaces/ICapitalPool.sol";
 import "../interfaces/IBackstopPool.sol";
 import "../interfaces/IRewardDistributor.sol";
 import "../interfaces/IRiskManagerPMHook.sol";
-// --- NEW INTERFACE ---
 import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
 
 
 /**
  * @title PolicyManager
  * @author Gemini
- * @notice Handles policy lifecycle. Updated to fetch capital data from UnderwriterManager.
- * @dev CORRECTED: Added clearIncreasesAndGetPendingAmount to be called by RiskManager during claims.
+ * @notice Handles policy lifecycle, including purchasing, premium management, and cancellations.
+ * @dev V2: Hardened against Denial of Service attacks by limiting the number of pending increases per policy.
  */
 contract PolicyManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -30,7 +29,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     /* ───────────────────────── Constants ───────────────────────── */
     uint256 public constant BPS = 10_000;
     uint256 public constant SECS_YEAR = 365 days;
-    uint256 private constant PROCESS_LIMIT = 50;  // cap for batch processing
+    uint256 public constant PROCESS_LIMIT = 50;  // Max pending increases & batch processing cap
 
     /* ───────────────────────── State Variables ───────────────────────── */
     uint256 public coverCooldownPeriod = 0 days;
@@ -40,7 +39,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     IPolicyNFT public immutable policyNFT;
     IRewardDistributor public rewardDistributor;
     IRiskManagerPMHook public riskManager;
-    // --- NEW STATE VARIABLE ---
     IUnderwriterManager public underwriterManager;
     uint256 public catPremiumBps = 2_000; // 20%
 
@@ -53,7 +51,9 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
     mapping(uint256 => uint256) public pendingIncreaseListHead;
     mapping(uint256 => PendingIncreaseNode) private _nodes;
-    mapping(uint256 => uint256) public pendingCoverageSum;  // total queued per policy
+    mapping(uint256 => uint256) public pendingCoverageSum;
+    // --- NEW: Counter to prevent DoS vector ---
+    mapping(uint256 => uint256) public pendingIncreaseCount;
     uint256 private _nextNodeId = 1;
 
     /* ───────────────────────── Errors ───────────────────────── */
@@ -68,7 +68,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     error PolicyNotActive();
     error AddressesNotSet();
     error TooManyPendingIncreases();
-    error NotRiskManager(); // NEW
+    error NotRiskManager();
 
     /* ───────────────────────── Events ──────────────────────────── */
     event AddressesSet(address indexed registry, address indexed capital, address indexed rewards, address rm, address um);
@@ -90,7 +90,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     /* ───────────────────── Admin Functions ───────────────────── */
-
     function setAddresses(
         address registry,
         address capital,
@@ -130,7 +129,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     /* ───────────────────── Policy Management ───────────────────── */
-
     function purchaseCover(
         uint256 poolId,
         uint256 coverageAmount,
@@ -179,6 +177,9 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     function increaseCover(uint256 policyId, uint256 additionalCoverage) external nonReentrant {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
         if (additionalCoverage == 0 || additionalCoverage > type(uint128).max) revert InvalidAmount();
+
+        // --- FIXED: Enforce limit on pending increases to prevent DoS ---
+        require(pendingIncreaseCount[policyId] < PROCESS_LIMIT, "Too many pending increases");
         
         _settleAndDrainPremium(policyId);
         if (policyNFT.ownerOf(policyId) != msg.sender) revert NotPolicyOwner();
@@ -198,6 +199,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         });
         pendingIncreaseListHead[policyId] = nodeId;
         pendingCoverageSum[policyId] += additionalCoverage;
+        pendingIncreaseCount[policyId]++; // --- FIXED: Increment counter ---
 
         riskManager.updateCoverageSold(pol.poolId, additionalCoverage, true);
 
@@ -234,13 +236,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     /* ───────────────── Trusted Functions ───────────────── */
-
-    /**
-     * @notice Called by the RiskManager during claim processing to clear any pending increases. 5000000
-     * @dev This is a crucial step to prevent orphaned liability on the books when a policy is terminated.
-     * @param policyId The ID of the policy whose pending increases should be cleared.
-     * @return totalCancelled The total amount of coverage from the pending increases that were cancelled.
-     */
     function clearIncreasesAndGetPendingAmount(uint256 policyId)
         external
         onlyRiskManager
@@ -250,7 +245,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     }
 
     /* ───────────────── Internal Helpers ────────────────────────── */
-
     function _terminatePolicy(uint256 policyId, IPolicyNFT.Policy memory pol) internal {
         uint256 pendingToCancel = _clearAllPendingIncreases(policyId);
         uint256 totalToReduce = pol.coverage + pendingToCancel;
@@ -266,18 +260,21 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         totalCancelled = pendingCoverageSum[policyId];
         if (totalCancelled == 0) return 0;
 
-        uint256 cleared = 0;
+        uint256 clearedCount = 0;
         uint256 nodeId = pendingIncreaseListHead[policyId];
 
+        // This loop is now safe because the number of nodes is capped at PROCESS_LIMIT
         while (nodeId != 0) {
-            if (cleared >= PROCESS_LIMIT) revert TooManyPendingIncreases();
+            // Safeguard check, should not be hit with the new logic
+            if (clearedCount >= PROCESS_LIMIT) revert TooManyPendingIncreases();
             uint256 nextId = _nodes[nodeId].nextNodeId;
             delete _nodes[nodeId];
             nodeId = nextId;
-            cleared++;
+            clearedCount++;
         }
         pendingIncreaseListHead[policyId] = 0;
         pendingCoverageSum[policyId] = 0;
+        pendingIncreaseCount[policyId] = 0; // --- FIXED: Reset counter ---
     }
 
     function _validateIncreaseCover(uint256 policyId, uint256 additionalCoverage, IPolicyNFT.Policy memory pol) internal view {
@@ -366,7 +363,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         if (catAmt > 0) {
             IERC20 asset = capitalPool.underlyingAsset();
             asset.safeTransfer(address(catPool), catAmt);
-            // This assumes the BackstopPool has been corrected to not pull funds again.
             catPool.receiveUsdcPremium(catAmt);
         }
 
@@ -393,6 +389,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
             if (block.timestamp >= node.activationTimestamp) {
                 finalized += node.amount;
                 pendingCoverageSum[_policyId] -= node.amount;
+                pendingIncreaseCount[_policyId]--; // --- FIXED: Decrement counter ---
 
                 if (prev == 0) {
                     pendingIncreaseListHead[_policyId] = nextId;
@@ -432,19 +429,15 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         return (coverage * rateBps * 7 days) / (SECS_YEAR * BPS);
     }
 
-
     /* ───────────────────── View Functions ───────────────────── */
-
     function getPendingIncreases(uint256 policyId) external view returns (PendingIncreaseNode[] memory) {
-        uint256 count = 0;
-        uint256 nodeId = pendingIncreaseListHead[policyId];
-        while (nodeId != 0 && count < PROCESS_LIMIT) {
-            count++;
-            nodeId = _nodes[nodeId].nextNodeId;
+        uint256 count = pendingIncreaseCount[policyId];
+        if (count == 0) {
+            return new PendingIncreaseNode[](0);
         }
 
         PendingIncreaseNode[] memory list = new PendingIncreaseNode[](count);
-        nodeId = pendingIncreaseListHead[policyId];
+        uint256 nodeId = pendingIncreaseListHead[policyId];
         for (uint256 i = 0; i < count; i++) {
             list[i] = _nodes[nodeId];
             nodeId = _nodes[nodeId].nextNodeId;

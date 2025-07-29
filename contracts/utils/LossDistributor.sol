@@ -7,12 +7,12 @@ import "../interfaces/IUnderwriterManager.sol";
 import "../interfaces/ICapitalPool.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-
 /**
  * @title LossDistributor
  * @author Gemini
  * @notice Manages the scalable accounting of losses for underwriters using the "pull-over-push" pattern.
- * @dev This avoids gas-intensive loops by tracking losses on a per-share basis and realizing them on demand.
+ * @dev CORRECTED: The contract now accounts for losses in terms of CapitalPool shares, not asset value.
+ * This ensures that loss calculations are consistent with the pool's state at the moment a loss occurs.
  */
 contract LossDistributor is ILossDistributor, Ownable {
     // --- Dependencies ---
@@ -27,17 +27,17 @@ contract LossDistributor is ILossDistributor, Ownable {
 
     // --- Accounting Structs for the "Pull-over-Push" Pattern ---
     struct LossTracker {
-        // Total accumulated losses for a pool, per unit of pledge, stored with high precision.
-        uint256 accumulatedLossPerPledge;
+        // Total accumulated shares to be burned for a pool, per unit of pledge, stored with high precision.
+        uint256 accumulatedSharesToBurnPerPledge;
     }
 
+    // --- FIX: Updated UserLossState to track historical debt ---
     struct UserLossState {
-        // The total loss the user has already realized and "paid" for.
-        uint256 lossDebt;
-        uint256 accumulatedLossPerPledgeAtLastUpdate;
-
+        // Share debt that was crystallized during previous pledge updates.
+        uint256 historicalShareDebt;
+        // A snapshot of the pool's loss ratio at the user's last pledge update.
+        uint256 accumulatedSharesToBurnPerPledgeAtLastUpdate;
     }
-
 
     // --- State Variables ---
     mapping(uint256 => LossTracker) public poolLossTrackers;
@@ -93,129 +93,87 @@ contract LossDistributor is ILossDistributor, Ownable {
 
     /* ───────────────────────── Core Logic ──────────────────────── */
 
-    /**
-     * @notice Records a new loss by updating the pool's loss-per-pledge metric.
-     * @dev This is now a highly scalable O(1) operation.
-     */
     function distributeLoss(
         uint256 poolId,
         uint256 lossAmount,
         uint256 totalPledgeInPool
     ) external override onlyRiskManager {
-        if (lossAmount == 0 || totalPledgeInPool == 0) {
-            return;
-        }
+        if (lossAmount == 0 || totalPledgeInPool == 0) return;
+        uint256 sharesToBurn = capitalPool.valueToShares(lossAmount);
+        if (sharesToBurn == 0) return;
+        poolLossTrackers[poolId].accumulatedSharesToBurnPerPledge += (sharesToBurn * PRECISION_FACTOR) / totalPledgeInPool;
+    }
+    
+    // --- FIX: Implemented logic to handle pledge updates ---
+    /**
+     * @notice Snapshots a user's current loss state before their pledge is updated.
+     * @dev Called by UnderwriterManager *before* a user's pledge is changed.
+     * This crystallizes any pending losses and sets a new baseline for future loss calculations.
+     */
+    function recordPledgeUpdate(address user, uint256 poolId) external override onlyUnderwriterManager {
         LossTracker storage tracker = poolLossTrackers[poolId];
-        tracker.accumulatedLossPerPledge += (lossAmount * PRECISION_FACTOR) / totalPledgeInPool;
+        UserLossState storage userState = userLossStates[user][poolId];
+        uint256 currentPledge = underwriterManager.underwriterPoolPledge(user, poolId);
+
+        // Calculate the "live" share debt accrued since the last update
+        uint256 lossRatioDelta = tracker.accumulatedSharesToBurnPerPledge - userState.accumulatedSharesToBurnPerPledgeAtLastUpdate;
+        if (lossRatioDelta > 0 && currentPledge > 0) {
+            uint256 newShareDebt = (currentPledge * lossRatioDelta) / PRECISION_FACTOR;
+            // Add the newly calculated debt to the historical total
+            userState.historicalShareDebt += newShareDebt;
+        }
+
+        // Snapshot the current pool loss ratio as the new baseline for this user
+        userState.accumulatedSharesToBurnPerPledgeAtLastUpdate = tracker.accumulatedSharesToBurnPerPledge;
     }
 
-    /**
-     * @notice Realizes a user's total aggregated losses from multiple pools at once.
-     * @dev This function is called by the UnderwriterManager after it has summed up
-     * the pending losses from all of a user's leveraged positions.
-     */
     function realizeAggregateLoss(
         address user,
-        uint256 totalLossValue,
+        uint256 totalSharesToBurn,
         uint256[] calldata poolIds
     ) external override onlyUnderwriterManager {
-        if (totalLossValue == 0) return;
+        if (totalSharesToBurn == 0) return;
 
-        // 1. Convert the single, total loss value into a number of shares to burn.
-        uint256 sharesToBurn = totalLossValue; // capitalPool.valueToShares(totalLossValue);
+        (,, uint256 userMasterShares,) = capitalPool.getUnderwriterAccount(user);
+        uint256 clampedSharesToBurn = Math.min(totalSharesToBurn, userMasterShares);
 
-        if (sharesToBurn > 0) {
-            // Get the user's actual, current share balance to ensure we don't burn more than they have.
-            (,, uint256 userMasterShares,) = capitalPool.getUnderwriterAccount(user);
-            uint256 clampedSharesToBurn = Math.min(sharesToBurn, userMasterShares);
-
-            if (clampedSharesToBurn > 0) {
-                // 2. Perform the SINGLE, simplified burn operation on the CapitalPool.
-                capitalPool.burnSharesForLoss(user, clampedSharesToBurn);
-            }
+        if (clampedSharesToBurn > 0) {
+            capitalPool.burnSharesForLoss(user, clampedSharesToBurn);
         }
 
-        // 3. Loop through the user's covered pools to update their loss debt,
-        //    ensuring their accounting is fully settled.
+        // --- FIX: Reset user's debt state after it has been settled ---
+        // After burning shares, clear the historical debt and update the snapshot.
         for (uint i = 0; i < poolIds.length; i++) {
             uint256 poolId = poolIds[i];
-            LossTracker storage tracker = poolLossTrackers[poolId];
-            UserLossState storage userState = userLossStates[user][poolId];
-            uint256 userPledge = underwriterManager.underwriterPoolPledge(user, poolId);
-            
-            if (userPledge > 0) {
-                userState.lossDebt = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
-            }
+            userLossStates[user][poolId].historicalShareDebt = 0;
+            userLossStates[user][poolId].accumulatedSharesToBurnPerPledgeAtLastUpdate = poolLossTrackers[poolId].accumulatedSharesToBurnPerPledge;
         }
     }
 
     /* ───────────────────────── View Functions ──────────────────────── */
     
+    // --- FIX: Updated logic to calculate total pending losses ---
     /**
-     * @notice Calculates the pending, unrealized losses for a user in a specific pool.
+     * @notice Calculates a user's total pending share debt for a specific pool.
+     * @dev It sums the crystallized historical debt with the "live" debt accrued since the last update.
+     * @return pendingSharesToBurn The total number of shares the user owes.
      */
     function getPendingLosses(
         address user,
         uint256 poolId,
         uint256 userPledge
-    ) public view override returns (uint256) {
-        LossTracker storage tracker = poolLossTrackers[poolId];
+    ) public view override returns (uint256 pendingSharesToBurn) {
         UserLossState storage userState = userLossStates[user][poolId];
+        LossTracker storage tracker = poolLossTrackers[poolId];
 
-        uint256 totalLossIncurred = (userPledge * tracker.accumulatedLossPerPledge) / PRECISION_FACTOR;
-        
-        // Ensure we don't return a negative number due to rounding
-        if (totalLossIncurred <= userState.lossDebt) {
-            return 0;
+        // Calculate the "live" share debt accrued since the last update
+        uint256 lossRatioDelta = tracker.accumulatedSharesToBurnPerPledge - userState.accumulatedSharesToBurnPerPledgeAtLastUpdate;
+        uint256 liveShareDebt = 0;
+        if (lossRatioDelta > 0 && userPledge > 0) {
+            liveShareDebt = (userPledge * lossRatioDelta) / PRECISION_FACTOR;
         }
-        
-        return totalLossIncurred - userState.lossDebt;
+
+        // Total pending loss is the sum of historical and live debt
+        return userState.historicalShareDebt + liveShareDebt;
     }
-
-    // In LossDistributor.sol
-
-/**
- * @notice Snapshots the current pool loss state for a user.
- * @dev Called by UnderwriterManager when a user's pledge is changed.
- * This sets a new baseline for calculating prospective losses.
- */
-function recordPledgeUpdate(
-    address user,
-    uint256 poolId
-) external override onlyUnderwriterManager {
-    userLossStates[user][poolId].accumulatedLossPerPledgeAtLastUpdate = poolLossTrackers[poolId].accumulatedLossPerPledge;
-}
-
-
-    // In LossDistributor.sol
-
-/**
- * @notice Calculates only the new losses a user is exposed to since their last pledge update.
- * @dev This provides an intuitive view of losses, ignoring historical losses
- * that occurred before the user's capital was pledged.
- * @return The amount of new, unrealized loss affecting the user.
- */
-function getProspectiveLosses(
-    address user,
-    uint256 poolId,
-    uint256 userPledge
-) public view returns (uint256) {
-    LossTracker storage tracker = poolLossTrackers[poolId];
-    UserLossState storage userState = userLossStates[user][poolId];
-
-    uint256 currentLossPerPledge = tracker.accumulatedLossPerPledge;
-    uint256 lossPerPledgeAtUpdate = userState.accumulatedLossPerPledgeAtLastUpdate;
-
-    // If the pool's current loss ratio is less than or equal to the user's snapshot,
-    // it means no new losses have occurred that affect them.
-    if (currentLossPerPledge <= lossPerPledgeAtUpdate) {
-        return 0;
-    }
-
-    // Calculate the increase in loss-per-pledge since the user's last update.
-    uint256 deltaLossPerPledge = currentLossPerPledge - lossPerPledgeAtUpdate;
-
-    // The prospective loss is their current pledge multiplied by the new loss ratio.
-    return (userPledge * deltaLossPerPledge) / PRECISION_FACTOR;
-}
 }
