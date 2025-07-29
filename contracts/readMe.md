@@ -1,6 +1,6 @@
-# Amplify Insurance Smart Contracts
+# LayerCover Insurance Smart Contracts
 
-This directory contains the Solidity sources for the Amplify Insurance protocol. The contracts implement an on-chain insurance marketplace where underwriters supply USDC liquidity and policy-holders buy cover on specific risks. All lifecycle actions are enforced by these smart contracts.
+This directory contains the Solidity sources for the LayerCover protocol. The contracts implement an on-chain insurance marketplace where underwriters supply USDC liquidity and policy-holders buy cover on specific risks. All lifecycle actions are enforced by these smart contracts.
 
 ## Directory structure
 
