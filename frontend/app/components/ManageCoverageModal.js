@@ -136,7 +136,9 @@ export default function ManageCoverageModal({
       } else if (action === "decrease") {
         if (!shares) throw new Error("share info missing")
         const cp = await getCapitalPoolWithSigner(depInfo.capitalPool)
-        tx = await cp.requestWithdrawal(shares)
+        const rm = await getUnderwriterManagerWithSigner(depInfo.underwriterManager)
+        const amount = await cp.sharesToValue(shares)
+        tx = await rm.requestWithdrawal(amount)
         setTxHash(tx.hash)
         await tx.wait()
       } else if (action === "increase") {
