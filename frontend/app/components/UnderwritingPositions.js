@@ -12,7 +12,6 @@ import useUnderwriterDetails from "../../hooks/useUnderwriterDetails"
 import usePools from "../../hooks/usePools"
 import useYieldAdapters from "../../hooks/useYieldAdapters"
 import { ethers } from "ethers"
-import { getCapitalPoolWithSigner } from "../../lib/capitalPool"
 import { getUnderwriterManagerWithSigner } from "../../lib/underwriterManager"
 import { getTokenName, getTokenLogo, getProtocolLogo, getProtocolName, getProtocolType } from "../config/tokenNameMap"
 import { getDeployment } from "../config/deployments"
@@ -152,11 +151,10 @@ export default function UnderwritingPositions({ displayCurrency }) {
     setIsRequesting(true)
     try {
       const dep = getDeployment(selectedPosition.deployment)
-      const cp = await getCapitalPoolWithSigner(dep.capitalPool, dep.name)
+      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
       const dec = pools.find((p) => p.deployment === selectedPosition.deployment)?.underlyingAssetDecimals ?? 6
       const amountBn = ethers.utils.parseUnits(withdrawalData.amount.toString(), dec)
-      const shares = await cp.valueToShares(amountBn)
-      const tx = await cp.requestWithdrawal(shares)
+      const tx = await rm.requestWithdrawal(amountBn)
       await tx.wait()
 
       const readyDate = Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days from now
@@ -180,8 +178,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
     setIsExecuting(true)
     try {
       const dep = getDeployment(position.deployment)
-      const cp = await getCapitalPoolWithSigner(dep.capitalPool, dep.name)
-      const tx = await cp.executeWithdrawal(0)
+      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
+      const tx = await rm.executeWithdrawal(0)
       await tx.wait()
 
       setWithdrawalRequests((prev) => {
@@ -200,8 +198,8 @@ export default function UnderwritingPositions({ displayCurrency }) {
     setIsCancelling(true)
     try {
       const dep = getDeployment(position.deployment)
-      const cp = await getCapitalPoolWithSigner(dep.capitalPool, dep.name)
-      const tx = await cp.cancelWithdrawalRequest()
+      const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
+      const tx = await rm.cancelWithdrawal(0)
       await tx.wait()
 
       setWithdrawalRequests((prev) => {
