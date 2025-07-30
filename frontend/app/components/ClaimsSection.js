@@ -16,9 +16,9 @@ export default function ClaimsSection({ displayCurrency }) {
   const [activeTab, setActiveTab] = useState("affected") // 'affected' or 'history'
   const [claimingId, setClaimingId] = useState(null)
   const { address } = useAccount()
-  const { claims } = useClaims()
+  const { claims, refresh: refreshClaims } = useClaims()
   const { pools } = usePools()
-  const { positions: affectedPositions } = useUnderwriterClaims(address)
+  const { positions: affectedPositions, refresh: refreshPositions } = useUnderwriterClaims(address)
 
   const handleClaimCollateral = async (id) => {
     try {
@@ -26,6 +26,8 @@ export default function ClaimsSection({ displayCurrency }) {
       const manager = await getClaimsCollateralManagerWithSigner()
       const tx = await manager.claimCollateral(id)
       await tx.wait()
+      refreshPositions()
+      refreshClaims()
     } catch (err) {
       console.error("Claim collateral failed", err)
     } finally {
