@@ -12,8 +12,7 @@ import "../interfaces/IPoolRegistry.sol";
  * @title LossDistributor
  * @author Gemini
  * @notice Manages accounting for direct and contagion losses.
- * @dev V3: Implements a hybrid model where contagion losses only affect underwriters 
- * who are allocated to both the source and target pools.
+ * @dev V5: Corrected modifier on distributeLoss to allow calls from CapitalPool.
  */
 contract LossDistributor is ILossDistributor, Ownable {
     // --- Dependencies ---
@@ -30,35 +29,29 @@ contract LossDistributor is ILossDistributor, Ownable {
 
     // --- Accounting Structs ---
     struct LossTracker {
-        /// @notice Total accumulated shares-to-burn per unit of pledge for a pool.
         uint256 accumulatedSharesToBurnPerPledge;
     }
 
     struct UserDirectLossState {
-        /// @notice Crystallized share debt from previous pledge updates.
         uint256 historicalShareDebt;
-        /// @notice Snapshot of the pool's direct loss ratio at last pledge update.
         uint256 directRatioSnapshot;
     }
 
     // --- State Variables ---
-    /// @notice Tracks direct losses for a given pool.
-    mapping(uint256 => LossTracker) public poolLossTrackers;
-    /// @notice Tracks contagion losses pushed from a source pool to a target pool.
+    mapping(uint256 => LossTracker) public poolLossTrackers; // Direct losses
     mapping(uint256 => mapping(uint256 => LossTracker)) public contagionLossTrackers; // [targetPoolId][sourcePoolId]
-
-    /// @notice Tracks an underwriter's historical debt and snapshots for direct losses.
     mapping(address => mapping(uint256 => UserDirectLossState)) public userLossStates;
-    /// @notice Tracks an underwriter's ratio snapshot for contagion losses.
     mapping(address => mapping(uint256 => mapping(uint256 => uint256))) public userContagionRatioSnapshots; // [user][targetPoolId][sourcePoolId]
 
     uint256 public constant PRECISION_FACTOR = 1e18;
 
     // --- Modifiers & Errors ---
-    modifier onlyRiskManager() {
-        require(msg.sender == riskManager, "LD: Not RiskManager");
+    // <<< FIX START: Changed modifier to allow calls from the CapitalPool contract.
+    modifier onlyCapitalPool() {
+        require(msg.sender == address(capitalPool), "LD: Not CapitalPool");
         _;
     }
+    // <<< FIX END
 
     modifier onlyUnderwriterManager() {
         require(msg.sender == address(underwriterManager), "LD: Not UnderwriterManager");
@@ -113,41 +106,52 @@ contract LossDistributor is ILossDistributor, Ownable {
 
     // --- Core Logic ---
 
+    /**
+     * @notice Distributes a fixed loss amount across direct and contagion vectors.
+     * @dev This function calculates the total shares to burn once, then distributes them
+     * proportionally based on capital overlap to prevent loss amplification.
+     */
     function distributeLoss(
         uint256 claimPoolId,
         uint256 lossAmount
-    ) external override onlyRiskManager {
+    ) external override onlyCapitalPool { // <<< FIX: Using the correct modifier.
         if (lossAmount == 0) return;
 
-        uint256 totalCapitalInClaimPool = underwriterManager.overlapExposure(claimPoolId, claimPoolId);
-        if (totalCapitalInClaimPool == 0) return;
+        uint256 totalSharesToBurn = capitalPool.valueToShares(lossAmount);
+        if (totalSharesToBurn == 0) return;
 
-        // 1. Handle the Direct Loss on the Claiming Pool
-        uint256 sharesToBurnForDirectLoss = capitalPool.valueToShares(lossAmount);
-        if (sharesToBurnForDirectLoss > 0) {
-            poolLossTrackers[claimPoolId].accumulatedSharesToBurnPerPledge +=
-                (sharesToBurnForDirectLoss * PRECISION_FACTOR) / totalCapitalInClaimPool;
+        uint256 totalOverlapSum = 0;
+        uint256 poolCount = poolRegistry.getPoolCount();
+        for (uint256 i = 0; i < poolCount; i++) {
+            totalOverlapSum += underwriterManager.overlapExposure(claimPoolId, i);
         }
 
-        // 2. Distribute Contagion Loss to other correlated pools
-        uint256 poolCount = poolRegistry.getPoolCount();
-        for (uint256 p = 0; p < poolCount; p++) {
-            if (p == claimPoolId) continue;
+        if (totalOverlapSum == 0) {
+            uint256 totalCapitalInClaimPool = underwriterManager.overlapExposure(claimPoolId, claimPoolId);
+            if (totalCapitalInClaimPool > 0) {
+                poolLossTrackers[claimPoolId].accumulatedSharesToBurnPerPledge +=
+                    (totalSharesToBurn * PRECISION_FACTOR) / totalCapitalInClaimPool;
+            }
+            return;
+        }
 
-            uint256 overlap = underwriterManager.overlapExposure(claimPoolId, p);
-            if (overlap == 0) continue;
+        for (uint256 i = 0; i < poolCount; i++) {
+            uint256 targetPoolId = i;
+            uint256 overlapWithTarget = underwriterManager.overlapExposure(claimPoolId, targetPoolId);
+            if (overlapWithTarget == 0) continue;
 
-            uint256 lossForPoolP = Math.mulDiv(lossAmount, overlap, totalCapitalInClaimPool);
-            if (lossForPoolP == 0) continue;
-            
-            uint256 totalCapitalInPoolP = underwriterManager.overlapExposure(p, p);
-            if (totalCapitalInPoolP == 0) continue;
+            uint256 sharesForThisVector = Math.mulDiv(totalSharesToBurn, overlapWithTarget, totalOverlapSum);
+            if (sharesForThisVector == 0) continue;
 
-            uint256 sharesToBurnForContagion = capitalPool.valueToShares(lossForPoolP);
-            if (sharesToBurnForContagion > 0) {
-                // Store this loss in the dedicated contagion tracker
-                contagionLossTrackers[p][claimPoolId].accumulatedSharesToBurnPerPledge +=
-                    (sharesToBurnForContagion * PRECISION_FACTOR) / totalCapitalInPoolP;
+            uint256 totalCapitalInTargetPool = underwriterManager.overlapExposure(targetPoolId, targetPoolId);
+            if (totalCapitalInTargetPool == 0) continue;
+
+            if (targetPoolId == claimPoolId) {
+                poolLossTrackers[targetPoolId].accumulatedSharesToBurnPerPledge +=
+                    (sharesForThisVector * PRECISION_FACTOR) / totalCapitalInTargetPool;
+            } else {
+                contagionLossTrackers[targetPoolId][claimPoolId].accumulatedSharesToBurnPerPledge +=
+                    (sharesForThisVector * PRECISION_FACTOR) / totalCapitalInTargetPool;
             }
         }
     }
@@ -163,7 +167,6 @@ contract LossDistributor is ILossDistributor, Ownable {
             userLossStates[user][poolId].historicalShareDebt += pendingDebt;
         }
 
-        // Update snapshots to the current values
         userLossStates[user][poolId].directRatioSnapshot = poolLossTrackers[poolId].accumulatedSharesToBurnPerPledge;
         
         uint256 poolCount = poolRegistry.getPoolCount();
@@ -186,7 +189,6 @@ contract LossDistributor is ILossDistributor, Ownable {
             capitalPool.burnSharesForLoss(user, burnable);
         }
 
-        // Reset user loss states for all their allocated pools
         for (uint256 i = 0; i < poolIds.length; i++) {
             uint256 pid = poolIds[i];
             userLossStates[user][pid].historicalShareDebt = 0;
@@ -211,19 +213,16 @@ contract LossDistributor is ILossDistributor, Ownable {
         UserDirectLossState storage uds = userLossStates[user][poolId];
         pendingSharesToBurn = uds.historicalShareDebt;
 
-        // 1. Calculate debt from DIRECT losses on this pool.
         LossTracker storage directTracker = poolLossTrackers[poolId];
         uint256 directDelta = directTracker.accumulatedSharesToBurnPerPledge - uds.directRatioSnapshot;
         if (directDelta > 0) {
             pendingSharesToBurn += (userPledge * directDelta) / PRECISION_FACTOR;
         }
 
-        // 2. Calculate debt from CONTAGION losses pushed from other pools.
         uint256 poolCount = poolRegistry.getPoolCount();
         for (uint256 sourcePoolId = 0; sourcePoolId < poolCount; sourcePoolId++) {
             if (sourcePoolId == poolId) continue;
             
-            // Only add contagion debt if the user was also underwriting the source pool.
             if (underwriterManager.isAllocatedToPool(user, sourcePoolId)) {
                 LossTracker storage contagionTracker = contagionLossTrackers[poolId][sourcePoolId];
                 uint256 snapshot = userContagionRatioSnapshots[user][poolId][sourcePoolId];

@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface ICapitalPool {
     struct PayoutData {
+        uint256 poolId; // <<< FIX: Added poolId to the payout data struct.
         address claimant;
         uint256 claimantAmount;
         address feeRecipient;
@@ -16,6 +17,7 @@ interface ICapitalPool {
         uint256[] capitalPerAdapter;
         uint256 totalCapitalFromPoolLPs;
     }
+
     
     enum YieldPlatform { NONE, AAVE, COMPOUND, OTHER_YIELD }
 
@@ -35,6 +37,9 @@ interface ICapitalPool {
     function sharesToValue(uint256 shares) external view returns (uint256);
     function valueToShares(uint256 value) external view returns (uint256);
     function executePayout(PayoutData calldata payoutData) external;
+    function requestWithdrawal(address user, uint256 sharesToBurn) external;
+    function cancelWithdrawalRequest(address user, uint256 requestIndex) external;
+    function executeWithdrawal(address user, uint256 requestIndex) external;
     function burnSharesForLoss(
         address underwriter,
         uint256 burnAmount

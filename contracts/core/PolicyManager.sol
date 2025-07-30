@@ -21,7 +21,7 @@ import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
  * @title PolicyManager
  * @author Gemini
  * @notice Handles policy lifecycle, including purchasing, premium management, and cancellations.
- * @dev V2: Hardened against Denial of Service attacks by limiting the number of pending increases per policy.
+ * @dev V4: Fixed allowance issue for premium distribution.
  */
 contract PolicyManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -52,7 +52,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
     mapping(uint256 => uint256) public pendingIncreaseListHead;
     mapping(uint256 => PendingIncreaseNode) private _nodes;
     mapping(uint256 => uint256) public pendingCoverageSum;
-    // --- NEW: Counter to prevent DoS vector ---
     mapping(uint256 => uint256) public pendingIncreaseCount;
     uint256 private _nextNodeId = 1;
 
@@ -178,7 +177,6 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         if (address(poolRegistry) == address(0)) revert AddressesNotSet();
         if (additionalCoverage == 0 || additionalCoverage > type(uint128).max) revert InvalidAmount();
 
-        // --- FIXED: Enforce limit on pending increases to prevent DoS ---
         require(pendingIncreaseCount[policyId] < PROCESS_LIMIT, "Too many pending increases");
         
         _settleAndDrainPremium(policyId);
@@ -199,7 +197,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         });
         pendingIncreaseListHead[policyId] = nodeId;
         pendingCoverageSum[policyId] += additionalCoverage;
-        pendingIncreaseCount[policyId]++; // --- FIXED: Increment counter ---
+        pendingIncreaseCount[policyId]++;
 
         riskManager.updateCoverageSold(pol.poolId, additionalCoverage, true);
 
@@ -263,9 +261,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         uint256 clearedCount = 0;
         uint256 nodeId = pendingIncreaseListHead[policyId];
 
-        // This loop is now safe because the number of nodes is capped at PROCESS_LIMIT
         while (nodeId != 0) {
-            // Safeguard check, should not be hit with the new logic
             if (clearedCount >= PROCESS_LIMIT) revert TooManyPendingIncreases();
             uint256 nextId = _nodes[nodeId].nextNodeId;
             delete _nodes[nodeId];
@@ -274,7 +270,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         }
         pendingIncreaseListHead[policyId] = 0;
         pendingCoverageSum[policyId] = 0;
-        pendingIncreaseCount[policyId] = 0; // --- FIXED: Reset counter ---
+        pendingIncreaseCount[policyId] = 0;
     }
 
     function _validateIncreaseCover(uint256 policyId, uint256 additionalCoverage, IPolicyNFT.Policy memory pol) internal view {
@@ -362,16 +358,20 @@ contract PolicyManager is Ownable, ReentrancyGuard {
 
         if (catAmt > 0) {
             IERC20 asset = capitalPool.underlyingAsset();
-            asset.safeTransfer(address(catPool), catAmt);
+            // <<< FIX START: Approve the BackstopPool to pull the funds, then call it.
+            asset.forceApprove(address(catPool), catAmt);
             catPool.receiveUsdcPremium(catAmt);
+            // <<< FIX END
         }
 
         if (poolInc > 0) {
             (,,uint256 pledged) = underwriterManager.getPoolPayoutData(poolId);
             if (pledged > 0) {
                 IERC20 asset = capitalPool.underlyingAsset();
-                asset.safeTransfer(address(rewardDistributor), poolInc);
+                // <<< FIX START: Approve the RewardDistributor to pull the funds, then call it.
+                asset.forceApprove(address(rewardDistributor), poolInc);
                 rewardDistributor.distribute(poolId, address(asset), poolInc, pledged);
+                // <<< FIX END
             }
         }
     }
@@ -389,7 +389,7 @@ contract PolicyManager is Ownable, ReentrancyGuard {
             if (block.timestamp >= node.activationTimestamp) {
                 finalized += node.amount;
                 pendingCoverageSum[_policyId] -= node.amount;
-                pendingIncreaseCount[_policyId]--; // --- FIXED: Decrement counter ---
+                pendingIncreaseCount[_policyId]--;
 
                 if (prev == 0) {
                     pendingIncreaseListHead[_policyId] = nextId;
@@ -416,6 +416,11 @@ contract PolicyManager is Ownable, ReentrancyGuard {
         }
 
         uint256 utilBps = (sold * BPS) / availableCapital;
+
+        if (utilBps > BPS) {
+            utilBps = BPS;
+        }
+
         if (utilBps < rateModel.kink) {
             return rateModel.base + (utilBps * rateModel.slope1) / BPS;
         } else {

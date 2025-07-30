@@ -104,7 +104,7 @@ async function main() {
 
   const PoolRegistry = await ethers.getContractFactory("PoolRegistry");
   const poolRegistry = await PoolRegistry.deploy(deployer.address, riskManager.target, policyManager.target);
-  await poolRegistry.waitForDeployment(); 
+  await poolRegistry.waitForDeployment();
   console.log("PoolRegistry deployed to:", poolRegistry.target);
 
   const CapitalPool = await ethers.getContractFactory("CapitalPool");
@@ -136,21 +136,39 @@ async function main() {
   /*───────────────────────── Wire up permissions and addresses ───────────────────────*/
   console.log("\nWiring up contract permissions and addresses...");
   await waitForTx(policyNFT.setPolicyManager(policyManager.target), "Set PolicyManager on PolicyNFT");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(policyNFT.setRiskManager(riskManager.target), "Set RiskManager on PolicyNFT");
-  
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(catShare.transferOwnership(catPool.target), "Transfer CatShare ownership to BackstopPool");
+  await new Promise(resolve => setTimeout(resolve, 5000));
+
   await waitForTx(catPool.initialize(), "Initialize BackstopPool");
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   await waitForTx(capitalPool.setRiskManager(riskManager.target), "Set RiskManager on CapitalPool");
   await waitForTx(capitalPool.setUnderwriterManager(underwriterManager.target), "Set UnderwriterManager on CapitalPool");
 
   await waitForTx(catPool.setRiskManager(riskManager.target), "Set RiskManager on BackstopPool");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(catPool.setCapitalPool(capitalPool.target), "Set CapitalPool on BackstopPool");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(catPool.setPolicyManager(policyManager.target), "Set PolicyManager on BackstopPool");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(catPool.setRewardDistributor(rewardDistributor.target), "Set RewardDistributor on BackstopPool");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(rewardDistributor.setCatPool(catPool.target), "Set BackstopPool on RewardDistributor");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
 
   await waitForTx(policyManager.setAddresses(poolRegistry.target, capitalPool.target, catPool.target, rewardDistributor.target, riskManager.target,underwriterManager.target), "Set addresses on PolicyManager");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(riskManager.setAddresses(
     capitalPool.target,
     poolRegistry.target,
@@ -160,6 +178,12 @@ async function main() {
     rewardDistributor.target,
     underwriterManager.target
   ), "Set addresses on RiskManager");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  await waitForTx(riskManager.setCommittee(deployer.address), "Set Fee Recipient");
+
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(underwriterManager.setAddresses(
     capitalPool.target,
     poolRegistry.target,
@@ -168,13 +192,17 @@ async function main() {
     rewardDistributor.target,
     riskManager.target
   ), "Set addresses on UnderwriterManager");
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   /*───────────────────────── ProtocolConfigurator ───────────────────────*/
   console.log("\nDeploying and configuring RiskAdmin (ProtocolConfigurator)...");
   const ProtocolConfigurator = await ethers.getContractFactory("RiskAdmin");
   const protocolConfigurator = await ProtocolConfigurator.deploy(deployer.address);
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await protocolConfigurator.waitForDeployment();
   console.log("RiskAdmin deployed to:", protocolConfigurator.target);
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   await waitForTx(protocolConfigurator.initialize(
     poolRegistry.target,
@@ -182,6 +210,7 @@ async function main() {
     policyManager.target,
     underwriterManager.target,
   ), "Initialize RiskAdmin");
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   /*─────────────────────────── Yield adapters ────────────────────────────*/
   console.log("\nDeploying yield adapters...");
@@ -191,6 +220,7 @@ async function main() {
     : [USDC_ADDRESS, AAVE_POOL_ADDRESS, AAVE_AUSDC_ADDRESS, deployer.address];
   const aaveAdapter = await AaveAdapter.deploy(...aaveArgs);
   await aaveAdapter.waitForDeployment();
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   await waitForTx(aaveAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on AaveAdapter");
 
@@ -201,29 +231,52 @@ async function main() {
   const compoundAdapter = await CompoundAdapter.deploy(...compoundArgs);
   await compoundAdapter.waitForDeployment();
 
-  
+  await new Promise(resolve => setTimeout(resolve, 5000));
+
   await waitForTx(compoundAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on CompoundAdapter");
 
   /*──────────────── Transfer ownership and configure via RiskAdmin ──────*/
   console.log("\nTransferring ownership to RiskAdmin and configuring...");
   await waitForTx(poolRegistry.transferOwnership(protocolConfigurator.target), "Transfer PoolRegistry ownership");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(capitalPool.transferOwnership(protocolConfigurator.target), "Transfer CapitalPool ownership");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(policyManager.transferOwnership(protocolConfigurator.target), "Transfer PolicyManager ownership");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(riskManager.transferOwnership(protocolConfigurator.target), "Transfer RiskManager ownership");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(underwriterManager.transferOwnership(protocolConfigurator.target), "Transfer UnderwriterManager ownership");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(rewardDistributor.transferOwnership(protocolConfigurator.target), "Transfer RewardDistributor ownership");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(catPool.transferOwnership(protocolConfigurator.target), "Transfer BackstopPool ownership");
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   // Use configurator for initial setup
   await waitForTx(protocolConfigurator.setRiskManager(poolRegistry.target, riskManager.target), "Set RiskManager on PoolRegistry via Admin");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(protocolConfigurator.setRiskManager(capitalPool.target, riskManager.target), "Set RiskManager on CapitalPool via Admin");
-  
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(protocolConfigurator.setRewardDistributor(capitalPool.target, rewardDistributor.target), "Set rewardDistributor on CapitalPool via Admin");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(protocolConfigurator.setLossDistributor(capitalPool.target, lossDistributor.target), "Set lossDistributor on CapitalPool via Admin");
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   // 1=AAVE, 2=COMPOUND
   await waitForTx(protocolConfigurator.setCapitalPoolBaseYieldAdapter(1, aaveAdapter.target), "Set Aave adapter via Admin");
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   await waitForTx(protocolConfigurator.setCapitalPoolBaseYieldAdapter(2, compoundAdapter.target), "Set Compound adapter via Admin");
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   /*────────────────────── Protocol risk‑pool examples ───────────────────*/
   console.log("\nAdding initial risk pools...");
@@ -239,16 +292,34 @@ async function main() {
   if (useMocks) {
       // For mocks, we'll assign Low and Moderate risk
       await waitForTx(protocolConfigurator.addProtocolRiskPool(USDC_ADDRESS, defaultRateModel, 500, RiskRating.Low), "Add USDC risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       if (DAI) await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250, RiskRating.Low), "Add DAI risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       if (USDM_ADDRESS) await waitForTx(protocolConfigurator.addProtocolRiskPool(USDM_ADDRESS, defaultRateModel, 250, RiskRating.Elevated), "Add USDM risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       if (USDT_ADDRESS) await waitForTx(protocolConfigurator.addProtocolRiskPool(USDT_ADDRESS, defaultRateModel, 250, RiskRating.Moderate), "Add USDT risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
     } else {
       // For real assets, we can be more specific based on protocol reputation and asset type
       await waitForTx(protocolConfigurator.addProtocolRiskPool(AAVE_AUSDC_ADDRESS, defaultRateModel, 500, RiskRating.Low), "Add Aave risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       await waitForTx(protocolConfigurator.addProtocolRiskPool(COMPOUND_COMET_USDC, defaultRateModel, 500, RiskRating.Low), "Add Compound risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       await waitForTx(protocolConfigurator.addProtocolRiskPool(MOONWELL_MUSDC, defaultRateModel, 500, RiskRating.Moderate), "Add Moonwell risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       await waitForTx(protocolConfigurator.addProtocolRiskPool(EULER_EUSDC, defaultRateModel, 500, RiskRating.Elevated), "Add Euler risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       await waitForTx(protocolConfigurator.addProtocolRiskPool(DAI, defaultRateModel, 250, RiskRating.Low), "Add DAI risk pool");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       await waitForTx(protocolConfigurator.addProtocolRiskPool(USD_PLUS, defaultRateModel, 250, RiskRating.Elevated), "Add USD+ risk pool");
     }
 

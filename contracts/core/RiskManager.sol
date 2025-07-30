@@ -21,7 +21,7 @@ import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
  * @title RiskManager
  * @author Gemini
  * @notice Orchestrates claim processing and liquidations.
- * @dev Relies on the LossDistributor and UnderwriterManager hooks for correct loss accounting.
+ * @dev V3: Removed redundant loss distribution call.
  */
 contract RiskManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -133,13 +133,9 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
         _distributePremium(data, claimAmount);
         
-        uint256 lossBorneByPool = _distributeLossesAndRecord(data, claimAmount);
-        
-        // **FIXED**: The redundant and incorrect call to underwriterManager.recordLossAgainstPledge
-        // has been removed to prevent double-counting the loss. The system now correctly relies
-        // on the LossDistributor -> CapitalPool -> UnderwriterManager.onLossRealized pathway.
-        
-        _executePayout(data, claimAmount, lossBorneByPool);
+        _handleShortfall(data, claimAmount);
+                
+        _executePayout(data, claimAmount);
 
         bool isFullClaim = (claimAmount == policy.coverage);
         
@@ -176,36 +172,30 @@ contract RiskManager is Ownable, ReentrancyGuard {
         );
     }
 
-    function _distributeLossesAndRecord(ClaimData memory _data, uint256 _claimAmount) internal returns (uint256) {
+    function _handleShortfall(ClaimData memory _data, uint256 _claimAmount) internal {
         uint256 lossBorneByPool = Math.min(_claimAmount, _data.totalCapitalPledged);
-
-        if (lossBorneByPool > 0) {
-            lossDistributor.distributeLoss(
-                _data.policy.poolId,
-                lossBorneByPool
-            );
-        }
         
         uint256 shortfall = _claimAmount > lossBorneByPool ? _claimAmount - lossBorneByPool : 0;
         if (shortfall > 0) {
             catPool.drawFund(shortfall);
         }
-        return lossBorneByPool;
     }
 
-    function _executePayout(ClaimData memory _data, uint256 _claimAmount, uint256 _lossBorneByPool) internal {
+    function _executePayout(ClaimData memory _data, uint256 _claimAmount) internal {
         uint256 claimFee = (_claimAmount * _data.poolClaimFeeBps) / BPS;
         uint256 payoutAmount = _claimAmount > claimFee ? _claimAmount - claimFee : 0;
 
         ICapitalPool.PayoutData memory payoutData = ICapitalPool.PayoutData({
+            poolId: _data.policy.poolId,
             claimant: _data.claimant,
             claimantAmount: payoutAmount,
             feeRecipient: committee,
             feeAmount: claimFee,
             adapters: _data.adapters,
             capitalPerAdapter: _data.capitalPerAdapter,
-            totalCapitalFromPoolLPs: _lossBorneByPool
+            totalCapitalFromPoolLPs: _data.totalCapitalPledged
         });
+        
         capitalPool.executePayout(payoutData);
     }
 

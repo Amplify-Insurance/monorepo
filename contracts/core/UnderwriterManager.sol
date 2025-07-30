@@ -17,8 +17,8 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 /**
  * @title UnderwriterManager
  * @author Gemini
- * @notice Manages the allocation (pledging) of capital to risk pools using a risk-based points system.
- * @dev V5: Added comprehensive snapshotting to prevent liability escape on portfolio changes.
+ * @notice Manages the allocation (pledging) of capital to risk pools and safe withdrawals.
+ * @dev V7: Added safe withdrawal functions that check for unpledged capital.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -79,6 +79,8 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     error NoticePeriodActive();
     error InsufficientFreeCapital();
     error InsufficientRiskPoints(uint256 current, uint256 required, uint256 total);
+    error InsufficientUnpledgedCapital(uint256 requested, uint256 available);
+
 
     // --- Modifiers ---
     modifier onlyCapitalPool() {
@@ -131,9 +133,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         address underwriter = msg.sender;
         uint256[] memory existingAllocs = underwriterAllocations[underwriter];
 
-        // --- PRODUCTION FIX: Snapshot all existing pools before changing the portfolio ---
-        // This locks in any pending contagion or direct losses based on the user's current
-        // allocation set, preventing the "liability escape" vulnerability.
         for (uint256 i = 0; i < existingAllocs.length; i++) {
             lossDistributor.recordPledgeUpdate(underwriter, existingAllocs[i]);
         }
@@ -145,7 +144,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         underwriterRiskPointsUsed[underwriter] += pointsToUse;
 
         for (uint256 i = 0; i < poolIds.length; i++) {
-            // Snapshot the new pool before allocation.
             lossDistributor.recordPledgeUpdate(underwriter, poolIds[i]);
             _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
         }
@@ -155,9 +153,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     function requestDeallocateFromPool(uint256 poolId) external nonReentrant {
         _checkDeallocationRequest(msg.sender, poolId);
-        
-        // It's crucial to snapshot the state *before* creating the request.
-        // The deallocation itself will trigger a full portfolio snapshot later.
         lossDistributor.recordPledgeUpdate(msg.sender, poolId);
         
         uint256 pledgeAmount = underwriterPoolPledge[msg.sender][poolId];
@@ -171,9 +166,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         address underwriter = msg.sender;
         uint256[] memory existingAllocs = underwriterAllocations[underwriter];
 
-        // --- PRODUCTION FIX: Snapshot all existing pools before changing the portfolio ---
-        // This is critical to lock in the user's liability from the pool they are
-        // leaving *before* isAllocatedToPool(user, poolId) becomes false.
         for (uint256 i = 0; i < existingAllocs.length; i++) {
             lossDistributor.recordPledgeUpdate(underwriter, existingAllocs[i]);
         }
@@ -200,9 +192,44 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         emit CapitalDeallocated(underwriter, poolId, pledgeAmount, adapter);
     }
 
+    // <<< FIX START: New safe withdrawal functions for unpledged capital.
+    
+    /**
+     * @notice Request to withdraw capital that is NOT currently pledged to any risk pool.
+     * @param amount The amount of USDC to withdraw.
+     */
+    function requestWithdrawal(uint256 amount) external nonReentrant {
+        (uint256 unpledgedCapital, ) = getUnpledgedCapital(msg.sender);
+        if (amount > unpledgedCapital) {
+            revert InsufficientUnpledgedCapital(amount, unpledgedCapital);
+        }
+        
+        uint256 sharesToBurn = capitalPool.valueToShares(amount);
+        capitalPool.requestWithdrawal(msg.sender, sharesToBurn);
+    }
+
+    /**
+     * @notice Cancel a pending withdrawal request.
+     * @param requestIndex The index of the request to cancel, obtained from CapitalPool events.
+     */
+    function cancelWithdrawal(uint256 requestIndex) external nonReentrant {
+        capitalPool.cancelWithdrawalRequest(msg.sender, requestIndex);
+    }
+
+    /**
+     * @notice Execute a pending withdrawal request after the notice period has passed.
+     * @param requestIndex The index of the request to execute.
+     */
+    function executeWithdrawal(uint256 requestIndex) external nonReentrant {
+        // Before executing, realize any pending losses to ensure the share value is correct.
+        realizeLossesForAllPools(msg.sender);
+        capitalPool.executeWithdrawal(msg.sender, requestIndex);
+    }
+    
+    // <<< FIX END
+
     // --- Hooks & State Updaters ---
     function onCapitalDeposited(address underwriter, uint256 amount) external onlyCapitalPool {
-        // Realize losses first to ensure deposit is added to a clean slate.
         realizeLossesForAllPools(underwriter);
 
         (uint256 principalAfter, , , ) = capitalPool.getUnderwriterAccount(underwriter);
@@ -357,6 +384,21 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
         nextCursor = (end == length) ? 0 : end;
     }
+
+    function getUnpledgedCapital(address user) public view returns (uint256 unpledgedCapital, uint256 totalPledged) {
+        (uint256 totalDepositedPrincipal, , , ) = capitalPool.getUnderwriterAccount(user);
+        
+        uint256[] memory allocations = underwriterAllocations[user];
+        for (uint i = 0; i < allocations.length; i++) {
+            totalPledged += underwriterPoolPledge[user][allocations[i]];
+        }
+        
+        if (totalDepositedPrincipal >= totalPledged) {
+            unpledgedCapital = totalDepositedPrincipal - totalPledged;
+        } else {
+            unpledgedCapital = 0;
+        }
+    }
     
     // --- Internal & Helper Functions ---
     function _updateOverlapMatrix(address underwriter, int256 sign) internal {
@@ -403,8 +445,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
         totalCapitalPledgedToPool[poolId] += totalPledge;
         capitalPerAdapter[poolId][adapter] += totalPledge;
-        // The diagonal exposure is the total pledge.
-        overlapExposure[poolId][poolId] += totalPledge;
         
         _addAdapterToPool(poolId, adapter);
 
@@ -472,7 +512,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             if (pledge > 0) {
                 totalCapitalPledgedToPool[poolId] -= pledge;
                 capitalPerAdapter[poolId][adapter] -= pledge;
-                overlapExposure[poolId][poolId] -= pledge;
             }
             _removeUnderwriterFromPool(underwriter, poolId);
         }
