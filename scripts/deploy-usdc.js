@@ -344,6 +344,8 @@ async function main() {
     RiskManager:       riskManager.target,
     ProtocolConfigurator: protocolConfigurator.target,
     UnderwriterManager: underwriterManager.target,
+    ClaimsCollateralManager: claimsCollateralManager.target,
+
   };
 
   addresses[useMocks ? "Mock Aave Adapter" : "Aave Adapter"] = aaveAdapter.target;
