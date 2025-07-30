@@ -16,12 +16,13 @@ import {ILossDistributor} from "../interfaces/ILossDistributor.sol";
 import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 import {IUnderwriterManager} from "../interfaces/IUnderwriterManager.sol";
 import {IPolicyManager} from "../interfaces/IPolicyManager.sol";
+import {IClaimsCollateralManager} from "../interfaces/IClaimsCollateralManager.sol";
 
 /**
  * @title RiskManager
  * @author Gemini
  * @notice Orchestrates claim processing and liquidations.
- * @dev V3: Removed redundant loss distribution call.
+ * @dev V5: Corrected claim ID passing for collateral management.
  */
 contract RiskManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -34,6 +35,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     ILossDistributor public lossDistributor;
     IRewardDistributor public rewardDistributor;
     IUnderwriterManager public underwriterManager;
+    IClaimsCollateralManager public claimsCollateralManager;
     address public policyManager;
     address public committee;
 
@@ -41,6 +43,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
 
     // --- Structs ---
     struct ClaimData {
+        uint256 policyId; // <<< FIX: Added policyId to track the claim
         IPolicyNFT.Policy policy;
         address claimant;
         uint256 totalCapitalPledged;
@@ -48,9 +51,12 @@ contract RiskManager is Ownable, ReentrancyGuard {
         uint256 poolClaimFeeBps;
         address[] adapters;
         uint256[] capitalPerAdapter;
+        address[] underwriters;
+        uint256[] underwriterPledges;
     }
 
     // --- Events ---
+    event ClaimsCollateralManagerSet(address indexed newManager);
     event AddressesSet(
         address capital,
         address registry,
@@ -63,6 +69,7 @@ contract RiskManager is Ownable, ReentrancyGuard {
     event CommitteeSet(address committee);
     event UnderwriterLiquidated(address indexed liquidator, address indexed underwriter);
     event ClaimProcessed(uint256 indexed policyId, uint256 amountClaimed, bool isFullClaim);
+
 
     // --- Errors ---
     error NotPolicyManager();
@@ -103,6 +110,12 @@ contract RiskManager is Ownable, ReentrancyGuard {
         emit AddressesSet(_capital, _registry, _policyManager, _cat, _loss, _rewards, _underwriterManager);
     }
 
+    function setClaimsCollateralManager(address _manager) external onlyOwner {
+        if (_manager == address(0)) revert ZeroAddressNotAllowed();
+        claimsCollateralManager = IClaimsCollateralManager(_manager);
+        emit ClaimsCollateralManagerSet(_manager);
+    }
+
     function setCommittee(address _newCommittee) external onlyOwner {
         if (_newCommittee == address(0)) revert ZeroAddressNotAllowed();
         committee = _newCommittee;
@@ -112,7 +125,6 @@ contract RiskManager is Ownable, ReentrancyGuard {
     // --- Public Functions ---
     function liquidateInsolventUnderwriter(address _underwriter) external nonReentrant {
         _checkInsolvency(_underwriter);
-        // This function must be made external in UnderwriterManager
         underwriterManager.realizeLossesForAllPools(_underwriter);
         emit UnderwriterLiquidated(msg.sender, _underwriter);
     }
@@ -125,13 +137,14 @@ contract RiskManager is Ownable, ReentrancyGuard {
         if (block.timestamp < policy.activation) revert PolicyNotActive();
         if (claimAmount == 0 || claimAmount > policy.coverage) revert InvalidClaimAmount();
 
-        ClaimData memory data = _prepareClaimData(policy, claimant);
+        // <<< FIX: Pass policyId into the preparation function
+        ClaimData memory data = _prepareClaimData(policyId, policy, claimant);
 
         uint256 pendingAmountCancelled = IPolicyManager(policyManager)
             .clearIncreasesAndGetPendingAmount(policyId);
         uint256 totalReduction = claimAmount + pendingAmountCancelled;
 
-        _distributePremium(data, claimAmount);
+        _handleDistressedAsset(data, claimAmount);
         
         _handleShortfall(data, claimAmount);
                 
@@ -156,19 +169,22 @@ contract RiskManager is Ownable, ReentrancyGuard {
     }
 
     // --- Internal Functions ---
-    function _distributePremium(ClaimData memory _data, uint256 _claimAmount) internal {
-        if (_claimAmount == 0 || address(_data.protocolToken) == address(0)) return;
+    function _handleDistressedAsset(ClaimData memory _data, uint256 _claimAmount) internal {
+        if (_claimAmount == 0 || address(_data.protocolToken) == address(0) || address(claimsCollateralManager) == address(0)) return;
 
         uint8 protocolDecimals = IERC20Metadata(address(_data.protocolToken)).decimals();
         uint8 underlyingDecimals = IERC20Metadata(address(capitalPool.underlyingAsset())).decimals();
         uint256 protocolCoverage = _scaleAmount(_claimAmount, underlyingDecimals, protocolDecimals);
 
-        _data.protocolToken.safeTransferFrom(msg.sender, address(rewardDistributor), protocolCoverage);
-        rewardDistributor.distribute(
-            _data.policy.poolId,
+        IERC20(_data.protocolToken).safeTransferFrom(msg.sender, address(this), protocolCoverage);
+        IERC20(_data.protocolToken).forceApprove(address(claimsCollateralManager), protocolCoverage);
+
+        claimsCollateralManager.depositCollateral(
+            _data.policyId, // <<< FIX: Use the correct policyId from the struct
             address(_data.protocolToken),
             protocolCoverage,
-            _data.totalCapitalPledged
+            _data.underwriters,
+            _data.underwriterPledges
         );
     }
 
@@ -200,14 +216,19 @@ contract RiskManager is Ownable, ReentrancyGuard {
     }
 
     function _prepareClaimData(
+        uint256 policyId, // <<< FIX: Accept policyId as an argument
         IPolicyNFT.Policy memory _policy,
         address _claimant
     ) internal view returns (ClaimData memory data) {
+        data.policyId = policyId; // <<< FIX: Store the policyId
         data.policy = _policy;
         data.claimant = _claimant;
         
         (data.adapters, data.capitalPerAdapter, data.totalCapitalPledged) =
             underwriterManager.getPoolPayoutData(data.policy.poolId);
+            
+        (data.underwriters, data.underwriterPledges) = 
+            underwriterManager.getPoolUnderwriterPledges(data.policy.poolId);
         
         (data.protocolToken,,,,data.poolClaimFeeBps,) = poolRegistry.getPoolStaticData(data.policy.poolId);
     }

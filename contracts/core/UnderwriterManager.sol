@@ -341,6 +341,21 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
     }
 
+
+    function getPoolUnderwriterPledges(uint256 poolId)
+        external
+        view
+        returns (address[] memory underwriters, uint256[] memory pledges)
+    {
+        address[] memory underwriterList = poolSpecificUnderwriters[poolId];
+        pledges = new uint256[](underwriterList.length);
+        for (uint i = 0; i < underwriterList.length; i++) {
+            pledges[i] = underwriterPoolPledge[underwriterList[i]][poolId];
+        }
+        return (underwriterList, pledges);
+    }
+
+
     // --- View Functions ---
     function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256) {
         address[] memory adapters = poolActiveAdapters[poolId];

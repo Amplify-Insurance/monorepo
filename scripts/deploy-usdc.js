@@ -87,6 +87,11 @@ async function main() {
   await riskManager.waitForDeployment();
   console.log("RiskManager deployed to:", riskManager.target);
 
+  const ClaimsCollateralManager = await ethers.getContractFactory("ClaimsCollateralManager");
+  const claimsCollateralManager = await ClaimsCollateralManager.deploy(riskManager.target, deployer.address);
+  await claimsCollateralManager.waitForDeployment();
+  console.log("RiskManager deployed to:", claimsCollateralManager.target);
+
   const UnderwriterManager = await ethers.getContractFactory("UnderwriterManager");
   const underwriterManager = await UnderwriterManager.deploy(deployer.address);
   await underwriterManager.waitForDeployment();
@@ -181,6 +186,10 @@ async function main() {
   await new Promise(resolve => setTimeout(resolve, 1000));
 
   await waitForTx(riskManager.setCommittee(deployer.address), "Set Fee Recipient");
+
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  await waitForTx(riskManager.setClaimsCollateralManager(claimsCollateralManager.target), "Set ClaimsCollateralManager");
 
   await new Promise(resolve => setTimeout(resolve, 1000));
 
