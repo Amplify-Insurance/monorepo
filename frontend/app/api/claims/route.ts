@@ -1,58 +1,61 @@
 import { NextResponse } from "next/server";
-
-const SUBGRAPH_URL =
-  process.env.SUBGRAPH_URL ?? process.env.NEXT_PUBLIC_SUBGRAPH_URL;
+import { provider } from "../../../lib/provider";
+import { getRiskManager } from "../../../lib/riskManager";
+import { getClaimsCollateralManager } from "../../../lib/claimsCollateralManager";
 
 export async function GET() {
   try {
-    if (!SUBGRAPH_URL) {
-      throw new Error("SUBGRAPH_URL not configured");
-    }
+    const riskManager = getRiskManager();
+    const collateralManager = getClaimsCollateralManager();
 
-    const pageSize = 1000;
-    let skip = 0;
-    const items: any[] = [];
+    const claimTopic = riskManager.interface.getEvent("ClaimProcessed").topicHash;
+    const fromBlock = BigInt(
+      process.env.CLAIM_START_BLOCK ?? process.env.NEXT_PUBLIC_CLAIM_START_BLOCK ??
+        "0"
+    );
 
-    while (true) {
-      const query = `{
-        claims(first: ${pageSize}, skip: ${skip}, orderBy: timestamp, orderDirection: desc) {
-          policyId
-          poolId
-          claimant
-          coverage
-          netPayoutToClaimant
-          claimFee
-          protocolTokenAmountReceived
-          timestamp
-          transactionHash
+    const logs = await provider.getLogs({
+      address: riskManager.address,
+      topics: [claimTopic],
+      fromBlock,
+      toBlock: "latest",
+    });
+
+    const claims = [] as any[];
+    for (const log of logs) {
+      const parsed = riskManager.interface.parseLog(log);
+      const policyId = parsed.args.policyId as bigint;
+      const amountClaimed = parsed.args.amountClaimed as bigint;
+
+      const block = await provider.getBlock(log.blockHash!);
+      const receipt = await provider.getTransactionReceipt(log.transactionHash);
+
+      let protocolTokenAmountReceived = 0n;
+      for (const l of receipt.logs) {
+        if (
+          l.address.toLowerCase() === collateralManager.address.toLowerCase() &&
+          l.topics[0] ===
+            collateralManager.interface.getEvent("CollateralDeposited").topicHash
+        ) {
+          const dep = collateralManager.interface.parseLog(l);
+          if (dep.args.claimId === policyId) {
+            protocolTokenAmountReceived = dep.args.amount as bigint;
+          }
         }
-      }`;
+      }
 
-      const response = await fetch(SUBGRAPH_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+      claims.push({
+        transactionHash: log.transactionHash,
+        timestamp: Number(block.timestamp),
+        policyId: Number(policyId),
+        poolId: 0,
+        claimant: "0x",
+        coverage: amountClaimed.toString(),
+        netPayoutToClaimant: amountClaimed.toString(),
+        claimFee: "0",
+        protocolTokenAmountReceived: protocolTokenAmountReceived.toString(),
       });
-
-      const json = await response.json();
-      const batch = json?.data?.claims || [];
-      items.push(...batch);
-
-      if (batch.length < pageSize) break;
-      skip += pageSize;
     }
-
-    const claims = items.map((c) => ({
-      transactionHash: c.transactionHash,
-      timestamp: Number(c.timestamp),
-      policyId: Number(c.policyId),
-      poolId: Number(c.poolId),
-      claimant: c.claimant,
-      coverage: c.coverage,
-      netPayoutToClaimant: c.netPayoutToClaimant,
-      claimFee: c.claimFee,
-      protocolTokenAmountReceived: c.protocolTokenAmountReceived,
-    }));
 
     return NextResponse.json({ claims });
   } catch (err: any) {
