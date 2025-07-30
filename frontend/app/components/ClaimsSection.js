@@ -8,13 +8,30 @@ import { ethers } from "ethers"
 import { useAccount } from "wagmi"
 import useClaims from "../../hooks/useClaims"
 import usePools from "../../hooks/usePools"
+import useUnderwriterClaims from "../../hooks/useUnderwriterClaims"
+import { getClaimsCollateralManagerWithSigner } from "../../lib/claimsCollateralManager"
 import { getTokenName, getTokenLogo } from "../config/tokenNameMap"
 
 export default function ClaimsSection({ displayCurrency }) {
   const [activeTab, setActiveTab] = useState("affected") // 'affected' or 'history'
+  const [claimingId, setClaimingId] = useState(null)
   const { address } = useAccount()
   const { claims } = useClaims()
   const { pools } = usePools()
+  const { positions: affectedPositions } = useUnderwriterClaims(address)
+
+  const handleClaimCollateral = async (id) => {
+    try {
+      setClaimingId(id)
+      const manager = await getClaimsCollateralManagerWithSigner()
+      const tx = await manager.claimCollateral(id)
+      await tx.wait()
+    } catch (err) {
+      console.error("Claim collateral failed", err)
+    } finally {
+      setClaimingId(null)
+    }
+  }
 
   const claimsData = claims
     .filter((c) => !address || c.claimant.toLowerCase() === address.toLowerCase())
@@ -47,7 +64,23 @@ export default function ClaimsSection({ displayCurrency }) {
     })
     .filter(Boolean)
 
-  if (claimsData.length === 0) {
+  const affectedData = affectedPositions.map((p) => {
+    const pool = pools.find((pl) => Number(pl.id) === p.poolId)
+    const protocol = pool ? getTokenName(pool.protocolTokenToCover) : p.poolId
+    const tokenName = getTokenName(p.collateralAsset)
+    return {
+      id: p.id,
+      protocol,
+      token: p.collateralAsset,
+      tokenName,
+      amount: p.amount,
+      value: p.amount, // value in native asset unknown
+      claimDate: p.claimDate,
+      claimed: p.claimed,
+    }
+  })
+
+  if (claimsData.length === 0 && affectedData.length === 0) {
     return (
       <div className="text-center py-8">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
@@ -150,7 +183,7 @@ export default function ClaimsSection({ displayCurrency }) {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {claimsData.map((claim) => (
+                {(activeTab === "affected" ? affectedData : claimsData).map((claim) => (
                   <tr key={claim.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -211,21 +244,35 @@ export default function ClaimsSection({ displayCurrency }) {
                               : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                             }`}
                         >
-                          {claim.status.charAt(0).toUpperCase() + claim.status.slice(1)}
+                          {claim.status?.charAt(0).toUpperCase() + claim.status?.slice(1)}
                         </span>
                       )}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <a
-                        href={`https://etherscan.io/tx/${claim.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 inline-flex items-center"
-                      >
-                        <span className="hidden sm:inline">View Transaction</span>
-                        <span className="sm:hidden">View</span>
-                        <ExternalLink className="ml-1 h-3 w-3" />
-                      </a>
+                      {activeTab === "affected" ? (
+                        claim.claimed ? (
+                          <span className="text-gray-500">Claimed</span>
+                        ) : (
+                          <button
+                            onClick={() => handleClaimCollateral(claim.id)}
+                            disabled={claimingId === claim.id}
+                            className="text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                          >
+                            {claimingId === claim.id ? 'Claiming...' : 'Claim'}
+                          </button>
+                        )
+                      ) : (
+                        <a
+                          href={`https://etherscan.io/tx/${claim.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 inline-flex items-center"
+                        >
+                          <span className="hidden sm:inline">View Transaction</span>
+                          <span className="sm:hidden">View</span>
+                          <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      )}
                     </td>
                   </tr>
                 ))}
