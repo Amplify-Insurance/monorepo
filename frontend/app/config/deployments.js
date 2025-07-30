@@ -16,6 +16,7 @@ try {
     policyManager: item.PolicyManager,
     priceOracle: item.PriceOracle,
     multicallReader: item.MulticallReader,
+    claimsCollateralManager: item.ClaimsCollateralManager,
     lossDistributor: item.LossDistributor,
     rewardDistributor: item.RewardDistributor,
     policyNft: item.PolicyNFT,
@@ -53,3 +54,6 @@ export const PRICE_ORACLE_ADDRESS =
 
 export const MULTICALL_READER_ADDRESS =
   deployments[0] && deployments[0].multicallReader;
+
+export const CLAIMS_COLLATERAL_MANAGER_ADDRESS =
+  deployments[0] && deployments[0].claimsCollateralManager;
