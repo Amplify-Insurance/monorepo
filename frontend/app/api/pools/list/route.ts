@@ -9,7 +9,6 @@ import {
   getUnderlyingAssetDecimals,
 } from "../../../../lib/capitalPool";
 import { getUnderwriterManager } from "../../../../lib/underwriterManager";
-import { getCapitalPool } from "../../../../lib/capitalPool";
 import { getLossDistributor } from "../../../../lib/lossDistributor";
 import bnToString from "../../../../lib/bnToString";
 import { ethers } from "ethers";
@@ -72,26 +71,25 @@ function calcPremiumRateBps(pool: any): bigint {
 async function calcRiskAdjustedCapacity(dep: any, poolId: number, coverageSold: string) {
   try {
     const uwm = getUnderwriterManager(dep.underwriterManager, dep.name);
-    const cp = getCapitalPool(dep.capitalPool, dep.name);
     const ld = getLossDistributor(dep.lossDistributor, dep.name);
     const underwriters: string[] = await uwm.getPoolUnderwriters(poolId);
-    let totalNet = 0n;
+    let totalPoolNetPledge = 0n;
+
     for (const uw of underwriters) {
-      const [, , masterShares] = await cp.getUnderwriterAccount(uw);
-      const grossVal = BigInt((await cp.sharesToValue(masterShares)).toString());
-      const allocations: bigint[] = await uwm.getUnderwriterAllocations(uw);
-      let pendingShares = 0n;
-      for (const pid of allocations) {
-        const pledge = await uwm.underwriterPoolPledge(uw, pid);
-        const pending = await ld.getPendingLosses(uw, pid, pledge);
-        pendingShares += BigInt(pending.toString());
-      }
-      const pendingVal = pendingShares > 0n ? BigInt((await cp.sharesToValue(pendingShares)).toString()) : 0n;
-      const net = grossVal > pendingVal ? grossVal - pendingVal : 0n;
-      totalNet += net;
+      // 1. Get the pledge specific to THIS pool
+      const grossPledge = BigInt((await uwm.underwriterPoolPledge(uw, poolId)).toString());
+      if (grossPledge === 0n) continue;
+
+      // 2. Get the pending losses for THIS pool only
+      // Note: The smart contract already does this calculation in getRiskAdjustedPledge
+      const netPledge = BigInt((await uwm.getRiskAdjustedPledge(uw, poolId)).toString());
+
+      // 3. Add the underwriter's net contribution to the pool's total
+      totalPoolNetPledge += netPledge;
     }
+
     const sold = BigInt(coverageSold);
-    const capacity = totalNet > sold ? totalNet - sold : 0n;
+    const capacity = totalPoolNetPledge > sold ? totalPoolNetPledge - sold : 0n;
     return capacity.toString();
   } catch (err) {
     console.error('Failed to calc risk adjusted capacity', err);
