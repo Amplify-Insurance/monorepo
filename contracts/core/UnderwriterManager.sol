@@ -18,7 +18,7 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
  * @title UnderwriterManager
  * @author Gemini
  * @notice Manages the allocation (pledging) of capital to risk pools and safe withdrawals.
- * @dev V7: Added safe withdrawal functions that check for unpledged capital.
+ * @dev V9: Corrected deallocation logic to prevent affecting other pools' available cover.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -164,13 +164,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     function deallocateFromPool(uint256 poolId) external nonReentrant {
         _validateDeallocationRequest(msg.sender, poolId);
         address underwriter = msg.sender;
-        uint256[] memory existingAllocs = underwriterAllocations[underwriter];
-
-        for (uint256 i = 0; i < existingAllocs.length; i++) {
-            lossDistributor.recordPledgeUpdate(underwriter, existingAllocs[i]);
-        }
         
-        _updateOverlapMatrix(underwriter, -1);
+        lossDistributor.recordPledgeUpdate(underwriter, poolId);
+        
+        // <<< FIX START: Replace the broad matrix update with a targeted one.
+        _updateOverlapOnDeallocation(underwriter, poolId);
+        // <<< FIX END
 
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
         address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
@@ -187,17 +186,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
         _removeUnderwriterFromPool(underwriter, poolId);
         
-        _updateOverlapMatrix(underwriter, 1);
-
         emit CapitalDeallocated(underwriter, poolId, pledgeAmount, adapter);
     }
-
-    // <<< FIX START: New safe withdrawal functions for unpledged capital.
     
-    /**
-     * @notice Request to withdraw capital that is NOT currently pledged to any risk pool.
-     * @param amount The amount of USDC to withdraw.
-     */
     function requestWithdrawal(uint256 amount) external nonReentrant {
         (uint256 unpledgedCapital, ) = getUnpledgedCapital(msg.sender);
         if (amount > unpledgedCapital) {
@@ -208,26 +199,15 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         capitalPool.requestWithdrawal(msg.sender, sharesToBurn);
     }
 
-    /**
-     * @notice Cancel a pending withdrawal request.
-     * @param requestIndex The index of the request to cancel, obtained from CapitalPool events.
-     */
     function cancelWithdrawal(uint256 requestIndex) external nonReentrant {
         capitalPool.cancelWithdrawalRequest(msg.sender, requestIndex);
     }
 
-    /**
-     * @notice Execute a pending withdrawal request after the notice period has passed.
-     * @param requestIndex The index of the request to execute.
-     */
     function executeWithdrawal(uint256 requestIndex) external nonReentrant {
-        // Before executing, realize any pending losses to ensure the share value is correct.
         realizeLossesForAllPools(msg.sender);
         capitalPool.executeWithdrawal(msg.sender, requestIndex);
     }
     
-    // <<< FIX END
-
     // --- Hooks & State Updaters ---
     function onCapitalDeposited(address underwriter, uint256 amount) external onlyCapitalPool {
         realizeLossesForAllPools(underwriter);
@@ -341,6 +321,15 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
     }
 
+    // --- View Functions ---
+    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256) {
+        address[] memory adapters = poolActiveAdapters[poolId];
+        uint256[] memory capital = new uint256[](adapters.length);
+        for(uint i = 0; i < adapters.length; i++){
+            capital[i] = capitalPerAdapter[poolId][adapters[i]];
+        }
+        return (adapters, capital, totalCapitalPledgedToPool[poolId]);
+    }
 
     function getPoolUnderwriterPledges(uint256 poolId)
         external
@@ -353,17 +342,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             pledges[i] = underwriterPoolPledge[underwriterList[i]][poolId];
         }
         return (underwriterList, pledges);
-    }
-
-
-    // --- View Functions ---
-    function getPoolPayoutData(uint256 poolId) external view returns (address[] memory, uint256[] memory, uint256) {
-        address[] memory adapters = poolActiveAdapters[poolId];
-        uint256[] memory capital = new uint256[](adapters.length);
-        for(uint i = 0; i < adapters.length; i++){
-            capital[i] = capitalPerAdapter[poolId][adapters[i]];
-        }
-        return (adapters, capital, totalCapitalPledgedToPool[poolId]);
     }
 
     function getPoolUnderwriters(uint256 poolId) external view returns (address[] memory) {
@@ -416,6 +394,26 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
     
     // --- Internal & Helper Functions ---
+    // <<< FIX START: New targeted function for deallocation.
+    function _updateOverlapOnDeallocation(address underwriter, uint256 poolIdToRemove) internal {
+        uint256[] memory allocations = underwriterAllocations[underwriter];
+        uint256 pledge = underwriterPoolPledge[underwriter][poolIdToRemove];
+        if (pledge == 0) return;
+
+        // Loop through all of the user's current allocations (before removal)
+        for (uint i = 0; i < allocations.length; i++) {
+            uint256 p = allocations[i];
+            if (p == poolIdToRemove) continue; 
+
+            // For every other pool 'p', remove the link to the pool being removed
+            overlapExposure[p][poolIdToRemove] -= pledge;
+            overlapExposure[poolIdToRemove][p] -= pledge;
+        }
+        // Finally, remove the diagonal for the removed pool
+        overlapExposure[poolIdToRemove][poolIdToRemove] -= pledge;
+    }
+    // <<< FIX END
+
     function _updateOverlapMatrix(address underwriter, int256 sign) internal {
         uint256[] memory allocations = underwriterAllocations[underwriter];
         uint256 numAllocations = allocations.length;

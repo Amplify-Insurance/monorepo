@@ -2,7 +2,7 @@
   "_format": "hh-sol-artifact-1",
   "contractName": "UnderwriterManager",
   "sourceName": "contracts/core/UnderwriterManager.sol",
-  "abi": [
+  "abi":[
     {
       "inputs": [
         {
@@ -35,8 +35,50 @@
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "current",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "required",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "total",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientRiskPoints",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requested",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "available",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientUnpledgedCapital",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "InvalidPoolId",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "MathOverflowedMulDiv",
       "type": "error"
     },
     {
@@ -254,31 +296,6 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": true,
-          "internalType": "address",
-          "name": "underwriter",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "poolId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "lossAmount",
-          "type": "uint256"
-        }
-      ],
-      "name": "LossRecorded",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
           "indexed": false,
           "internalType": "uint256",
           "name": "newMax",
@@ -321,6 +338,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "TOTAL_RISK_POINTS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256[]",
@@ -329,6 +359,19 @@
         }
       ],
       "name": "allocateCapital",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requestIndex",
+          "type": "uint256"
+        }
+      ],
+      "name": "cancelWithdrawal",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -456,6 +499,19 @@
       "inputs": [
         {
           "internalType": "uint256",
+          "name": "requestIndex",
+          "type": "uint256"
+        }
+      ],
+      "name": "executeWithdrawal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
           "name": "poolId",
           "type": "uint256"
         }
@@ -489,12 +545,70 @@
           "type": "uint256"
         }
       ],
+      "name": "getPoolUnderwriterPledges",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "underwriters",
+          "type": "address[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "pledges",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "poolId",
+          "type": "uint256"
+        }
+      ],
       "name": "getPoolUnderwriters",
       "outputs": [
         {
           "internalType": "address[]",
           "name": "",
           "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "poolId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "cursor",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getPoolUnderwritersPaginated",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "underwriters_",
+          "type": "address[]"
+        },
+        {
+          "internalType": "uint256",
+          "name": "nextCursor",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -514,6 +628,30 @@
           "internalType": "uint256[]",
           "name": "",
           "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getUnpledgedCapital",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "unpledgedCapital",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalPledged",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -638,8 +776,26 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "",
+          "name": "underwriter",
           "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "valueLost",
+          "type": "uint256"
+        }
+      ],
+      "name": "onLossRealized",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         },
         {
           "internalType": "uint256",
@@ -647,9 +803,15 @@
           "type": "uint256"
         }
       ],
-      "name": "onLossRealized",
-      "outputs": [],
-      "stateMutability": "nonpayable",
+      "name": "overlapExposure",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -754,21 +916,11 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "underwriter",
+          "name": "user",
           "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "poolId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "lossAmount",
-          "type": "uint256"
         }
       ],
-      "name": "recordLossAgainstPledge",
+      "name": "realizeLossesForAllPools",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -789,6 +941,19 @@
         }
       ],
       "name": "requestDeallocateFromPool",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "requestWithdrawal",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1001,6 +1166,25 @@
         }
       ],
       "name": "underwriterPoolPledge",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "underwriterRiskPointsUsed",
       "outputs": [
         {
           "internalType": "uint256",
