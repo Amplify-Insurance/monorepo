@@ -59,9 +59,25 @@ export default function UnderwritingPositions({ displayCurrency }) {
         const pool = pools.find((pl) => pl.deployment === d.deployment && Number(pl.id) === Number(pid))
         if (!pool) continue
         const protocol = getTokenName(pool.id)
-        const amount = Number(
-          ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, pool.underlyingAssetDecimals ?? 6),
+        const dec = pool.underlyingAssetDecimals ?? 6
+        const deposited = Number(
+          ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, dec),
         )
+        // Sum pending losses across all allocated pools for this deployment
+        const pendingLossTotal = Object.entries(d.pendingLosses || {}).reduce(
+          (sum, [lossPid, loss]) => {
+            const lossPool = pools.find(
+              (pl) =>
+                pl.deployment === d.deployment &&
+                Number(pl.id) === Number(lossPid),
+            )
+            if (!lossPool) return sum
+            const lossDec = lossPool.underlyingAssetDecimals ?? dec
+            return sum + Number(ethers.utils.formatUnits(loss, lossDec))
+          },
+          0,
+        )
+        const amount = Math.max(0, deposited - pendingLossTotal)
         const pendingLossStr = d.pendingLosses?.[pid] ?? "0"
         const pendingLoss = Number(ethers.utils.formatUnits(pendingLossStr, pool.underlyingAssetDecimals ?? 6))
         const positionId = `${d.deployment}-${pid}`
