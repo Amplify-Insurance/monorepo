@@ -30,12 +30,12 @@ export default function Navbar() {
           <div className="flex items-center md:hidden">
             <Link href="/" className="flex-shrink-0 flex items-center">
               <img
-                src="/layercover-logo-light.svg"
+                src="/layercover-logo-light.png"
                 alt="LayerCover logo"
                 className="h-10 w-auto mr-2 block dark:hidden"
               />
               <img
-                src="/layercover-logo-dark.svg"
+                src="/layercover-logo-dark.png"
                 alt="LayerCover logo"
                 className="h-10 w-auto mr-2 hidden dark:block"
               />
@@ -48,12 +48,12 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-8">
             <Link href="/" className="flex items-center space-x-3">
               <img
-                src="/layercover-logo-light.svg"
+                src="/layercover-logo-light.png"
                 alt="LayerCover logo"
                 className="h-10 w-auto block dark:hidden"
               />
               <img
-                src="/layercover-logo-dark.svg"
+                src="/layercover-logo-dark.png"
                 alt="LayerCover logo"
                 className="h-10 w-auto hidden dark:block"
               />

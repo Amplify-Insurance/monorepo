@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="120" height="24" viewBox="0 0 120 24">
-  <rect width="120" height="24" fill="#1e40af" />
-  <path d="M12 2 L20 5 V11 C20 16.55 16.5 21.5 12 22 C7.5 21.5 4 16.55 4 11 V5 L12 2 Z" fill="white"/>
-  <text x="32" y="16" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="white">LayerCover</text>
-</svg>

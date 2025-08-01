@@ -583,6 +583,10 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         return _getTotalNAV() + unsettledPayouts;
     }
 
+    function getTotalNAV() external view returns (uint256) {
+        return _getTotalNAV();
+    }
+
     function _getTotalNAV() internal view returns (uint256) {
         uint256 totalValue;
         for (uint256 i = 0; i < activeYieldAdapterAddresses.length; i++) {

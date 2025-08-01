@@ -18,7 +18,7 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
  * @title UnderwriterManager
  * @author Gemini
  * @notice Manages the allocation (pledging) of capital to risk pools and safe withdrawals.
- * @dev V13: Implemented O(n) incremental updates for risk matrix on allocation/deallocation.
+ * @dev V16: Optimized mutex group check for gas efficiency.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -51,6 +51,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
     // --- State: Cross-Pool Risk ---
     mapping(uint256 => mapping(uint256 => uint256)) public overlapExposure;
+    mapping(uint256 => uint256) public poolMutexGroupId;
 
     // --- Constants & Config ---
     uint256 public constant ABSOLUTE_MAX_ALLOCATIONS = 50;
@@ -65,7 +66,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     event CapitalDeallocated(address indexed underwriter, uint256 indexed poolId, uint256 amount, address adapter);
     event DeallocationNoticePeriodSet(uint256 newPeriod);
     event MaxAllocationsPerUnderwriterSet(uint256 newMax);
+    event PoolMutexGroupSet(uint256 indexed groupId, uint256[] poolIds);
 
+    error MutexAllocationNotAllowed(uint256 poolId, uint256 groupId);
     error NotCapitalPool();
     error NotRiskManager();
     error NoCapitalToAllocate();
@@ -80,7 +83,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     error InsufficientFreeCapital();
     error InsufficientRiskPoints(uint256 current, uint256 required, uint256 total);
     error InsufficientWithdrawableCapital(uint256 requested, uint256 available);
-
 
     // --- Modifiers ---
     modifier onlyCapitalPool() {
@@ -127,6 +129,14 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         deallocationNoticePeriod = _newPeriod;
         emit DeallocationNoticePeriodSet(_newPeriod);
     }
+    
+    function setPoolMutexGroup(uint256[] calldata poolIds, uint256 groupId) external onlyOwner {
+        require(groupId != 0, "Group ID cannot be zero");
+        for (uint256 i = 0; i < poolIds.length; i++) {
+            poolMutexGroupId[poolIds[i]] = groupId;
+        }
+        emit PoolMutexGroupSet(groupId, poolIds);
+    }
 
     // --- Underwriter Capital Management ---
     function allocateCapital(uint256[] calldata poolIds) external nonReentrant {
@@ -146,7 +156,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
         }
         
-        // Incrementally update the matrix for only the new pools
         _addMatrixOverlapForNewPools(underwriter, existingAllocs, poolIds);
     }
     
@@ -189,7 +198,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         _validateDeallocationRequest(msg.sender, poolId);
         address underwriter = msg.sender;
         
-        // Incrementally remove the exposure for the deallocated pool
         _removeMatrixOverlapForPool(underwriter, poolId);
 
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
@@ -205,7 +213,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             _removeAdapterFromPool(poolId, adapter);
         }
 
-        // This removes the pool from the underwriter's state
         _removeUnderwriterFromPool(underwriter, poolId);
         
         emit CapitalDeallocated(underwriter, poolId, pledgeAmount, adapter);
@@ -229,8 +236,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         
         if (principalBefore == 0) return;
 
-        // A proportional change in capital affects all pledges and thus all overlaps.
-        // A full matrix rebuild is necessary here.
         _rebuildOverlapMatrixForPledgeChange(underwriter, -1);
 
         uint256[] memory allocations = underwriterAllocations[underwriter];
@@ -440,10 +445,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     
     // --- Internal & Helper Functions ---
 
-    /**
-     * @dev O(n) method to add matrix overlaps for newly allocated pools.
-     * Links new pools to existing pools and to each other.
-     */
     function _addMatrixOverlapForNewPools(
         address underwriter,
         uint256[] memory existingPools,
@@ -453,7 +454,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         if (newPoolsLen == 0) return;
         uint256 existingPoolsLen = existingPools.length;
 
-        // 1. Create links between new pools and existing pools
         if (existingPoolsLen > 0) {
             for (uint256 i = 0; i < newPoolsLen; i++) {
                 uint256 newPoolId = newPools[i];
@@ -465,14 +465,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
                     uint256 pledgeToExisting = underwriterPoolPledge[underwriter][existingPoolId];
                     if (pledgeToExisting == 0) continue;
 
-                    // Add cross-exposure
                     overlapExposure[existingPoolId][newPoolId] += pledgeToNew;
                     overlapExposure[newPoolId][existingPoolId] += pledgeToExisting;
                 }
             }
         }
 
-        // 2. Create links between the new pools themselves
         for (uint256 i = 0; i < newPoolsLen; i++) {
             uint256 poolA = newPools[i];
             uint256 pledgeToA = underwriterPoolPledge[underwriter][poolA];
@@ -488,9 +486,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev O(n) method to remove matrix overlaps for a deallocated pool.
-     */
     function _removeMatrixOverlapForPool(address underwriter, uint256 removedPoolId) internal {
         uint256[] memory currentAllocs = underwriterAllocations[underwriter];
         uint256 pledgeToRemoved = underwriterPoolPledge[underwriter][removedPoolId];
@@ -498,23 +493,16 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
 
         for (uint256 i = 0; i < currentAllocs.length; i++) {
             uint256 poolId = currentAllocs[i];
+            if (poolId == removedPoolId) continue;
             uint256 pledge = underwriterPoolPledge[underwriter][poolId];
             if (pledge == 0) continue;
             
-            // Remove cross-exposure links
-            if (poolId != removedPoolId) {
-                overlapExposure[poolId][removedPoolId] -= pledgeToRemoved;
-                overlapExposure[removedPoolId][poolId] -= pledge;
-            }
+            overlapExposure[poolId][removedPoolId] -= pledgeToRemoved;
+            overlapExposure[removedPoolId][poolId] -= pledge;
         }
-        // Remove self-exposure
         overlapExposure[removedPoolId][removedPoolId] -= pledgeToRemoved;
     }
 
-    /**
-     * @dev O(n^2) method to fully rebuild the matrix contribution for an underwriter.
-     * Necessary when all pledge values change proportionally (e.g., on deposit/withdrawal).
-     */
     function _rebuildOverlapMatrixForPledgeChange(address underwriter, int256 sign) internal {
         uint256[] memory allocations = underwriterAllocations[underwriter];
         uint256 numAllocations = allocations.length;
@@ -617,6 +605,34 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         delete isAllocatedToPool[underwriter][poolId];
     }
 
+    function _checkMutexGroups(
+        uint256[] memory existingAllocs,
+        uint256[] calldata newPools
+    ) internal view {
+        uint256 newPoolsLen = newPools.length;
+        if (newPoolsLen == 0) return;
+        uint256 existingAllocsLen = existingAllocs.length;
+
+        for (uint256 i = 0; i < newPoolsLen; i++) {
+            uint256 newPoolId = newPools[i];
+            uint256 newGroupId = poolMutexGroupId[newPoolId];
+            if (newGroupId != 0) {
+                // Check against pools the user is already in.
+                for (uint256 j = 0; j < existingAllocsLen; j++) {
+                    if (newGroupId == poolMutexGroupId[existingAllocs[j]]) {
+                        revert MutexAllocationNotAllowed(newPoolId, newGroupId);
+                    }
+                }
+                // Check against other new pools in this same transaction.
+                for (uint256 j = 0; j < i; j++) {
+                    if (newGroupId == poolMutexGroupId[newPools[j]]) {
+                        revert MutexAllocationNotAllowed(newPoolId, newGroupId);
+                    }
+                }
+            }
+        }
+    }
+
     function _handleFullWithdrawalCleanup(address underwriter) internal {
         _rebuildOverlapMatrixForPledgeChange(underwriter, -1);
         address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
@@ -629,13 +645,11 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
                 capitalPerAdapter[poolId][adapter] -= pledge;
             }
         }
-        // No need to call _removeUnderwriterFromPool in a loop, which is inefficient.
-        // Just delete the user's entire allocation state.
         delete underwriterAllocations[underwriter];
         delete underwriterRiskPointsUsed[underwriter];
     }
 
-    function _prepareAllocateCapital(uint256[] calldata poolIds) internal view returns (uint256, address, uint256) {
+ function _prepareAllocateCapital(uint256[] calldata poolIds) internal view returns (uint256, address, uint256) {
         (uint256 totalDepositedPrincipal, , , ) = capitalPool.getUnderwriterAccount(msg.sender);
         if (totalDepositedPrincipal == 0) revert NoCapitalToAllocate();
         
@@ -644,6 +658,11 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             revert ExceedsMaxAllocations();
         }
         
+        uint256[] memory existingAllocs = underwriterAllocations[msg.sender];
+        
+        // --- REFACTORED: Call the new helper function ---
+        _checkMutexGroups(existingAllocs, poolIds);
+
         uint256 currentPointsUsed = underwriterRiskPointsUsed[msg.sender];
         uint256 additionalPointsRequired = 0;
         uint256 poolCount = poolRegistry.getPoolCount();
@@ -666,6 +685,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         
         return (totalDepositedPrincipal, adapter, additionalPointsRequired);
     }
+    
     
     function _isDeallocationPossible(address underwriter, uint256 poolId, uint256 amount) internal view returns (bool) {
         if (poolId >= poolRegistry.getPoolCount() || !isAllocatedToPool[underwriter][poolId] || deallocationRequestTimestamp[underwriter][poolId] != 0) {
