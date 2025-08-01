@@ -16,6 +16,7 @@ import { formatCurrency, formatPercentage } from "../utils/formatting"
 import { getRiskRatingText, getRiskRatingColor } from "../utils/riskRating"
 import CoverageModal from "./CoverageModal"
 import usePools from "../../hooks/usePools"
+import useCoverAvailable from "../../hooks/useCoverAvailable"
 import { utils as ethersUtils, BigNumber } from "ethers"
 import {
   getTokenName,
@@ -33,6 +34,7 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPool, setSelectedPool] = useState(null)
   const { pools, loading } = usePools()
+  const { amount: availableStr, decimals: availableDecimals, loading: availableLoading } = useCoverAvailable()
   const [typeFilter, setTypeFilter] = useState("all") // 'all', 'protocol', 'stablecoin', 'lst'
   const [sortConfig, setSortConfig] = useState({ key: "tvl", direction: "desc" })
 
@@ -85,13 +87,16 @@ export default function MarketsTable({ displayCurrency, mode = "purchase" }) {
     grouped[pool.id] = entry
   }
 
+  const globalAvailable = availableLoading
+    ? 0
+    : Number(ethersUtils.formatUnits(availableStr || "0", availableDecimals))
+
   const markets = Object.values(grouped).map((m) => {
     const premiums = m.pools.map((p) => p.premium)
     const minPremium = premiums.length ? Math.min(...premiums) : 0
-    const available = m.pools.reduce((acc, p) => acc + p.capacity, 0)
     return {
       ...m,
-      coverAvailable: available,
+      coverAvailable: globalAvailable,
       premium: minPremium,
     }
   })
