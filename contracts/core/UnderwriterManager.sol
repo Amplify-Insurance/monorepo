@@ -321,6 +321,55 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         
         _rebuildOverlapMatrixForPledgeChange(underwriter, 1);
     }
+
+    /**
+ * @notice A convenience function to deposit capital and allocate it in a single transaction.
+ * @dev The user must first approve this contract to spend their underlying tokens.
+ * @param amount The amount of the underlying asset to deposit.
+ * @param yieldChoice The yield strategy to use for the deposited capital.
+ * @param poolIds The IDs of the risk pools to allocate the new capital to.
+ */
+function depositAndAllocate(
+    uint256 amount,
+    ICapitalPool.YieldPlatform yieldChoice,
+    uint256[] calldata poolIds
+) external nonReentrant {
+    address underwriter = msg.sender;
+
+    // --- Step 1: Deposit Logic ---
+    if (amount > 0) {
+        // Get the underlying asset from the Capital Pool
+        IERC20 underlying = IERC20(capitalPool.underlyingAsset());
+        
+        // Pull approved tokens from the user to this contract
+        underlying.safeTransferFrom(underwriter, address(this), amount);
+        
+        // Approve the Capital Pool to pull the tokens from this contract
+        underlying.approve(address(capitalPool), amount);
+
+        // Call the new `depositFor` function on the Capital Pool
+        capitalPool.depositFor(underwriter, amount, yieldChoice);
+    }
+
+    // --- Step 2: Allocation Logic ---
+    // This logic is identical to the allocateCapital function
+    uint256[] memory existingAllocs = underwriterAllocations[underwriter];
+
+    for (uint256 i = 0; i < existingAllocs.length; i++) {
+        lossDistributor.recordPledgeUpdate(underwriter, existingAllocs[i]);
+    }
+    
+    (uint256 totalCapitalToPledge, address adapter, uint256 pointsToUse) = _prepareAllocateCapital(poolIds);
+    
+    underwriterRiskPointsUsed[underwriter] += pointsToUse;
+
+    for (uint256 i = 0; i < poolIds.length; i++) {
+        lossDistributor.recordPledgeUpdate(underwriter, poolIds[i]);
+        _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
+    }
+    
+    _addMatrixOverlapForNewPools(underwriter, existingAllocs, poolIds);
+}
     
     function realizeLossesForAllPools(address user) public nonReentrant {
         uint256[] memory allocations = underwriterAllocations[user];

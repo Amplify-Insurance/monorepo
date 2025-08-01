@@ -40,9 +40,7 @@ interface ICapitalPool {
     function requestWithdrawal(address user, uint256 sharesToBurn) external;
     function cancelWithdrawalRequest(address user, uint256 requestIndex) external;
     function executeWithdrawal(address user, uint256 requestIndex) external;
-    function burnSharesForLoss(
-        address underwriter,
-        uint256 burnAmount
-    ) external;
+    function burnSharesForLoss(address underwriter, uint256 burnAmount) external;
+    function depositFor(address user, uint256 amount, YieldPlatform yieldChoice) external;
 }
 

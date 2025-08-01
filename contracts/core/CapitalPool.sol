@@ -231,6 +231,32 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         emit Deposit(msg.sender, _amount, sharesToMint, _yieldChoice);
     }
 
+    function depositFor(address user, uint256 amount, YieldPlatform yieldChoice) 
+        external 
+        override  
+        onlyUnderwriterManager 
+    {
+        // The deposit validation logic is the same, just for the specified user
+        IYieldAdapter chosenAdapter = _validateDeposit(amount, yieldChoice);
+        uint256 sharesToMint = _calculateSharesToMint(amount);
+        if (sharesToMint == 0) revert NoSharesToMint(amount);
+        
+        // The key difference: transfer funds from UnderwriterManager (the caller)
+        underlyingAsset.safeTransferFrom(msg.sender, address(this), amount);
+        underlyingAsset.forceApprove(address(chosenAdapter), amount);
+        chosenAdapter.deposit(amount);
+        
+        // The state is updated for the specified user, not msg.sender
+        UnderwriterAccount storage account = underwriterAccounts[user];
+        _updateStateOnDeposit(account, amount, sharesToMint, yieldChoice, chosenAdapter);
+        
+        if (address(underwriterManager) != address(0)) {
+            // The hook is called for the specified user
+            underwriterManager.onCapitalDeposited(user, amount);
+        }
+        emit Deposit(user, amount, sharesToMint, yieldChoice);
+    }
+
     function _validateDeposit(
         uint256 _amount,
         YieldPlatform _yieldChoice
