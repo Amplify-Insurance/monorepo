@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { YieldPlatform, getYieldPlatformInfo } from '../app/config/yieldPlatforms';
-import { getTokenSymbol } from '../lib/erc20';
+import { getTokenMetadata } from '../lib/erc20';
 
 export default function useYieldAdapters(deployment) {
   const [adapters, setAdapters] = useState([]);
@@ -31,7 +31,8 @@ export default function useYieldAdapters(deployment) {
 
               let symbol = '';
               try {
-                symbol = await getTokenSymbol(item.asset);
+                const meta = await getTokenMetadata(item.asset);
+                symbol = meta.symbol;
               } catch {}
 
               return {
