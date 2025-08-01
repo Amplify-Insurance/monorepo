@@ -9,6 +9,7 @@ import { ethers } from "ethers"
 import { useAccount } from "wagmi"
 import { getCapitalPoolWithSigner } from "../../lib/capitalPool"
 import { getERC20WithSigner } from "../../lib/erc20"
+import { getUnderwriterManagerWithSigner } from "../../lib/underwriterManager"
 import { getDeployment } from "../config/deployments"
 
 export default function IncreasePositionModal({ isOpen, onClose, position, displayCurrency = "USD" }) {
@@ -72,13 +73,15 @@ export default function IncreasePositionModal({ isOpen, onClose, position, displ
       const amountBn = ethers.utils.parseUnits(amount, dec)
 
       // Approve spending if necessary
-      const allowance = await tokenContract.allowance(address, dep.capitalPool)
+      const rmAddress = dep.underwriterManager
+      const allowance = await tokenContract.allowance(address, rmAddress)
       if (allowance.lt(amountBn)) {
-        const approveTx = await tokenContract.approve(dep.capitalPool, amountBn)
+        const approveTx = await tokenContract.approve(rmAddress, amountBn)
         await approveTx.wait()
       }
 
-      const tx = await cp.deposit(amountBn, position.yieldChoice)
+      const rm = await getUnderwriterManagerWithSigner(rmAddress)
+      const tx = await rm.depositAndAllocate(amountBn, position.yieldChoice, [])
       setTxHash(tx.hash)
       await tx.wait()
 
