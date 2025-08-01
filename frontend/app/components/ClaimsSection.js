@@ -77,6 +77,7 @@ export default function ClaimsSection({ displayCurrency }) {
       tokenName,
       amount: p.amount,
       value: p.amount, // value in native asset unknown
+      pendingLoss: p.pendingLoss,
       claimDate: p.claimDate,
       claimed: p.claimed,
     }
@@ -174,6 +175,18 @@ export default function ClaimsSection({ displayCurrency }) {
                     scope="col"
                     className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
                   >
+                    Pending Losses
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                  >
+                    Claim Status
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell"
+                  >
                     {activeTab === "affected" ? "Claim Date" : "Status"}
                   </th>
                   <th
@@ -230,6 +243,16 @@ export default function ClaimsSection({ displayCurrency }) {
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="text-sm text-gray-900 dark:text-white">
                         {formatCurrency(claim.value, "USD", displayCurrency)}
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {formatCurrency(claim.pendingLoss || 0, "USD", displayCurrency)}
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {claim.claimed ? 'Claimed' : 'Unclaimed'}
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">

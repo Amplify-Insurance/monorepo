@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import ERC20 from '../abi/ERC20.json'
 import { getCatPoolWithSigner } from '../lib/catPool'
+import { getMulticallReader } from '../lib/multicallReader'
 
 export default function useCatPoolUserInfo(address) {
   const [info, setInfo] = useState(null)
@@ -14,13 +15,17 @@ export default function useCatPoolUserInfo(address) {
       const cp = await getCatPoolWithSigner()
       const catShareAddr = await cp.catShareToken()
       const provider = new ethers.providers.Web3Provider(window.ethereum)
-      // Pass the ABI explicitly when using ethers v6
       const token = new ethers.Contract(catShareAddr, ERC20.abi, provider)
-      const [balance, totalSupply, liquid] = await Promise.all([
-        token.balanceOf(address),
-        token.totalSupply(),
-        cp.liquidUsdc(),
-      ])
+      const multicall = getMulticallReader()
+      const calls = [
+        { target: catShareAddr, callData: token.interface.encodeFunctionData('balanceOf', [address]) },
+        { target: catShareAddr, callData: token.interface.encodeFunctionData('totalSupply') },
+        { target: cp.address, callData: cp.interface.encodeFunctionData('liquidUsdc') },
+      ]
+      const res = await multicall.tryAggregate(false, calls)
+      const balance = res[0].success ? token.interface.decodeFunctionResult('balanceOf', res[0].returnData)[0] : 0n
+      const totalSupply = res[1].success ? token.interface.decodeFunctionResult('totalSupply', res[1].returnData)[0] : 0n
+      const liquid = res[2].success ? cp.interface.decodeFunctionResult('liquidUsdc', res[2].returnData)[0] : 0n
       let value = 0n
       if (totalSupply > 0n) {
         value = (balance * liquid) / totalSupply

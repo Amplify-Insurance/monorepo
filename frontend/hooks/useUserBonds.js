@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react' // Import useCallback
 import { ethers } from 'ethers'
 import { getCommittee } from '../lib/committee'
 import { STAKING_TOKEN_ADDRESS } from '../app/config/deployments'
-import { getTokenDecimals, getTokenSymbol } from '../lib/erc20'
+import { getTokenMetadata } from '../lib/erc20'
 import { getProtocolName, getProtocolLogo } from '../app/config/tokenNameMap'
 
 export default function useUserBonds(address) {
@@ -19,8 +19,9 @@ export default function useUserBonds(address) {
     setLoading(true)
     try {
       const committee = getCommittee()
-      const decimals = await getTokenDecimals(STAKING_TOKEN_ADDRESS)
-      const symbol = await getTokenSymbol(STAKING_TOKEN_ADDRESS)
+      const meta = await getTokenMetadata(STAKING_TOKEN_ADDRESS)
+      const decimals = meta.decimals
+      const symbol = meta.symbol
       const count = await committee.proposalCounter()
       const items = []
       for (let i = 1; i <= Number(count); i++) {
