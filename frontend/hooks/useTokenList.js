@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getTokenSymbol, getTokenName } from '../lib/erc20'
+import { getTokenMetadata } from '../lib/erc20'
 
 export default function useTokenList(pools) {
   const [tokens, setTokens] = useState([])
@@ -13,11 +13,14 @@ export default function useTokenList(pools) {
       try {
         const unique = [...new Set(pools.map(p => p.protocolTokenToCover))]
         const list = await Promise.all(
-          unique.map(async (addr) => ({
-            address: addr,
-            symbol: (await getTokenSymbol(addr)) || addr.slice(0, 6),
-            name: (await getTokenName(addr)) || addr,
-          }))
+          unique.map(async (addr) => {
+            const meta = await getTokenMetadata(addr)
+            return {
+              address: addr,
+              symbol: meta.symbol || addr.slice(0, 6),
+              name: meta.name || addr,
+            }
+          })
         )
         setTokens(list)
       } catch (err) {
