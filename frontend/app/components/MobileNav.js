@@ -52,7 +52,16 @@ export default function MobileNav() {
           <div className="fixed inset-y-0 right-0 w-full max-w-xs bg-white dark:bg-gray-800 shadow-xl flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="flex items-center text-xl font-bold text-blue-600 dark:text-blue-400">
-                <img src="/layercover-logo.svg" alt="LayerCover logo" className="h-8 w-8 mr-2" />
+                <img
+                  src="/layercover-logo-light.svg"
+                  alt="LayerCover logo"
+                  className="h-8 w-8 mr-2 block dark:hidden"
+                />
+                <img
+                  src="/layercover-logo-dark.svg"
+                  alt="LayerCover logo"
+                  className="h-8 w-8 mr-2 hidden dark:block"
+                />
                 LayerCover
               </h2>
               <button
