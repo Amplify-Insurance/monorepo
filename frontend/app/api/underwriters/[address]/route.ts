@@ -88,22 +88,38 @@ export async function GET(
         }
 
         const lossCalls: { target: string; callData: string }[] = []
+        const netCalls: { target: string; callData: string }[] = []
         for (const id of allocatedPoolIds) {
           lossCalls.push({
             target: dep.lossDistributor,
             callData: ld.interface.encodeFunctionData('getProspectiveLosses', [addr, BigInt(id), pledge]),
           })
+          netCalls.push({
+            target: dep.underwriterManager,
+            callData: rm.interface.encodeFunctionData('getRiskAdjustedPledge', [addr, BigInt(id)]),
+          })
         }
 
-        const lossResults = await multicall.tryAggregate(false, lossCalls)
+        const [lossResults, netResults] = await Promise.all([
+          multicall.tryAggregate(false, lossCalls),
+          multicall.tryAggregate(false, netCalls),
+        ])
 
         const pendingLosses: Record<string, string> = {}
+        const riskAdjustedPledges: Record<string, string> = {}
         for (let i = 0; i < lossResults.length; i++) {
-          if (!lossResults[i].success) continue
-          try {
-            const [loss] = ld.interface.decodeFunctionResult('getProspectiveLosses', lossResults[i].returnData)
-            pendingLosses[allocatedPoolIds[i]] = loss.toString()
-          } catch {}
+          if (lossResults[i].success) {
+            try {
+              const [loss] = ld.interface.decodeFunctionResult('getProspectiveLosses', lossResults[i].returnData)
+              pendingLosses[allocatedPoolIds[i]] = loss.toString()
+            } catch {}
+          }
+          if (netResults[i] && netResults[i].success) {
+            try {
+              const [net] = rm.interface.decodeFunctionResult('getRiskAdjustedPledge', netResults[i].returnData)
+              riskAdjustedPledges[allocatedPoolIds[i]] = net.toString()
+            } catch {}
+          }
         }
 
         const deallocCalls: { target: string; callData: string }[] = []
@@ -138,6 +154,7 @@ export async function GET(
           deallocationRequests,
           allocatedPoolIds,
           pendingLosses,
+          riskAdjustedPledges,
         })
       } catch {}
     }
