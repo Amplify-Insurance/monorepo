@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: { params: { address: string
       const cp = getCapitalPool(dep.capitalPool, dep.name)
       try {
         const [pledge] = await cp.getUnderwriterAccount(addr)
-        const pending = await ld.getProspectiveLosses(addr, id, pledge)
+        const pending = await ld.getPendingLosses(addr, id, pledge)
         results.push({ deployment: dep.name, pending: pending.toString() })
       } catch {}
     }
