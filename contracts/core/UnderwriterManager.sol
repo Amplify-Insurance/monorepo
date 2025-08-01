@@ -18,7 +18,7 @@ import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
  * @title UnderwriterManager
  * @author Gemini
  * @notice Manages the allocation (pledging) of capital to risk pools and safe withdrawals.
- * @dev V9: Corrected deallocation logic to prevent affecting other pools' available cover.
+ * @dev V13: Implemented O(n) incremental updates for risk matrix on allocation/deallocation.
  */
 contract UnderwriterManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -79,7 +79,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     error NoticePeriodActive();
     error InsufficientFreeCapital();
     error InsufficientRiskPoints(uint256 current, uint256 required, uint256 total);
-    error InsufficientUnpledgedCapital(uint256 requested, uint256 available);
+    error InsufficientWithdrawableCapital(uint256 requested, uint256 available);
 
 
     // --- Modifiers ---
@@ -136,8 +136,6 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < existingAllocs.length; i++) {
             lossDistributor.recordPledgeUpdate(underwriter, existingAllocs[i]);
         }
-
-        _updateOverlapMatrix(underwriter, -1);
         
         (uint256 totalCapitalToPledge, address adapter, uint256 pointsToUse) = _prepareAllocateCapital(poolIds);
         
@@ -147,11 +145,37 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             lossDistributor.recordPledgeUpdate(underwriter, poolIds[i]);
             _executeAllocation(poolIds[i], totalCapitalToPledge, adapter);
         }
+        
+        // Incrementally update the matrix for only the new pools
+        _addMatrixOverlapForNewPools(underwriter, existingAllocs, poolIds);
+    }
+    
+    function requestWithdrawal(uint256 amount) external nonReentrant {
+        (uint256 totalWithdrawable, uint256 unpledgedCapital) = getTotalWithdrawableCapital(msg.sender);
 
-        _updateOverlapMatrix(underwriter, 1);
+        if (amount > totalWithdrawable) {
+            revert InsufficientWithdrawableCapital(amount, totalWithdrawable);
+        }
+
+        if (amount <= unpledgedCapital) {
+            uint256 sharesToBurn = capitalPool.valueToShares(amount);
+            capitalPool.requestWithdrawal(msg.sender, sharesToBurn);
+        } else {
+            uint256[] memory allocations = underwriterAllocations[msg.sender];
+            bool deallocationStarted = false;
+            for (uint i = 0; i < allocations.length; i++) {
+                uint256 poolId = allocations[i];
+                if (_isDeallocationPossible(msg.sender, poolId, amount)) {
+                    requestDeallocateFromPool(poolId);
+                    deallocationStarted = true;
+                    break; 
+                }
+            }
+            require(deallocationStarted, "Could not find a pool to deallocate from");
+        }
     }
 
-    function requestDeallocateFromPool(uint256 poolId) external nonReentrant {
+    function requestDeallocateFromPool(uint256 poolId) public  {
         _checkDeallocationRequest(msg.sender, poolId);
         lossDistributor.recordPledgeUpdate(msg.sender, poolId);
         
@@ -165,11 +189,8 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         _validateDeallocationRequest(msg.sender, poolId);
         address underwriter = msg.sender;
         
-        lossDistributor.recordPledgeUpdate(underwriter, poolId);
-        
-        // <<< FIX START: Replace the broad matrix update with a targeted one.
-        _updateOverlapOnDeallocation(underwriter, poolId);
-        // <<< FIX END
+        // Incrementally remove the exposure for the deallocated pool
+        _removeMatrixOverlapForPool(underwriter, poolId);
 
         uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
         address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
@@ -184,21 +205,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             _removeAdapterFromPool(poolId, adapter);
         }
 
+        // This removes the pool from the underwriter's state
         _removeUnderwriterFromPool(underwriter, poolId);
         
         emit CapitalDeallocated(underwriter, poolId, pledgeAmount, adapter);
     }
     
-    function requestWithdrawal(uint256 amount) external nonReentrant {
-        (uint256 unpledgedCapital, ) = getUnpledgedCapital(msg.sender);
-        if (amount > unpledgedCapital) {
-            revert InsufficientUnpledgedCapital(amount, unpledgedCapital);
-        }
-        
-        uint256 sharesToBurn = capitalPool.valueToShares(amount);
-        capitalPool.requestWithdrawal(msg.sender, sharesToBurn);
-    }
-
     function cancelWithdrawal(uint256 requestIndex) external nonReentrant {
         capitalPool.cancelWithdrawalRequest(msg.sender, requestIndex);
     }
@@ -217,7 +229,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         
         if (principalBefore == 0) return;
 
-        _updateOverlapMatrix(underwriter, -1);
+        // A proportional change in capital affects all pledges and thus all overlaps.
+        // A full matrix rebuild is necessary here.
+        _rebuildOverlapMatrixForPledgeChange(underwriter, -1);
 
         uint256[] memory allocations = underwriterAllocations[underwriter];
         if (allocations.length > 0) {
@@ -240,11 +254,11 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             }
         }
         
-        _updateOverlapMatrix(underwriter, 1);
+        _rebuildOverlapMatrixForPledgeChange(underwriter, 1);
     }
 
     function onCapitalWithdrawn(address underwriter, uint256 principalComponentRemoved, bool isFullWithdrawal) external onlyCapitalPool {
-        _updateOverlapMatrix(underwriter, -1);
+        _rebuildOverlapMatrixForPledgeChange(underwriter, -1);
 
         (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
         uint256 principalBefore = principalAfter + principalComponentRemoved;
@@ -272,12 +286,12 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
 
         if (!isFullWithdrawal) {
-            _updateOverlapMatrix(underwriter, 1);
+            _rebuildOverlapMatrixForPledgeChange(underwriter, 1);
         }
     }
 
     function onLossRealized(address underwriter, uint256 valueLost) external onlyCapitalPool {
-        _updateOverlapMatrix(underwriter, -1);
+        _rebuildOverlapMatrixForPledgeChange(underwriter, -1);
 
         (uint256 principalAfter, , ,) = capitalPool.getUnderwriterAccount(underwriter);
         uint256 principalBefore = principalAfter + valueLost;
@@ -300,7 +314,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
             }
         }
         
-        _updateOverlapMatrix(underwriter, 1);
+        _rebuildOverlapMatrixForPledgeChange(underwriter, 1);
     }
     
     function realizeLossesForAllPools(address user) public nonReentrant {
@@ -393,28 +407,115 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         }
     }
     
-    // --- Internal & Helper Functions ---
-    // <<< FIX START: New targeted function for deallocation.
-    function _updateOverlapOnDeallocation(address underwriter, uint256 poolIdToRemove) internal {
-        uint256[] memory allocations = underwriterAllocations[underwriter];
-        uint256 pledge = underwriterPoolPledge[underwriter][poolIdToRemove];
-        if (pledge == 0) return;
+    function getTotalWithdrawableCapital(address user) public view returns (uint256 totalWithdrawable, uint256 unpledgedCapital) {
+        (unpledgedCapital, ) = getUnpledgedCapital(user);
+        totalWithdrawable = unpledgedCapital;
 
-        // Loop through all of the user's current allocations (before removal)
+        uint256[] memory allocations = underwriterAllocations[user];
         for (uint i = 0; i < allocations.length; i++) {
-            uint256 p = allocations[i];
-            if (p == poolIdToRemove) continue; 
-
-            // For every other pool 'p', remove the link to the pool being removed
-            overlapExposure[p][poolIdToRemove] -= pledge;
-            overlapExposure[poolIdToRemove][p] -= pledge;
+            uint256 poolId = allocations[i];
+            uint256 pledgeAmount = underwriterPoolPledge[user][poolId];
+            if (pledgeAmount > 0 && _isDeallocationPossible(user, poolId, pledgeAmount)) {
+                totalWithdrawable += pledgeAmount;
+            }
         }
-        // Finally, remove the diagonal for the removed pool
-        overlapExposure[poolIdToRemove][poolIdToRemove] -= pledge;
     }
-    // <<< FIX END
 
-    function _updateOverlapMatrix(address underwriter, int256 sign) internal {
+    function getRiskAdjustedPledge(address user, uint256 poolId) public view returns (uint256) {
+        uint256 pledge = underwriterPoolPledge[user][poolId];
+        if (pledge == 0) {
+            return 0;
+        }
+        
+        uint256 pendingLossValue = capitalPool.sharesToValue(
+            lossDistributor.getPendingLosses(user, poolId, pledge)
+        );
+
+        if (pledge >= pendingLossValue) {
+            return pledge - pendingLossValue;
+        } else {
+            return 0;
+        }
+    }
+    
+    // --- Internal & Helper Functions ---
+
+    /**
+     * @dev O(n) method to add matrix overlaps for newly allocated pools.
+     * Links new pools to existing pools and to each other.
+     */
+    function _addMatrixOverlapForNewPools(
+        address underwriter,
+        uint256[] memory existingPools,
+        uint256[] memory newPools
+    ) internal {
+        uint256 newPoolsLen = newPools.length;
+        if (newPoolsLen == 0) return;
+        uint256 existingPoolsLen = existingPools.length;
+
+        // 1. Create links between new pools and existing pools
+        if (existingPoolsLen > 0) {
+            for (uint256 i = 0; i < newPoolsLen; i++) {
+                uint256 newPoolId = newPools[i];
+                uint256 pledgeToNew = underwriterPoolPledge[underwriter][newPoolId];
+                if (pledgeToNew == 0) continue;
+
+                for (uint256 j = 0; j < existingPoolsLen; j++) {
+                    uint256 existingPoolId = existingPools[j];
+                    uint256 pledgeToExisting = underwriterPoolPledge[underwriter][existingPoolId];
+                    if (pledgeToExisting == 0) continue;
+
+                    // Add cross-exposure
+                    overlapExposure[existingPoolId][newPoolId] += pledgeToNew;
+                    overlapExposure[newPoolId][existingPoolId] += pledgeToExisting;
+                }
+            }
+        }
+
+        // 2. Create links between the new pools themselves
+        for (uint256 i = 0; i < newPoolsLen; i++) {
+            uint256 poolA = newPools[i];
+            uint256 pledgeToA = underwriterPoolPledge[underwriter][poolA];
+            if (pledgeToA == 0) continue;
+
+            for (uint256 j = 0; j < newPoolsLen; j++) {
+                uint256 poolB = newPools[j];
+                uint256 pledgeToB = underwriterPoolPledge[underwriter][poolB];
+                if (pledgeToB == 0) continue;
+
+                overlapExposure[poolA][poolB] += pledgeToB;
+            }
+        }
+    }
+
+    /**
+     * @dev O(n) method to remove matrix overlaps for a deallocated pool.
+     */
+    function _removeMatrixOverlapForPool(address underwriter, uint256 removedPoolId) internal {
+        uint256[] memory currentAllocs = underwriterAllocations[underwriter];
+        uint256 pledgeToRemoved = underwriterPoolPledge[underwriter][removedPoolId];
+        if (pledgeToRemoved == 0) return;
+
+        for (uint256 i = 0; i < currentAllocs.length; i++) {
+            uint256 poolId = currentAllocs[i];
+            uint256 pledge = underwriterPoolPledge[underwriter][poolId];
+            if (pledge == 0) continue;
+            
+            // Remove cross-exposure links
+            if (poolId != removedPoolId) {
+                overlapExposure[poolId][removedPoolId] -= pledgeToRemoved;
+                overlapExposure[removedPoolId][poolId] -= pledge;
+            }
+        }
+        // Remove self-exposure
+        overlapExposure[removedPoolId][removedPoolId] -= pledgeToRemoved;
+    }
+
+    /**
+     * @dev O(n^2) method to fully rebuild the matrix contribution for an underwriter.
+     * Necessary when all pledge values change proportionally (e.g., on deposit/withdrawal).
+     */
+    function _rebuildOverlapMatrixForPledgeChange(address underwriter, int256 sign) internal {
         uint256[] memory allocations = underwriterAllocations[underwriter];
         uint256 numAllocations = allocations.length;
 
@@ -517,6 +618,7 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
     }
 
     function _handleFullWithdrawalCleanup(address underwriter) internal {
+        _rebuildOverlapMatrixForPledgeChange(underwriter, -1);
         address adapter = capitalPool.getUnderwriterAdapterAddress(underwriter);
         uint256[] memory allocations = underwriterAllocations[underwriter];
         for (uint i=0; i < allocations.length; i++) {
@@ -526,8 +628,9 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
                 totalCapitalPledgedToPool[poolId] -= pledge;
                 capitalPerAdapter[poolId][adapter] -= pledge;
             }
-            _removeUnderwriterFromPool(underwriter, poolId);
         }
+        // No need to call _removeUnderwriterFromPool in a loop, which is inefficient.
+        // Just delete the user's entire allocation state.
         delete underwriterAllocations[underwriter];
         delete underwriterRiskPointsUsed[underwriter];
     }
@@ -563,19 +666,25 @@ contract UnderwriterManager is Ownable, ReentrancyGuard {
         
         return (totalDepositedPrincipal, adapter, additionalPointsRequired);
     }
-
-    function _checkDeallocationRequest(address underwriter, uint256 poolId) internal view {
-        if (poolId >= poolRegistry.getPoolCount()) revert InvalidPoolId();
-        if (!isAllocatedToPool[underwriter][poolId]) revert NotAllocated();
-        if (deallocationRequestTimestamp[underwriter][poolId] != 0) revert DeallocationRequestPending();
+    
+    function _isDeallocationPossible(address underwriter, uint256 poolId, uint256 amount) internal view returns (bool) {
+        if (poolId >= poolRegistry.getPoolCount() || !isAllocatedToPool[underwriter][poolId] || deallocationRequestTimestamp[underwriter][poolId] != 0) {
+            return false;
+        }
         
-        uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
         (, uint256 totalSold, , , ,) = poolRegistry.getPoolStaticData(poolId);
         uint256 currentPledged = totalCapitalPledgedToPool[poolId];
         uint256 pendingW = capitalPendingWithdrawal[poolId];
         uint256 freeCapital = currentPledged > totalSold + pendingW ? currentPledged - totalSold - pendingW : 0;
 
-        if (pledgeAmount > freeCapital) revert InsufficientFreeCapital();
+        return amount <= freeCapital;
+    }
+
+    function _checkDeallocationRequest(address underwriter, uint256 poolId) internal view {
+        uint256 pledgeAmount = underwriterPoolPledge[underwriter][poolId];
+        if (!_isDeallocationPossible(underwriter, poolId, pledgeAmount)) {
+            revert InsufficientFreeCapital();
+        }
     }
 
     function _validateDeallocationRequest(address underwriter, uint256 poolId) internal view {

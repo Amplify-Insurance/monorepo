@@ -229,7 +229,7 @@ async function main() {
     : [USDC_ADDRESS, AAVE_POOL_ADDRESS, AAVE_AUSDC_ADDRESS, deployer.address];
   const aaveAdapter = await AaveAdapter.deploy(...aaveArgs);
   await aaveAdapter.waitForDeployment();
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise(resolve => setTimeout(resolve, 3000));
 
   await waitForTx(aaveAdapter.setCapitalPoolAddress(capitalPool.target), "Set CapitalPool on AaveAdapter");
 

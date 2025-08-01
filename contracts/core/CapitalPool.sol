@@ -282,7 +282,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         principalInAdapter[address(_adapter)] += _amount;
     }
 
-    function requestWithdrawal(address user, uint256 sharesToBurn) external nonReentrant onlyUnderwriterManager {
+    function requestWithdrawal(address user, uint256 sharesToBurn) external onlyUnderwriterManager {
         if (sharesToBurn == 0) revert InvalidAmount(sharesToBurn);
         UnderwriterAccount storage account = underwriterAccounts[user];
         uint256 newTotalPending = account.totalPendingWithdrawalShares + sharesToBurn;
@@ -300,7 +300,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         emit WithdrawalRequested(user, sharesToBurn, unlockTime, requestIndex);
     }
 
-    function cancelWithdrawalRequest(address user, uint256 requestIndex) external nonReentrant onlyUnderwriterManager {
+    function cancelWithdrawalRequest(address user, uint256 requestIndex) external onlyUnderwriterManager {
         WithdrawalRequest[] storage requests = withdrawalRequests[user];
         if (requestIndex >= requests.length) revert InvalidRequestIndex(requestIndex, requests.length);
         
@@ -312,7 +312,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
         emit WithdrawalRequestCancelled(user, sharesToCancel, requestIndex);
     }
 
-    function executeWithdrawal(address user, uint256 requestIndex) external nonReentrant onlyUnderwriterManager {
+    function executeWithdrawal(address user, uint256 requestIndex) external onlyUnderwriterManager {
         uint256 requestedSharesToBurn = _validateWithdrawalRequestAndGetShares(user, requestIndex);
         
         UnderwriterAccount storage account = underwriterAccounts[user];
@@ -425,7 +425,7 @@ contract CapitalPool is ReentrancyGuard, Ownable, ICapitalPool {
     }
 
     /* ───────────────────── Trusted Functions ─────────────────── */
-    function executePayout(PayoutData calldata _payoutData) external override nonReentrant onlyRiskManager {
+    function executePayout(PayoutData calldata _payoutData) external override onlyRiskManager {
         uint256 claimantAmount = _payoutData.claimantAmount;
         uint256 feeAmount = _payoutData.feeAmount;
         uint256 totalPayoutAmount = claimantAmount + feeAmount;

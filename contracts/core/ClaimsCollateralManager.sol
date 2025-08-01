@@ -84,7 +84,7 @@ contract ClaimsCollateralManager is IClaimsCollateralManager, Ownable, Reentranc
         uint256 amount,
         address[] calldata underwriters,
         uint256[] calldata capitalProvided
-    ) external override onlyRiskManager nonReentrant {
+    ) external override onlyRiskManager {
         if (collateralAsset == address(0) || amount == 0 || underwriters.length != capitalProvided.length || underwriters.length == 0) {
             revert InvalidInput();
         }

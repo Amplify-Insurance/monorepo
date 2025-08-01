@@ -12,7 +12,7 @@ import "../interfaces/IPoolRegistry.sol";
  * @title LossDistributor
  * @author Gemini
  * @notice Manages accounting for direct and contagion losses.
- * @dev V5: Corrected modifier on distributeLoss to allow calls from CapitalPool.
+ * @dev V6: Updated to amplify losses across all of an underwriter's covered pools.
  */
 contract LossDistributor is ILossDistributor, Ownable {
     // --- Dependencies ---
@@ -46,12 +46,10 @@ contract LossDistributor is ILossDistributor, Ownable {
     uint256 public constant PRECISION_FACTOR = 1e18;
 
     // --- Modifiers & Errors ---
-    // <<< FIX START: Changed modifier to allow calls from the CapitalPool contract.
     modifier onlyCapitalPool() {
         require(msg.sender == address(capitalPool), "LD: Not CapitalPool");
         _;
     }
-    // <<< FIX END
 
     modifier onlyUnderwriterManager() {
         require(msg.sender == address(underwriterManager), "LD: Not UnderwriterManager");
@@ -107,51 +105,43 @@ contract LossDistributor is ILossDistributor, Ownable {
     // --- Core Logic ---
 
     /**
-     * @notice Distributes a fixed loss amount across direct and contagion vectors.
-     * @dev This function calculates the total shares to burn once, then distributes them
-     * proportionally based on capital overlap to prevent loss amplification.
+     * @notice Applies a loss to the originating pool and all linked contagion pools.
+     * @dev This model amplifies risk by applying the same loss ratio everywhere,
+     * rather than distributing a fixed loss amount.
      */
     function distributeLoss(
         uint256 claimPoolId,
         uint256 lossAmount
-    ) external override onlyCapitalPool { // <<< FIX: Using the correct modifier.
+    ) external override onlyCapitalPool {
         if (lossAmount == 0) return;
 
         uint256 totalSharesToBurn = capitalPool.valueToShares(lossAmount);
         if (totalSharesToBurn == 0) return;
 
-        uint256 totalOverlapSum = 0;
+        // Get total capital in the pool where the claim happened. This is the denominator for the ratio.
+        // The overlap of a pool with itself is the total capital pledged to it.
+        uint256 totalCapitalInClaimPool = underwriterManager.overlapExposure(claimPoolId, claimPoolId);
+        if (totalCapitalInClaimPool == 0) return;
+
+        // Calculate the loss ratio. This is the "damage per unit of pledge" in the claim pool.
+        uint256 lossRatio = (totalSharesToBurn * PRECISION_FACTOR) / totalCapitalInClaimPool;
+
+        // Now, apply this SAME loss ratio to every other pool that has overlapping capital.
         uint256 poolCount = poolRegistry.getPoolCount();
         for (uint256 i = 0; i < poolCount; i++) {
-            totalOverlapSum += underwriterManager.overlapExposure(claimPoolId, i);
-        }
-
-        if (totalOverlapSum == 0) {
-            uint256 totalCapitalInClaimPool = underwriterManager.overlapExposure(claimPoolId, claimPoolId);
-            if (totalCapitalInClaimPool > 0) {
-                poolLossTrackers[claimPoolId].accumulatedSharesToBurnPerPledge +=
-                    (totalSharesToBurn * PRECISION_FACTOR) / totalCapitalInClaimPool;
-            }
-            return;
-        }
-
-        for (uint256 i = 0; i < poolCount; i++) {
             uint256 targetPoolId = i;
+            
+            // Check if there is any overlapping capital. If not, this target pool is unaffected.
             uint256 overlapWithTarget = underwriterManager.overlapExposure(claimPoolId, targetPoolId);
             if (overlapWithTarget == 0) continue;
 
-            uint256 sharesForThisVector = Math.mulDiv(totalSharesToBurn, overlapWithTarget, totalOverlapSum);
-            if (sharesForThisVector == 0) continue;
-
-            uint256 totalCapitalInTargetPool = underwriterManager.overlapExposure(targetPoolId, targetPoolId);
-            if (totalCapitalInTargetPool == 0) continue;
-
+            // Apply the same loss ratio to all linked pools.
             if (targetPoolId == claimPoolId) {
-                poolLossTrackers[targetPoolId].accumulatedSharesToBurnPerPledge +=
-                    (sharesForThisVector * PRECISION_FACTOR) / totalCapitalInTargetPool;
+                // This is the direct loss
+                poolLossTrackers[targetPoolId].accumulatedSharesToBurnPerPledge += lossRatio;
             } else {
-                contagionLossTrackers[targetPoolId][claimPoolId].accumulatedSharesToBurnPerPledge +=
-                    (sharesForThisVector * PRECISION_FACTOR) / totalCapitalInTargetPool;
+                // This is the contagion loss, now amplified
+                contagionLossTrackers[targetPoolId][claimPoolId].accumulatedSharesToBurnPerPledge += lossRatio;
             }
         }
     }
