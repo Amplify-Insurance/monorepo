@@ -153,18 +153,16 @@ export default function ManageCoverageModal({
         const assetAddr = await getUnderlyingAssetAddress(depInfo.capitalPool)
         const token = await getERC20WithSigner(assetAddr)
         const addr = await token.signer.getAddress()
-        const allowance = await token.allowance(addr, depInfo.capitalPool)
+        const rmAddress = depInfo.underwriterManager
+        const allowance = await token.allowance(addr, rmAddress)
         if (allowance.lt(amountBn)) {
-          const approveTx = await token.approve(depInfo.capitalPool, amountBn)
+          const approveTx = await token.approve(rmAddress, amountBn)
           await approveTx.wait()
         }
 
-        tx = await cp.deposit(amountBn, yieldChoice)
+        tx = await rm.depositAndAllocate(amountBn, yieldChoice, [poolId])
         setTxHash(tx.hash)
         await tx.wait()
-        const tx2 = await rm.allocateCapital([poolId])
-        setTxHash(tx2.hash)
-        await tx2.wait()
       } else {
         return
       }
