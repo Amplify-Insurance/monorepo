@@ -371,7 +371,7 @@ function depositAndAllocate(
     _addMatrixOverlapForNewPools(underwriter, existingAllocs, poolIds);
 }
     
-    function realizeLossesForAllPools(address user) public nonReentrant {
+    function realizeLossesForAllPools(address user) public {
         uint256[] memory allocations = underwriterAllocations[user];
         if (allocations.length == 0) return;
 
