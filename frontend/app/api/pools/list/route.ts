@@ -69,33 +69,54 @@ function calcPremiumRateBps(pool: any): bigint {
   return base + (slope1 * kink) / BPS + (slope2 * (u - kink)) / BPS;
 }
 
-async function calcRiskAdjustedCapacity(dep: any, poolId: number, coverageSold: string) {
+async function calcRiskAdjustedCapacity(
+  dep: any,
+  poolId: number,
+  coverageSold: string,
+) {
   try {
     const uwm = getUnderwriterManager(dep.underwriterManager, dep.name);
     const cp = getCapitalPool(dep.capitalPool, dep.name);
     const ld = getLossDistributor(dep.lossDistributor, dep.name);
     const underwriters: string[] = await uwm.getPoolUnderwriters(poolId);
-    let totalNet = 0n;
-    for (const uw of underwriters) {
-      const [, , masterShares] = await cp.getUnderwriterAccount(uw);
-      const grossVal = BigInt((await cp.sharesToValue(masterShares)).toString());
-      const allocations: bigint[] = await uwm.getUnderwriterAllocations(uw);
-      let pendingShares = 0n;
-      for (const pid of allocations) {
-        const pledge = await uwm.underwriterPoolPledge(uw, pid);
-        const pending = await ld.getPendingLosses(uw, pid, pledge);
-        pendingShares += BigInt(pending.toString());
-      }
-      const pendingVal = pendingShares > 0n ? BigInt((await cp.sharesToValue(pendingShares)).toString()) : 0n;
-      const net = grossVal > pendingVal ? grossVal - pendingVal : 0n;
-      totalNet += net;
-    }
+
+    const netVals = await Promise.all(
+      underwriters.map(async (uw) => {
+        const [account, allocations] = await Promise.all([
+          cp.getUnderwriterAccount(uw),
+          uwm.getUnderwriterAllocations(uw),
+        ]);
+        const [, , masterShares] = account;
+
+        const grossValPromise = cp.sharesToValue(masterShares);
+        const pendingSharesArr = await Promise.all(
+          allocations.map(async (pid) => {
+            const pledge = await uwm.underwriterPoolPledge(uw, pid);
+            const pending = await ld.getPendingLosses(uw, pid, pledge);
+            return BigInt(pending.toString());
+          }),
+        );
+        const pendingShares = pendingSharesArr.reduce(
+          (sum, val) => sum + val,
+          0n,
+        );
+        const grossVal = BigInt((await grossValPromise).toString());
+        const pendingVal =
+          pendingShares > 0n
+            ? BigInt((await cp.sharesToValue(pendingShares)).toString())
+            : 0n;
+        const net = grossVal > pendingVal ? grossVal - pendingVal : 0n;
+        return net;
+      }),
+    );
+
+    const totalNet = netVals.reduce((sum, val) => sum + val, 0n);
     const sold = BigInt(coverageSold);
     const capacity = totalNet > sold ? totalNet - sold : 0n;
     return capacity.toString();
   } catch (err) {
-    console.error('Failed to calc risk adjusted capacity', err);
-    return '0';
+    console.error("Failed to calc risk adjusted capacity", err);
+    return "0";
   }
 }
 
@@ -292,16 +313,22 @@ export async function GET() {
         pools[i].protocolTokenDecimals = protoDec;
       }
 
-      for (const p of pools) {
-        const riskAdjustedCapacity = await calcRiskAdjustedCapacity(dep, p.id, p.totalCoverageSold);
-        allPools.push({
-          deployment: dep.name,
-          underlyingAssetDecimals: underlyingDec,
-          underlyingAsset,
-          riskAdjustedCapacity,
-          ...p,
-        });
-      }
+      await Promise.all(
+        pools.map(async (p) => {
+          const riskAdjustedCapacity = await calcRiskAdjustedCapacity(
+            dep,
+            p.id,
+            p.totalCoverageSold,
+          );
+          allPools.push({
+            deployment: dep.name,
+            underlyingAssetDecimals: underlyingDec,
+            underlyingAsset,
+            riskAdjustedCapacity,
+            ...p,
+          });
+        }),
+      );
     } catch (err: any) {
       console.error("Failed to load pools for deployment", dep.name, err);
     }
