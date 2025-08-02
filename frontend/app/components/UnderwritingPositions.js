@@ -233,17 +233,26 @@ export default function UnderwritingPositions({ displayCurrency }) {
   // Calculate total yield and value
   const weightedYield = underwritingPositions.reduce((sum, position) => sum + position.yield * position.nativeValue, 0)
 
-  const totalDeposited = (details || []).reduce((sum, d) => {
+  // Sum the raw deposited amounts per deployment
+  const grossDeposited = (details || []).reduce((sum, d) => {
     const dec = pools.find((p) => p.deployment === d.deployment)?.underlyingAssetDecimals ?? 6
     return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, dec))
   }, 0)
-  const totalDepositedUsd = (details || []).reduce((sum, d) => {
+  const grossDepositedUsd = (details || []).reduce((sum, d) => {
     const pool = pools.find((p) => p.deployment === d.deployment)
     const price = pool?.tokenPriceUsd ?? 1
     const dec = pool?.underlyingAssetDecimals ?? 6
 
     return sum + Number(ethers.utils.formatUnits(d.totalDepositedAssetPrincipal, dec)) * price
   }, 0)
+
+  // Track capital already claimed against the underwriter
+  const totalClaimed = underwritingPositions.reduce((sum, p) => sum + p.pendingLoss, 0)
+  const totalClaimedUsd = underwritingPositions.reduce((sum, p) => sum + p.pendingLossUsd, 0)
+
+  // Net deposited value after accounting for claims
+  const totalDeposited = grossDeposited - totalClaimed
+  const totalDepositedUsd = grossDepositedUsd - totalClaimedUsd
   const totalUnderwritten = underwritingPositions.reduce((sum, p) => sum + p.nativeValue, 0)
 
   const totalUnderwrittenUsd = underwritingPositions.reduce((sum, p) => sum + p.usdValue, 0)
