@@ -251,7 +251,11 @@ export default function UnderwritingPositions({ displayCurrency }) {
   const totalClaimedUsd = underwritingPositions.reduce((sum, p) => sum + p.pendingLossUsd, 0)
 
   // Net deposited value after accounting for claims
-  const totalDeposited = grossDeposited - totalClaimed
+  const numberOfPools = details?.[0]?.allocatedPoolIds?.length ?? 0
+
+  // Net deposited value after accounting for claims amplified by the number of pools
+  const totalDeposited = numberOfPools > 0 ? grossDeposited - (totalClaimed / numberOfPools) : grossDeposited
+
   const totalDepositedUsd = grossDepositedUsd - totalClaimedUsd
   const totalUnderwritten = underwritingPositions.reduce((sum, p) => sum + p.nativeValue, 0)
 
