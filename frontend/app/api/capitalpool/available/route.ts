@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCapitalPool, getUnderlyingAssetDecimals } from '../../../../lib/capitalPool';
 import { getPoolRegistry } from '../../../../lib/poolRegistry';
+
 import deployments from '../../../config/deployments';
 
 export async function GET(req: Request) {
@@ -25,6 +26,13 @@ export async function GET(req: Request) {
     const sold = poolData.reduce((acc, data) => acc + BigInt(data[1].toString()), 0n);
 
     const available = BigInt(nav.toString()) - BigInt(unsettled.toString()) - sold;
+
+    const [nav, unsettled, decimals] = await Promise.all([
+      cp.getTotalNAV(),
+      cp.unsettledPayouts(),
+      getUnderlyingAssetDecimals(dep.capitalPool, dep.name),
+    ]);
+    const available = nav.sub(unsettled);
     return NextResponse.json({ available: available.toString(), decimals });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

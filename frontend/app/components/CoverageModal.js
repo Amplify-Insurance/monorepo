@@ -191,26 +191,20 @@ export default function CoverageModal({
         // "provide" flow
         const amountBn = ethers.utils.parseUnits(amount, dec)
         const cp = await getCapitalPoolWithSigner(dep.capitalPool)
-        const cpAddress = dep.capitalPool
-        const rm = await getUnderwriterManagerWithSigner(dep.underwriterManager)
+        const rmAddress = dep.underwriterManager
+        const rm = await getUnderwriterManagerWithSigner(rmAddress)
         const ids = poolIds.length ? poolIds : poolId ? [poolId] : []
 
         // Approve spending if necessary
-        const allowance = await tokenContract.allowance(address, cpAddress)
+        const allowance = await tokenContract.allowance(address, rmAddress)
         if (allowance.lt(amountBn)) {
-          const approveTx = await tokenContract.approve(cpAddress, amountBn)
+          const approveTx = await tokenContract.approve(rmAddress, amountBn)
           await approveTx.wait()
         }
 
-        const tx = await cp.deposit(amountBn, yieldChoice)
+        const tx = await rm.depositAndAllocate(amountBn, yieldChoice, ids)
         setTxHash(tx.hash)
         await tx.wait()
-
-        if (ids.length) {
-          const tx2 = await rm.allocateCapital(ids)
-          setTxHash(tx2.hash)
-          await tx2.wait()
-        }
       }
 
       onClose()
