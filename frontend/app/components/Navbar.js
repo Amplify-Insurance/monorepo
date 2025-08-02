@@ -15,12 +15,7 @@ export default function Navbar() {
   const pathname = usePathname()
 
   const navigation = [
-    // { name: "Markets", href: "/markets" },
-    // { name: "Dashboard", href: "/dashboard" },
-    // { name: "Staking", href: "/staking" },
-    // { name: "Backstop Pool", href: "/catpool" },
-    // { name: "Analytics", href: "/analytics" },
-    // { name: "Claims", href: "/claims" },
+    // Navigation items are intentionally managed in the sidebar and mobile menu
   ]
 
   return (
@@ -105,7 +100,7 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Navigation */}
-      <MobileNav isOpen={isOpen} navigation={navigation} pathname={pathname} onClose={() => setIsOpen(false)} />
+      <MobileNav isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </nav>
   )
 }
