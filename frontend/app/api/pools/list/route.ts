@@ -14,6 +14,48 @@ import { getLossDistributor } from "../../../../lib/lossDistributor";
 import bnToString from "../../../../lib/bnToString";
 import { ethers } from "ethers";
 import deployments from "../../../config/deployments";
+import { getProvider } from "../../../../lib/provider";
+
+type CachedPools = {
+  block: number;
+  pools: any[];
+};
+
+const poolsCache = new Map<string, CachedPools>();
+
+interface RiskCacheEntry {
+  totalCoverageSold: string;
+  totalCapitalPledgedToPool: string;
+  capitalPendingWithdrawal: string;
+  capacity: string;
+}
+
+const riskCache = new Map<string, Map<number, RiskCacheEntry>>();
+
+function pLimit(concurrency: number) {
+  const queue: (() => void)[] = [];
+  let active = 0;
+  const next = () => {
+    active--;
+    if (queue.length) {
+      const fn = queue.shift();
+      if (fn) fn();
+    }
+  };
+  return async function <T>(fn: () => Promise<T>): Promise<T> {
+    if (active >= concurrency) {
+      await new Promise<void>((resolve) => queue.push(resolve));
+    }
+    active++;
+    try {
+      return await fn();
+    } finally {
+      next();
+    }
+  };
+}
+
+const limit = pLimit(5);
 
 /**
  * Basis‑points denominator (10 000) expressed as bigint for fixed‑point math.
@@ -127,10 +169,21 @@ async function calcRiskAdjustedCapacity(
 export async function GET() {
   const allPools: any[] = [];
   for (const dep of deployments) {
+    const provider = getProvider(dep.name);
+    const block = await provider.getBlockNumber();
+    const cached = poolsCache.get(dep.name);
+    if (cached && cached.block === block) {
+      allPools.push(...cached.pools);
+      continue;
+    }
+
     const poolRegistry = getPoolRegistry(dep.poolRegistry, dep.name);
     const policyManager = getPolicyManager(dep.policyManager, dep.name);
     const priceOracle = getPriceOracle(dep.priceOracle, dep.name);
     const underwriterManager = getUnderwriterManager(dep.underwriterManager, dep.name);
+    const prevRisk = riskCache.get(dep.name) || new Map<number, RiskCacheEntry>();
+    const newRisk = new Map<number, RiskCacheEntry>();
+    const depPools: any[] = [];
     try {
       /* 1️⃣ How many pools exist? */
       let count = 0n;
@@ -314,21 +367,49 @@ export async function GET() {
       }
 
       await Promise.all(
-        pools.map(async (p) => {
-          const riskAdjustedCapacity = await calcRiskAdjustedCapacity(
-            dep,
-            p.id,
-            p.totalCoverageSold,
-          );
-          allPools.push({
-            deployment: dep.name,
-            underlyingAssetDecimals: underlyingDec,
-            underlyingAsset,
-            riskAdjustedCapacity,
-            ...p,
-          });
-        }),
+        pools.map((p) =>
+          limit(async () => {
+            const prev = prevRisk.get(p.id);
+            if (
+              prev &&
+              prev.totalCoverageSold === p.totalCoverageSold &&
+              prev.totalCapitalPledgedToPool === p.totalCapitalPledgedToPool &&
+              prev.capitalPendingWithdrawal === p.capitalPendingWithdrawal
+            ) {
+              depPools.push({
+                deployment: dep.name,
+                underlyingAssetDecimals: underlyingDec,
+                underlyingAsset,
+                riskAdjustedCapacity: prev.capacity,
+                ...p,
+              });
+              newRisk.set(p.id, prev);
+              return;
+            }
+            const riskAdjustedCapacity = await calcRiskAdjustedCapacity(
+              dep,
+              p.id,
+              p.totalCoverageSold,
+            );
+            depPools.push({
+              deployment: dep.name,
+              underlyingAssetDecimals: underlyingDec,
+              underlyingAsset,
+              riskAdjustedCapacity,
+              ...p,
+            });
+            newRisk.set(p.id, {
+              totalCoverageSold: p.totalCoverageSold,
+              totalCapitalPledgedToPool: p.totalCapitalPledgedToPool,
+              capitalPendingWithdrawal: p.capitalPendingWithdrawal,
+              capacity: riskAdjustedCapacity,
+            });
+          })
+        )
       );
+      riskCache.set(dep.name, newRisk);
+      poolsCache.set(dep.name, { block, pools: depPools });
+      allPools.push(...depPools);
     } catch (err: any) {
       console.error("Failed to load pools for deployment", dep.name, err);
     }
